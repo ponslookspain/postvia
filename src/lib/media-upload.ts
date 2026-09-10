@@ -12,28 +12,25 @@ import {
   headPrivateBlob,
 } from "@/lib/blob";
 import {
-  logBlobAuthEnvPresence,
   logDiagnostic,
   logErrorDiagnostic,
+  logBlobAuthEnvPresence,
   safePathname,
 } from "@/lib/diagnostics";
 
 export const CLIENT_UPLOAD_TTL_MS = 5 * 60 * 1000;
 
-export type UploadErrorResult = {
-  ok: false;
-  status: number;
-  error: string;
-};
-
-export function shouldUseClientUpload(sizeBytes: number): boolean {
-  return sizeBytes > 0;
-}
-
+/**
+ * Result of authorizing a user to upload media to a post.
+ */
 export type MediaAuthorizeResult =
   | { ok: true; userId: string; postId: string }
-  | UploadErrorResult;
+  | { ok: false; status: number; error: string };
 
+/**
+ * Authorize a user to upload media to a post.
+ * Checks authentication, post existence, and ownership.
+ */
 export function authorizeMediaUpload(input: {
   user: { id: string } | null;
   post: { userId: string } | null;
@@ -51,10 +48,20 @@ export function authorizeMediaUpload(input: {
   return { ok: true, userId: input.user.id, postId: input.statedPostId };
 }
 
+/**
+ * Result of preparing a client upload using the presign flow.
+ */
 export type PrepareUploadResult =
   | { ok: true; presignedUrl: string; pathname: string }
-  | UploadErrorResult;
+  | { ok: false; status: number; error: string };
 
+/**
+ * Prepares a client upload using the existing presign flow.
+ * The client receives a presigned URL and must perform a PUT request
+ * to that URL, then call /api/media/confirm.
+ *
+ * @deprecated Use the new official Vercel Blob client upload flow instead.
+ */
 export async function prepareClientUpload(input: {
   user: { id: string } | null;
   postId: string | null;
@@ -108,10 +115,24 @@ export async function prepareClientUpload(input: {
   }
 }
 
+/**
+ * Result of confirming a client upload.
+ */
 export type ConfirmUploadResult =
   | { ok: false; status: number; error: string }
-  | { ok: true; media: Media };
+  | { ok: true; media: Media; pathname: string; url: string };
 
+/**
+ * Confirms a client upload using the existing flow.
+ *
+ * This route:
+ * 1. Validates the pathname is scoped to the user's post
+ * 2. Calls head() to verify the blob exists in store
+ * 3. Validates the media metadata (contentType, size)
+ * 4. Creates the Media Prisma record
+ *
+ * @deprecated Use the new official Vercel Blob client upload flow instead.
+ */
 export async function confirmClientUpload(input: {
   user: { id: string } | null;
   postId: string | null;
@@ -180,7 +201,7 @@ export async function confirmClientUpload(input: {
       pathname: safePathname(meta.pathname),
       status: 201,
     });
-    return { ok: true, media };
+    return { ok: true, media, pathname: meta.pathname, url: meta.url };
   } catch (error) {
     logErrorDiagnostic(
       "media",
@@ -195,4 +216,12 @@ export async function confirmClientUpload(input: {
     }
     return { ok: false, status: 500, error: "Failed to create media record" };
   }
+}
+
+/**
+ * Legacy function: shouldUseClientUpload.
+ * Kept for backward compatibility with tests.
+ */
+export function shouldUseClientUpload(sizeBytes: number): boolean {
+  return sizeBytes > 0;
 }
