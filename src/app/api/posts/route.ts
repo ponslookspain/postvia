@@ -21,12 +21,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { text } = await request.json();
+    const { text, platform: rawPlatform } = await request.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
     }
 
+    const platform = rawPlatform === "THREADS" ? "THREADS" : "X";
     const user = await getOrCreateDemoUser();
 
     const post = await prisma.post.create({
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
         status: "DRAFT",
         targets: {
           create: {
-            platform: "X",
+            platform,
             status: "PENDING",
           },
         },

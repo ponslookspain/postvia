@@ -7,25 +7,41 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
   const user = await getOrCreateDemoUser();
-  const account = await prisma.socialAccount.findUnique({
-    where: {
-      userId_platform: {
-        userId: user.id,
-        platform: "X",
+  const [xAccount, threadsAccount] = await Promise.all([
+    prisma.socialAccount.findUnique({
+      where: {
+        userId_platform: {
+          userId: user.id,
+          platform: "X",
+        },
       },
-    },
-    select: {
-      id: true,
-      platform: true,
-      externalId: true,
-      username: true,
-      createdAt: true,
-    },
-  });
+      select: {
+        id: true,
+        platform: true,
+        externalId: true,
+        username: true,
+        createdAt: true,
+      },
+    }),
+    prisma.socialAccount.findUnique({
+      where: {
+        userId_platform: {
+          userId: user.id,
+          platform: "THREADS",
+        },
+      },
+      select: {
+        id: true,
+        platform: true,
+        externalId: true,
+        username: true,
+        createdAt: true,
+      },
+    }),
+  ]);
 
-  const serializedAccount = account
-    ? { ...account, createdAt: account.createdAt.toISOString() }
-    : null;
+  const serialize = (account: typeof xAccount) =>
+    account ? { ...account, createdAt: account.createdAt.toISOString() } : null;
 
   return (
     <Suspense
@@ -38,7 +54,10 @@ export default async function AccountsPage() {
         </div>
       }
     >
-      <AccountsContent account={serializedAccount} />
+      <AccountsContent
+        xAccount={serialize(xAccount)}
+        threadsAccount={serialize(threadsAccount)}
+      />
     </Suspense>
   );
 }

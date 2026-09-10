@@ -18,8 +18,22 @@ export default async function PostDetailPage({
 
   if (!post) notFound();
 
+  const targetPlatform = post.targets[0]?.platform;
+  const account = targetPlatform
+    ? await prisma.socialAccount.findUnique({
+        where: {
+          userId_platform: {
+            userId: post.userId,
+            platform: targetPlatform,
+          },
+        },
+        select: { username: true },
+      })
+    : null;
+
   const serialized = {
     ...post,
+    username: account?.username ?? null,
     createdAt: post.createdAt.toISOString(),
     scheduledAt: post.scheduledAt?.toISOString() ?? null,
     publishedAt: post.publishedAt?.toISOString() ?? null,

@@ -2,18 +2,31 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X_POST_CHAR_LIMIT } from "@/lib/utils";
+import {
+  X_POST_CHAR_LIMIT,
+  THREADS_POST_CHAR_LIMIT,
+  threadsPostUrl,
+} from "@/lib/utils";
+
+type Platform = "X" | "THREADS";
 
 type PublishResult = {
   ok: boolean;
+  platform?: Platform;
   externalPostId?: string;
   username?: string;
   error?: string;
 };
 
+const PLATFORM_OPTIONS: { value: Platform; label: string }[] = [
+  { value: "X", label: "X" },
+  { value: "THREADS", label: "Threads" },
+];
+
 export default function NewPostPage() {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [platform, setPlatform] = useState<Platform>("X");
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -22,8 +35,10 @@ export default function NewPostPage() {
     null
   );
 
+  const charLimit =
+    platform === "THREADS" ? THREADS_POST_CHAR_LIMIT : X_POST_CHAR_LIMIT;
   const charCount = text.length;
-  const isOverLimit = charCount > X_POST_CHAR_LIMIT;
+  const isOverLimit = charCount > charLimit;
   const canSave = text.trim().length > 0 && !isOverLimit && !saving;
   const canPublish =
     text.trim().length > 0 && !isOverLimit && !publishing && !saving;
@@ -36,7 +51,7 @@ export default function NewPostPage() {
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim() }),
+        body: JSON.stringify({ text: text.trim(), platform }),
       });
 
       if (!res.ok) throw new Error("Failed to save");
@@ -60,7 +75,7 @@ export default function NewPostPage() {
       const createRes = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim() }),
+        body: JSON.stringify({ text: text.trim(), platform }),
       });
 
       if (!createRes.ok) throw new Error("Failed to create post");
@@ -75,6 +90,7 @@ export default function NewPostPage() {
       if (publishRes.ok) {
         setPublishResult({
           ok: true,
+          platform: result.platform || platform,
           externalPostId: result.externalPostId,
           username: result.username,
         });
@@ -82,6 +98,7 @@ export default function NewPostPage() {
       } else {
         setPublishResult({
           ok: false,
+          platform,
           error: result.error || "Publication failed",
         });
         setSavedId(postData.id);
@@ -89,6 +106,7 @@ export default function NewPostPage() {
     } catch {
       setPublishResult({
         ok: false,
+        platform,
         error: "Network error. Please try again.",
       });
     } finally {
@@ -97,6 +115,8 @@ export default function NewPostPage() {
   }
 
   if (publishResult) {
+    const resultPlatform = publishResult.platform ?? "X";
+    const isThreads = resultPlatform === "THREADS";
     return (
       <div className="p-8 max-w-3xl">
         <h1 className="text-2xl font-semibold mb-8">Create post</h1>
@@ -120,24 +140,46 @@ export default function NewPostPage() {
               </div>
               <p className="text-lg font-medium mb-2">Published successfully</p>
               <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-6">
-                <svg
-                  className="w-4 h-4"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
+                {isThreads ? (
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <circle cx="12" cy="12" r="8.5" />
+                    <circle cx="12" cy="12" r="4" />
+                    <circle cx="15" cy="9" r="0.75" fill="currentColor" stroke="none" />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </svg>
+                )}
                 @{publishResult.username} · Published
               </div>
               <div className="flex items-center justify-center gap-3">
-                {publishResult.externalPostId && (
+                {publishResult.externalPostId && publishResult.username && (
                   <a
-                    href={`https://x.com/i/status/${publishResult.externalPostId}`}
+                    href={
+                      isThreads
+                        ? threadsPostUrl(
+                            publishResult.username,
+                            publishResult.externalPostId
+                          )
+                        : `https://x.com/i/status/${publishResult.externalPostId}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
                   >
-                    View on X
+                    View on {isThreads ? "Threads" : "X"}
                   </a>
                 )}
                 <button
@@ -257,7 +299,7 @@ export default function NewPostPage() {
           />
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-muted-foreground">
-              Platform: X (Twitter)
+              Platform: {platform === "THREADS" ? "Threads" : "X (Twitter)"}
             </span>
             <span
               className={`text-xs font-mono ${
@@ -266,12 +308,13 @@ export default function NewPostPage() {
                   : "text-muted-foreground"
               }`}
             >
-              {charCount} / {X_POST_CHAR_LIMIT}
+              {charCount} / {charLimit}
             </span>
           </div>
           {isOverLimit && (
             <p className="text-xs text-red-600 mt-1">
-              Post exceeds the {X_POST_CHAR_LIMIT} character limit for X
+              Post exceeds the {charLimit} character limit for{" "}
+              {platform === "THREADS" ? "Threads" : "X"}
             </p>
           )}
         </div>
@@ -279,16 +322,23 @@ export default function NewPostPage() {
         <div>
           <label className="block text-sm font-medium mb-2">Platform</label>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-md text-sm font-medium bg-foreground text-primary-foreground">
-              <svg
-                className="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-              X
-            </span>
+            {PLATFORM_OPTIONS.map((option) => {
+              const active = platform === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setPlatform(option.value)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-foreground text-primary-foreground border-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -296,14 +346,29 @@ export default function NewPostPage() {
           <label className="block text-sm font-medium mb-2">Preview</label>
           <div className="border border-border rounded-lg p-5 max-w-md">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-foreground flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-primary-foreground"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
+              <div className="w-10 h-10 rounded-full bg-foreground text-primary-foreground flex items-center justify-center">
+                {platform === "THREADS" ? (
+                  <svg
+                    className="w-5 h-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <circle cx="12" cy="12" r="8.5" />
+                    <circle cx="12" cy="12" r="4" />
+                    <circle cx="15" cy="9" r="0.75" fill="currentColor" stroke="none" />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-5 h-5"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </svg>
+                )}
               </div>
               <div>
                 <p className="text-sm font-semibold">Demo User</p>

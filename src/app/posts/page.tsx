@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { formatPlatformName } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function PostsPage() {
                 <div className="flex-1 min-w-0 mr-4">
                   <p className="text-sm truncate mb-1">{post.text}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{target?.platform ?? "X"}</span>
+                    <span>{formatPlatformName(target?.platform ?? "X")}</span>
                     <span>·</span>
                     <StatusBadge status={post.status} />
                     <span>·</span>

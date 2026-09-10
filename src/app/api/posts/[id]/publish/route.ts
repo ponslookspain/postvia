@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDemoUser } from "@/lib/auth";
 import { XProvider } from "@/lib/social/x";
+import { ThreadsProvider } from "@/lib/social/threads";
+import type { SocialProvider } from "@/lib/social/provider";
+
+function getProvider(platform: string): SocialProvider {
+  switch (platform) {
+    case "X":
+      return new XProvider();
+    case "THREADS":
+      return new ThreadsProvider();
+    default:
+      throw new Error(`Unsupported platform: ${platform}`);
+  }
+}
 
 export async function POST(
   _request: NextRequest,
@@ -10,22 +23,6 @@ export async function POST(
   try {
     const { id } = await params;
     const user = await getOrCreateDemoUser();
-
-    const account = await prisma.socialAccount.findUnique({
-      where: {
-        userId_platform: {
-          userId: user.id,
-          platform: "X",
-        },
-      },
-    });
-
-    if (!account) {
-      return NextResponse.json(
-        { error: "X account not connected. Please connect your X account first." },
-        { status: 400 }
-      );
-    }
 
     const post = await prisma.post.findUnique({
       where: { id },
@@ -47,10 +44,30 @@ export async function POST(
       );
     }
 
-    const target = post.targets.find((t) => t.platform === "X");
+    const target = post.targets.find(
+      (t) => t.status === "PENDING" || t.status === "FAILED"
+    );
     if (!target) {
       return NextResponse.json(
-        { error: "No X target found for this post" },
+        { error: "No publishable target found for this post" },
+        { status: 400 }
+      );
+    }
+
+    const account = await prisma.socialAccount.findUnique({
+      where: {
+        userId_platform: {
+          userId: user.id,
+          platform: target.platform,
+        },
+      },
+    });
+
+    if (!account) {
+      return NextResponse.json(
+        {
+          error: `${target.platform} account not connected. Please connect your ${target.platform} account first.`,
+        },
         { status: 400 }
       );
     }
@@ -64,8 +81,12 @@ export async function POST(
       data: { status: "PUBLISHING" },
     });
 
-    const xProvider = new XProvider();
-    const result = await xProvider.publishPost(account.accessToken, post.text);
+    const provider = getProvider(target.platform);
+    const result = await provider.publishPost(
+      account.accessToken,
+      post.text,
+      account.externalId
+    );
 
     if (result.success) {
       const now = new Date();
@@ -89,6 +110,7 @@ export async function POST(
 
       return NextResponse.json({
         ok: true,
+        platform: target.platform,
         externalPostId: result.externalPostId,
         username: account.username,
       });

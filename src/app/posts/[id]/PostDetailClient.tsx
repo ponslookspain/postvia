@@ -2,13 +2,19 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X_POST_CHAR_LIMIT } from "@/lib/utils";
+import {
+  X_POST_CHAR_LIMIT,
+  THREADS_POST_CHAR_LIMIT,
+  threadsPostUrl,
+  formatPlatformName,
+} from "@/lib/utils";
 
 interface Post {
   id: string;
   text: string;
   status: string;
   errorMessage?: string | null;
+  username?: string | null;
   createdAt: string;
   scheduledAt: string | null;
   publishedAt: string | null;
@@ -37,12 +43,15 @@ export default function PostDetailPage({
   const [publishing, setPublishing] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
-  const charCount = text.length;
-  const isOverLimit = charCount > X_POST_CHAR_LIMIT;
-  const canSave = text.trim().length > 0 && !isOverLimit && !saving;
-
   const target = post.targets[0];
+  const platform = target?.platform ?? "X";
   const externalPostId = target?.externalPostId;
+  const charLimit =
+    platform === "THREADS" ? THREADS_POST_CHAR_LIMIT : X_POST_CHAR_LIMIT;
+
+  const charCount = text.length;
+  const isOverLimit = charCount > charLimit;
+  const canSave = text.trim().length > 0 && !isOverLimit && !saving;
 
   async function handleSave() {
     if (!canSave) return;
@@ -91,7 +100,7 @@ export default function PostDetailPage({
           publishedAt: now,
           errorMessage: null,
           targets: prev.targets.map((t) =>
-            t.platform === "X"
+            t.platform === platform
               ? {
                   ...t,
                   status: "PUBLISHED",
@@ -108,7 +117,7 @@ export default function PostDetailPage({
           status: "FAILED",
           errorMessage: data.error || "Publication failed",
           targets: prev.targets.map((t) =>
-            t.platform === "X"
+            t.platform === platform
               ? { ...t, status: "FAILED", errorMessage: data.error }
               : t
           ),
@@ -139,7 +148,7 @@ export default function PostDetailPage({
           publishedAt: now,
           errorMessage: null,
           targets: prev.targets.map((t) =>
-            t.platform === "X"
+            t.platform === platform
               ? {
                   ...t,
                   status: "PUBLISHED",
@@ -156,7 +165,7 @@ export default function PostDetailPage({
           status: "FAILED",
           errorMessage: data.error || "Publication failed",
           targets: prev.targets.map((t) =>
-            t.platform === "X"
+            t.platform === platform
               ? { ...t, status: "FAILED", errorMessage: data.error }
               : t
           ),
@@ -198,7 +207,7 @@ export default function PostDetailPage({
               />
               <div className="flex items-center justify-between mt-2">
                 <span className="text-xs text-muted-foreground">
-                  Platform: X (Twitter)
+                  Platform: {formatPlatformName(platform)}
                 </span>
                 <span
                   className={`text-xs font-mono ${
@@ -207,12 +216,12 @@ export default function PostDetailPage({
                       : "text-muted-foreground"
                   }`}
                 >
-                  {charCount} / {X_POST_CHAR_LIMIT}
+                  {charCount} / {charLimit}
                 </span>
               </div>
               {isOverLimit && (
                 <p className="text-xs text-red-600 mt-1">
-                  Post exceeds the {X_POST_CHAR_LIMIT} character limit
+                  Post exceeds the {charLimit} character limit
                 </p>
               )}
             </>
@@ -228,7 +237,7 @@ export default function PostDetailPage({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">Platform</label>
-            <p className="text-sm">{target?.platform ?? "X"}</p>
+            <p className="text-sm">{formatPlatformName(platform)}</p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Status</label>
@@ -329,12 +338,16 @@ export default function PostDetailPage({
 
               {post.status === "PUBLISHED" && externalPostId && (
                 <a
-                  href={`https://x.com/i/status/${externalPostId}`}
+                  href={
+                    platform === "THREADS"
+                      ? threadsPostUrl(post.username ?? "", externalPostId)
+                      : `https://x.com/i/status/${externalPostId}`
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
                 >
-                  View on X
+                  View on {platform === "THREADS" ? "Threads" : "X"}
                 </a>
               )}
 
