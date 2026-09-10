@@ -103,40 +103,56 @@ describe("resolveThreadsMediaPolicy", () => {
 
   test("a single image selects that image", () => {
     const result = resolveThreadsMediaPolicy([
-      { id: "media-1", type: "IMAGE" },
-    ]);
-    assert.deepEqual(result, { kind: "image", mediaId: "media-1" });
-  });
-
-  test("a single video is rejected as images-only", () => {
-    const result = resolveThreadsMediaPolicy([
-      { id: "media-1", type: "VIDEO" },
+      { id: "media-1", type: "IMAGE", mimeType: "image/png" },
     ]);
     assert.deepEqual(result, {
-      kind: "error",
-      message: "Threads posts currently support images only.",
+      kind: "media",
+      mediaId: "media-1",
+      mediaType: "IMAGE",
     });
   });
 
-  test("multiple images produce the controlled error message", () => {
+  test("a single MP4 video is accepted for publishing", () => {
     const result = resolveThreadsMediaPolicy([
-      { id: "media-1", type: "IMAGE" },
-      { id: "media-2", type: "IMAGE" },
+      { id: "media-1", type: "VIDEO", mimeType: "video/mp4" },
+    ]);
+    assert.deepEqual(result, {
+      kind: "media",
+      mediaId: "media-1",
+      mediaType: "VIDEO",
+    });
+  });
+
+  test("a WebM video is rejected with a clear MP4-only error", () => {
+    const result = resolveThreadsMediaPolicy([
+      { id: "media-1", type: "VIDEO", mimeType: "video/webm" },
+    ]);
+    assert.equal(result.kind, "error");
+    if (result.kind === "error") {
+      assert.match(result.message, /MP4/);
+      assert.match(result.message, /WebM/);
+    }
+  });
+
+  test("multiple media produce the controlled error message", () => {
+    const result = resolveThreadsMediaPolicy([
+      { id: "media-1", type: "IMAGE", mimeType: "image/png" },
+      { id: "media-2", type: "IMAGE", mimeType: "image/jpeg" },
     ]);
     assert.deepEqual(result, {
       kind: "error",
-      message: "Threads image posts currently support one image.",
+      message: "Threads posts currently support one image or one video.",
     });
   });
 
   test("mixed image and video also produce the controlled error message", () => {
     const result = resolveThreadsMediaPolicy([
-      { id: "media-1", type: "IMAGE" },
-      { id: "media-2", type: "VIDEO" },
+      { id: "media-1", type: "IMAGE", mimeType: "image/png" },
+      { id: "media-2", type: "VIDEO", mimeType: "video/mp4" },
     ]);
     assert.deepEqual(result, {
       kind: "error",
-      message: "Threads image posts currently support one image.",
+      message: "Threads posts currently support one image or one video.",
     });
   });
 });

@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { executePublish } from "@/lib/publish";
 
+// Threads video containers can keep processing for minutes; publishing
+// polls them inline. 300s is within the maxDuration allowed on the
+// current Vercel plan (Hobby+ with fluid compute).
+export const maxDuration = 300;
+
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

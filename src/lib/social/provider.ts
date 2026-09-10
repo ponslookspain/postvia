@@ -1,7 +1,19 @@
+import type { MediaKind } from "@/lib/media";
+
 export interface PublishResult {
   success: boolean;
   externalPostId?: string;
   error?: string;
+}
+
+/**
+ * A media attachment resolved to a URL the platform can fetch
+ * (for Threads this is a short-lived signed URL into the PRIVATE
+ * Vercel Blob store, scoped to exactly one blob pathname).
+ */
+export interface PublishMedia {
+  url: string;
+  kind: MediaKind;
 }
 
 export interface SocialProvider {
@@ -19,7 +31,7 @@ export interface SocialProvider {
     accessToken: string,
     text: string,
     externalId: string,
-    imageUrl?: string
+    media?: PublishMedia
   ): Promise<PublishResult>;
   revokeToken(accessToken: string): Promise<boolean>;
 }

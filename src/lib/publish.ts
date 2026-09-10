@@ -3,8 +3,9 @@ import { XProvider } from "@/lib/social/x";
 import {
   ThreadsProvider,
   THREADS_PUBLISH_IMAGE_TTL_MS,
+  THREADS_PUBLISH_VIDEO_TTL_MS,
 } from "@/lib/social/threads";
-import type { SocialProvider } from "@/lib/social/provider";
+import type { PublishMedia, SocialProvider } from "@/lib/social/provider";
 import { resolveThreadsMediaPolicy, type MediaKind } from "@/lib/media";
 import { createSignedGetUrl } from "@/lib/blob";
 
@@ -27,37 +28,48 @@ function getProvider(platform: string): SocialProvider {
   }
 }
 
-export async function chooseThreadsImageUrl(
-  media: readonly { id: string; type: MediaKind; pathname: string }[],
-  signUrl: (pathname: string) => Promise<string>
-): Promise<{ imageUrl?: string; error?: string }> {
+export function threadsMediaTtlMs(kind: MediaKind): number {
+  return kind === "VIDEO"
+    ? THREADS_PUBLISH_VIDEO_TTL_MS
+    : THREADS_PUBLISH_IMAGE_TTL_MS;
+}
+
+export async function chooseThreadsMedia(
+  media: readonly {
+    id: string;
+    type: MediaKind;
+    pathname: string;
+    mimeType: string;
+  }[],
+  signUrl: (pathname: string, ttlMs: number) => Promise<string>
+): Promise<{ media?: PublishMedia; error?: string }> {
   const policy = resolveThreadsMediaPolicy(media);
   if (policy.kind === "text") return {};
   if (policy.kind === "error") return { error: policy.message };
 
-  const image = media.find((m) => m.id === policy.mediaId);
-  if (!image) return { error: "Threads media could not be resolved" };
+  const chosen = media.find((m) => m.id === policy.mediaId);
+  if (!chosen) return { error: "Threads media could not be resolved" };
 
   try {
-    const imageUrl = await signUrl(image.pathname);
-    return { imageUrl };
+    const url = await signUrl(chosen.pathname, threadsMediaTtlMs(chosen.type));
+    return { media: { url, kind: chosen.type } };
   } catch {
     return { error: "Failed to generate media URL for Threads" };
   }
 }
 
-async function resolveThreadsImageUrl(postId: string): Promise<{
-  imageUrl?: string;
+async function resolveThreadsMedia(postId: string): Promise<{
+  media?: PublishMedia;
   error?: string;
 }> {
   const media = await prisma.media.findMany({
     where: { postId },
     orderBy: { createdAt: "asc" },
-    select: { id: true, type: true, pathname: true },
+    select: { id: true, type: true, pathname: true, mimeType: true },
   });
 
-  return chooseThreadsImageUrl(media, (pathname) =>
-    createSignedGetUrl({ pathname, ttlMs: THREADS_PUBLISH_IMAGE_TTL_MS })
+  return chooseThreadsMedia(media, (pathname, ttlMs) =>
+    createSignedGetUrl({ pathname, ttlMs })
   );
 }
 
@@ -85,14 +97,14 @@ export async function executePublish(
   },
   target: { id: string; platform: string }
 ): Promise<PublishOutcome> {
-  let imageUrl: string | undefined;
+  let media: PublishMedia | undefined;
   if (target.platform === "THREADS") {
-    const resolved = await resolveThreadsImageUrl(post.id);
+    const resolved = await resolveThreadsMedia(post.id);
     if (resolved.error) {
       await markFailed(post.id, target.id, resolved.error);
       return { ok: false, error: resolved.error, platform: target.platform };
     }
-    imageUrl = resolved.imageUrl;
+    media = resolved.media;
   }
 
   await prisma.post.update({
@@ -109,7 +121,7 @@ export async function executePublish(
     account.accessToken,
     post.text,
     account.externalId,
-    imageUrl
+    media
   );
 
   if (result.success) {

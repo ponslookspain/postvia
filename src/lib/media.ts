@@ -104,25 +104,28 @@ export function makeBlobPathname(
 
 export type ThreadsMediaPolicy =
   | { kind: "text" }
-  | { kind: "image"; mediaId: string }
+  | { kind: "media"; mediaId: string; mediaType: MediaKind }
   | { kind: "error"; message: string };
 
+const THREADS_MP4_MIME = "video/mp4";
+
 export function resolveThreadsMediaPolicy(
-  media: readonly { id: string; type: MediaKind }[]
+  media: readonly { id: string; type: MediaKind; mimeType: string }[]
 ): ThreadsMediaPolicy {
   if (media.length === 0) return { kind: "text" };
   if (media.length > 1) {
     return {
       kind: "error",
-      message: "Threads image posts currently support one image.",
+      message: "Threads posts currently support one image or one video.",
     };
   }
   const only = media[0];
-  if (only.type !== "IMAGE") {
+  if (only.type === "VIDEO" && only.mimeType !== THREADS_MP4_MIME) {
     return {
       kind: "error",
-      message: "Threads posts currently support images only.",
+      message:
+        "Threads video posts require an MP4 file. WebM videos are not supported by Threads.",
     };
   }
-  return { kind: "image", mediaId: only.id };
+  return { kind: "media", mediaId: only.id, mediaType: only.type };
 }

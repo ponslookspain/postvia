@@ -4,6 +4,13 @@ import { executePublish } from "@/lib/publish";
 
 const AUTH_PREFIX = "Bearer ";
 
+// One scheduled video publish can poll Meta's container for up to ~4
+// minutes; keep the function inside the plan maxDuration (300s) and
+// stop claiming new posts when the tick budget runs out - remaining
+// SCHEDULED posts are picked up by the next cron tick.
+export const maxDuration = 300;
+const CRON_TICK_BUDGET_MS = 240_000;
+
 function isAuthorized(request: NextRequest): boolean {
   const expected = process.env.CRON_SECRET;
   if (!expected || expected.length === 0) return false;
@@ -27,6 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date();
+  const tickStartedAt = Date.now();
 
   const duePosts = await prisma.post.findMany({
     where: {
@@ -41,6 +49,12 @@ export async function POST(request: NextRequest) {
   let skipped = 0;
 
   for (const post of duePosts) {
+    if (Date.now() - tickStartedAt > CRON_TICK_BUDGET_MS) {
+      // Out of time for this tick; unclaimed posts stay SCHEDULED and are
+      // picked up by the next cron invocation.
+      break;
+    }
+
     const claim = await prisma.post.updateMany({
       where: { id: post.id, status: "SCHEDULED" },
       data: { status: "PUBLISHING" },

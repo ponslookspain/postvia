@@ -4,6 +4,9 @@ import assert from "node:assert/strict";
 process.env.THREADS_POLL_DELAY_MS = "5";
 process.env.THREADS_POLL_MAX_ATTEMPTS = "3";
 process.env.THREADS_POLL_TIMEOUT_MS = "100";
+process.env.THREADS_VIDEO_POLL_DELAY_MS = "5";
+process.env.THREADS_VIDEO_POLL_MAX_ATTEMPTS = "3";
+process.env.THREADS_VIDEO_POLL_TIMEOUT_MS = "100";
 
 type ThreadsProviderType = typeof import("../src/lib/social/threads").ThreadsProvider;
 let ThreadsProviderClass: ThreadsProviderType;
@@ -184,7 +187,10 @@ describe("ThreadsProvider.publishPost", () => {
       "token",
       "caption text",
       "12345",
-      "https://signed.example/media/u1/photo.jpg?expiry=111111&sig=abc"
+      {
+        url: "https://signed.example/media/u1/photo.jpg?expiry=111111&sig=abc",
+        kind: "IMAGE",
+      }
     );
 
     const params = new URLSearchParams(lastCreateBody);
@@ -195,9 +201,67 @@ describe("ThreadsProvider.publishPost", () => {
       params.get("image_url"),
       "https://signed.example/media/u1/photo.jpg?expiry=111111&sig=abc"
     );
+    assert.equal(params.get("video_url"), null);
     assert.equal(params.get("text"), "caption text");
     assert.equal(statusFetches, 2, "image containers still poll until FINISHED");
     assert.equal(publishFetches, 1);
+  });
+
+  test("one video creates a VIDEO container with video_url and publishes after polling", async () => {
+    statusQueue = [
+      { status: "IN_PROGRESS" },
+      { status: "IN_PROGRESS" },
+      { status: "FINISHED" },
+    ];
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost(
+      "token",
+      "watch this",
+      "12345",
+      {
+        url: "https://signed.example/media/u1/clip.mp4?expiry=222222&sig=abc",
+        kind: "VIDEO",
+      }
+    );
+
+    const params = new URLSearchParams(lastCreateBody);
+    assert.equal(res.success, true);
+    assert.equal(res.externalPostId, "888");
+    assert.equal(params.get("media_type"), "VIDEO");
+    assert.equal(
+      params.get("video_url"),
+      "https://signed.example/media/u1/clip.mp4?expiry=222222&sig=abc"
+    );
+    assert.equal(params.get("image_url"), null);
+    assert.equal(params.get("text"), "watch this");
+    assert.equal(statusFetches, 3, "video containers poll until FINISHED");
+    assert.equal(publishFetches, 1);
+  });
+
+  test("video publishing fails with 'not ready' when container stays IN_PROGRESS", async () => {
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost("token", "hello", "12345", {
+      url: "https://signed.example/clip.mp4",
+      kind: "VIDEO",
+    });
+
+    assert.equal(res.success, false);
+    assert.match(res.error ?? "", /not ready/);
+    assert.equal(statusFetches, 3);
+    assert.equal(publishFetches, 0);
+  });
+
+  test("EXPIRED container is reported and never published", async () => {
+    statusQueue = [{ status: "EXPIRED" }];
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost("token", "hello", "12345", {
+      url: "https://signed.example/clip.mp4",
+      kind: "VIDEO",
+    });
+
+    assert.equal(res.success, false);
+    assert.match(res.error ?? "", /expired/);
+    assert.equal(publishFetches, 0);
   });
 
   test("image container failure is reported as FAILED with the Meta error", async () => {
@@ -212,12 +276,31 @@ describe("ThreadsProvider.publishPost", () => {
       "token",
       "caption",
       "12345",
-      "https://signed.example/image.jpg"
+      { url: "https://signed.example/image.jpg", kind: "IMAGE" }
     );
 
     assert.equal(res.success, false);
     assert.match(res.error ?? "", /failed to process/);
     assert.match(res.error ?? "", /image_url is not publicly accessible/);
+    assert.equal(publishFetches, 0);
+  });
+
+  test("video container failure surfaces the Meta error_message", async () => {
+    statusQueue = [
+      {
+        status: "ERROR",
+        error_message: "video_url failed to download",
+      },
+    ];
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost("token", "caption", "12345", {
+      url: "https://signed.example/clip.mp4",
+      kind: "VIDEO",
+    });
+
+    assert.equal(res.success, false);
+    assert.match(res.error ?? "", /failed to process/);
+    assert.match(res.error ?? "", /video_url failed to download/);
     assert.equal(publishFetches, 0);
   });
 

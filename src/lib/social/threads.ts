@@ -1,5 +1,5 @@
 import { logDiagnostic, logErrorDiagnostic } from "@/lib/diagnostics";
-import type { SocialProvider, PublishResult } from "./provider";
+import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
 
 const THREADS_AUTH_URL = "https://threads.net/oauth/authorize";
 const THREADS_TOKEN_URL = "https://graph.threads.net/oauth/access_token";
@@ -11,7 +11,34 @@ const POLL_DELAY_MS = envNumber("THREADS_POLL_DELAY_MS", 1500);
 const POLL_MAX_ATTEMPTS = envNumber("THREADS_POLL_MAX_ATTEMPTS", 20);
 const POLL_TIMEOUT_MS = envNumber("THREADS_POLL_TIMEOUT_MS", 30000);
 
+// Video containers download + transcode server-side and can stay
+// IN_PROGRESS for minutes; Meta recommends polling up to ~5 minutes.
+const VIDEO_POLL_DELAY_MS = envNumber("THREADS_VIDEO_POLL_DELAY_MS", 5000);
+const VIDEO_POLL_MAX_ATTEMPTS = envNumber("THREADS_VIDEO_POLL_MAX_ATTEMPTS", 60);
+const VIDEO_POLL_TIMEOUT_MS = envNumber("THREADS_VIDEO_POLL_TIMEOUT_MS", 240000);
+
 export const THREADS_PUBLISH_IMAGE_TTL_MS = 5 * 60 * 1000;
+// Meta fetches video_url asynchronously while the container processes,
+// so the signed private-Blob URL must outlive the whole polling window.
+export const THREADS_PUBLISH_VIDEO_TTL_MS = 30 * 60 * 1000;
+
+type PollBudget = {
+  delayMs: number;
+  maxAttempts: number;
+  timeoutMs: number;
+};
+
+const IMAGE_POLL_BUDGET: PollBudget = {
+  delayMs: POLL_DELAY_MS,
+  maxAttempts: POLL_MAX_ATTEMPTS,
+  timeoutMs: POLL_TIMEOUT_MS,
+};
+
+const VIDEO_POLL_BUDGET: PollBudget = {
+  delayMs: VIDEO_POLL_DELAY_MS,
+  maxAttempts: VIDEO_POLL_MAX_ATTEMPTS,
+  timeoutMs: VIDEO_POLL_TIMEOUT_MS,
+};
 
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -61,13 +88,14 @@ function logMetaError(scope: string, status: number, body: unknown): void {
 
 async function waitForContainerReady(
   containerId: string,
-  accessToken: string
+  accessToken: string,
+  budget: PollBudget
 ): Promise<PublishResult> {
   const startedAt = Date.now();
   let attempts = 0;
   let lastStatus = "IN_PROGRESS";
 
-  while (attempts < POLL_MAX_ATTEMPTS && Date.now() - startedAt <= POLL_TIMEOUT_MS) {
+  while (attempts < budget.maxAttempts && Date.now() - startedAt <= budget.timeoutMs) {
     attempts++;
     const res = await fetch(
       `${THREADS_API_BASE}/v1.0/${containerId}?fields=status,error_message&access_token=${encodeURIComponent(
@@ -99,6 +127,13 @@ async function waitForContainerReady(
         error: `Threads API error: media container failed to process${reason ? `: ${reason}` : ""}`,
       };
     }
+    if (status === "EXPIRED") {
+      return {
+        success: false,
+        error:
+          "Threads API error: media container expired before publishing. Please try publishing again.",
+      };
+    }
     if (status !== "IN_PROGRESS") {
       return {
         success: false,
@@ -107,8 +142,8 @@ async function waitForContainerReady(
     }
 
     lastStatus = status;
-    if (attempts < POLL_MAX_ATTEMPTS && Date.now() - startedAt <= POLL_TIMEOUT_MS) {
-      await sleep(POLL_DELAY_MS);
+    if (attempts < budget.maxAttempts && Date.now() - startedAt <= budget.timeoutMs) {
+      await sleep(budget.delayMs);
     }
   }
 
@@ -116,7 +151,7 @@ async function waitForContainerReady(
     success: false,
     error: `Threads API error: media container not ready (last status ${JSON.stringify(
       lastStatus
-    )}) after ${POLL_MAX_ATTEMPTS} attempts / ${POLL_TIMEOUT_MS}ms`,
+    )}) after ${budget.maxAttempts} attempts / ${budget.timeoutMs}ms`,
   };
 }
 
@@ -219,15 +254,18 @@ export class ThreadsProvider implements SocialProvider {
     accessToken: string,
     text: string,
     externalId: string,
-    imageUrl?: string
+    media?: PublishMedia
   ): Promise<PublishResult> {
     const containerParams: Record<string, string> = {
       text,
       access_token: accessToken,
     };
-    if (imageUrl) {
+    if (media?.kind === "IMAGE") {
       containerParams.media_type = "IMAGE";
-      containerParams.image_url = imageUrl;
+      containerParams.image_url = media.url;
+    } else if (media?.kind === "VIDEO") {
+      containerParams.media_type = "VIDEO";
+      containerParams.video_url = media.url;
     } else {
       containerParams.media_type = "TEXT";
     }
@@ -257,7 +295,11 @@ export class ThreadsProvider implements SocialProvider {
       };
     }
 
-    const ready = await waitForContainerReady(container.id, accessToken);
+    const ready = await waitForContainerReady(
+      container.id,
+      accessToken,
+      media?.kind === "VIDEO" ? VIDEO_POLL_BUDGET : IMAGE_POLL_BUDGET
+    );
     if (!ready.success) {
       return { success: false, error: ready.error };
     }
@@ -276,6 +318,7 @@ export class ThreadsProvider implements SocialProvider {
     const published = await publishRes.json();
     logDiagnostic("threads", "published", {
       status: "PUBLISHED",
+      mediaType: media?.kind ?? "TEXT",
       errorMessage: null,
     });
     return {

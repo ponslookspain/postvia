@@ -18,7 +18,10 @@ import {
   validateReservedPathname,
 } from "../src/lib/media-upload";
 import { buildGetPresignOptions } from "../src/lib/blob";
-import { THREADS_PUBLISH_IMAGE_TTL_MS } from "../src/lib/social/threads";
+import {
+  THREADS_PUBLISH_IMAGE_TTL_MS,
+  THREADS_PUBLISH_VIDEO_TTL_MS,
+} from "../src/lib/social/threads";
 import { safePathname } from "../src/lib/diagnostics";
 
 const MB = 1024 * 1024;
@@ -348,7 +351,11 @@ describe("signed URL generation (Threads image publishing)", () => {
   });
 
   test("presign TTL constants are finite positive timestamps", () => {
-    for (const ttl of [CLIENT_UPLOAD_TTL_MS, THREADS_PUBLISH_IMAGE_TTL_MS]) {
+    for (const ttl of [
+      CLIENT_UPLOAD_TTL_MS,
+      THREADS_PUBLISH_IMAGE_TTL_MS,
+      THREADS_PUBLISH_VIDEO_TTL_MS,
+    ]) {
       assert.ok(Number.isInteger(ttl) && ttl > 0, `ttl ${ttl} must be positive`);
     }
   });
