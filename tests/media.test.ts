@@ -5,6 +5,7 @@ import {
   validateMediaInput,
   sanitizeFilename,
   makeBlobPathname,
+  resolveThreadsMediaPolicy,
   MEDIA_LIMITS,
 } from "../src/lib/media";
 
@@ -92,5 +93,50 @@ describe("makeBlobPathname", () => {
     const a = makeBlobPathname("user-1", "photo.jpg");
     const b = makeBlobPathname("user-1", "photo.jpg");
     assert.notEqual(a, b);
+  });
+});
+
+describe("resolveThreadsMediaPolicy", () => {
+  test("no media keeps the text-only flow", () => {
+    assert.deepEqual(resolveThreadsMediaPolicy([]), { kind: "text" });
+  });
+
+  test("a single image selects that image", () => {
+    const result = resolveThreadsMediaPolicy([
+      { id: "media-1", type: "IMAGE" },
+    ]);
+    assert.deepEqual(result, { kind: "image", mediaId: "media-1" });
+  });
+
+  test("a single video is rejected as images-only", () => {
+    const result = resolveThreadsMediaPolicy([
+      { id: "media-1", type: "VIDEO" },
+    ]);
+    assert.deepEqual(result, {
+      kind: "error",
+      message: "Threads posts currently support images only.",
+    });
+  });
+
+  test("multiple images produce the controlled error message", () => {
+    const result = resolveThreadsMediaPolicy([
+      { id: "media-1", type: "IMAGE" },
+      { id: "media-2", type: "IMAGE" },
+    ]);
+    assert.deepEqual(result, {
+      kind: "error",
+      message: "Threads image posts currently support one image.",
+    });
+  });
+
+  test("mixed image and video also produce the controlled error message", () => {
+    const result = resolveThreadsMediaPolicy([
+      { id: "media-1", type: "IMAGE" },
+      { id: "media-2", type: "VIDEO" },
+    ]);
+    assert.deepEqual(result, {
+      kind: "error",
+      message: "Threads image posts currently support one image.",
+    });
   });
 });

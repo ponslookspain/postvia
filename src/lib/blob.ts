@@ -1,4 +1,4 @@
-import { del, get, put } from "@vercel/blob";
+import { del, get, issueSignedToken, presignUrl, put } from "@vercel/blob";
 import type { GetBlobResult } from "@vercel/blob";
 
 export type UploadedBlob = {
@@ -36,4 +36,23 @@ export async function fetchPrivateBlob(
     useCache: false,
     headers: rangeHeader ? { Range: rangeHeader } : undefined,
   });
+}
+
+export async function createSignedGetUrl(input: {
+  pathname: string;
+  ttlMs: number;
+}): Promise<string> {
+  const validUntil = Date.now() + input.ttlMs;
+  const signedToken = await issueSignedToken({
+    pathname: input.pathname,
+    operations: ["get"],
+    validUntil,
+  });
+  const { presignedUrl } = await presignUrl(signedToken, {
+    access: "private",
+    operation: "get",
+    pathname: input.pathname,
+    validUntil,
+  });
+  return presignedUrl;
 }

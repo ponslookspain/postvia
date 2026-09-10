@@ -18,7 +18,8 @@ export interface SocialProvider {
   publishPost(
     accessToken: string,
     text: string,
-    externalId: string
+    externalId: string,
+    imageUrl?: string
   ): Promise<PublishResult>;
   revokeToken(accessToken: string): Promise<boolean>;
 }

@@ -74,3 +74,28 @@ export function makeBlobPathname(userId: string, filename: string): string {
   const random = globalThis.crypto.randomUUID().replace(/-/g, "");
   return `media/${userId}/${random}-${safe}`;
 }
+
+export type ThreadsMediaPolicy =
+  | { kind: "text" }
+  | { kind: "image"; mediaId: string }
+  | { kind: "error"; message: string };
+
+export function resolveThreadsMediaPolicy(
+  media: readonly { id: string; type: MediaKind }[]
+): ThreadsMediaPolicy {
+  if (media.length === 0) return { kind: "text" };
+  if (media.length > 1) {
+    return {
+      kind: "error",
+      message: "Threads image posts currently support one image.",
+    };
+  }
+  const only = media[0];
+  if (only.type !== "IMAGE") {
+    return {
+      kind: "error",
+      message: "Threads posts currently support images only.",
+    };
+  }
+  return { kind: "image", mediaId: only.id };
+}

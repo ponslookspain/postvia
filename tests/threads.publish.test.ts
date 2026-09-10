@@ -20,6 +20,7 @@ describe("ThreadsProvider.publishPost", () => {
   let publishHandler: () => Response;
   let statusFetches = 0;
   let publishFetches = 0;
+  let lastCreateBody = "";
 
   function json(status: number, body: unknown): Response {
     return new Response(JSON.stringify(body), {
@@ -49,6 +50,7 @@ describe("ThreadsProvider.publishPost", () => {
       publishFetches++;
       return publishHandler();
     }
+    if (typeof init?.body === "string") lastCreateBody = init.body;
     return createHandler();
   }
 
@@ -60,6 +62,7 @@ describe("ThreadsProvider.publishPost", () => {
     statusFetches = 0;
     publishFetches = 0;
     statusQueue = [];
+    lastCreateBody = "";
     createHandler = () => json(200, { id: "779" });
     publishHandler = () => json(200, { id: "888" });
     globalThis.fetch = mockFetch;
@@ -158,6 +161,63 @@ describe("ThreadsProvider.publishPost", () => {
     assert.match(res.error ?? "", /code=190/);
     assert.match(res.error ?? "", /Invalid OAuth 2.0 Access Token/);
     assert.equal(statusFetches, 0);
+    assert.equal(publishFetches, 0);
+  });
+
+  test("text-only posts keep the existing TEXT container flow", async () => {
+    statusQueue = [{ status: "FINISHED" }];
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost("token", "hello", "12345");
+
+    const params = new URLSearchParams(lastCreateBody);
+    assert.equal(res.success, true);
+    assert.equal(params.get("media_type"), "TEXT");
+    assert.equal(params.get("text"), "hello");
+    assert.equal(params.get("image_url"), null);
+    assert.equal(publishFetches, 1);
+  });
+
+  test("one image creates an IMAGE container with image_url", async () => {
+    statusQueue = [{ status: "IN_PROGRESS" }, { status: "FINISHED" }];
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost(
+      "token",
+      "caption text",
+      "12345",
+      "https://signed.example/media/u1/photo.jpg?expiry=111111&sig=abc"
+    );
+
+    const params = new URLSearchParams(lastCreateBody);
+    assert.equal(res.success, true);
+    assert.equal(res.externalPostId, "888");
+    assert.equal(params.get("media_type"), "IMAGE");
+    assert.equal(
+      params.get("image_url"),
+      "https://signed.example/media/u1/photo.jpg?expiry=111111&sig=abc"
+    );
+    assert.equal(params.get("text"), "caption text");
+    assert.equal(statusFetches, 2, "image containers still poll until FINISHED");
+    assert.equal(publishFetches, 1);
+  });
+
+  test("image container failure is reported as FAILED with the Meta error", async () => {
+    statusQueue = [
+      {
+        status: "ERROR",
+        error_message: "image_url is not publicly accessible",
+      },
+    ];
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost(
+      "token",
+      "caption",
+      "12345",
+      "https://signed.example/image.jpg"
+    );
+
+    assert.equal(res.success, false);
+    assert.match(res.error ?? "", /failed to process/);
+    assert.match(res.error ?? "", /image_url is not publicly accessible/);
     assert.equal(publishFetches, 0);
   });
 

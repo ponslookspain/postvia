@@ -10,6 +10,8 @@ const POLL_DELAY_MS = envNumber("THREADS_POLL_DELAY_MS", 1500);
 const POLL_MAX_ATTEMPTS = envNumber("THREADS_POLL_MAX_ATTEMPTS", 20);
 const POLL_TIMEOUT_MS = envNumber("THREADS_POLL_TIMEOUT_MS", 30000);
 
+export const THREADS_PUBLISH_IMAGE_TTL_MS = 5 * 60 * 1000;
+
 function envNumber(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -194,8 +196,20 @@ export class ThreadsProvider implements SocialProvider {
   async publishPost(
     accessToken: string,
     text: string,
-    externalId: string
+    externalId: string,
+    imageUrl?: string
   ): Promise<PublishResult> {
+    const containerParams: Record<string, string> = {
+      text,
+      access_token: accessToken,
+    };
+    if (imageUrl) {
+      containerParams.media_type = "IMAGE";
+      containerParams.image_url = imageUrl;
+    } else {
+      containerParams.media_type = "TEXT";
+    }
+
     const containerRes = await fetch(
       `${THREADS_API_BASE}/v1.0/${externalId}/threads`,
       {
@@ -203,11 +217,7 @@ export class ThreadsProvider implements SocialProvider {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({
-          media_type: "TEXT",
-          text,
-          access_token: accessToken,
-        }).toString(),
+        body: new URLSearchParams(containerParams).toString(),
       }
     );
 
