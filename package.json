@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test": "node --import tsx --test tests/threads.publish.test.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.4",
