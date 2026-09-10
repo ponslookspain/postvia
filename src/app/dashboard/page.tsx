@@ -1,16 +1,27 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
+import { AppShell } from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const user = await requireUser();
+
   const [totalPosts, drafts, scheduled, published, recentPosts] =
     await Promise.all([
-      prisma.post.count(),
-      prisma.post.count({ where: { status: "DRAFT" } }),
-      prisma.post.count({ where: { status: "SCHEDULED" } }),
-      prisma.post.count({ where: { status: "PUBLISHED" } }),
+      prisma.post.count({ where: { userId: user.id } }),
+      prisma.post.count({
+        where: { userId: user.id, status: "DRAFT" },
+      }),
+      prisma.post.count({
+        where: { userId: user.id, status: "SCHEDULED" },
+      }),
+      prisma.post.count({
+        where: { userId: user.id, status: "PUBLISHED" },
+      }),
       prisma.post.findMany({
+        where: { userId: user.id },
         take: 5,
         orderBy: { createdAt: "desc" },
         include: { targets: true },
@@ -25,7 +36,8 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="p-8 max-w-5xl">
+    <AppShell user={user}>
+      <div className="p-8 max-w-5xl">
       <h1 className="text-2xl font-semibold mb-8">Dashboard</h1>
 
       <div className="grid grid-cols-4 gap-4 mb-10">
@@ -88,7 +100,8 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </AppShell>
   );
 }
 

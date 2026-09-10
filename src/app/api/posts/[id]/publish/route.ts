@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateDemoUser } from "@/lib/auth";
+import { getApiUser } from "@/lib/auth";
 import { executePublish } from "@/lib/publish";
 
 export async function POST(
@@ -9,7 +9,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const user = await getOrCreateDemoUser();
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
 
     const post = await prisma.post.findUnique({
       where: { id },

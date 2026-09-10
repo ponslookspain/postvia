@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { XProvider } from "@/lib/social/x";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateDemoUser } from "@/lib/auth";
+import { getApiUser } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -38,11 +38,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+
     const xProvider = new XProvider();
     const tokens = await xProvider.exchangeCode(code, codeVerifier);
     const xUser = await xProvider.getCurrentUser(tokens.accessToken);
-
-    const user = await getOrCreateDemoUser();
 
     await prisma.socialAccount.upsert({
       where: {

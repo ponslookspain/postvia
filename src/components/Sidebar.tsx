@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "grid" },
@@ -49,8 +50,22 @@ function Icon({ name }: { name: string }) {
   }
 }
 
-export function Sidebar() {
+export function Sidebar({
+  userName,
+  userEmail,
+}: {
+  userName: string;
+  userEmail: string;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
+  const initial = userName.trim().charAt(0).toUpperCase() || "U";
+
+  async function handleSignOut() {
+    await authClient.signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <aside className="w-56 border-r border-border bg-white h-screen sticky top-0 flex flex-col">
@@ -81,13 +96,19 @@ export function Sidebar() {
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-            D
+            {initial}
           </div>
-          <div className="text-sm">
-            <p className="font-medium">Demo User</p>
-            <p className="text-muted-foreground text-xs">demo@postvia.com</p>
+          <div className="text-sm flex-1 min-w-0">
+            <p className="font-medium truncate">{userName}</p>
+            <p className="text-muted-foreground text-xs truncate">{userEmail}</p>
           </div>
         </div>
+        <button
+          onClick={handleSignOut}
+          className="mt-3 w-full text-left text-sm text-muted-foreground hover:text-foreground px-1 py-1 rounded transition-colors"
+        >
+          Sign out
+        </button>
       </div>
     </aside>
   );

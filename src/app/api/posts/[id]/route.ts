@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getApiUser } from "@/lib/auth";
+
+async function findOwnedPost(id: string, userId: string) {
+  return prisma.post.findFirst({
+    where: { id, userId },
+    include: { targets: true },
+  });
+}
 
 export async function GET(
   _request: NextRequest,
@@ -7,10 +15,12 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const post = await prisma.post.findUnique({
-      where: { id },
-      include: { targets: true },
-    });
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const post = await findOwnedPost(id, user.id);
 
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
@@ -31,9 +41,13 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
     const body = await request.json();
 
-    const existing = await prisma.post.findUnique({ where: { id } });
+    const existing = await findOwnedPost(id, user.id);
     if (!existing) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
@@ -65,8 +79,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
 
-    const existing = await prisma.post.findUnique({ where: { id } });
+    const existing = await findOwnedPost(id, user.id);
     if (!existing) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateDemoUser } from "@/lib/auth";
+import { getApiUser } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getOrCreateDemoUser();
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
     const status = request.nextUrl.searchParams.get("status");
 
     const posts = await prisma.post.findMany({
@@ -26,6 +29,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const { text, platform: rawPlatform, scheduledAt } = await request.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -61,8 +69,6 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-
-    const user = await getOrCreateDemoUser();
 
     const post = await prisma.post.create({
       data: {

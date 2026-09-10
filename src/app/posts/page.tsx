@@ -1,17 +1,22 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatPlatformName } from "@/lib/utils";
+import { requireUser } from "@/lib/auth";
+import { AppShell } from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
 
 export default async function PostsPage() {
+  const user = await requireUser();
   const posts = await prisma.post.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     include: { targets: true },
   });
 
   return (
-    <div className="p-8 max-w-5xl">
+    <AppShell user={user}>
+      <div className="p-8 max-w-5xl">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-semibold">Posts</h1>
         <Link
@@ -94,7 +99,8 @@ export default async function PostsPage() {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </AppShell>
   );
 }
 

@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
+import { AppShell } from "@/components/AppShell";
 import PostDetailClient from "./PostDetailClient";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +12,10 @@ export default async function PostDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const user = await requireUser();
 
-  const post = await prisma.post.findUnique({
-    where: { id },
+  const post = await prisma.post.findFirst({
+    where: { id, userId: user.id },
     include: { targets: true },
   });
 
@@ -39,5 +42,9 @@ export default async function PostDetailPage({
     publishedAt: post.publishedAt?.toISOString() ?? null,
   };
 
-  return <PostDetailClient params={Promise.resolve({ id })} post={serialized} />;
+  return (
+    <AppShell user={user}>
+      <PostDetailClient params={Promise.resolve({ id })} post={serialized} />
+    </AppShell>
+  );
 }

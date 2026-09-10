@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { generateState } from "@/lib/social/pkce";
 import { cookies } from "next/headers";
+import { getApiUser } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const threadsProvider = new ThreadsProvider();
     const state = generateState();
 

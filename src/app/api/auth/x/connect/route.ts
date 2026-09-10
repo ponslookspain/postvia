@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { XProvider } from "@/lib/social/x";
 import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/lib/social/pkce";
 import { cookies } from "next/headers";
+import { getApiUser } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     const xProvider = new XProvider();
     const state = generateState();
     const codeVerifier = generateCodeVerifier();
