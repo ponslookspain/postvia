@@ -368,22 +368,13 @@ export default function PostDetailPage({
               )}
 
               {post.status === "FAILED" && (
-                <>
-                  <button
-                    onClick={handleRetry}
-                    disabled={retrying}
-                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
-                  >
-                    {retrying ? "Retrying..." : "Retry"}
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="px-4 py-2 text-sm text-destructive border border-destructive/30 rounded-md hover:bg-red-50 transition-colors disabled:opacity-40"
-                  >
-                    {deleting ? "Deleting..." : "Delete"}
-                  </button>
-                </>
+                <button
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
+                >
+                  {retrying ? "Retrying..." : "Retry"}
+                </button>
               )}
 
               {(post.status === "DRAFT" ||

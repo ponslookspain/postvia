@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
-export function LoginForm() {
+export function LoginForm({
+  deleted = false,
+  passwordChanged = false,
+}: {
+  deleted?: boolean;
+  passwordChanged?: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,6 +49,14 @@ export function LoginForm() {
         {error && (
           <div className="mb-4 p-3 rounded-md border border-destructive/30 bg-red-50 text-sm text-destructive">
             {error}
+          </div>
+        )}
+
+        {(deleted || passwordChanged) && (
+          <div className="mb-4 p-3 rounded-md border border-border bg-muted/50 text-sm">
+            {deleted
+              ? "Your account has been deleted."
+              : "Password changed. Please sign in again."}
           </div>
         )}
 
