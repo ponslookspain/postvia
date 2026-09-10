@@ -757,7 +757,7 @@ export default function NewPostComposer({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,.jpg,.jpeg,.png,.webp,.gif,.mp4,.m4v,.webm"
             multiple
             className="hidden"
             onChange={(e) => {
