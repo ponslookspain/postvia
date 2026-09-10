@@ -1,3 +1,4 @@
+import { logDiagnostic, logErrorDiagnostic } from "@/lib/diagnostics";
 import type { SocialProvider, PublishResult } from "./provider";
 
 const THREADS_AUTH_URL = "https://threads.net/oauth/authorize";
@@ -41,6 +42,23 @@ function formatMetaError(status: number, body: unknown): string {
   return parts.join(" ");
 }
 
+function logMetaError(scope: string, status: number, body: unknown): void {
+  const err = (body as {
+    error?: {
+      code?: number;
+      error_subcode?: number;
+      fbtrace_id?: string;
+      message?: string;
+    };
+  })?.error;
+  logErrorDiagnostic("threads", `${scope} failed`, new Error(err?.message ?? "Meta error"), {
+    status,
+    code: err?.code,
+    subcode: err?.error_subcode,
+    fbtrace_id: err?.fbtrace_id,
+  });
+}
+
 async function waitForContainerReady(
   containerId: string,
   accessToken: string
@@ -59,6 +77,7 @@ async function waitForContainerReady(
     const data = await res.json().catch(() => null);
 
     if (!res.ok) {
+      logMetaError("container poll", res.status, data);
       return { success: false, error: formatMetaError(res.status, data) };
     }
     if (!data || typeof data !== "object") {
@@ -69,7 +88,10 @@ async function waitForContainerReady(
     }
 
     const status = (data as { status?: string }).status;
-    if (status === "FINISHED") return { success: true };
+    if (status === "FINISHED") {
+      logDiagnostic("threads", "container finished", { status: "FINISHED" });
+      return { success: true };
+    }
     if (status === "ERROR") {
       const reason = (data as { error_message?: string }).error_message;
       return {
@@ -223,6 +245,7 @@ export class ThreadsProvider implements SocialProvider {
 
     if (!containerRes.ok) {
       const errorData = await containerRes.json().catch(() => null);
+      logMetaError("container create", containerRes.status, errorData);
       return { success: false, error: formatMetaError(containerRes.status, errorData) };
     }
 
@@ -246,10 +269,15 @@ export class ThreadsProvider implements SocialProvider {
 
     if (!publishRes.ok) {
       const errorData = await publishRes.json().catch(() => null);
+      logMetaError("threads_publish", publishRes.status, errorData);
       return { success: false, error: formatMetaError(publishRes.status, errorData) };
     }
 
     const published = await publishRes.json();
+    logDiagnostic("threads", "published", {
+      status: "PUBLISHED",
+      errorMessage: null,
+    });
     return {
       success: true,
       externalPostId: published?.id,

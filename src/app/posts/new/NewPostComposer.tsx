@@ -47,38 +47,85 @@ function nextMediaKey(): string {
   return `media-${mediaKeyCounter}-${Date.now()}`;
 }
 
+type PresignResponse = {
+  presignedUrl: string;
+  pathname: string;
+};
+
 function uploadFileToPost(
   postId: string,
   file: File,
   onProgress: (percent: number) => void
 ): Promise<string | null> {
   return new Promise((resolve) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/media/upload");
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      }
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(null);
-        return;
-      }
-      let message = "Upload failed";
+    (async () => {
       try {
-        const data = JSON.parse(xhr.responseText);
-        if (typeof data?.error === "string") message = data.error;
+        onProgress(0);
+        const presignRes = await fetch("/api/media/presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            postId,
+            filename: file.name,
+            mimeType: file.type,
+            size: file.size,
+          }),
+        });
+        if (!presignRes.ok) {
+          const data = await presignRes.json().catch(() => null);
+          resolve(
+            typeof data?.error === "string" ? data.error : "Failed to prepare upload"
+          );
+          return;
+        }
+        const presignData = (await presignRes.json()) as PresignResponse;
+
+        const putStatus: number = await new Promise((resolvePut) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", presignData.presignedUrl);
+          xhr.setRequestHeader("Content-Type", file.type);
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              onProgress(Math.round((event.loaded / event.total) * 100));
+            }
+          };
+          xhr.onload = () => resolvePut(xhr.status);
+          xhr.onerror = () => resolvePut(0);
+          xhr.onabort = () => resolvePut(0);
+          xhr.send(file);
+        });
+
+        if (putStatus < 200 || putStatus >= 300) {
+          resolve(
+            putStatus === 0
+              ? "Network error. Please try again."
+              : `Upload failed (HTTP ${putStatus})`
+          );
+          return;
+        }
+        onProgress(100);
+
+        const confirmRes = await fetch("/api/media/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            postId,
+            pathname: presignData.pathname,
+            filename: file.name,
+          }),
+        });
+        if (!confirmRes.ok) {
+          const data = await confirmRes.json().catch(() => null);
+          resolve(
+            typeof data?.error === "string" ? data.error : "Upload failed"
+          );
+          return;
+        }
+        resolve(null);
       } catch {
-        // fall back to generic message
+        resolve("Network error. Please try again.");
       }
-      resolve(message);
-    };
-    xhr.onerror = () => resolve("Network error. Please try again.");
-    const form = new FormData();
-    form.append("postId", postId);
-    form.append("file", file);
-    xhr.send(form);
+    })();
   });
 }
 
