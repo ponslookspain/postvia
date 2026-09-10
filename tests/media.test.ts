@@ -83,15 +83,15 @@ describe("sanitizeFilename", () => {
 });
 
 describe("makeBlobPathname", () => {
-  test("scopes the path to the user id", () => {
-    const pathname = makeBlobPathname("user-1", "photo.jpg");
-    assert.ok(pathname.startsWith("media/user-1/"));
+  test("scopes the path to the user and post id", () => {
+    const pathname = makeBlobPathname("user-1", "post-1", "photo.jpg");
+    assert.ok(pathname.startsWith("media/user-1/post-1/"));
     assert.ok(pathname.endsWith("-photo.jpg"));
   });
 
   test("produces unique paths for the same input", () => {
-    const a = makeBlobPathname("user-1", "photo.jpg");
-    const b = makeBlobPathname("user-1", "photo.jpg");
+    const a = makeBlobPathname("user-1", "post-1", "photo.jpg");
+    const b = makeBlobPathname("user-1", "post-1", "photo.jpg");
     assert.notEqual(a, b);
   });
 });

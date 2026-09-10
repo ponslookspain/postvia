@@ -5,7 +5,6 @@ import {
   head,
   issueSignedToken,
   presignUrl,
-  put,
 } from "@vercel/blob";
 import type { GetBlobResult } from "@vercel/blob";
 import { isAscii } from "@/lib/media";
@@ -14,11 +13,6 @@ import {
   logErrorDiagnostic,
   safePathname,
 } from "@/lib/diagnostics";
-
-export type UploadedBlob = {
-  url: string;
-  pathname: string;
-};
 
 export type BlobHead = {
   url: string;
@@ -33,57 +27,14 @@ export type GetPresignRequest = {
   pathname: string;
 };
 
-export type PutPresignRequest = {
-  access: "private";
-  operation: "put";
-  pathname: string;
-  allowedContentTypes: string[];
-  maximumSizeInBytes: number;
-};
-
 export function buildGetPresignOptions(pathname: string): GetPresignRequest {
   return { access: "private", operation: "get", pathname };
 }
 
-export function buildPutPresignOptions(
-  pathname: string,
-  constraints: { maximumSizeInBytes: number; allowedContentTypes: readonly string[] }
-): PutPresignRequest {
-  return {
-    access: "private",
-    operation: "put",
-    pathname,
-    allowedContentTypes: [...constraints.allowedContentTypes],
-    maximumSizeInBytes: constraints.maximumSizeInBytes,
-  };
-}
-
-export async function uploadPrivateBlob(input: {
-  pathname: string;
-  body: ArrayBuffer | File | Blob;
-  contentType: string;
-}): Promise<UploadedBlob> {
-  try {
-    const result = await put(input.pathname, input.body, {
-      access: "private",
-      addRandomSuffix: false,
-      allowOverwrite: false,
-      contentType: input.contentType,
-    });
-    logDiagnostic("blob", "server upload ok", {
-      method: "server",
-      contentType: input.contentType,
-      pathname: safePathname(result.pathname),
-    });
-    return { url: result.url, pathname: result.pathname };
-  } catch (error) {
-    logErrorDiagnostic("blob", "server upload failed", error, {
-      method: "server",
-      contentType: input.contentType,
-      pathname: safePathname(input.pathname),
-    });
-    throw error;
-  }
+function nonAsciiPathnameError(): Error {
+  return new Error(
+    "Blob pathname for signed URLs must be ASCII-only. Re-upload the media so the object name is regenerated."
+  );
 }
 
 export async function deleteBlobs(
@@ -104,7 +55,9 @@ export async function fetchPrivateBlob(
   });
 }
 
-export async function headPrivateBlob(pathname: string): Promise<BlobHead | null> {
+export async function headPrivateBlob(
+  pathname: string
+): Promise<BlobHead | null> {
   try {
     const meta = await head(pathname);
     return {
@@ -122,49 +75,46 @@ export async function headPrivateBlob(pathname: string): Promise<BlobHead | null
   }
 }
 
-export async function createPresignedUploadUrl(input: {
+/**
+ * Issues a `put` signed token for the official client upload flow
+ * (`uploadPresigned()` + `handleUploadPresigned()`).
+ *
+ * Uses `issueSignedToken`, which authenticates through the Vercel OIDC
+ * credentials injected by the platform (no BLOB_READ_WRITE_TOKEN needed),
+ * and keeps the store PRIVATE.
+ */
+export async function createPutSignedToken(input: {
   pathname: string;
   contentType: string;
   maximumSizeInBytes: number;
   ttlMs: number;
-}): Promise<{ presignedUrl: string; pathname: string }> {
+}): Promise<Awaited<ReturnType<typeof issueSignedToken>>> {
   if (!isAscii(input.pathname)) {
     logErrorDiagnostic(
       "blob",
-      "presign aborted: non-ascii pathname",
-      new Error(
-        `Blob pathname for signed URLs must be ASCII-only; got '${input.pathname}'. Regenerate the object with an ASCII slug.`
-      ),
+      "signed put token aborted: non-ascii pathname",
+      new Error("Blob pathname must be ASCII-only for signed tokens."),
       { pathname: safePathname(input.pathname) }
     );
-    throw new Error(
-      "Blob pathname for signed URLs must be ASCII-only. Re-upload the media so the object name is regenerated."
-    );
+    throw nonAsciiPathnameError();
   }
   try {
-    const validUntil = Date.now() + input.ttlMs;
-    const signedToken = await issueSignedToken({
+    const token = await issueSignedToken({
       pathname: input.pathname,
       operations: ["put"],
-      validUntil,
+      validUntil: Date.now() + input.ttlMs,
       maximumSizeInBytes: input.maximumSizeInBytes,
       allowedContentTypes: [input.contentType],
     });
-    const { presignedUrl } = await presignUrl(
-      signedToken,
-      buildPutPresignOptions(input.pathname, {
-        maximumSizeInBytes: input.maximumSizeInBytes,
-        allowedContentTypes: [input.contentType],
-      })
-    );
-    logDiagnostic("blob", "prepared presigned put url", {
-      method: "client",
+    logDiagnostic("blob", "issued put signed token", {
       contentType: input.contentType,
       pathname: safePathname(input.pathname),
+      maximumSizeInBytes: input.maximumSizeInBytes,
+      ttlMs: input.ttlMs,
     });
-    return { presignedUrl, pathname: input.pathname };
+    return token;
   } catch (error) {
-    logErrorDiagnostic("blob", "presigned put url preparation failed", error, {
+    logErrorDiagnostic("blob", "put signed token failed", error, {
       contentType: input.contentType,
       pathname: safePathname(input.pathname),
     });
@@ -172,6 +122,10 @@ export async function createPresignedUploadUrl(input: {
   }
 }
 
+/**
+ * Creates a short-lived signed GET URL for a private blob so that
+ * Threads can fetch the image during publishing.
+ */
 export async function createSignedGetUrl(input: {
   pathname: string;
   ttlMs: number;
@@ -180,14 +134,10 @@ export async function createSignedGetUrl(input: {
     logErrorDiagnostic(
       "blob",
       "signed get aborted: non-ascii pathname",
-      new Error(
-        `Blob pathname for signed URLs must be ASCII-only; got '${input.pathname}'. Regenerate the object with an ASCII slug.`
-      ),
+      new Error("Blob pathname must be ASCII-only for signed URLs."),
       { pathname: safePathname(input.pathname) }
     );
-    throw new Error(
-      "Blob pathname for signed URLs must be ASCII-only. Re-upload the media so the object name is regenerated."
-    );
+    throw nonAsciiPathnameError();
   }
   try {
     const validUntil = Date.now() + input.ttlMs;
@@ -196,7 +146,7 @@ export async function createSignedGetUrl(input: {
       operations: ["get"],
       validUntil,
     });
-    const { presignedUrl } = await presignUrl(
+    const { presignedUrl: signedGetUrl } = await presignUrl(
       signedToken,
       buildGetPresignOptions(input.pathname)
     );
@@ -204,7 +154,7 @@ export async function createSignedGetUrl(input: {
       pathname: safePathname(input.pathname),
       ttlMs: input.ttlMs,
     });
-    return presignedUrl;
+    return signedGetUrl;
   } catch (error) {
     logErrorDiagnostic("blob", "signed get url generation failed", error, {
       pathname: safePathname(input.pathname),

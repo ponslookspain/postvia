@@ -1,86 +1,118 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { handleUploadPresigned } from "@vercel/blob/client";
+import type { HandleUploadPresignedBody } from "@vercel/blob/client";
 import { getApiUser } from "@/lib/auth";
-import { validateMediaInput, makeBlobPathname } from "@/lib/media";
-import { uploadPrivateBlob, deleteBlobs } from "@/lib/blob";
+import { prisma } from "@/lib/prisma";
+import { MEDIA_LIMITS, validateMediaInput } from "@/lib/media";
+import { createPutSignedToken } from "@/lib/blob";
+import {
+  buildUploadTokenPayload,
+  CLIENT_UPLOAD_TTL_MS,
+  parseClientPayload,
+  registerCompletedUpload,
+  validateReservedPathname,
+} from "@/lib/media-upload";
+import { logErrorDiagnostic } from "@/lib/diagnostics";
 
+/**
+ * Official Vercel Blob client-upload endpoint for the PRIVATE store.
+ *
+ * Browser requests  -> `blob.generate-presigned-url`:
+ *   session auth, post ownership, pathname scope + media policy checks,
+ *   then an `issueSignedToken` "put" token (Vercel OIDC) is presigned by
+ *   handleUploadPresigned and returned to the SDK, which PUTs the file
+ *   directly to Blob storage.
+ *
+ * Vercel Blob service -> `blob.upload-completed`:
+ *   Ed25519 signature verified with BLOB_WEBHOOK_PUBLIC_KEY, then the
+ *   Media row is created (idempotent; throws for retry on failure).
+ */
 export async function POST(request: NextRequest) {
+  let body: HandleUploadPresignedBody;
   try {
-    const user = await getApiUser();
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const form = await request.formData();
-    const postIdValue = form.get("postId");
-    const postId = typeof postIdValue === "string" ? postIdValue : "";
-    const file = form.get("file");
-
-    if (!postId) {
-      return NextResponse.json({ error: "postId is required" }, { status: 400 });
-    }
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "file is required" }, { status: 400 });
-    }
-
-    const post = await prisma.post.findFirst({
-      where: { id: postId, userId: user.id },
-      select: { id: true },
-    });
-    if (!post) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    }
-
-    const validation = validateMediaInput(file.type, file.size);
-    if (!validation.ok) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
-    }
-
-    const pathname = makeBlobPathname(user.id, file.name);
-
-    let stored;
-    try {
-      stored = await uploadPrivateBlob({
-        pathname,
-        body: file,
-        contentType: file.type,
-      });
-    } catch {
-      return NextResponse.json(
-        { error: "Failed to upload file" },
-        { status: 500 }
-      );
-    }
-
-    try {
-      const media = await prisma.media.create({
-        data: {
-          userId: user.id,
-          postId,
-          url: stored.url,
-          pathname: stored.pathname,
-          filename: file.name,
-          mimeType: file.type,
-          size: file.size,
-          type: validation.kind,
-        },
-      });
-      return NextResponse.json(media, { status: 201 });
-    } catch {
-      try {
-        await deleteBlobs([stored.pathname]);
-      } catch {
-        // Best-effort orphan cleanup; ignore secondary failures.
-      }
-      return NextResponse.json(
-        { error: "Failed to create media record" },
-        { status: 500 }
-      );
-    }
+    body = (await request.json()) as HandleUploadPresignedBody;
   } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  try {
+    const result = await handleUploadPresigned({
+      request,
+      body,
+      webhookPublicKey: process.env.BLOB_WEBHOOK_PUBLIC_KEY,
+      getSignedToken: async (pathname, clientPayload, multipart) => {
+        if (multipart) {
+          throw new Error("Multipart uploads are not supported");
+        }
+        const user = await getApiUser();
+        if (!user) {
+          throw new Error("Not authenticated");
+        }
+        const parsed = parseClientPayload(clientPayload);
+        if (!parsed.ok) {
+          throw new Error(parsed.error);
+        }
+        const { postId, filename, mimeType, size } = parsed.data;
+
+        const post = await prisma.post.findFirst({
+          where: { id: postId, userId: user.id },
+          select: { userId: true },
+        });
+        if (!post) {
+          throw new Error("Post not found");
+        }
+
+        if (!validateReservedPathname(pathname, user.id, postId)) {
+          throw new Error("Invalid upload path");
+        }
+
+        const validation = validateMediaInput(mimeType, size);
+        if (!validation.ok) {
+          throw new Error(validation.error);
+        }
+        const maximumSizeInBytes = MEDIA_LIMITS[validation.kind].maxBytes;
+
+        const token = await createPutSignedToken({
+          pathname,
+          contentType: mimeType,
+          maximumSizeInBytes,
+          ttlMs: CLIENT_UPLOAD_TTL_MS,
+        });
+
+        return {
+          token,
+          urlOptions: {
+            validUntil: Date.now() + CLIENT_UPLOAD_TTL_MS,
+            allowedContentTypes: [mimeType],
+            maximumSizeInBytes,
+            tokenPayload: buildUploadTokenPayload({
+              userId: user.id,
+              postId,
+              filename,
+            }),
+          },
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        await registerCompletedUpload({
+          blob: {
+            pathname: blob.pathname,
+            url: blob.url,
+            contentType: blob.contentType,
+          },
+          tokenPayload,
+        });
+      },
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    logErrorDiagnostic("media", "upload handler failed", error, {
+      stage: body?.type ?? "unknown",
+    });
     return NextResponse.json(
-      { error: "Failed to upload file" },
-      { status: 500 }
+      { error: "Upload handler failed" },
+      { status: 400 }
     );
   }
 }

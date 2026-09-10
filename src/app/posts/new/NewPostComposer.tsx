@@ -9,6 +9,7 @@ import {
   isFutureIso,
 } from "@/lib/utils";
 import { validateMediaInput } from "@/lib/media";
+import { uploadPresigned } from "@vercel/blob/client";
 
 type Platform = "X" | "THREADS";
 
@@ -47,10 +48,32 @@ function nextMediaKey(): string {
   return `media-${mediaKeyCounter}-${Date.now()}`;
 }
 
-type PresignResponse = {
-  presignedUrl: string;
+type PrepareResponse = {
   pathname: string;
 };
+
+const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
+const MEDIA_REGISTER_POLL_MS = 500;
+
+async function waitForMediaRegistration(
+  postId: string,
+  pathname: string
+): Promise<string | null> {
+  const deadline = Date.now() + MEDIA_REGISTER_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const res = await fetch(
+      `/api/media/status?postId=${encodeURIComponent(postId)}&pathname=${encodeURIComponent(pathname)}`
+    );
+    if (res.ok) {
+      const data = (await res.json().catch(() => null)) as {
+        exists?: boolean;
+      } | null;
+      if (data?.exists) return null;
+    }
+    await new Promise((r) => setTimeout(r, MEDIA_REGISTER_POLL_MS));
+  }
+  return "Upload did not finish registering in time. Please try again.";
+}
 
 function uploadFileToPost(
   postId: string,
@@ -61,7 +84,10 @@ function uploadFileToPost(
     (async () => {
       try {
         onProgress(0);
-        const presignRes = await fetch("/api/media/presign", {
+
+        // Step 1: the server reserves an authorized, ASCII-only,
+        // user/post-scoped pathname (session + ownership + limits checked).
+        const prepRes = await fetch("/api/media/prepare", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -71,57 +97,48 @@ function uploadFileToPost(
             size: file.size,
           }),
         });
-        if (!presignRes.ok) {
-          const data = await presignRes.json().catch(() => null);
+        if (!prepRes.ok) {
+          const data = await prepRes.json().catch(() => null);
           resolve(
-            typeof data?.error === "string" ? data.error : "Failed to prepare upload"
+            typeof data?.error === "string"
+              ? data.error
+              : "Failed to prepare upload"
           );
           return;
         }
-        const presignData = (await presignRes.json()) as PresignResponse;
+        const { pathname } = (await prepRes.json()) as PrepareResponse;
 
-        const putStatus: number = await new Promise((resolvePut) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", presignData.presignedUrl);
-          xhr.setRequestHeader("Content-Type", file.type);
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              onProgress(Math.round((event.loaded / event.total) * 100));
-            }
-          };
-          xhr.onload = () => resolvePut(xhr.status);
-          xhr.onerror = () => resolvePut(0);
-          xhr.onabort = () => resolvePut(0);
-          xhr.send(file);
-        });
-
-        if (putStatus < 200 || putStatus >= 300) {
-          resolve(
-            putStatus === 0
-              ? "Network error. Please try again."
-              : `Upload failed (HTTP ${putStatus})`
-          );
+        // Step 2: official Vercel Blob client upload for private stores.
+        // uploadPresigned() talks to /api/media/upload (handleUploadPresigned),
+        // PUTs the file directly to Blob storage, and THROWS on any failure.
+        // It resolves only once the control plane confirms the stored blob.
+        let storedPathname = pathname;
+        try {
+          const uploaded = await uploadPresigned(pathname, file, {
+            access: "private",
+            handleUploadUrl: "/api/media/upload",
+            clientPayload: JSON.stringify({
+              postId,
+              filename: file.name,
+              mimeType: file.type,
+              size: file.size,
+            }),
+            contentType: file.type,
+            onUploadProgress: ({ percentage }) =>
+              onProgress(Math.min(100, Math.round(percentage))),
+          });
+          storedPathname = uploaded.pathname || pathname;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "Unknown upload error";
+          resolve(`Upload failed: ${message}`);
           return;
         }
         onProgress(100);
 
-        const confirmRes = await fetch("/api/media/confirm", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            postId,
-            pathname: presignData.pathname,
-            filename: file.name,
-          }),
-        });
-        if (!confirmRes.ok) {
-          const data = await confirmRes.json().catch(() => null);
-          resolve(
-            typeof data?.error === "string" ? data.error : "Upload failed"
-          );
-          return;
-        }
-        resolve(null);
+        // Step 3: the server registers the Media row from the verified
+        // blob.upload-completed webhook; wait for it before publishing.
+        resolve(await waitForMediaRegistration(postId, storedPathname));
       } catch {
         resolve("Network error. Please try again.");
       }

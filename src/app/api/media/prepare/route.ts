@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
-import { prepareClientUpload } from "@/lib/media-upload";
+import { reserveUploadPathname } from "@/lib/media-upload";
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await getApiUser();
-    const result = await prepareClientUpload({
+    const result = await reserveUploadPathname({
       user,
-      postId: typeof body.postId === "string" ? body.postId : null,
+      postId: typeof body.postId === "string" ? body.postId : "",
       filename: typeof body.filename === "string" ? body.filename : "",
       mimeType: typeof body.mimeType === "string" ? body.mimeType : "",
       size: typeof body.size === "number" ? body.size : 0,
@@ -32,10 +32,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    return NextResponse.json({
-      presignedUrl: result.presignedUrl,
-      pathname: result.pathname,
-    });
+    return NextResponse.json({ pathname: result.pathname });
   } catch {
     return NextResponse.json(
       { error: "Failed to prepare upload" },

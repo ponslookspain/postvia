@@ -90,10 +90,16 @@ export function slugifyPathSegment(filename: string): string {
   return `${name.slice(0, 80 - keptExt.length)}${keptExt}`;
 }
 
-export function makeBlobPathname(userId: string, filename: string): string {
+export const MAX_MEDIA_PER_POST = 4;
+
+export function makeBlobPathname(
+  userId: string,
+  postId: string,
+  filename: string
+): string {
   const safe = slugifyPathSegment(filename);
   const random = globalThis.crypto.randomUUID().replace(/-/g, "");
-  return `media/${userId}/${random}-${safe}`;
+  return `media/${userId}/${postId}/${random}-${safe}`;
 }
 
 export type ThreadsMediaPolicy =
