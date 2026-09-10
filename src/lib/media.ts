@@ -69,8 +69,29 @@ export function sanitizeFilename(filename: string): string {
   return cleaned || "file";
 }
 
+export function isAscii(text: string): boolean {
+  return /^[\x00-\x7F]*$/.test(text);
+}
+
+export function slugifyPathSegment(filename: string): string {
+  const ascii = filename
+    .replace(UNSAFE_FILENAME_CHARS, "_")
+    .replace(/\s+/g, "_")
+    .replace(/[^\x20-\x7E]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[._-]+/, "")
+    .trim();
+  const dot = ascii.lastIndexOf(".");
+  const base = dot > 0 ? ascii.slice(0, dot) : ascii;
+  const ext = dot > 0 ? ascii.slice(dot + 1) : "";
+  const name =
+    base.replace(/[^A-Za-z0-9_-]/g, "_").replace(/_+/g, "_") || "file";
+  const keptExt = /^[A-Za-z0-9]{1,10}$/.test(ext) ? `.${ext}` : "";
+  return `${name.slice(0, 80 - keptExt.length)}${keptExt}`;
+}
+
 export function makeBlobPathname(userId: string, filename: string): string {
-  const safe = sanitizeFilename(filename);
+  const safe = slugifyPathSegment(filename);
   const random = globalThis.crypto.randomUUID().replace(/-/g, "");
   return `media/${userId}/${random}-${safe}`;
 }

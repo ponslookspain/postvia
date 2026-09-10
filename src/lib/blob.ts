@@ -8,6 +8,7 @@ import {
   put,
 } from "@vercel/blob";
 import type { GetBlobResult } from "@vercel/blob";
+import { isAscii } from "@/lib/media";
 import {
   logDiagnostic,
   logErrorDiagnostic,
@@ -127,6 +128,19 @@ export async function createPresignedUploadUrl(input: {
   maximumSizeInBytes: number;
   ttlMs: number;
 }): Promise<{ presignedUrl: string; pathname: string }> {
+  if (!isAscii(input.pathname)) {
+    logErrorDiagnostic(
+      "blob",
+      "presign aborted: non-ascii pathname",
+      new Error(
+        `Blob pathname for signed URLs must be ASCII-only; got '${input.pathname}'. Regenerate the object with an ASCII slug.`
+      ),
+      { pathname: safePathname(input.pathname) }
+    );
+    throw new Error(
+      "Blob pathname for signed URLs must be ASCII-only. Re-upload the media so the object name is regenerated."
+    );
+  }
   try {
     const validUntil = Date.now() + input.ttlMs;
     const signedToken = await issueSignedToken({
@@ -162,6 +176,19 @@ export async function createSignedGetUrl(input: {
   pathname: string;
   ttlMs: number;
 }): Promise<string> {
+  if (!isAscii(input.pathname)) {
+    logErrorDiagnostic(
+      "blob",
+      "signed get aborted: non-ascii pathname",
+      new Error(
+        `Blob pathname for signed URLs must be ASCII-only; got '${input.pathname}'. Regenerate the object with an ASCII slug.`
+      ),
+      { pathname: safePathname(input.pathname) }
+    );
+    throw new Error(
+      "Blob pathname for signed URLs must be ASCII-only. Re-upload the media so the object name is regenerated."
+    );
+  }
   try {
     const validUntil = Date.now() + input.ttlMs;
     const signedToken = await issueSignedToken({
