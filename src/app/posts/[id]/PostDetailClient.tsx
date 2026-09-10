@@ -24,6 +24,14 @@ interface Post {
     status: string;
     errorMessage?: string | null;
   }[];
+  media: {
+    id: string;
+    filename: string;
+    mimeType: string;
+    size: number;
+    type: "IMAGE" | "VIDEO";
+    createdAt: string;
+  }[];
 }
 
 export default function PostDetailPage({
@@ -42,6 +50,7 @@ export default function PostDetailPage({
   const [deleting, setDeleting] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
 
   const target = post.targets[0];
   const platform = target?.platform ?? "X";
@@ -131,6 +140,22 @@ export default function PostDetailPage({
       }));
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function handleDeleteMedia(mediaId: string) {
+    setDeletingMediaId(mediaId);
+    try {
+      const res = await fetch(`/api/media/${mediaId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete media");
+      setPost((prev) => ({
+        ...prev,
+        media: prev.media.filter((m) => m.id !== mediaId),
+      }));
+    } catch {
+      alert("Failed to delete media.");
+    } finally {
+      setDeletingMediaId(null);
     }
   }
 
@@ -233,6 +258,60 @@ export default function PostDetailPage({
             </div>
           )}
         </div>
+
+        {post.media.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium mb-2">Media</label>
+            <div className="flex flex-wrap gap-3">
+              {post.media.map((item) => (
+                <div key={item.id} className="relative w-40 h-40">
+                  <div className="w-40 h-40 rounded-md border border-border overflow-hidden bg-muted">
+                    {item.type === "IMAGE" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/media/${item.id}`}
+                        alt={item.filename}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <video
+                        src={`/api/media/${item.id}`}
+                        className="w-full h-full object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMedia(item.id)}
+                    disabled={deletingMediaId === item.id}
+                    aria-label={`Remove ${item.filename}`}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground text-primary-foreground flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-40"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                  <p className="text-xs text-muted-foreground mt-1 w-40 truncate">
+                    {item.filename}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div>

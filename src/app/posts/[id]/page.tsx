@@ -16,7 +16,7 @@ export default async function PostDetailPage({
 
   const post = await prisma.post.findFirst({
     where: { id, userId: user.id },
-    include: { targets: true },
+    include: { targets: true, media: true },
   });
 
   if (!post) notFound();
@@ -40,6 +40,14 @@ export default async function PostDetailPage({
     createdAt: post.createdAt.toISOString(),
     scheduledAt: post.scheduledAt?.toISOString() ?? null,
     publishedAt: post.publishedAt?.toISOString() ?? null,
+    media: post.media.map((m) => ({
+      id: m.id,
+      filename: m.filename,
+      mimeType: m.mimeType,
+      size: m.size,
+      type: m.type,
+      createdAt: m.createdAt.toISOString(),
+    })),
   };
 
   return (

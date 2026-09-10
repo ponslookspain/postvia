@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   X_POST_CHAR_LIMIT,
@@ -8,6 +8,7 @@ import {
   threadsPostUrl,
   isFutureIso,
 } from "@/lib/utils";
+import { validateMediaInput } from "@/lib/media";
 
 type Platform = "X" | "THREADS";
 
@@ -18,6 +19,68 @@ type PublishResult = {
   username?: string;
   error?: string;
 };
+
+type DraftMedia = {
+  key: string;
+  file: File;
+  previewUrl: string;
+  kind: "IMAGE" | "VIDEO";
+  name: string;
+  size: number;
+  status: "pending" | "uploading" | "done" | "error";
+  progress: number;
+  error?: string;
+};
+
+const MAX_MEDIA = 4;
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+let mediaKeyCounter = 0;
+
+function nextMediaKey(): string {
+  mediaKeyCounter += 1;
+  return `media-${mediaKeyCounter}-${Date.now()}`;
+}
+
+function uploadFileToPost(
+  postId: string,
+  file: File,
+  onProgress: (percent: number) => void
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/media/upload");
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(null);
+        return;
+      }
+      let message = "Upload failed";
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (typeof data?.error === "string") message = data.error;
+      } catch {
+        // fall back to generic message
+      }
+      resolve(message);
+    };
+    xhr.onerror = () => resolve("Network error. Please try again.");
+    const form = new FormData();
+    form.append("postId", postId);
+    form.append("file", file);
+    xhr.send(form);
+  });
+}
 
 const PLATFORM_OPTIONS: { value: Platform; label: string }[] = [
   { value: "X", label: "X" },
@@ -39,7 +102,10 @@ export default function NewPostComposer({
   userEmail: string;
 }) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
+  const [media, setMedia] = useState<DraftMedia[]>([]);
+  const [mediaUploadNote, setMediaUploadNote] = useState<string | null>(null);
   const [platform, setPlatform] = useState<Platform>("THREADS");
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -73,6 +139,86 @@ export default function NewPostComposer({
 
   const scheduledIso = getScheduledIso();
 
+  function clearMedia() {
+    setMedia((prev) => {
+      for (const item of prev) URL.revokeObjectURL(item.previewUrl);
+      return [];
+    });
+    setMediaUploadNote(null);
+  }
+
+  function addFiles(files: File[]) {
+    const pending: DraftMedia[] = [];
+    for (const file of files) {
+      const validation = validateMediaInput(file.type, file.size);
+      if (!validation.ok) {
+        alert(validation.error);
+        continue;
+      }
+      pending.push({
+        key: nextMediaKey(),
+        file,
+        previewUrl: URL.createObjectURL(file),
+        kind: validation.kind,
+        name: file.name,
+        size: file.size,
+        status: "pending",
+        progress: 0,
+      });
+    }
+    if (pending.length === 0) return;
+    setMedia((prev) => {
+      if (prev.length + pending.length > MAX_MEDIA) {
+        alert(`You can attach up to ${MAX_MEDIA} files per post.`);
+        return prev;
+      }
+      return [...prev, ...pending];
+    });
+  }
+
+  function removeMedia(key: string) {
+    setMedia((prev) => {
+      const item = prev.find((m) => m.key === key);
+      if (item) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter((m) => m.key !== key);
+    });
+  }
+
+  async function uploadMediaForPost(postId: string): Promise<string[]> {
+    const items = media;
+    const errors: string[] = [];
+    for (const item of items) {
+      setMedia((prev) =>
+        prev.map((m) =>
+          m.key === item.key
+            ? { ...m, status: "uploading", progress: 0, error: undefined }
+            : m
+        )
+      );
+      const error = await uploadFileToPost(
+        postId,
+        item.file,
+        (percent) =>
+          setMedia((prev) =>
+            prev.map((m) => (m.key === item.key ? { ...m, progress: percent } : m))
+          )
+      );
+      if (error) {
+        errors.push(`${item.name}: ${error}`);
+        setMedia((prev) =>
+          prev.map((m) =>
+            m.key === item.key ? { ...m, status: "error", error } : m
+          )
+        );
+      } else {
+        setMedia((prev) =>
+          prev.map((m) => (m.key === item.key ? { ...m, status: "done" } : m))
+        );
+      }
+    }
+    return errors;
+  }
+
   async function handleSaveDraft() {
     if (!canSave) return;
     setSaving(true);
@@ -87,6 +233,14 @@ export default function NewPostComposer({
       if (!res.ok) throw new Error("Failed to save");
 
       const data = await res.json();
+      if (media.length > 0) {
+        const errors = await uploadMediaForPost(data.id);
+        setMediaUploadNote(
+          errors.length > 0
+            ? `Draft saved but some media could not be uploaded: ${errors.join("; ")}`
+            : null
+        );
+      }
       setSavedId(data.id);
       setSaved(true);
     } catch {
@@ -131,6 +285,17 @@ export default function NewPostComposer({
         return;
       }
 
+      if (media.length > 0) {
+        const errors = await uploadMediaForPost(data.id);
+        if (errors.length > 0) {
+          setScheduleError(
+            `Failed to upload media: ${errors[0]}. The post was not scheduled. You can retry from the saved draft.`
+          );
+          setSavedId(data.id);
+          return;
+        }
+      }
+
       setSavedId(data.id);
       setScheduledAt(scheduledIso);
     } catch {
@@ -154,6 +319,19 @@ export default function NewPostComposer({
 
       if (!createRes.ok) throw new Error("Failed to create post");
       const postData = await createRes.json();
+
+      if (media.length > 0) {
+        const errors = await uploadMediaForPost(postData.id);
+        if (errors.length > 0) {
+          setPublishResult({
+            ok: false,
+            platform,
+            error: `Failed to upload media: ${errors[0]}. The post was not published. You can retry from the saved draft.`,
+          });
+          setSavedId(postData.id);
+          return;
+        }
+      }
 
       const publishRes = await fetch(`/api/posts/${postData.id}/publish`, {
         method: "POST",
@@ -354,6 +532,7 @@ export default function NewPostComposer({
                 setScheduleDate("");
                 setScheduleTime("");
                 setScheduleMode(false);
+                clearMedia();
               }}
               className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
             >
@@ -392,12 +571,18 @@ export default function NewPostComposer({
             </svg>
           </div>
           <p className="text-lg font-medium mb-6">Draft saved</p>
+          {mediaUploadNote && (
+            <p className="text-sm text-amber-600 mb-6 mx-auto max-w-md">
+              {mediaUploadNote}
+            </p>
+          )}
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => {
                 setSaved(false);
                 setSavedId(null);
                 setText("");
+                clearMedia();
               }}
               className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
             >
@@ -477,6 +662,109 @@ export default function NewPostComposer({
               );
             })}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Media</label>
+          <div className="flex flex-wrap items-start gap-3">
+            {media.map((item) => (
+              <div key={item.key}>
+                <div className="relative w-28 h-28 rounded-md border border-border overflow-hidden bg-muted">
+                  {item.kind === "IMAGE" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.previewUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={item.previewUrl}
+                      className="w-full h-full object-cover"
+                      muted
+                    />
+                  )}
+                  {item.status === "uploading" && (
+                    <div className="absolute inset-0 bg-foreground/60 flex flex-col items-center justify-center">
+                      <span className="text-xs font-medium text-white">
+                        {item.progress}%
+                      </span>
+                    </div>
+                  )}
+                  {item.status === "error" && (
+                    <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center">
+                      <span className="text-xs font-medium text-white">
+                        Failed
+                      </span>
+                    </div>
+                  )}
+                  {item.status !== "uploading" && (
+                    <button
+                      type="button"
+                      onClick={() => removeMedia(item.key)}
+                      aria-label={`Remove ${item.name}`}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground text-primary-foreground flex items-center justify-center hover:opacity-80 transition-opacity"
+                    >
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 w-28 truncate">
+                  {item.name} · {formatFileSize(item.size)}
+                </p>
+              </div>
+            ))}
+            {media.length < MAX_MEDIA && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={saving || publishing || scheduling}
+                className="w-28 h-28 rounded-md border border-dashed border-border flex flex-col items-center justify-center text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40"
+              >
+                <svg
+                  className="w-5 h-5 mb-1"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span className="text-xs">Add media</span>
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            JPG, PNG, WebP or GIF images up to 10 MB; MP4 or WebM videos up to
+            100 MB.
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) addFiles(Array.from(e.target.files));
+              e.target.value = "";
+            }}
+          />
         </div>
 
         {scheduleMode && !schedulingForX && (

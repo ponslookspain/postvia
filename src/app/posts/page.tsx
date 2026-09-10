@@ -11,7 +11,7 @@ export default async function PostsPage() {
   const posts = await prisma.post.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    include: { targets: true },
+    include: { targets: true, media: true },
   });
 
   return (
@@ -41,12 +41,34 @@ export default async function PostsPage() {
         <div className="border border-border rounded-lg divide-y divide-border">
           {posts.map((post) => {
             const target = post.targets[0];
+            const preview = post.media[0];
             return (
               <Link
                 key={post.id}
                 href={`/posts/${post.id}`}
                 className="flex items-center justify-between p-5 hover:bg-muted/50 transition-colors"
               >
+                {preview && (
+                  <div className="flex items-center gap-1.5 mr-4 shrink-0">
+                    {preview.type === "IMAGE" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/media/${preview.id}`}
+                        alt=""
+                        className="w-10 h-10 rounded-md object-cover"
+                      />
+                    ) : (
+                      <span className="text-xs font-medium px-2 py-1 rounded bg-muted text-muted-foreground">
+                        Video
+                      </span>
+                    )}
+                    {post.media.length > 1 && (
+                      <span className="text-xs text-muted-foreground">
+                        +{post.media.length - 1}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0 mr-4">
                   <p className="text-sm truncate mb-1">{post.text}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">

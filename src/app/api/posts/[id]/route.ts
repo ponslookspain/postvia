@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { deleteBlobs } from "@/lib/blob";
 
 async function findOwnedPost(id: string, userId: string) {
   return prisma.post.findFirst({
     where: { id, userId },
-    include: { targets: true },
+    include: { targets: true, media: true },
   });
 }
 
@@ -61,7 +62,7 @@ export async function PATCH(
           scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
         }),
       },
-      include: { targets: true },
+      include: { targets: true, media: true },
     });
 
     return NextResponse.json(post);
@@ -87,6 +88,17 @@ export async function DELETE(
     const existing = await findOwnedPost(id, user.id);
     if (!existing) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+
+    if (existing.media.length > 0) {
+      try {
+        await deleteBlobs(existing.media.map((m) => m.pathname));
+      } catch {
+        return NextResponse.json(
+          { error: "Failed to delete media" },
+          { status: 500 }
+        );
+      }
     }
 
     await prisma.post.delete({ where: { id } });

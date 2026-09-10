@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { XProvider } from "@/lib/social/x";
 import { ThreadsProvider } from "@/lib/social/threads";
+import { deleteBlobs } from "@/lib/blob";
 
-const CONFIRMATION_PHRASE = "УДАЛИТЬ";
+const CONFIRMATION_PHRASE = "delete";
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -28,6 +29,11 @@ export async function DELETE(request: NextRequest) {
       where: { userId: user.id },
     });
 
+    const mediaToDelete = await prisma.media.findMany({
+      where: { userId: user.id },
+      select: { pathname: true },
+    });
+
     for (const account of accounts) {
       try {
         if (account.platform === "X") {
@@ -40,10 +46,20 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    try {
+      await deleteBlobs(mediaToDelete.map((m) => m.pathname));
+    } catch {
+      return NextResponse.json(
+        { error: "Failed to delete media" },
+        { status: 500 }
+      );
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.postTarget.deleteMany({
         where: { post: { userId: user.id } },
       });
+      await tx.media.deleteMany({ where: { userId: user.id } });
       await tx.post.deleteMany({ where: { userId: user.id } });
       await tx.socialAccount.deleteMany({ where: { userId: user.id } });
       await tx.session.deleteMany({ where: { userId: user.id } });

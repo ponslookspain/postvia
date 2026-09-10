@@ -10,11 +10,12 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "node --import tsx --test tests/threads.publish.test.ts"
+    "test": "node --import tsx --test tests/threads.publish.test.ts tests/media.test.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.4",
     "@prisma/client": "^6.19.3",
+    "@vercel/blob": "^2.8.0",
     "better-auth": "^1.7.4",
     "next": "16.3.4",
     "react": "19.2.8",

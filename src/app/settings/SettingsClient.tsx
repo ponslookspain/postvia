@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
-const CONFIRMATION_PHRASE = "УДАЛИТЬ";
+const CONFIRMATION_PHRASE = "delete";
 
 type Message = { type: "success" | "error"; text: string } | null;
 
