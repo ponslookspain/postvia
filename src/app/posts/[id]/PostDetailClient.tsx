@@ -261,6 +261,22 @@ export default function PostDetailPage({
               })}
             </p>
           </div>
+          {post.scheduledAt && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Scheduled for
+              </label>
+              <p className="text-sm text-amber-700">
+                {new Date(post.scheduledAt).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium mb-1">Published</label>
             <p className="text-sm text-muted-foreground">
@@ -370,7 +386,9 @@ export default function PostDetailPage({
                 </>
               )}
 
-              {(post.status === "DRAFT" || post.status === "FAILED") && (
+              {(post.status === "DRAFT" ||
+                post.status === "SCHEDULED" ||
+                post.status === "FAILED") && (
                 <button
                   onClick={handleDelete}
                   disabled={deleting}

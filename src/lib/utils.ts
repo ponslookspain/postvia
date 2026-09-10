@@ -34,3 +34,7 @@ export function formatDate(date: Date): string {
     year: "numeric",
   });
 }
+
+export function isFutureIso(isoDate: string): boolean {
+  return new Date(isoDate).getTime() > Date.now();
+}

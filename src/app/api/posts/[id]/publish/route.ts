@@ -1,20 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateDemoUser } from "@/lib/auth";
-import { XProvider } from "@/lib/social/x";
-import { ThreadsProvider } from "@/lib/social/threads";
-import type { SocialProvider } from "@/lib/social/provider";
-
-function getProvider(platform: string): SocialProvider {
-  switch (platform) {
-    case "X":
-      return new XProvider();
-    case "THREADS":
-      return new ThreadsProvider();
-    default:
-      throw new Error(`Unsupported platform: ${platform}`);
-  }
-}
+import { executePublish } from "@/lib/publish";
 
 export async function POST(
   _request: NextRequest,
@@ -37,19 +24,27 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (post.status === "PUBLISHED") {
-      return NextResponse.json(
-        { error: "Post is already published" },
-        { status: 400 }
-      );
-    }
-
     const target = post.targets.find(
       (t) => t.status === "PENDING" || t.status === "FAILED"
     );
     if (!target) {
       return NextResponse.json(
         { error: "No publishable target found for this post" },
+        { status: 400 }
+      );
+    }
+
+    const claim = await prisma.post.updateMany({
+      where: {
+        id,
+        status: { in: ["DRAFT", "SCHEDULED", "FAILED"] },
+      },
+      data: { status: "PUBLISHING" },
+    });
+
+    if (claim.count === 0) {
+      return NextResponse.json(
+        { error: "Post is already being published or has been published" },
         { status: 400 }
       );
     }
@@ -64,6 +59,10 @@ export async function POST(
     });
 
     if (!account) {
+      await prisma.post.update({
+        where: { id },
+        data: { status: "FAILED" },
+      });
       return NextResponse.json(
         {
           error: `${target.platform} account not connected. Please connect your ${target.platform} account first.`,
@@ -72,69 +71,21 @@ export async function POST(
       );
     }
 
-    await prisma.post.update({
-      where: { id },
-      data: { status: "PUBLISHING" },
-    });
-    await prisma.postTarget.update({
-      where: { id: target.id },
-      data: { status: "PUBLISHING" },
-    });
+    const result = await executePublish(post, account, target);
 
-    const provider = getProvider(target.platform);
-    const result = await provider.publishPost(
-      account.accessToken,
-      post.text,
-      account.externalId
-    );
-
-    if (result.success) {
-      const now = new Date();
-      await prisma.post.update({
-        where: { id },
-        data: {
-          status: "PUBLISHED",
-          publishedAt: now,
-          errorMessage: null,
-        },
-      });
-      await prisma.postTarget.update({
-        where: { id: target.id },
-        data: {
-          status: "PUBLISHED",
-          externalPostId: result.externalPostId,
-          publishedAt: now,
-          errorMessage: null,
-        },
-      });
-
+    if (result.ok) {
       return NextResponse.json({
         ok: true,
-        platform: target.platform,
+        platform: result.platform,
         externalPostId: result.externalPostId,
-        username: account.username,
+        username: result.username,
       });
-    } else {
-      await prisma.post.update({
-        where: { id },
-        data: {
-          status: "FAILED",
-          errorMessage: result.error || "Publication failed",
-        },
-      });
-      await prisma.postTarget.update({
-        where: { id: target.id },
-        data: {
-          status: "FAILED",
-          errorMessage: result.error || "Publication failed",
-        },
-      });
-
-      return NextResponse.json(
-        { error: result.error || "Publication failed" },
-        { status: 422 }
-      );
     }
+
+    return NextResponse.json(
+      { error: result.error || "Publication failed" },
+      { status: 422 }
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to publish";

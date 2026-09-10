@@ -58,6 +58,17 @@ export default async function PostsPage() {
                           year: "numeric",
                         })}
                       </span>
+                    ) : post.status === "SCHEDULED" && post.scheduledAt ? (
+                      <span className="text-amber-700">
+                        Scheduled{" "}
+                        {new Date(post.scheduledAt).toLocaleString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
                     ) : (
                       <span>
                         {post.createdAt.toLocaleDateString("en-GB", {

@@ -6,6 +6,7 @@ import {
   X_POST_CHAR_LIMIT,
   THREADS_POST_CHAR_LIMIT,
   threadsPostUrl,
+  isFutureIso,
 } from "@/lib/utils";
 
 type Platform = "X" | "THREADS";
@@ -23,17 +24,30 @@ const PLATFORM_OPTIONS: { value: Platform; label: string }[] = [
   { value: "THREADS", label: "Threads" },
 ];
 
+function toLocalInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}`;
+}
+
 export default function NewPostPage() {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [platform, setPlatform] = useState<Platform>("X");
+  const [platform, setPlatform] = useState<Platform>("THREADS");
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(
     null
   );
+  const [scheduleMode, setScheduleMode] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [scheduledAt, setScheduledAt] = useState<string | null>(null);
 
   const charLimit =
     platform === "THREADS" ? THREADS_POST_CHAR_LIMIT : X_POST_CHAR_LIMIT;
@@ -42,6 +56,16 @@ export default function NewPostPage() {
   const canSave = text.trim().length > 0 && !isOverLimit && !saving;
   const canPublish =
     text.trim().length > 0 && !isOverLimit && !publishing && !saving;
+  const schedulingForX = platform === "X";
+
+  function getScheduledIso(): string | null {
+    if (!scheduleDate || !scheduleTime) return null;
+    const local = new Date(`${scheduleDate}T${scheduleTime}`);
+    if (Number.isNaN(local.getTime())) return null;
+    return local.toISOString();
+  }
+
+  const scheduledIso = getScheduledIso();
 
   async function handleSaveDraft() {
     if (!canSave) return;
@@ -63,6 +87,50 @@ export default function NewPostPage() {
       alert("Failed to save draft. Please try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSchedule() {
+    setScheduleError(null);
+    if (!schedulingForX && (!scheduleDate || !scheduleTime)) {
+      setScheduleError("Please choose a date and time.");
+      return;
+    }
+    if (
+      !scheduledIso ||
+      !isFutureIso(scheduledIso)
+    ) {
+      setScheduleError(
+        "Scheduled time must be in the future. Please pick another date or time."
+      );
+      return;
+    }
+
+    setScheduling(true);
+    try {
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: text.trim(),
+          platform,
+          scheduledAt: scheduledIso,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setScheduleError(data.error || "Failed to schedule post.");
+        return;
+      }
+
+      setSavedId(data.id);
+      setScheduledAt(scheduledIso);
+    } catch {
+      setScheduleError("Failed to schedule post. Please try again.");
+    } finally {
+      setScheduling(false);
     }
   }
 
@@ -237,6 +305,66 @@ export default function NewPostPage() {
     );
   }
 
+  if (saved && savedId && scheduledAt) {
+    const scheduledLocal = new Date(scheduledAt);
+    return (
+      <div className="p-8 max-w-3xl">
+        <h1 className="text-2xl font-semibold mb-8">Create post</h1>
+        <div className="border border-border rounded-lg p-8 text-center">
+          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-6 h-6 text-amber-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <p className="text-lg font-medium mb-2">Post scheduled</p>
+          <p className="text-sm text-muted-foreground mb-6">
+            {scheduledLocal.toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}{" "}
+            ·{" "}
+            {scheduledLocal.toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                setSaved(false);
+                setScheduledAt(null);
+                setText("");
+                setScheduleDate("");
+                setScheduleTime("");
+                setScheduleMode(false);
+              }}
+              className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
+            >
+              Create another
+            </button>
+            <button
+              onClick={() => router.push(`/posts/${savedId}`)}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
+            >
+              View post
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (saved && savedId) {
     return (
       <div className="p-8 max-w-3xl">
@@ -328,7 +456,10 @@ export default function NewPostPage() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setPlatform(option.value)}
+                  onClick={() => {
+                    setPlatform(option.value);
+                    setScheduleMode(false);
+                  }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
                     active
                       ? "bg-foreground text-primary-foreground border-foreground"
@@ -341,6 +472,54 @@ export default function NewPostPage() {
             })}
           </div>
         </div>
+
+        {scheduleMode && !schedulingForX && (
+          <div className="border border-border rounded-lg p-5">
+            <label className="block text-sm font-medium mb-3">
+              Schedule date and time
+            </label>
+            <div className="flex items-start gap-4">
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  min={toLocalInputValue(new Date())}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">
+                  Time
+                </label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
+                />
+              </div>
+            </div>
+            {scheduledIso && (
+              <p className="text-xs text-muted-foreground mt-3">
+                Will be published on{" "}
+                {new Date(scheduledIso).toLocaleString("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            )}
+            {scheduleError && (
+              <p className="text-xs text-red-600 mt-3">{scheduleError}</p>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium mb-2">Preview</label>
@@ -385,21 +564,65 @@ export default function NewPostPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSaveDraft}
-            disabled={!canSave}
-            className="px-5 py-2.5 text-sm font-medium border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saving ? "Saving..." : "Save draft"}
-          </button>
-          <button
-            onClick={handlePublish}
-            disabled={!canPublish}
-            className="px-5 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {publishing ? "Publishing..." : "Publish now"}
-          </button>
+        <div className="flex flex-col gap-3">
+          {schedulingForX && scheduleMode && (
+            <p className="text-xs text-amber-600">
+              Scheduling for X is not available yet. Choose Threads to schedule
+              a post.
+            </p>
+          )}
+          {schedulingForX && !scheduleMode && (
+            <p className="text-xs text-muted-foreground">
+              Scheduling is available for Threads. Publish to X is available
+              now.
+            </p>
+          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSaveDraft}
+              disabled={!canSave}
+              className="px-5 py-2.5 text-sm font-medium border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {saving ? "Saving..." : "Save draft"}
+            </button>
+            <button
+              onClick={() => {
+                if (schedulingForX) return;
+                setScheduleMode((v) => !v);
+                setScheduleError(null);
+              }}
+              disabled={schedulingForX || scheduling}
+              title={
+                schedulingForX
+                  ? "Scheduling for X is not available yet. Use Threads."
+                  : "Schedule this post"
+              }
+              className={`px-5 py-2.5 text-sm font-medium border rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                scheduleMode
+                  ? "bg-foreground text-primary-foreground border-foreground"
+                  : "border-border hover:bg-muted"
+              }`}
+            >
+              {scheduling ? "Scheduling..." : "Schedule"}
+            </button>
+            <button
+              onClick={handlePublish}
+              disabled={!canPublish}
+              className="px-5 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {publishing ? "Publishing..." : "Publish now"}
+            </button>
+          </div>
+
+          {scheduleMode && !schedulingForX && (
+            <button
+              onClick={handleSchedule}
+              disabled={!canSave || scheduling}
+              className="px-5 py-2.5 text-sm font-medium bg-amber-500 text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed self-start"
+            >
+              Confirm schedule
+            </button>
+          )}
         </div>
       </div>
     </div>
