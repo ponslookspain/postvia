@@ -104,6 +104,15 @@ export function LoginForm({
             Sign up
           </Link>
         </p>
+        <p className="mt-4 text-xs text-muted-foreground">
+          <Link href="/terms" className="hover:underline">
+            Terms of Service
+          </Link>
+          <span className="mx-2">·</span>
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+        </p>
       </div>
     </div>
   );

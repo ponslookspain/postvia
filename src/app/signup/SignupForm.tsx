@@ -110,6 +110,16 @@ export function SignupForm() {
             Sign in
           </Link>
         </p>
+        <p className="mt-4 text-xs text-muted-foreground">
+          By signing up you agree to the{" "}
+          <Link href="/terms" className="hover:underline">
+            Terms of Service
+          </Link>
+          <span className="mx-1">and</span>
+          <Link href="/privacy" className="hover:underline">
+            Privacy Policy
+          </Link>
+        </p>
       </div>
     </div>
   );
