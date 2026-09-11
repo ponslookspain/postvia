@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { threadsPostUrl, isFutureIso } from "@/lib/utils";
 import { validateMediaInput } from "@/lib/media";
 import { buildComposerPreviews } from "@/lib/composer-previews";
-import { uploadPresigned } from "@vercel/blob/client";
 
-type Platform = "X" | "THREADS" | "TIKTOK";
+import type { Platform } from "@prisma/client";
 
 type PublishResult = {
   ok: boolean;
@@ -73,6 +72,37 @@ type PrepareResponse = {
 const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
 const MEDIA_REGISTER_POLL_MS = 500;
 
+const PUBLISH_POLL_MS = 2000;
+const PUBLISH_POLL_TIMEOUT_MS = 330_000;
+
+type SettledPost = {
+  status: string;
+  errorMessage?: string | null;
+  targets: {
+    status: string;
+    platform: Platform;
+    externalPostId: string | null;
+    errorMessage?: string | null;
+    socialAccount?: { username: string } | null;
+  }[];
+};
+
+async function waitForPostSettled(postId: string): Promise<SettledPost | null> {
+  const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, PUBLISH_POLL_MS));
+    try {
+      const res = await fetch(`/api/posts/${postId}`);
+      if (!res.ok) continue;
+      const post = (await res.json()) as SettledPost;
+      if (post.status !== "PUBLISHING") return post;
+    } catch {
+      // transient network hiccup: keep polling until the deadline
+    }
+  }
+  return null;
+}
+
 async function waitForMediaRegistration(
   postId: string,
   pathname: string
@@ -127,11 +157,11 @@ function uploadFileToPost(
         const { pathname } = (await prepRes.json()) as PrepareResponse;
 
         // Step 2: official Vercel Blob client upload for private stores.
-        // uploadPresigned() talks to /api/media/upload (handleUploadPresigned),
-        // PUTs the file directly to Blob storage, and THROWS on any failure.
-        // It resolves only once the control plane confirms the stored blob.
+        // The SDK is imported lazily so its chunk stays out of the
+        // composer's initial bundle until a file is actually uploaded.
         let storedPathname = pathname;
         try {
+          const { uploadPresigned } = await import("@vercel/blob/client");
           const uploaded = await uploadPresigned(pathname, file, {
             access: "private",
             handleUploadUrl: "/api/media/upload",
@@ -173,15 +203,20 @@ function toLocalInputValue(date: Date): string {
 
 export default function NewPostComposer({
   userName,
+  accounts,
 }: {
   userName: string;
+  accounts: ConnectedAccount[];
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [media, setMedia] = useState<DraftMedia[]>([]);
-  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(() =>
+    accounts
+      .filter((account) => account.implemented && account.platform === "THREADS")
+      .map((account) => account.id)
+  );
   const [targetOverrides, setTargetOverrides] = useState<TargetOverrideState>({});
   const [customizingIds, setCustomizingIds] = useState<string[]>([]);
   const [creatorInfos, setCreatorInfos] = useState<
@@ -265,27 +300,6 @@ export default function NewPostComposer({
         );
     }
   }, [selectedAccounts]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/accounts")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data: ConnectedAccount[]) => {
-        if (cancelled) return;
-        setAccounts(data);
-        setSelectedAccountIds(
-          data
-            .filter((account) => account.implemented && account.platform === "THREADS")
-            .map((account) => account.id)
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setAccounts([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   function buildPostBody(nextScheduledAt?: string) {
     return {
@@ -569,24 +583,60 @@ export default function NewPostComposer({
         method: "POST",
       });
 
-      const result = await publishRes.json();
-
-      if (publishRes.ok) {
-        setPublishResult({
-          ok: true,
-          platform: result.platform || platform,
-          externalPostId: result.externalPostId,
-          username: result.username,
-        });
-        setSavedId(postData.id);
-      } else {
+      if (!publishRes.ok && publishRes.status !== 202) {
+        const result = await publishRes.json().catch(() => null);
         setPublishResult({
           ok: false,
           platform,
-          error: result.error || "Publication failed",
+          error:
+            typeof result?.error === "string"
+              ? result.error
+              : "Publication failed",
         });
         setSavedId(postData.id);
+        return;
       }
+
+      // 202: publishing continues server-side (waitUntil); poll the real
+      // target statuses from the database instead of assuming success.
+      const settled = await waitForPostSettled(postData.id);
+      if (!settled) {
+        setPublishResult({
+          ok: false,
+          platform,
+          error:
+            "Still publishing on some platforms. Open the post to watch progress.",
+        });
+      } else if (settled.status === "PUBLISHED") {
+        const done = (settled.targets ?? []).find(
+          (t: { status: string }) => t.status === "PUBLISHED"
+        );
+        setPublishResult({
+          ok: true,
+          platform: done?.platform ?? platform,
+          externalPostId: done?.externalPostId ?? undefined,
+          username: done?.socialAccount?.username ?? undefined,
+        });
+      } else {
+        const failedNotes = (settled.targets ?? [])
+          .filter((t: { status: string }) => t.status === "FAILED")
+          .map(
+            (t: { platform: string; errorMessage?: string | null }) =>
+              `${t.platform}: ${t.errorMessage || "failed"}`
+          )
+          .join("; ");
+        setPublishResult({
+          ok: false,
+          platform,
+          error:
+            settled.status === "PARTIALLY_PUBLISHED"
+              ? `Published to some platforms; others failed (${failedNotes || "see post"}). Open the post to retry.`
+              : settled.errorMessage ||
+                failedNotes ||
+                "Publication failed",
+        });
+      }
+      setSavedId(postData.id);
     } catch {
       setPublishResult({
         ok: false,

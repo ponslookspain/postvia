@@ -131,12 +131,22 @@ export async function reserveUploadPathname(input: {
   mimeType: string;
   size: number;
 }): Promise<ReserveUploadResult> {
-  const post = input.user
-    ? await prisma.post.findFirst({
-        where: { id: input.postId, userId: input.user.id },
-        select: { userId: true },
-      })
-    : null;
+  // Ownership lookup and the per-post media count are independent reads
+  // (both scoped by user id); the media count query is harmless for a
+  // foreign/unauthenticated post because every decision below still
+  // short-circuits on the authorization/validation results in the same
+  // order as before.
+  const [post, existingMediaCount] = await Promise.all([
+    input.user
+      ? prisma.post.findFirst({
+          where: { id: input.postId, userId: input.user.id },
+          select: { userId: true },
+        })
+      : Promise.resolve(null),
+    prisma.media.count({
+      where: { postId: input.postId, userId: input.user?.id ?? "" },
+    }),
+  ]);
 
   const authorized = authorizeMediaUpload({
     user: input.user,
@@ -150,9 +160,7 @@ export async function reserveUploadPathname(input: {
     return { ok: false, status: 400, error: validation.error };
   }
 
-  const existing = await prisma.media.count({
-    where: { postId: authorized.postId, userId: authorized.userId },
-  });
+  const existing = existingMediaCount;
   if (existing >= MAX_MEDIA_PER_POST) {
     return {
       ok: false,

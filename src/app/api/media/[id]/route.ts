@@ -21,7 +21,21 @@ export async function GET(
       return NextResponse.json({ error: "Media not found" }, { status: 404 });
     }
 
+    // A media id is an immutable, never-reused cuid: once served for this
+    // (authenticated) user its bytes never change. Cache is `private`, so
+    // only this user's own browser stores it - no cross-user exposure,
+    // including after deletion (ids are never recycled).
+    const etag = `"${media.id}"`;
     const range = request.headers.get("range");
+    // Only short-circuit full reads; never shortcut a byte-range request
+    // (that would break resumable/video byte fetching).
+    if (!range && request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: { ETag: etag, "Cache-Control": "private, max-age=3600" },
+      });
+    }
+
     const result = await fetchPrivateBlob(media.pathname, range);
     if (!result) {
       return NextResponse.json(
@@ -36,7 +50,8 @@ export async function GET(
 
     const headers = new Headers();
     headers.set("Content-Type", media.mimeType);
-    headers.set("Cache-Control", "private, no-store, max-age=0");
+    headers.set("Cache-Control", "private, max-age=3600");
+    headers.set("ETag", etag);
     headers.set("Accept-Ranges", "bytes");
 
     const contentLength = result.headers.get("content-length");

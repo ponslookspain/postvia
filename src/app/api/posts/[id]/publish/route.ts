@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { publishPostTargets } from "@/lib/publish";
+import { logErrorDiagnostic } from "@/lib/diagnostics";
 
-// Threads video containers can keep processing for minutes; publishing
-// polls them inline. 300s is within the maxDuration allowed on the
-// current Vercel plan (Hobby+ with fluid compute).
+// Threads/TikTok video publishing can keep processing for minutes; the
+// work continues in the background (waitUntil) within this 300s window.
 export const maxDuration = 300;
 
 export async function POST(
@@ -19,9 +20,14 @@ export async function POST(
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const post = await prisma.post.findUnique({
+    // Ownership + publishability check in one light query; the full post
+    // (targets + media) is loaded exactly once, inside publishPostTargets.
+    const post = await prisma.post.findFirst({
       where: { id },
-      include: { targets: true },
+      select: {
+        userId: true,
+        targets: { select: { status: true } },
+      },
     });
 
     if (!post) {
@@ -57,20 +63,20 @@ export async function POST(
       );
     }
 
-    const result = await publishPostTargets(id);
-
-    if (result.ok) {
-      return NextResponse.json({
-        ok: true,
-        platform: result.platform,
-        externalPostId: result.externalPostId,
-        username: result.username,
-      });
-    }
+    // Atomic target claims, externalJobId persistence, ownership re-checks
+    // and finalize semantics all stay inside publishPostTargets — the
+    // background continuation only removes the client from the critical path.
+    waitUntil(
+      publishPostTargets(id).catch((error) => {
+        logErrorDiagnostic("publish", "background publish failed", error, {
+          postId: id,
+        });
+      })
+    );
 
     return NextResponse.json(
-      { error: result.error || "Publication failed" },
-      { status: 422 }
+      { ok: true, status: "PUBLISHING" },
+      { status: 202 }
     );
   } catch (error) {
     const message =

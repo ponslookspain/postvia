@@ -8,25 +8,32 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const user = await requireUser();
 
-  const [totalPosts, drafts, scheduled, published, recentPosts] =
-    await Promise.all([
-      prisma.post.count({ where: { userId: user.id } }),
-      prisma.post.count({
-        where: { userId: user.id, status: "DRAFT" },
-      }),
-      prisma.post.count({
-        where: { userId: user.id, status: "SCHEDULED" },
-      }),
-      prisma.post.count({
-        where: { userId: user.id, status: "PUBLISHED" },
-      }),
-      prisma.post.findMany({
-        where: { userId: user.id },
-        take: 5,
-        orderBy: { createdAt: "desc" },
-        include: { targets: true },
-      }),
-    ]);
+  // One groupBy replaces the four per-status count queries; total is the
+  // sum of the same groups. Recent posts run in parallel with it.
+  const [statusGroups, recentPosts] = await Promise.all([
+    prisma.post.groupBy({
+      by: ["status"],
+      where: { userId: user.id },
+      _count: { _all: true },
+    }),
+    prisma.post.findMany({
+      where: { userId: user.id },
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: { targets: true },
+    }),
+  ]);
+
+  const countsByStatus = Object.fromEntries(
+    statusGroups.map((group) => [group.status, group._count._all])
+  ) as Partial<Record<string, number>>;
+  const totalPosts = statusGroups.reduce(
+    (sum, group) => sum + group._count._all,
+    0
+  );
+  const drafts = countsByStatus.DRAFT ?? 0;
+  const scheduled = countsByStatus.SCHEDULED ?? 0;
+  const published = countsByStatus.PUBLISHED ?? 0;
 
   const stats = [
     { label: "Posts", value: totalPosts },

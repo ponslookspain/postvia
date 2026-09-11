@@ -41,6 +41,52 @@ interface Post {
   }[];
 }
 
+const PUBLISH_POLL_MS = 2000;
+const PUBLISH_POLL_TIMEOUT_MS = 330_000;
+
+// Publish/retry respond 202 while the work continues server-side.
+// Poll the real per-target statuses from the DB instead of assuming success.
+async function pollUntilSettled(
+  postId: string,
+  applySnapshot: (data: Partial<Post>) => void
+): Promise<void> {
+  const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, PUBLISH_POLL_MS));
+    try {
+      const res = await fetch(`/api/posts/${postId}`);
+      if (!res.ok) continue;
+      const data = (await res.json()) as Partial<Post>;
+      applySnapshot(data);
+      if (data.status && data.status !== "PUBLISHING") return;
+    } catch {
+      // transient error: keep polling until the deadline
+    }
+  }
+}
+
+async function startBackgroundAction(
+  path: string,
+  body?: unknown
+): Promise<{ started: boolean; error?: string }> {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 202 || res.ok) return { started: true };
+    const data = await res.json().catch(() => null);
+    return {
+      started: false,
+      error:
+        typeof data?.error === "string" ? data.error : "Publication failed",
+    };
+  } catch {
+    return { started: false, error: "Network error" };
+  }
+}
+
 export default function PostDetailPage({
   params,
   post: initialPost,
@@ -109,50 +155,15 @@ export default function PostDetailPage({
 
   async function handlePublish() {
     setPublishing(true);
-    try {
-      const res = await fetch(`/api/posts/${id}/publish`, { method: "POST" });
-      const data = await res.json();
-
-      if (res.ok) {
-        const now = new Date().toISOString();
-        setPost((prev) => ({
-          ...prev,
-          status: "PUBLISHED",
-          publishedAt: now,
-          errorMessage: null,
-          targets: prev.targets.map((t) =>
-            t.platform === platform
-              ? {
-                  ...t,
-                  status: "PUBLISHED",
-                  externalPostId: data.externalPostId,
-                  publishedAt: now,
-                  errorMessage: null,
-                }
-              : t
-          ),
-        }));
-      } else {
-        setPost((prev) => ({
-          ...prev,
-          status: "FAILED",
-          errorMessage: data.error || "Publication failed",
-          targets: prev.targets.map((t) =>
-            t.platform === platform
-              ? { ...t, status: "FAILED", errorMessage: data.error }
-              : t
-          ),
-        }));
-      }
-    } catch {
-      setPost((prev) => ({
-        ...prev,
-        status: "FAILED",
-        errorMessage: "Network error",
-      }));
-    } finally {
-      setPublishing(false);
+    const result = await startBackgroundAction(`/api/posts/${id}/publish`);
+    if (!result.started) {
+      setPost((prev) => ({ ...prev, errorMessage: result.error }));
+    } else {
+      await pollUntilSettled(id, (data) =>
+        setPost((prev) => ({ ...prev, ...data }))
+      );
     }
+    setPublishing(false);
   }
 
   async function handleDeleteMedia(mediaId: string) {
@@ -173,54 +184,18 @@ export default function PostDetailPage({
 
   async function handleRetry(targetId?: string) {
     setRetrying(true);
-    try {
-      const res = await fetch(`/api/posts/${id}/retry`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(targetId ? { targetId } : {}),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        const now = new Date().toISOString();
-        setPost((prev) => ({
-          ...prev,
-          status: "PUBLISHED",
-          publishedAt: now,
-          errorMessage: null,
-          targets: prev.targets.map((t) =>
-            (!targetId ? t.platform === platform : t.id === targetId)
-              ? {
-                  ...t,
-                  status: "PUBLISHED",
-                  externalPostId: data.externalPostId,
-                  publishedAt: now,
-                  errorMessage: null,
-                }
-              : t
-          ),
-        }));
-      } else {
-        setPost((prev) => ({
-          ...prev,
-          status: "FAILED",
-          errorMessage: data.error || "Publication failed",
-          targets: prev.targets.map((t) =>
-            (!targetId ? t.platform === platform : t.id === targetId)
-              ? { ...t, status: "FAILED", errorMessage: data.error }
-              : t
-          ),
-        }));
-      }
-    } catch {
-      setPost((prev) => ({
-        ...prev,
-        status: "FAILED",
-        errorMessage: "Network error",
-      }));
-    } finally {
-      setRetrying(false);
+    const result = await startBackgroundAction(
+      `/api/posts/${id}/retry`,
+      targetId ? { targetId } : {}
+    );
+    if (!result.started) {
+      setPost((prev) => ({ ...prev, errorMessage: result.error }));
+    } else {
+      await pollUntilSettled(id, (data) =>
+        setPost((prev) => ({ ...prev, ...data }))
+      );
     }
+    setRetrying(false);
   }
 
   function openReschedule() {
