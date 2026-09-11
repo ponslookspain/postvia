@@ -6,6 +6,7 @@ import {
   passwordErrorMessage,
   validatePassword,
 } from "../src/app/api/settings/password/route";
+import { PRODUCTION_URL, resolveBaseURL } from "../src/lib/base-url";
 
 process.env.BETTER_AUTH_SECRET = "test-better-auth-secret-123";
 
@@ -42,6 +43,23 @@ describe("verification email template", () => {
     const { html } = renderVerificationEmail("http://localhost/x?a=<script>");
     assert.ok(!html.includes("<script>"));
     assert.ok(html.includes("&lt;script&gt;"));
+  });
+
+  test("preserves the token and callbackURL together when rendering a full Better Auth URL", () => {
+    const url =
+      "https://postvia.vercel.app/api/auth/verify-email?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20ifQ.signaturePayload&callbackURL=%2Fverify-email";
+    const { html, text } = renderVerificationEmail(url);
+
+    const decodedHref = html
+      .match(/<a href="([^"]+)"/)![1]
+      .replace(/&amp;/g, "&");
+
+    assert.equal(decodedHref, url);
+    assert.ok(decodedHref.includes("token="));
+    assert.ok(decodedHref.includes("callbackURL=%2Fverify-email"));
+    assert.ok(text.includes(url));
+    assert.ok(text.includes("token="));
+    assert.ok(text.includes("callbackURL=%2Fverify-email"));
   });
 });
 
@@ -127,5 +145,57 @@ describe("password error messages", () => {
   test("non-client errors return null", () => {
     assert.equal(passwordErrorMessage({ statusCode: 500 }, "change"), null);
     assert.equal(passwordErrorMessage({}, "change"), null);
+  });
+});
+
+describe("Better Auth base URL resolution", () => {
+  test("explicit BETTER_AUTH_URL always wins", () => {
+    assert.equal(
+      resolveBaseURL({
+        BETTER_AUTH_URL: "https://custom.example.com",
+        VERCEL_ENV: "production",
+        VERCEL_URL: "postvia-abc123-postvia.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "postvia.vercel.app",
+      }),
+      "https://custom.example.com"
+    );
+  });
+
+  test("production resolves to the deterministic production alias (guards Google redirect_uri_mismatch)", () => {
+    assert.equal(
+      resolveBaseURL({ VERCEL_ENV: "production", VERCEL_URL: "deploy-a4wvan4ds-postvia.vercel.app" }),
+      "https://postvia.vercel.app"
+    );
+  });
+
+  test("production prefers VERCEL_PROJECT_PRODUCTION_URL when available", () => {
+    assert.equal(
+      resolveBaseURL({
+        VERCEL_ENV: "production",
+        VERCEL_URL: "deploy-a4wvan4ds-postvia.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "postvia.vercel.app",
+      }),
+      "https://postvia.vercel.app"
+    );
+  });
+
+  test("preview deployments keep their deployment-specific host", () => {
+    assert.equal(
+      resolveBaseURL({ VERCEL_URL: "postvia-pr-42-postvia.vercel.app" }),
+      "https://postvia-pr-42-postvia.vercel.app"
+    );
+  });
+
+  test("returns undefined when no Vercel or explicit URL is present", () => {
+    assert.equal(resolveBaseURL({}), undefined);
+  });
+
+  test("Google OAuth redirect URI for production matches the registered alias", () => {
+    const base = resolveBaseURL({ VERCEL_ENV: "production" })!;
+    assert.equal(base, PRODUCTION_URL);
+    assert.equal(
+      `${base}/api/auth/callback/google`,
+      "https://postvia.vercel.app/api/auth/callback/google"
+    );
   });
 });

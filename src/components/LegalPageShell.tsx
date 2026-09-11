@@ -4,11 +4,13 @@ export default function LegalPageShell({
   title,
   effectiveDate,
   intro,
+  currentPage,
   children,
 }: {
   title: string;
   effectiveDate: string;
   intro?: string;
+  currentPage?: "terms" | "privacy";
   children: React.ReactNode;
 }) {
   return (
@@ -19,7 +21,7 @@ export default function LegalPageShell({
             href="/login"
             className="text-sm font-medium text-muted-foreground hover:text-foreground"
           >
-            ← Postvia
+            &larr; Postvia
           </Link>
           <h1 className="mt-4 text-3xl font-semibold">{title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -31,6 +33,30 @@ export default function LegalPageShell({
         <div className="space-y-8 text-sm leading-6">{children}</div>
 
         <footer className="mt-14 border-t border-border pt-6 text-xs text-muted-foreground">
+          <p className="mb-2">
+            See also:{" "}
+            <Link
+              href="/terms"
+              className={
+                currentPage === "terms"
+                  ? "font-semibold text-foreground"
+                  : "hover:text-foreground"
+              }
+            >
+              Terms of Service
+            </Link>
+            <span className="mx-2">&middot;</span>
+            <Link
+              href="/privacy"
+              className={
+                currentPage === "privacy"
+                  ? "font-semibold text-foreground"
+                  : "hover:text-foreground"
+              }
+            >
+              Privacy Policy
+            </Link>
+          </p>
           <p>
             Questions?{" "}
             <a

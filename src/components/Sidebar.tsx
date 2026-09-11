@@ -109,6 +109,15 @@ export function Sidebar({
         >
           Sign out
         </button>
+        <div className="mt-4 pt-3 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
+          <Link href="/terms" className="hover:text-foreground transition-colors">
+            Terms
+          </Link>
+          <span>&middot;</span>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">
+            Privacy
+          </Link>
+        </div>
       </div>
     </aside>
   );

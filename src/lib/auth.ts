@@ -5,14 +5,13 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
+import { resolveBaseURL } from "@/lib/base-url";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   secret: process.env.BETTER_AUTH_SECRET!,
   basePath: "/api/auth",
-  baseURL: process.env.BETTER_AUTH_URL ?? (process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : undefined),
+  baseURL: resolveBaseURL(),
   trustedOrigins: [
     "http://localhost:3000",
     "https://postvia.vercel.app",
