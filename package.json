@@ -11,7 +11,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "node --import tsx --test tests/threads.publish.test.ts tests/media.test.ts tests/threads.media.test.ts tests/media-client.test.ts tests/scheduling.test.ts tests/schedule.test.ts tests/platform-capabilities.test.ts tests/multi-target.test.ts tests/composer-previews.test.ts tests/tiktok.test.ts tests/instagram.test.ts"
+    "test": "node --import tsx --test tests/threads.publish.test.ts tests/media.test.ts tests/threads.media.test.ts tests/media-client.test.ts tests/scheduling.test.ts tests/schedule.test.ts tests/platform-capabilities.test.ts tests/multi-target.test.ts tests/composer-previews.test.ts tests/tiktok.test.ts tests/instagram.test.ts tests/auth-ux.test.ts"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.7.4",
@@ -21,7 +21,8 @@
     "better-auth": "^1.7.4",
     "next": "16.3.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "resend": "^6.27.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { GoogleButton } from "@/components/GoogleButton";
 
 export function LoginForm({
   deleted = false,
@@ -13,15 +14,25 @@ export function LoginForm({
   passwordChanged?: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get("error");
+  const oauthAccountNotLinked = oauthError === "account_not_linked";
+  const oauthFailed = oauthError !== null && !oauthAccountNotLinked;
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [resending, setResending] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setEmailNotVerified(false);
+    setResendSuccess(false);
 
     const { error: signInError } = await authClient.signIn.email({
       email,
@@ -29,6 +40,14 @@ export function LoginForm({
     });
 
     if (signInError) {
+      if (
+        signInError.message?.toLowerCase().includes("email not verified") ||
+        signInError.status === 403
+      ) {
+        setEmailNotVerified(true);
+        setSubmitting(false);
+        return;
+      }
       setError(signInError.message || "Unable to sign in");
       setSubmitting(false);
       return;
@@ -38,6 +57,24 @@ export function LoginForm({
     router.refresh();
   }
 
+  async function handleResendVerification() {
+    setResending(true);
+    setResendSuccess(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) setResendSuccess(true);
+      else setError("Failed to resend. Please try again.");
+    } catch {
+      setError("Failed to resend. Please try again.");
+    }
+    setResending(false);
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-8">
       <div className="w-full max-w-sm">
@@ -45,6 +82,19 @@ export function LoginForm({
         <p className="text-sm text-muted-foreground mb-8">
           Publish to social media in one place
         </p>
+
+        {oauthAccountNotLinked && (
+          <div className="mb-4 p-3 rounded-md border border-destructive/30 bg-red-50 text-sm text-destructive">
+            This Google account is not linked to an existing account. Please
+            sign in with your email and password first.
+          </div>
+        )}
+
+        {oauthFailed && (
+          <div className="mb-4 p-3 rounded-md border border-destructive/30 bg-red-50 text-sm text-destructive">
+            Google sign-in failed. Please try again.
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 rounded-md border border-destructive/30 bg-red-50 text-sm text-destructive">
@@ -57,6 +107,28 @@ export function LoginForm({
             {deleted
               ? "Your account has been deleted."
               : "Password changed. Please sign in again."}
+          </div>
+        )}
+
+        {emailNotVerified && (
+          <div className="mb-4 p-3 rounded-md border border-amber-300/50 bg-amber-50 text-sm text-amber-800">
+            <p className="mb-2">
+              Your email address has not been verified yet.
+            </p>
+            {resendSuccess ? (
+              <p className="font-medium">
+                Verification email sent. Check your inbox.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleResendVerification()}
+                disabled={resending}
+                className="underline font-medium disabled:opacity-40"
+              >
+                {resending ? "Sending..." : "Resend verification email"}
+              </button>
+            )}
           </div>
         )}
 
@@ -97,6 +169,14 @@ export function LoginForm({
             {submitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
+
+        <div className="my-6 flex items-center gap-3">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted-foreground">or</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        <GoogleButton />
 
         <p className="mt-6 text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
