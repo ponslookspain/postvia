@@ -12,7 +12,7 @@ interface PlatformAccount {
 }
 
 interface PlatformConfig {
-  platform: "X" | "THREADS" | "TIKTOK";
+  platform: string;
   name: string;
   connectLabel: string;
   connectEndpoint: string;
@@ -41,7 +41,28 @@ const THREADS_ICON = (
   </svg>
 );
 
-const PLATFORMS: PlatformConfig[] = [
+const TIKTOK_ICON = (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.59 2.59 0 1 1 .77-5.05v-3.15a5.74 5.74 0 0 0-.77-.05A5.72 5.72 0 1 0 15.54 15V8.5a7.27 7.27 0 0 0 4.28 1.38V6.79a4.3 4.3 0 0 1-3.22-.97Z" />
+  </svg>
+);
+
+const INSTAGRAM_ICON = (
+  <svg
+    className="w-5 h-5"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <circle cx="12" cy="12" r="4" />
+    <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+const SINGLE_PLATFORMS: PlatformConfig[] = [
   {
     platform: "X",
     name: "X (Twitter)",
@@ -60,17 +81,41 @@ const PLATFORMS: PlatformConfig[] = [
   },
 ];
 
+// Multi-account platforms (a user may connect several handles).
+const MULTI_PLATFORMS: PlatformConfig[] = [
+  {
+    platform: "TIKTOK",
+    name: "TikTok",
+    connectLabel: "Connect TikTok",
+    connectEndpoint: "/api/auth/tiktok/connect",
+    disconnectEndpoint: "/api/accounts/tiktok",
+    icon: TIKTOK_ICON,
+  },
+  {
+    platform: "INSTAGRAM",
+    name: "Instagram",
+    connectLabel: "Connect Instagram",
+    connectEndpoint: "/api/auth/instagram/connect",
+    disconnectEndpoint: "/api/accounts/instagram",
+    icon: INSTAGRAM_ICON,
+  },
+];
+
 function getSearchParamMessage(searchParams: URLSearchParams): string | null {
   const connected = searchParams.get("connected");
   const error = searchParams.get("error");
 
-  if (connected === "true") return "Account connected successfully";
+  if (connected) return "Account connected successfully";
   if (error) {
     const errors: Record<string, string> = {
       access_denied: "Authorization was denied by the user",
       invalid_state: "Invalid OAuth state. Please try again.",
       invalid_session: "Session expired. Please try again.",
       missing_parameters: "Missing authorization parameters",
+      instagram_personal_account:
+        "Only Instagram Business or Creator accounts can be connected.",
+      instagram_callback_failed: "Instagram connection failed. Please try again.",
+      tiktok_callback_failed: "TikTok connection failed. Please try again.",
     };
     return errors[error] || `Error: ${error}`;
   }
@@ -81,10 +126,12 @@ export default function AccountsContent({
   xAccount: initialXAccount,
   threadsAccount: initialThreadsAccount,
   tiktokAccounts: initialTiktokAccounts,
+  instagramAccounts: initialInstagramAccounts,
 }: {
   xAccount: PlatformAccount | null;
   threadsAccount: PlatformAccount | null;
   tiktokAccounts: PlatformAccount[];
+  instagramAccounts: PlatformAccount[];
 }) {
   const searchParams = useSearchParams();
   const [xAccount, setXAccount] = useState<PlatformAccount | null>(
@@ -92,8 +139,12 @@ export default function AccountsContent({
   );
   const [threadsAccount, setThreadsAccount] =
     useState<PlatformAccount | null>(initialThreadsAccount);
-  const [tiktokAccounts, setTiktokAccounts] =
-    useState<PlatformAccount[]>(initialTiktokAccounts);
+  const [multiAccounts, setMultiAccounts] = useState<
+    Record<string, PlatformAccount[]>
+  >({
+    TIKTOK: initialTiktokAccounts,
+    INSTAGRAM: initialInstagramAccounts,
+  });
   const [connecting, setConnecting] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(() =>
@@ -125,30 +176,6 @@ export default function AccountsContent({
     }
   }
 
-  async function handleDisconnectTiktok(account: PlatformAccount) {
-    if (!confirm(`Disconnect TikTok @${account.username}?`)) return;
-    setDisconnecting(account.id);
-    try {
-      const res = await fetch(
-        `/api/accounts/tiktok?accountId=${encodeURIComponent(account.id)}`,
-        { method: "DELETE" }
-      );
-      if (res.ok) {
-        setTiktokAccounts((current) =>
-          current.filter((item) => item.id !== account.id)
-        );
-        setMessage("TikTok account disconnected");
-      } else {
-        const data = await res.json();
-        setMessage(data.error || "Failed to disconnect");
-      }
-    } catch {
-      setMessage("Failed to disconnect. Please try again.");
-    } finally {
-      setDisconnecting(null);
-    }
-  }
-
   async function handleDisconnect(config: PlatformConfig) {
     if (
       !confirm(
@@ -161,6 +188,36 @@ export default function AccountsContent({
       const res = await fetch(config.disconnectEndpoint, { method: "DELETE" });
       if (res.ok) {
         byPlatform[config.platform].setAccount(null);
+        setMessage(`${config.name} account disconnected`);
+      } else {
+        const data = await res.json();
+        setMessage(data.error || "Failed to disconnect");
+      }
+    } catch {
+      setMessage("Failed to disconnect. Please try again.");
+    } finally {
+      setDisconnecting(null);
+    }
+  }
+
+  async function handleDisconnectMulti(
+    config: PlatformConfig,
+    account: PlatformAccount
+  ) {
+    if (!confirm(`Disconnect ${config.name} @${account.username}?`)) return;
+    setDisconnecting(account.id);
+    try {
+      const res = await fetch(
+        `${config.disconnectEndpoint}?accountId=${encodeURIComponent(account.id)}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setMultiAccounts((current) => ({
+          ...current,
+          [config.platform]: current[config.platform].filter(
+            (item) => item.id !== account.id
+          ),
+        }));
         setMessage(`${config.name} account disconnected`);
       } else {
         const data = await res.json();
@@ -190,7 +247,7 @@ export default function AccountsContent({
       )}
 
       <div className="space-y-4">
-        {PLATFORMS.map((config) => {
+        {SINGLE_PLATFORMS.map((config) => {
           const { account } = byPlatform[config.platform];
           const connected = Boolean(account);
           return (
@@ -244,73 +301,69 @@ export default function AccountsContent({
           );
         })}
 
-        <div className="border border-border rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  tiktokAccounts.length > 0
-                    ? "bg-foreground text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.59 2.59 0 1 1 .77-5.05v-3.15a5.74 5.74 0 0 0-.77-.05A5.72 5.72 0 1 0 15.54 15V8.5a7.27 7.27 0 0 0 4.28 1.38V6.79a4.3 4.3 0 0 1-3.22-.97Z" />
-                </svg>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold">TikTok</p>
-                  {tiktokAccounts.length > 0 && (
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700">
-                      {tiktokAccounts.length} connected
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {tiktokAccounts.length === 0
-                    ? "Not connected"
-                    : "Video posts via Direct Post"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() =>
-                handleConnect({
-                  platform: "TIKTOK",
-                  name: "TikTok",
-                  connectLabel: "Connect TikTok",
-                  connectEndpoint: "/api/auth/tiktok/connect",
-                  disconnectEndpoint: "/api/accounts/tiktok",
-                  icon: null,
-                })
-              }
-              disabled={connecting === "TIKTOK"}
-              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
-            >
-              {connecting === "TIKTOK" ? "Connecting..." : "Connect TikTok"}
-            </button>
-          </div>
-          {tiktokAccounts.length > 0 && (
-            <ul className="mt-4 space-y-2">
-              {tiktokAccounts.map((account) => (
-                <li
-                  key={account.id}
-                  className="flex items-center justify-between border border-border rounded-md px-3 py-2"
-                >
-                  <span className="text-sm">@{account.username}</span>
-                  <button
-                    onClick={() => handleDisconnectTiktok(account)}
-                    disabled={disconnecting === account.id}
-                    className="px-3 py-1 text-xs text-destructive border border-destructive/30 rounded-md hover:bg-red-50 transition-colors disabled:opacity-40"
+        {MULTI_PLATFORMS.map((config) => {
+          const accounts = multiAccounts[config.platform] ?? [];
+          return (
+            <div key={config.platform} className="border border-border rounded-lg p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      accounts.length > 0
+                        ? "bg-foreground text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
                   >
-                    {disconnecting === account.id ? "Disconnecting..." : "Disconnect"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                    {config.icon}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold">{config.name}</p>
+                      {accounts.length > 0 && (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700">
+                          {accounts.length} connected
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {accounts.length === 0
+                        ? "Not connected"
+                        : "Multiple accounts supported"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleConnect(config)}
+                  disabled={connecting === config.platform}
+                  className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
+                >
+                  {connecting === config.platform
+                    ? "Connecting..."
+                    : config.connectLabel}
+                </button>
+              </div>
+              {accounts.length > 0 && (
+                <ul className="mt-4 space-y-2">
+                  {accounts.map((account) => (
+                    <li
+                      key={account.id}
+                      className="flex items-center justify-between border border-border rounded-md px-3 py-2"
+                    >
+                      <span className="text-sm">@{account.username}</span>
+                      <button
+                        onClick={() => handleDisconnectMulti(config, account)}
+                        disabled={disconnecting === account.id}
+                        className="px-3 py-1 text-xs text-destructive border border-destructive/30 rounded-md hover:bg-red-50 transition-colors disabled:opacity-40"
+                      >
+                        {disconnecting === account.id ? "Disconnecting..." : "Disconnect"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

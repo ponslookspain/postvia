@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { threadsPostUrl, isFutureIso } from "@/lib/utils";
 import { validateMediaInput } from "@/lib/media";
-import { buildComposerPreviews } from "@/lib/composer-previews";
+import {
+  buildComposerPreviews,
+  buildComposerMediaErrors,
+} from "@/lib/composer-previews";
 
 import type { Platform } from "@prisma/client";
 
@@ -256,24 +259,21 @@ export default function NewPostComposer({
     })
   );
   const hasOverLimit = previews.some((preview) => preview.overLimit);
-  const hasTikTok = selectedAccounts.some(
-    (account) => account.platform === "TIKTOK"
+  const mediaErrors = buildComposerMediaErrors(
+    selectedAccounts,
+    media.map((item) => ({ type: item.kind, mimeType: item.file.type }))
   );
-  const videoMediaCount = media.filter((item) => item.kind === "VIDEO").length;
-  const tiktokMediaError =
-    hasTikTok && (media.length !== 1 || videoMediaCount !== 1)
-      ? "TikTok requires exactly one MP4/WebM video."
-      : null;
+  const hasMediaError = mediaErrors.length > 0;
   const canSave =
     text.trim().length > 0 &&
     !hasOverLimit &&
-    !tiktokMediaError &&
+    !hasMediaError &&
     selectedAccountIds.length > 0 &&
     !saving;
   const canPublish =
     text.trim().length > 0 &&
     !hasOverLimit &&
-    !tiktokMediaError &&
+    !hasMediaError &&
     selectedAccountIds.length > 0 &&
     !publishing &&
     !saving;
@@ -982,9 +982,11 @@ export default function NewPostComposer({
               Select at least one connected account.
             </p>
           )}
-          {tiktokMediaError && (
-            <p className="text-xs text-red-600 mt-2">{tiktokMediaError}</p>
-          )}
+          {mediaErrors.map((message) => (
+            <p key={message} className="text-xs text-red-600 mt-2">
+              {message}
+            </p>
+          ))}
         </div>
 
         <div>

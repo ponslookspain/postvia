@@ -17,6 +17,13 @@ import {
   type TiktokPublishSettings,
 } from "@/lib/social/tiktok";
 import {
+  ensureFreshInstagramToken,
+  InstagramProvider,
+  instagramErrorMessage,
+  monitorInstagramContainer,
+  publishInstagramMedia,
+} from "@/lib/social/instagram";
+import {
   getPlatformCapabilities,
   type PlatformCapabilities,
 } from "@/lib/platforms/capabilities";
@@ -69,6 +76,8 @@ function getProvider(platform: string): SocialProvider {
       return new XProvider();
     case "THREADS":
       return new ThreadsProvider();
+    case "INSTAGRAM":
+      return new InstagramProvider();
     default:
       throw new Error(`Unsupported platform: ${platform}`);
   }
@@ -178,11 +187,18 @@ async function resolveTargetAccount(
 async function updateTargetFailure(
   postId: string,
   targetId: string,
-  error: string
+  error: string,
+  options: { clearJobId?: boolean } = {}
 ): Promise<void> {
   await prisma.postTarget.update({
     where: { id: targetId },
-    data: { status: "FAILED", errorMessage: error },
+    data: {
+      status: "FAILED",
+      errorMessage: error,
+      // Terminal platform-side failures must drop the job id so the next
+      // manual retry legitimately starts a fresh container/upload.
+      ...(options.clearJobId ? { externalJobId: null } : {}),
+    },
   });
 }
 
@@ -233,6 +249,9 @@ async function executeTargetPublish(
 
   if (target.platform === "TIKTOK") {
     return executeTiktokTarget(post, target, account, effective);
+  }
+  if (target.platform === "INSTAGRAM") {
+    return executeInstagramTarget(post, target, account, effective);
   }
 
   const resolvedMedia = await resolveTargetMedia(post, target, caps);
@@ -372,7 +391,11 @@ async function executeTiktokTarget(
     }
     case "invalid":
     case "failed": {
-      await updateTargetFailure(post.id, target.id, outcome.error);
+      // TikTok reports these states only when the job is terminal
+      // (FAILED status / rejected init): safe to clear for a fresh retry.
+      await updateTargetFailure(post.id, target.id, outcome.error, {
+        clearJobId: true,
+      });
       return failedOutcome(target, outcome.error);
     }
     case "processing": {
@@ -382,6 +405,104 @@ async function executeTiktokTarget(
         ok: false,
         error: "TikTok is still processing this video. Publishing continues automatically — do not reinitialize.",
         platform: "TIKTOK",
+      };
+    }
+  }
+}
+
+/** Instagram publishes by pointing Meta at a short-lived signed GET URL of
+ *  the PRIVATE blob (same fetch model already proven by Threads). */
+const INSTAGRAM_MEDIA_READ_TTL_MS = 30 * 60_000;
+
+async function executeInstagramTarget(
+  post: PublishPost,
+  target: PublishTarget,
+  account: PublishAccount,
+  effective: { text: string; content: Record<string, unknown>; settings: Record<string, unknown> }
+): Promise<PublishOutcome> {
+  const caps = getPlatformCapabilities("INSTAGRAM");
+  const mediaValidation = validateTargetMedia(caps, post.media);
+  if (!mediaValidation.ok) {
+    await updateTargetFailure(post.id, target.id, mediaValidation.error);
+    return failedOutcome(target, mediaValidation.error);
+  }
+  const media = post.media[0];
+  const caption =
+    typeof effective.content.text === "string" && effective.content.text.trim().length > 0
+      ? effective.content.text
+      : post.text;
+
+  let accessToken: string;
+  let mediaUrl: string;
+  try {
+    accessToken = await ensureFreshInstagramToken({
+      id: account.id,
+      accessToken: account.accessToken,
+      expiresAt: account.expiresAt,
+    });
+    mediaUrl = await createSignedGetUrl({
+      pathname: media.pathname,
+      ttlMs: INSTAGRAM_MEDIA_READ_TTL_MS,
+    });
+  } catch (error) {
+    const message = instagramErrorMessage(error);
+    await updateTargetFailure(post.id, target.id, message, {
+      clearJobId: true,
+    });
+    return failedOutcome(target, message);
+  }
+
+  const outcome = await publishInstagramMedia(
+    accessToken,
+    {
+      igUserId: account.externalId,
+      kind: media.type,
+      mediaUrl,
+      caption,
+      existingContainerId: target.externalJobId,
+    },
+    {
+      onContainerId: async (containerId) => {
+        await prisma.postTarget.update({
+          where: { id: target.id },
+          data: { externalJobId: containerId },
+        });
+      },
+    }
+  );
+
+  switch (outcome.state) {
+    case "published": {
+      await prisma.postTarget.update({
+        where: { id: target.id },
+        data: {
+          status: "PUBLISHED",
+          externalPostId: outcome.externalPostId ?? null,
+          publishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      return {
+        ok: true,
+        externalPostId: outcome.externalPostId ?? undefined,
+        username: account.username,
+        platform: "INSTAGRAM",
+      };
+    }
+    case "invalid":
+    case "failed": {
+      // ERROR/EXPIRED/media errors are terminal on Instagram's side: clear the
+      // container id so the next manual retry starts a fresh container.
+      await updateTargetFailure(post.id, target.id, outcome.error, {
+        clearJobId: true,
+      });
+      return failedOutcome(target, outcome.error);
+    }
+    case "processing": {
+      return {
+        ok: false,
+        error: "Instagram is still processing this media. Publishing continues automatically — do not retry yet.",
+        platform: "INSTAGRAM",
       };
     }
   }
@@ -429,6 +550,9 @@ export async function resumeTiktokTarget(
         where: { id: targetId },
         data: {
           status: "FAILED",
+          // Terminal job result: clear the id so a later manual retry can
+          // start a fresh publish instead of polling a dead job forever.
+          externalJobId: null,
           errorMessage: status.failReason
             ? `TikTok could not publish the video: ${status.failReason}`
             : "TikTok rejected the video post.",
@@ -447,12 +571,95 @@ export async function resumeTiktokTarget(
     ) {
       await prisma.postTarget.update({
         where: { id: targetId },
-        data: { status: "FAILED", errorMessage: tiktokErrorMessage(error) },
+        data: {
+          status: "FAILED",
+          externalJobId: null,
+          errorMessage: tiktokErrorMessage(error),
+        },
       });
       return "failed";
     }
     return "pending";
   }
+}
+
+/** Instagram stale-recovery: poll the SAME container, never re-create it. */
+export async function resumeInstagramTarget(
+  targetId: string
+): Promise<"complete" | "failed" | "pending" | "skip"> {
+  const target = await prisma.postTarget.findUnique({
+    where: { id: targetId },
+    include: { socialAccount: true },
+  });
+  if (
+    !target ||
+    target.platform !== "INSTAGRAM" ||
+    !target.externalJobId ||
+    target.status !== "PUBLISHING" ||
+    !target.socialAccount
+  ) {
+    return "skip";
+  }
+  const account = target.socialAccount;
+  try {
+    const accessToken = await ensureFreshInstagramToken(account);
+    const outcome = await monitorInstagramContainer(
+      accessToken,
+      { igUserId: account.externalId, containerId: target.externalJobId }
+    );
+    if (outcome.state === "published") {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "PUBLISHED",
+          externalPostId: outcome.externalPostId,
+          publishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      return "complete";
+    }
+    if (outcome.state === "failed") {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "FAILED",
+          externalJobId: null,
+          errorMessage: outcome.error,
+        },
+      });
+      return "failed";
+    }
+    return "pending";
+  } catch (error) {
+    await prisma.postTarget.update({
+      where: { id: targetId },
+      data: {
+        status: "FAILED",
+        externalJobId: null,
+        errorMessage: instagramErrorMessage(error),
+      },
+    });
+    return "failed";
+  }
+}
+
+/**
+ * Scheduler dispatch: resolve a stale PUBLISHING target by its own job,
+ * routing to the right platform resume. Non-job targets return "skip" so
+ * the standard stale-recovery resets them as before.
+ */
+export async function resumeJobTarget(
+  targetId: string
+): Promise<"complete" | "failed" | "pending" | "skip"> {
+  const platform = await prisma.postTarget.findUnique({
+    where: { id: targetId },
+    select: { platform: true },
+  });
+  if (platform?.platform === "INSTAGRAM") {
+    return resumeInstagramTarget(targetId);
+  }
+  return resumeTiktokTarget(targetId);
 }
 
 async function finalizePostStatus(postId: string, fallback: AggregatePostStatus): Promise<PublishOutcome> {

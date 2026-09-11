@@ -177,22 +177,22 @@ export function validateTargetMedia(
       };
     }
   }
-  if (!caps.implemented) {
-    return { ok: false, error: `${caps.label} publishing is not implemented yet` };
-  }
-  for (const item of media) {
-    if (item.type === "IMAGE" && !caps.media.image) {
-      return { ok: false, error: `${caps.label} does not support image media yet` };
+if (!caps.implemented) {
+      return { ok: false, error: `${caps.label} publishing is not implemented yet` };
     }
-    if (item.type === "VIDEO" && !caps.media.video) {
-      return { ok: false, error: `${caps.label} does not support video media yet` };
+    for (const item of media) {
+      if (item.type === "IMAGE" && !caps.media.image) {
+        return { ok: false, error: `${caps.label} does not support image media yet` };
+      }
+      if (item.type === "VIDEO" && !caps.media.video) {
+        return { ok: false, error: `${caps.label} does not support video media yet` };
+      }
+      if (caps.media.mimeTypes && !caps.media.mimeTypes.includes(item.mimeType)) {
+        return {
+          ok: false,
+          error: `${caps.label} does not support ${item.mimeType}. ${caps.label} accepts ${caps.media.mimeTypes.map((m) => m.split("/").pop()).join(" / ")} files.`,
+        };
+      }
     }
-    if (caps.media.mimeTypes && !caps.media.mimeTypes.includes(item.mimeType)) {
-      return {
-        ok: false,
-        error: `${caps.label} does not support ${item.mimeType}. ${caps.label} requires exactly one MP4/WebM video.`,
-      };
-    }
-  }
   return { ok: true };
 }

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { executePublish } from "@/lib/publish";
+import { executePublish, resumeJobTarget } from "@/lib/publish";
 import {
   isCronAuthorized,
   runScheduledPublishTick,
   type SchedulingDb,
 } from "@/lib/scheduling";
-import { resumeTiktokTarget } from "@/lib/publish";
 
 // One scheduled video publish can poll Meta's container for up to ~4
 // minutes; the tick stops claiming new posts at the internal budget
@@ -22,7 +21,7 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
     const stats = await runScheduledPublishTick({
       db: prisma as unknown as SchedulingDb,
       publish: executePublish,
-      resumeJob: (target) => resumeTiktokTarget(target.id),
+      resumeJob: (target) => resumeJobTarget(target.id),
     });
     return NextResponse.json({ ok: true, ...stats });
   } catch (error) {

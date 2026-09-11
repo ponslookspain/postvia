@@ -106,10 +106,21 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
   INSTAGRAM: {
     platform: "INSTAGRAM",
     label: "Instagram",
-    implemented: false,
+    implemented: true,
+    // Instagram professional accounts require media: single JPEG photo or
+    // single MP4 Reel in the MVP. Text-only posts are not publishable.
     supportsText: false,
-    media: { image: true, video: true, maxItems: 10 },
-    fields: [],
+    media: {
+      image: true,
+      video: true,
+      maxItems: 1,
+      // Meta's Content Publishing accepts JPEG images only and MP4/MOV video;
+      // our store uploads MP4, so the API-compatible pair is jpeg + mp4.
+      mimeTypes: ["image/jpeg", "video/mp4"],
+    },
+    fields: [
+      { key: "text", label: "Caption", type: "text", maxLength: 2200 },
+    ],
   },
   FACEBOOK: {
     platform: "FACEBOOK",

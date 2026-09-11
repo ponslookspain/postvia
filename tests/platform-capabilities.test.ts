@@ -112,7 +112,7 @@ describe("capability media validation", () => {
   });
 
   test("unimplemented platforms are rejected at publish validation", () => {
-    const result = validateTargetMedia(getPlatformCapabilities("INSTAGRAM"), [
+    const result = validateTargetMedia(getPlatformCapabilities("FACEBOOK"), [
       { type: "IMAGE", mimeType: "image/png" },
     ]);
     assert.equal(result.ok, false);
