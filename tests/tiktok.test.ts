@@ -104,13 +104,27 @@ describe("TikTok social layer", () => {
   }
 
   describe("authorize + token exchange", () => {
-    test("authorize URL uses v2 endpoint, scopes and exact redirect URI", () => {
+    test("authorize URL uses v2 endpoint, comma scopes and exact redirect URI", () => {
       const url = tiktok.getTiktokAuthorizeUrl("state-123");
       assert.ok(url.startsWith("https://www.tiktok.com/v2/auth/authorize/"));
       const params = new URL(url).searchParams;
       assert.equal(params.get("client_key"), "test-client-key");
       assert.equal(params.get("response_type"), "code");
-      assert.equal(params.get("scope"), "user.info.basic video.publish");
+
+      // TikTok contract: scope is a comma-separated string of scopes.
+      const scope = params.get("scope");
+      assert.equal(scope, "user.info.basic,video.publish");
+      const scopes = (scope ?? "").split(",");
+      assert.deepEqual(scopes, ["user.info.basic", "video.publish"]);
+      assert.ok(
+        !url.includes("user.info.basic+video.publish"),
+        "space-joined scopes would encode as '+' and TikTok rejects them"
+      );
+      assert.ok(
+        /scope=user\.info\.basic(%2C|,)video\.publish/.test(url),
+        `raw URL must carry comma-separated scopes, got: ${url}`
+      );
+
       assert.equal(
         params.get("redirect_uri"),
         "https://postvia.vercel.app/api/auth/tiktok/callback"

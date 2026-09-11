@@ -27,7 +27,11 @@ export function getTiktokAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
     client_key: clientKey,
     response_type: "code",
-    scope: TIKTOK_SCOPES.join(" "),
+    // Official Login Kit contract: scope must be a COMMA-separated string
+    // ("user.info.basic,video.publish"). URLSearchParams encodes "," as %2C,
+    // which TikTok decodes correctly; a space would become "+" and TikTok
+    // rejects it with an "scope" error.
+    scope: TIKTOK_SCOPES.join(","),
     redirect_uri: getTiktokRedirectUri(),
     state,
   });
