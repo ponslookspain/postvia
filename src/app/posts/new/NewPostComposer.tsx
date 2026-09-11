@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   X_POST_CHAR_LIMIT,
@@ -32,6 +32,15 @@ type DraftMedia = {
   progress: number;
   error?: string;
 };
+
+type ConnectedAccount = {
+  id: string;
+  platform: Platform;
+  username: string;
+  implemented: boolean;
+};
+
+type TargetOverrideState = Record<string, { content?: { text?: string } }>;
 
 const MAX_MEDIA = 4;
 
@@ -146,11 +155,6 @@ function uploadFileToPost(
   });
 }
 
-const PLATFORM_OPTIONS: { value: Platform; label: string }[] = [
-  { value: "X", label: "X" },
-  { value: "THREADS", label: "Threads" },
-];
-
 function toLocalInputValue(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
@@ -169,8 +173,10 @@ export default function NewPostComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [media, setMedia] = useState<DraftMedia[]>([]);
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [targetOverrides, setTargetOverrides] = useState<TargetOverrideState>({});
   const [mediaUploadNote, setMediaUploadNote] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<Platform>("THREADS");
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [scheduling, setScheduling] = useState(false);
@@ -185,14 +191,61 @@ export default function NewPostComposer({
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
 
+  const selectedAccounts = accounts.filter((account) =>
+    selectedAccountIds.includes(account.id)
+  );
+  const platform: Platform = selectedAccounts[0]?.platform ?? "THREADS";
   const charLimit =
     platform === "THREADS" ? THREADS_POST_CHAR_LIMIT : X_POST_CHAR_LIMIT;
   const charCount = text.length;
   const isOverLimit = charCount > charLimit;
-  const canSave = text.trim().length > 0 && !isOverLimit && !saving;
+  const canSave =
+    text.trim().length > 0 &&
+    !isOverLimit &&
+    selectedAccountIds.length > 0 &&
+    !saving;
   const canPublish =
-    text.trim().length > 0 && !isOverLimit && !publishing && !saving;
-  const schedulingForX = platform === "X";
+    text.trim().length > 0 &&
+    !isOverLimit &&
+    selectedAccountIds.length > 0 &&
+    !publishing &&
+    !saving;
+  const schedulingForX = selectedAccounts.some((account) => account.platform === "X");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/accounts")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((data: ConnectedAccount[]) => {
+        if (cancelled) return;
+        setAccounts(data);
+        setSelectedAccountIds(
+          data
+            .filter((account) => account.implemented && account.platform === "THREADS")
+            .map((account) => account.id)
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setAccounts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function buildPostBody(nextScheduledAt?: string) {
+    return {
+      text: text.trim(),
+      platform,
+      hasMedia: media.length > 0,
+      accountIds: selectedAccountIds,
+      targets: selectedAccountIds.map((accountId) => ({
+        accountId,
+        overrides: targetOverrides[accountId] ?? null,
+      })),
+      ...(nextScheduledAt ? { scheduledAt: nextScheduledAt } : {}),
+    };
+  }
 
   function getScheduledIso(): string | null {
     if (!scheduleDate || !scheduleTime) return null;
@@ -231,6 +284,11 @@ export default function NewPostComposer({
       });
     }
     if (pending.length === 0) return;
+    setSelectedAccountIds((current) =>
+      current.filter(
+        (id) => accounts.find((account) => account.id === id)?.platform !== "X"
+      )
+    );
     setMedia((prev) => {
       if (prev.length + pending.length > MAX_MEDIA) {
         alert(`You can attach up to ${MAX_MEDIA} files per post.`);
@@ -291,7 +349,7 @@ export default function NewPostComposer({
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim(), platform }),
+          body: JSON.stringify(buildPostBody()),
       });
 
       if (!res.ok) throw new Error("Failed to save");
@@ -335,11 +393,7 @@ export default function NewPostComposer({
       const res = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: text.trim(),
-          platform,
-          scheduledAt: scheduledIso,
-        }),
+        body: JSON.stringify(buildPostBody(scheduledIso)),
       });
 
       const data = await res.json();
@@ -378,7 +432,7 @@ export default function NewPostComposer({
       const createRes = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.trim(), platform }),
+          body: JSON.stringify(buildPostBody()),
       });
 
       if (!createRes.ok) throw new Error("Failed to create post");
@@ -703,29 +757,91 @@ export default function NewPostComposer({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2">Platform</label>
-          <div className="flex items-center gap-2">
-            {PLATFORM_OPTIONS.map((option) => {
-              const active = platform === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    setPlatform(option.value);
-                    setScheduleMode(false);
-                  }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-foreground text-primary-foreground border-foreground"
-                      : "border-border text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
+          <label className="block text-sm font-medium mb-2">Publish to</label>
+          {accounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Connect a social account before creating a post.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {accounts.map((account) => {
+                const selected = selectedAccountIds.includes(account.id);
+                const blockedByMedia = media.length > 0 && account.platform === "X";
+                const disabled = !account.implemented || blockedByMedia;
+                const overrideText = targetOverrides[account.id]?.content?.text;
+                return (
+                  <div key={account.id} className="border border-border rounded-md p-3">
+                    <label className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={disabled || saving || publishing || scheduling}
+                        onChange={(event) => {
+                          setSelectedAccountIds((current) =>
+                            event.target.checked
+                              ? [...current, account.id]
+                              : current.filter((id) => id !== account.id)
+                          );
+                        }}
+                      />
+                      <span className="text-sm font-medium">
+                        {account.platform} @{account.username}
+                      </span>
+                      {!account.implemented && (
+                        <span className="text-xs text-muted-foreground">Soon</span>
+                      )}
+                      {blockedByMedia && (
+                        <span className="text-xs text-red-600">
+                          X media publishing is not available
+                        </span>
+                      )}
+                    </label>
+                    {selected && (
+                      <div className="mt-3 pl-6">
+                        <label className="block text-xs font-medium text-muted-foreground mb-1">
+                          Customize per platform
+                        </label>
+                        <textarea
+                          value={overrideText ?? ""}
+                          placeholder="Use global text"
+                          rows={2}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setTargetOverrides((current) => ({
+                              ...current,
+                              [account.id]: value
+                                ? { content: { text: value } }
+                                : {},
+                            }));
+                          }}
+                          className="w-full border border-border rounded-md p-2 text-sm resize-none"
+                        />
+                        {overrideText && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTargetOverrides((current) => ({
+                                ...current,
+                                [account.id]: {},
+                              }))
+                            }
+                            className="text-xs text-muted-foreground mt-1 underline"
+                          >
+                            Use global
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {selectedAccountIds.length === 0 && (
+            <p className="text-xs text-red-600 mt-2">
+              Select at least one connected account.
+            </p>
+          )}
         </div>
 
         <div>

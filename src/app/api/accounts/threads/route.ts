@@ -1,20 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { ThreadsProvider } from "@/lib/social/threads";
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    const account = await prisma.socialAccount.findUnique({
+    const accountId = request.nextUrl.searchParams.get("accountId");
+    const account = await prisma.socialAccount.findFirst({
       where: {
-        userId_platform: {
-          userId: user.id,
-          platform: "THREADS",
-        },
+        userId: user.id,
+        platform: "THREADS",
+        ...(accountId ? { id: accountId } : {}),
       },
     });
 

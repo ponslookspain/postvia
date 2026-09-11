@@ -47,30 +47,31 @@ export async function GET(request: NextRequest) {
     const tokens = await xProvider.exchangeCode(code, codeVerifier);
     const xUser = await xProvider.getCurrentUser(tokens.accessToken);
 
-    await prisma.socialAccount.upsert({
+    const existingAccount = await prisma.socialAccount.findFirst({
       where: {
-        userId_platform: {
-          userId: user.id,
-          platform: "X",
-        },
-      },
-      update: {
-        externalId: xUser.externalId,
-        username: xUser.username,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresAt: tokens.expiresAt,
-      },
-      create: {
         userId: user.id,
         platform: "X",
         externalId: xUser.externalId,
-        username: xUser.username,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresAt: tokens.expiresAt,
       },
+      select: { id: true },
     });
+    const accountData = {
+      externalId: xUser.externalId,
+      username: xUser.username,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+    };
+    if (existingAccount) {
+      await prisma.socialAccount.update({
+        where: { id: existingAccount.id },
+        data: accountData,
+      });
+    } else {
+      await prisma.socialAccount.create({
+        data: { userId: user.id, platform: "X", ...accountData },
+      });
+    }
 
     const response = NextResponse.redirect(
       new URL("/accounts?connected=true", request.url)

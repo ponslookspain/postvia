@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
-import { executePublish } from "@/lib/publish";
+import { publishPostTargets } from "@/lib/publish";
 
 // Threads video containers can keep processing for minutes; publishing
 // polls them inline. 300s is within the maxDuration allowed on the
@@ -32,10 +32,10 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const target = post.targets.find(
+    const hasPublishableTarget = post.targets.some(
       (t) => t.status === "PENDING" || t.status === "FAILED"
     );
-    if (!target) {
+    if (!hasPublishableTarget) {
       return NextResponse.json(
         { error: "No publishable target found for this post" },
         { status: 400 }
@@ -45,7 +45,7 @@ export async function POST(
     const claim = await prisma.post.updateMany({
       where: {
         id,
-        status: { in: ["DRAFT", "SCHEDULED", "FAILED"] },
+        status: { in: ["DRAFT", "SCHEDULED", "FAILED", "PARTIALLY_PUBLISHED"] },
       },
       data: { status: "PUBLISHING" },
     });
@@ -57,29 +57,7 @@ export async function POST(
       );
     }
 
-    const account = await prisma.socialAccount.findUnique({
-      where: {
-        userId_platform: {
-          userId: user.id,
-          platform: target.platform,
-        },
-      },
-    });
-
-    if (!account) {
-      await prisma.post.update({
-        where: { id },
-        data: { status: "FAILED" },
-      });
-      return NextResponse.json(
-        {
-          error: `${target.platform} account not connected. Please connect your ${target.platform} account first.`,
-        },
-        { status: 400 }
-      );
-    }
-
-    const result = await executePublish(post, account, target);
+    const result = await publishPostTargets(id);
 
     if (result.ok) {
       return NextResponse.json({

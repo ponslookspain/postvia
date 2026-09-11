@@ -9,13 +9,8 @@ export const dynamic = "force-dynamic";
 export default async function AccountsPage() {
   const user = await requireUser();
   const [xAccount, threadsAccount] = await Promise.all([
-    prisma.socialAccount.findUnique({
-      where: {
-        userId_platform: {
-          userId: user.id,
-          platform: "X",
-        },
-      },
+    prisma.socialAccount.findFirst({
+      where: { userId: user.id, platform: "X" },
       select: {
         id: true,
         platform: true,
@@ -24,13 +19,8 @@ export default async function AccountsPage() {
         createdAt: true,
       },
     }),
-    prisma.socialAccount.findUnique({
-      where: {
-        userId_platform: {
-          userId: user.id,
-          platform: "THREADS",
-        },
-      },
+    prisma.socialAccount.findFirst({
+      where: { userId: user.id, platform: "THREADS" },
       select: {
         id: true,
         platform: true,

@@ -8,6 +8,11 @@ import {
   threadsPostUrl,
   formatPlatformName,
 } from "@/lib/utils";
+import {
+  localInputToIso,
+  localDateInputValue,
+  localTimeInputValue,
+} from "@/lib/schedule";
 
 interface Post {
   id: string;
@@ -19,7 +24,9 @@ interface Post {
   scheduledAt: string | null;
   publishedAt: string | null;
   targets: {
+    id: string;
     platform: string;
+    socialAccount?: { username: string } | null;
     externalPostId?: string | null;
     status: string;
     errorMessage?: string | null;
@@ -51,6 +58,11 @@ export default function PostDetailPage({
   const [publishing, setPublishing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleTime, setRescheduleTime] = useState("");
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [rescheduling, setRescheduling] = useState(false);
 
   const target = post.targets[0];
   const platform = target?.platform ?? "X";
@@ -159,10 +171,14 @@ export default function PostDetailPage({
     }
   }
 
-  async function handleRetry() {
+  async function handleRetry(targetId?: string) {
     setRetrying(true);
     try {
-      const res = await fetch(`/api/posts/${id}/retry`, { method: "POST" });
+      const res = await fetch(`/api/posts/${id}/retry`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(targetId ? { targetId } : {}),
+      });
       const data = await res.json();
 
       if (res.ok) {
@@ -173,7 +189,7 @@ export default function PostDetailPage({
           publishedAt: now,
           errorMessage: null,
           targets: prev.targets.map((t) =>
-            t.platform === platform
+            (!targetId ? t.platform === platform : t.id === targetId)
               ? {
                   ...t,
                   status: "PUBLISHED",
@@ -190,7 +206,7 @@ export default function PostDetailPage({
           status: "FAILED",
           errorMessage: data.error || "Publication failed",
           targets: prev.targets.map((t) =>
-            t.platform === platform
+            (!targetId ? t.platform === platform : t.id === targetId)
               ? { ...t, status: "FAILED", errorMessage: data.error }
               : t
           ),
@@ -207,11 +223,60 @@ export default function PostDetailPage({
     }
   }
 
+  function openReschedule() {
+    const base = post.scheduledAt
+      ? new Date(post.scheduledAt)
+      : new Date(Date.now() + 60 * 60 * 1000);
+    setRescheduleDate(localDateInputValue(base));
+    setRescheduleTime(localTimeInputValue(base));
+    setRescheduleError(null);
+    setRescheduleOpen(true);
+  }
+
+  async function sendScheduledAt(value: string | null) {
+    setRescheduling(true);
+    setRescheduleError(null);
+    try {
+      const res = await fetch(`/api/posts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduledAt: value }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRescheduleError(data.error || "Failed to reschedule.");
+        return false;
+      }
+      setPost((prev) => ({ ...prev, ...data }));
+      setRescheduleOpen(false);
+      return true;
+    } catch {
+      setRescheduleError("Network error. Please try again.");
+      return false;
+    } finally {
+      setRescheduling(false);
+    }
+  }
+
+  async function handleRescheduleSave() {
+    const iso = localInputToIso(rescheduleDate, rescheduleTime);
+    if (!iso) {
+      setRescheduleError("Please choose a valid date and time.");
+      return;
+    }
+    await sendScheduledAt(iso);
+  }
+
+  async function handleUnschedule() {
+    await sendScheduledAt(null);
+  }
+
   const statusColors: Record<string, string> = {
     DRAFT: "bg-muted text-muted-foreground",
     SCHEDULED: "bg-amber-50 text-amber-700",
     PUBLISHING: "bg-blue-50 text-blue-700",
     PUBLISHED: "bg-green-50 text-green-700",
+    PARTIALLY_PUBLISHED: "bg-amber-50 text-amber-700",
     FAILED: "bg-red-50 text-red-700",
   };
 
@@ -352,6 +417,7 @@ export default function PostDetailPage({
                   year: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
+                  timeZoneName: "short",
                 })}
               </p>
             </div>
@@ -381,6 +447,113 @@ export default function PostDetailPage({
             </div>
           )}
         </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2">Publishing targets</label>
+          <div className="space-y-2">
+            {post.targets.map((targetItem) => (
+              <div
+                key={targetItem.id}
+                className="flex items-center justify-between border border-border rounded-md px-3 py-2"
+              >
+                <div>
+                  <p className="text-sm font-medium">
+                    {formatPlatformName(targetItem.platform)}
+                    {targetItem.socialAccount?.username
+                      ? ` @${targetItem.socialAccount.username}`
+                      : ""}
+                  </p>
+                  {targetItem.errorMessage && (
+                    <p className="text-xs text-red-600">{targetItem.errorMessage}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {targetItem.status.toLowerCase()}
+                  </span>
+                  {targetItem.status === "FAILED" && (
+                    <button
+                      onClick={() => handleRetry(targetItem.id)}
+                      disabled={retrying}
+                      className="px-3 py-1 text-xs border border-border rounded-md hover:bg-muted disabled:opacity-40"
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {rescheduleOpen &&
+          (post.status === "DRAFT" || post.status === "SCHEDULED") &&
+          platform === "THREADS" && (
+            <div className="border border-border rounded-lg p-5">
+              <label className="block text-sm font-medium mb-3">
+                {post.status === "SCHEDULED"
+                  ? "Change scheduled time"
+                  : "Schedule this post"}
+              </label>
+              <div className="flex items-start gap-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={rescheduleDate}
+                    min={localDateInputValue(new Date())}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={rescheduleTime}
+                    onChange={(e) => setRescheduleTime(e.target.value)}
+                    className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Times are interpreted in your local timezone (
+                {Intl.DateTimeFormat().resolvedOptions().timeZone}).
+              </p>
+              {rescheduleError && (
+                <p className="text-xs text-red-600 mt-3">{rescheduleError}</p>
+              )}
+              <div className="flex items-center gap-3 mt-4">
+                <button
+                  onClick={handleRescheduleSave}
+                  disabled={rescheduling || !rescheduleDate || !rescheduleTime}
+                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {rescheduling ? "Saving..." : "Save time"}
+                </button>
+                {post.status === "SCHEDULED" && (
+                  <button
+                    onClick={handleUnschedule}
+                    disabled={rescheduling}
+                    className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
+                  >
+                    Remove schedule
+                  </button>
+                )}
+                <button
+                  onClick={() => setRescheduleOpen(false)}
+                  disabled={rescheduling}
+                  className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
         {post.status === "FAILED" && post.errorMessage && (
           <div className="p-4 rounded-lg border border-red-200 bg-red-50">
@@ -448,13 +621,25 @@ export default function PostDetailPage({
 
               {post.status === "FAILED" && (
                 <button
-                  onClick={handleRetry}
+                  onClick={() => handleRetry()}
                   disabled={retrying}
                   className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
                 >
                   {retrying ? "Retrying..." : "Retry"}
                 </button>
               )}
+
+              {(post.status === "DRAFT" ||
+                post.status === "SCHEDULED") &&
+                platform === "THREADS" && (
+                  <button
+                    onClick={openReschedule}
+                    disabled={rescheduling || publishing}
+                    className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
+                  >
+                    {post.status === "SCHEDULED" ? "Reschedule" : "Schedule"}
+                  </button>
+                )}
 
               {(post.status === "DRAFT" ||
                 post.status === "SCHEDULED" ||

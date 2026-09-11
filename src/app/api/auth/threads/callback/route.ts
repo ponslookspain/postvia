@@ -48,30 +48,31 @@ export async function GET(request: NextRequest) {
       tokens.accessToken
     );
 
-    await prisma.socialAccount.upsert({
+    const existingAccount = await prisma.socialAccount.findFirst({
       where: {
-        userId_platform: {
-          userId: user.id,
-          platform: "THREADS",
-        },
-      },
-      update: {
-        externalId: threadsUser.externalId,
-        username: threadsUser.username,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresAt: tokens.expiresAt,
-      },
-      create: {
         userId: user.id,
         platform: "THREADS",
         externalId: threadsUser.externalId,
-        username: threadsUser.username,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresAt: tokens.expiresAt,
       },
+      select: { id: true },
     });
+    const accountData = {
+      externalId: threadsUser.externalId,
+      username: threadsUser.username,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+    };
+    if (existingAccount) {
+      await prisma.socialAccount.update({
+        where: { id: existingAccount.id },
+        data: accountData,
+      });
+    } else {
+      await prisma.socialAccount.create({
+        data: { userId: user.id, platform: "THREADS", ...accountData },
+      });
+    }
 
     const response = NextResponse.redirect(
       new URL("/accounts?connected=true", request.url)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
-import { executePublish } from "@/lib/publish";
+import { publishPostTargets } from "@/lib/publish";
 
 export async function POST(
   _request: NextRequest,
@@ -27,47 +27,24 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const target = post.targets.find((t) => t.status === "FAILED");
+    let requestedTargetId: string | null = null;
+    try {
+      const body = await _request.json();
+      requestedTargetId = typeof body?.targetId === "string" ? body.targetId : null;
+    } catch {
+      // Empty body keeps legacy behavior: retry the first failed target.
+    }
+    const target = requestedTargetId
+      ? post.targets.find((t) => t.id === requestedTargetId && t.status === "FAILED")
+      : post.targets.find((t) => t.status === "FAILED");
     if (!target) {
       return NextResponse.json(
-        { error: "No failed target found" },
+        { error: "No failed target found for this retry" },
         { status: 400 }
       );
     }
 
-    const claim = await prisma.post.updateMany({
-      where: { id, status: "FAILED" },
-      data: { status: "PUBLISHING", errorMessage: null },
-    });
-
-    if (claim.count === 0) {
-      return NextResponse.json(
-        { error: "Post is no longer in a failed state" },
-        { status: 400 }
-      );
-    }
-
-    const account = await prisma.socialAccount.findUnique({
-      where: {
-        userId_platform: {
-          userId: user.id,
-          platform: target.platform,
-        },
-      },
-    });
-
-    if (!account) {
-      await prisma.post.update({
-        where: { id },
-        data: { status: "FAILED" },
-      });
-      return NextResponse.json(
-        { error: `${target.platform} account not connected` },
-        { status: 400 }
-      );
-    }
-
-    const result = await executePublish(post, account, target);
+    const result = await publishPostTargets(id, target.id);
 
     if (result.ok) {
       return NextResponse.json({

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { deleteBlobs } from "@/lib/blob";
+import { resolveScheduledAtUpdate } from "@/lib/schedule";
 
 async function findOwnedPost(id: string, userId: string) {
   return prisma.post.findFirst({
     where: { id, userId },
-    include: { targets: true, media: true },
+    include: { targets: { include: { socialAccount: { select: { username: true } } } }, media: true },
   });
 }
 
@@ -46,23 +47,70 @@ export async function PATCH(
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    const body = await request.json();
+    let body: Record<string, unknown>;
+    try {
+      const raw = await request.json();
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+        throw new Error("bad body");
+      }
+      body = raw as Record<string, unknown>;
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
 
     const existing = await findOwnedPost(id, user.id);
     if (!existing) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
+    // Status is owned by the publish/retry/cron flow, never by clients.
+    if (body.status !== undefined) {
+      return NextResponse.json(
+        { error: "Status is managed by publishing and cannot be set directly" },
+        { status: 400 }
+      );
+    }
+
+    const data: Record<string, unknown> = {};
+
+    if (body.text !== undefined) {
+      if (typeof body.text !== "string" || body.text.trim().length === 0) {
+        return NextResponse.json(
+          { error: "Text is required" },
+          { status: 400 }
+        );
+      }
+      data.text = body.text.trim();
+    }
+
+    if (body.scheduledAt !== undefined) {
+      const resolution = resolveScheduledAtUpdate({
+        currentStatus: existing.status,
+        platform: existing.targets[0]?.platform ?? "",
+        rawScheduledAt: body.scheduledAt,
+      });
+      if (!resolution.ok) {
+        return NextResponse.json(
+          { error: resolution.error },
+          { status: resolution.status }
+        );
+      }
+      data.scheduledAt = resolution.data.scheduledAt;
+      data.status = resolution.data.status;
+      data.errorMessage = null;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
     const post = await prisma.post.update({
       where: { id },
-      data: {
-        ...(body.text !== undefined && { text: body.text.trim() }),
-        ...(body.status !== undefined && { status: body.status }),
-        ...(body.scheduledAt !== undefined && {
-          scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
-        }),
-      },
-      include: { targets: true, media: true },
+      data,
+      include: { targets: { include: { socialAccount: { select: { username: true } } } }, media: true },
     });
 
     return NextResponse.json(post);
