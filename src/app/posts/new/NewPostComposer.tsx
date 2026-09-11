@@ -2,13 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  X_POST_CHAR_LIMIT,
-  THREADS_POST_CHAR_LIMIT,
-  threadsPostUrl,
-  isFutureIso,
-} from "@/lib/utils";
+import { threadsPostUrl, isFutureIso } from "@/lib/utils";
 import { validateMediaInput } from "@/lib/media";
+import { buildComposerPreviews } from "@/lib/composer-previews";
 import { uploadPresigned } from "@vercel/blob/client";
 
 type Platform = "X" | "THREADS";
@@ -40,7 +36,7 @@ type ConnectedAccount = {
   implemented: boolean;
 };
 
-type TargetOverrideState = Record<string, { content?: { text?: string } }>;
+type TargetOverrideState = Record<string, string>;
 
 const MAX_MEDIA = 4;
 
@@ -164,10 +160,8 @@ function toLocalInputValue(date: Date): string {
 
 export default function NewPostComposer({
   userName,
-  userEmail,
 }: {
   userName: string;
-  userEmail: string;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -176,6 +170,7 @@ export default function NewPostComposer({
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [targetOverrides, setTargetOverrides] = useState<TargetOverrideState>({});
+  const [customizingIds, setCustomizingIds] = useState<string[]>([]);
   const [mediaUploadNote, setMediaUploadNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -195,18 +190,24 @@ export default function NewPostComposer({
     selectedAccountIds.includes(account.id)
   );
   const platform: Platform = selectedAccounts[0]?.platform ?? "THREADS";
-  const charLimit =
-    platform === "THREADS" ? THREADS_POST_CHAR_LIMIT : X_POST_CHAR_LIMIT;
   const charCount = text.length;
-  const isOverLimit = charCount > charLimit;
+  const previews = buildComposerPreviews(
+    selectedAccounts,
+    text,
+    Object.entries(targetOverrides).map(([accountId, value]) => ({
+      accountId,
+      text: value,
+    }))
+  );
+  const hasOverLimit = previews.some((preview) => preview.overLimit);
   const canSave =
     text.trim().length > 0 &&
-    !isOverLimit &&
+    !hasOverLimit &&
     selectedAccountIds.length > 0 &&
     !saving;
   const canPublish =
     text.trim().length > 0 &&
-    !isOverLimit &&
+    !hasOverLimit &&
     selectedAccountIds.length > 0 &&
     !publishing &&
     !saving;
@@ -239,12 +240,33 @@ export default function NewPostComposer({
       platform,
       hasMedia: media.length > 0,
       accountIds: selectedAccountIds,
-      targets: selectedAccountIds.map((accountId) => ({
-        accountId,
-        overrides: targetOverrides[accountId] ?? null,
-      })),
+      targets: selectedAccountIds.map((accountId) => {
+        const override = targetOverrides[accountId];
+        return {
+          accountId,
+          overrides: override ? { content: { text: override } } : null,
+        };
+      }),
       ...(nextScheduledAt ? { scheduledAt: nextScheduledAt } : {}),
     };
+  }
+
+  function clearTargetOverride(accountId: string) {
+    setTargetOverrides((current) => {
+      const next = { ...current };
+      delete next[accountId];
+      return next;
+    });
+  }
+
+  function toggleAccountSelection(accountId: string, checked: boolean) {
+    setSelectedAccountIds((current) =>
+      checked ? [...current, accountId] : current.filter((id) => id !== accountId)
+    );
+    if (!checked) {
+      clearTargetOverride(accountId);
+      setCustomizingIds((current) => current.filter((id) => id !== accountId));
+    }
   }
 
   function getScheduledIso(): string | null {
@@ -725,7 +747,7 @@ export default function NewPostComposer({
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-medium mb-2">
-            What do you want to publish?
+            Post content
           </label>
           <textarea
             value={text}
@@ -736,22 +758,26 @@ export default function NewPostComposer({
           />
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs text-muted-foreground">
-              Platform: {platform === "THREADS" ? "Threads" : "X (Twitter)"}
+              Used by every selected platform unless customized
             </span>
             <span
               className={`text-xs font-mono ${
-                isOverLimit
+                hasOverLimit
                   ? "text-red-600 font-medium"
                   : "text-muted-foreground"
               }`}
             >
-              {charCount} / {charLimit}
+              {charCount} chars
             </span>
           </div>
-          {isOverLimit && (
+          {hasOverLimit && (
             <p className="text-xs text-red-600 mt-1">
-              Post exceeds the {charLimit} character limit for{" "}
-              {platform === "THREADS" ? "Threads" : "X"}
+              Too long for{" "}
+              {previews
+                .filter((preview) => preview.overLimit)
+                .map((preview) => `${preview.label} (${preview.maxLength})`)
+                .join(", ")}
+              . Shorten the text or use Customize in the preview below.
             </p>
           )}
         </div>
@@ -768,7 +794,7 @@ export default function NewPostComposer({
                 const selected = selectedAccountIds.includes(account.id);
                 const blockedByMedia = media.length > 0 && account.platform === "X";
                 const disabled = !account.implemented || blockedByMedia;
-                const overrideText = targetOverrides[account.id]?.content?.text;
+                const customized = Boolean(targetOverrides[account.id]);
                 return (
                   <div key={account.id} className="border border-border rounded-md p-3">
                     <label className="flex items-center gap-3">
@@ -776,17 +802,18 @@ export default function NewPostComposer({
                         type="checkbox"
                         checked={selected}
                         disabled={disabled || saving || publishing || scheduling}
-                        onChange={(event) => {
-                          setSelectedAccountIds((current) =>
-                            event.target.checked
-                              ? [...current, account.id]
-                              : current.filter((id) => id !== account.id)
-                          );
-                        }}
+                        onChange={(event) =>
+                          toggleAccountSelection(account.id, event.target.checked)
+                        }
                       />
                       <span className="text-sm font-medium">
                         {account.platform} @{account.username}
                       </span>
+                      {selected && customized && (
+                        <span className="text-xs text-amber-700">
+                          Customized
+                        </span>
+                      )}
                       {!account.implemented && (
                         <span className="text-xs text-muted-foreground">Soon</span>
                       )}
@@ -796,42 +823,6 @@ export default function NewPostComposer({
                         </span>
                       )}
                     </label>
-                    {selected && (
-                      <div className="mt-3 pl-6">
-                        <label className="block text-xs font-medium text-muted-foreground mb-1">
-                          Customize per platform
-                        </label>
-                        <textarea
-                          value={overrideText ?? ""}
-                          placeholder="Use global text"
-                          rows={2}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setTargetOverrides((current) => ({
-                              ...current,
-                              [account.id]: value
-                                ? { content: { text: value } }
-                                : {},
-                            }));
-                          }}
-                          className="w-full border border-border rounded-md p-2 text-sm resize-none"
-                        />
-                        {overrideText && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setTargetOverrides((current) => ({
-                                ...current,
-                                [account.id]: {},
-                              }))
-                            }
-                            className="text-xs text-muted-foreground mt-1 underline"
-                          >
-                            Use global
-                          </button>
-                        )}
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -952,6 +943,10 @@ export default function NewPostComposer({
             <label className="block text-sm font-medium mb-3">
               Schedule date and time
             </label>
+            <p className="text-xs text-muted-foreground mb-3 -mt-1">
+              One scheduled time for the whole post — it applies to all
+              selected platforms, which publish together.
+            </p>
             <div className="flex items-start gap-4">
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">
@@ -986,7 +981,8 @@ export default function NewPostComposer({
                   year: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
-                })}
+                })}{" "}
+                — this schedule applies to all selected platforms.
               </p>
             )}
             {scheduleError && (
@@ -996,46 +992,198 @@ export default function NewPostComposer({
         )}
 
         <div>
-          <label className="block text-sm font-medium mb-2">Preview</label>
-          <div className="border border-border rounded-lg p-5 max-w-md">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-foreground text-primary-foreground flex items-center justify-center">
-                {platform === "THREADS" ? (
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
+          <label className="block text-sm font-medium mb-2">
+            Previews
+            <span className="ml-2 font-normal text-muted-foreground">
+              {previews.length === 0
+                ? "Select a platform above to see its preview"
+                : `${previews.length} selected`}
+            </span>
+          </label>
+          {previews.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {previews.map((preview) => {
+                const isCustomizing = customizingIds.includes(preview.accountId);
+                return (
+                  <div
+                    key={preview.accountId}
+                    className="border border-border rounded-lg p-4"
                   >
-                    <circle cx="12" cy="12" r="8.5" />
-                    <circle cx="12" cy="12" r="4" />
-                    <circle cx="15" cy="9" r="0.75" fill="currentColor" stroke="none" />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                )}
-              </div>
-              <div>
-                <p className="text-sm font-semibold">{userName}</p>
-                <p className="text-xs text-muted-foreground">{userEmail}</p>
-              </div>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-full bg-foreground text-primary-foreground flex items-center justify-center">
+                        {preview.platform === "THREADS" ? (
+                          <svg
+                            className="w-5 h-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          >
+                            <circle cx="12" cy="12" r="8.5" />
+                            <circle cx="12" cy="12" r="4" />
+                            <circle
+                              cx="15"
+                              cy="9"
+                              r="0.75"
+                              fill="currentColor"
+                              stroke="none"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            className="w-5 h-5"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {userName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {preview.label} · @{preview.username}
+                        </p>
+                      </div>
+                    </div>
+                    {isCustomizing ? (
+                      <div>
+                        <textarea
+                          value={targetOverrides[preview.accountId] ?? preview.text}
+                          rows={4}
+                          placeholder={`Text for ${preview.label}`}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setTargetOverrides((current) => ({
+                              ...current,
+                              [preview.accountId]: value,
+                            }));
+                          }}
+                          className="w-full border border-border rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
+                        />
+                        <div className="flex items-center justify-between mt-2">
+                          <span
+                            className={`text-xs font-mono ${
+                              preview.overLimit
+                                ? "text-red-600 font-medium"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {preview.text.length} / {preview.maxLength}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            {preview.customized && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  clearTargetOverride(preview.accountId)
+                                }
+                                className="text-xs text-muted-foreground underline hover:text-foreground"
+                              >
+                                Use global
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCustomizingIds((current) =>
+                                  current.filter(
+                                    (id) => id !== preview.accountId
+                                  )
+                                )
+                              }
+                              className="text-xs font-medium"
+                            >
+                              Done
+                            </button>
+                          </div>
+                        </div>
+                        {preview.overLimit && (
+                          <p className="text-xs text-red-600 mt-1">
+                            Exceeds the {preview.maxLength} character limit for{" "}
+                            {preview.label}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        {media.length > 0 && (
+                          <div className="flex gap-1.5 mb-2">
+                            {media.slice(0, 4).map((item) =>
+                              item.kind === "IMAGE" ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  key={item.key}
+                                  src={item.previewUrl}
+                                  alt={item.name}
+                                  className="w-10 h-10 rounded object-cover border border-border"
+                                />
+                              ) : (
+                                <video
+                                  key={item.key}
+                                  src={item.previewUrl}
+                                  muted
+                                  className="w-10 h-10 rounded object-cover border border-border"
+                                />
+                              )
+                            )}
+                          </div>
+                        )}
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          {preview.text || (
+                            <span className="text-muted-foreground">
+                              Your post will appear here...
+                            </span>
+                          )}
+                        </p>
+                        <div className="flex items-center justify-between mt-3">
+                          <span
+                            className={`text-xs font-mono ${
+                              preview.overLimit
+                                ? "text-red-600 font-medium"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {preview.text.length} / {preview.maxLength}
+                            {preview.customized && (
+                              <span className="ml-2 text-amber-700">
+                                custom text
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCustomizingIds((current) => [
+                                ...current,
+                                preview.accountId,
+                              ])
+                            }
+                            disabled={saving || publishing || scheduling}
+                            className="px-2 py-1 text-xs border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
+                          >
+                            {preview.customized
+                              ? `Edit for ${preview.label}`
+                              : "Customize"}
+                          </button>
+                        </div>
+                        {preview.overLimit && (
+                          <p className="text-xs text-red-600 mt-1">
+                            Exceeds the {preview.maxLength} character limit for{" "}
+                            {preview.label}. Click Customize to shorten it just
+                            for this platform.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            <p className="text-sm whitespace-pre-wrap break-words">
-              {text || (
-                <span className="text-muted-foreground">
-                  Your post will appear here...
-                </span>
-              )}
-            </p>
-          </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">

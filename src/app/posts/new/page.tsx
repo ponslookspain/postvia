@@ -9,7 +9,7 @@ export default async function NewPostPage() {
 
   return (
     <AppShell user={user}>
-      <NewPostComposer userName={user.name} userEmail={user.email} />
+      <NewPostComposer userName={user.name} />
     </AppShell>
   );
 }
