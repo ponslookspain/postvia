@@ -42,7 +42,10 @@ export type StoredPostTarget = {
   platform: string;
   externalPostId: string | null;
   publishedAt: Date | null;
+  externalJobId?: string | null;
 };
+
+export type StaleJobResumeResult = "complete" | "failed" | "pending" | "skip";
 
 export type StoredPost = {
   id: string;
@@ -117,7 +120,10 @@ const TIMEOUT_MESSAGE =
  */
 export async function recoverStalePublishing(
   db: SchedulingDb,
-  now: Date
+  now: Date,
+  options: {
+    resumeJob?: (target: StoredPostTarget) => Promise<StaleJobResumeResult>;
+  } = {}
 ): Promise<Pick<TickStats, "recovered" | "finalized" | "expired">> {
   const stats = { recovered: 0, finalized: 0, expired: 0 };
   const cutoff = new Date(now.getTime() - STALE_PUBLISHING_MS);
@@ -128,20 +134,64 @@ export async function recoverStalePublishing(
   });
 
   for (const post of stale) {
-    const done = post.targets.find(
-      (t) => t.status === "PUBLISHED" && Boolean(t.externalPostId)
-    );
-    if (done) {
-      const allPublished = post.targets.every(
-        (target) => target.status === "PUBLISHED" && Boolean(target.externalPostId)
+    // Resume-first for targets with an external job id (TikTok): their publish
+    // may already be running platform-side. Never blind-reset such a target.
+    let pendingJob = false;
+    let jobsResolved = false;
+    for (const target of post.targets) {
+      if (target.status !== "PUBLISHING" || !target.externalJobId) continue;
+      const result = options.resumeJob
+        ? await options.resumeJob(target)
+        : "pending";
+      if (result === "pending") {
+        pendingJob = true;
+      } else if (result === "complete" || result === "failed") {
+        jobsResolved = true;
+      }
+    }
+    if (pendingJob) continue; // leave PUBLISHING; re-checked next tick
+
+    const current = jobsResolved
+      ? ((await db.post.findMany({ where: { id: post.id }, include: { targets: true } }))[0] ?? post)
+      : post;
+
+    const published = current.targets.filter((t) => t.status === "PUBLISHED");
+    const failed = current.targets.filter((t) => t.status === "FAILED");
+    const total = current.targets.length;
+
+    if (total > 0 && published.length === total) {
+      const latest = Math.max(
+        ...published.map((t) => (t.publishedAt ?? now).getTime())
       );
       await db.post.update({
         where: { id: post.id },
         data: {
-          status: allPublished ? "PUBLISHED" : "PARTIALLY_PUBLISHED",
-          publishedAt: allPublished ? done.publishedAt ?? now : null,
+          status: "PUBLISHED",
+          publishedAt: new Date(latest),
           errorMessage: null,
         },
+      });
+      stats.finalized++;
+      continue;
+    }
+
+    if (total > 0 && published.length > 0 && failed.length === total - published.length) {
+      await db.post.update({
+        where: { id: post.id },
+        data: {
+          status: "PARTIALLY_PUBLISHED",
+          publishedAt: null,
+          errorMessage: null,
+        },
+      });
+      stats.finalized++;
+      continue;
+    }
+
+    if (total > 0 && failed.length === total) {
+      await db.post.update({
+        where: { id: post.id },
+        data: { status: "FAILED", errorMessage: "All publish attempts failed." },
       });
       stats.finalized++;
       continue;
@@ -191,6 +241,7 @@ export async function runScheduledPublishTick(deps: {
     account?: SocialAccountRow,
     target?: { id: string; platform: string }
   ) => Promise<PublishOutcome>;
+  resumeJob?: (target: StoredPostTarget) => Promise<StaleJobResumeResult>;
   now?: Date;
   clock?: () => number;
   tickBudgetMs?: number;
@@ -211,7 +262,9 @@ export async function runScheduledPublishTick(deps: {
     skipped: 0,
   };
 
-  const recovery = await recoverStalePublishing(db, now);
+  const recovery = await recoverStalePublishing(db, now, {
+    resumeJob: deps.resumeJob,
+  });
   stats.recovered = recovery.recovered;
   stats.finalized = recovery.finalized;
   stats.expired = recovery.expired;

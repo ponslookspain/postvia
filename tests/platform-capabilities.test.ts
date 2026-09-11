@@ -24,10 +24,14 @@ describe("platform capability registry", () => {
     assert.equal(caps.media.video, false);
   });
 
-  test("TikTok has registry metadata but no provider implementation", () => {
+  test("TikTok is implemented for video-only Direct Post with settings fields", () => {
     const caps = getPlatformCapabilities("TIKTOK");
-    assert.equal(caps.implemented, false);
+    assert.equal(caps.implemented, true);
+    assert.equal(caps.supportsText, false);
+    assert.equal(caps.media.image, false);
+    assert.equal(caps.media.video, true);
     assert.ok(caps.fields.some((field) => field.key === "privacy_level"));
+    assert.ok(caps.fields.some((field) => field.key === "video_cover_timestamp_ms"));
   });
 });
 
@@ -85,9 +89,31 @@ describe("capability media validation", () => {
     );
   });
 
-  test("unimplemented platforms are rejected at publish validation", () => {
-    const result = validateTargetMedia(getPlatformCapabilities("TIKTOK"), [
+  test("TikTok requires exactly one video", () => {
+    const caps = getPlatformCapabilities("TIKTOK");
+    const none = validateTargetMedia(caps, []);
+    assert.equal(none.ok, false);
+    const two = validateTargetMedia(caps, [
       { type: "VIDEO", mimeType: "video/mp4" },
+      { type: "VIDEO", mimeType: "video/mp4" },
+    ]);
+    assert.equal(two.ok, false);
+    const image = validateTargetMedia(caps, [
+      { type: "IMAGE", mimeType: "image/png" },
+    ]);
+    assert.equal(image.ok, false);
+    if (!image.ok) assert.match(image.error, /exactly one MP4\/WebM video/);
+    const unsupported = validateTargetMedia(caps, [
+      { type: "VIDEO", mimeType: "video/x-msvideo" },
+    ]);
+    assert.equal(unsupported.ok, false);
+    const ok = validateTargetMedia(caps, [{ type: "VIDEO", mimeType: "video/mp4" }]);
+    assert.deepEqual(ok, { ok: true });
+  });
+
+  test("unimplemented platforms are rejected at publish validation", () => {
+    const result = validateTargetMedia(getPlatformCapabilities("INSTAGRAM"), [
+      { type: "IMAGE", mimeType: "image/png" },
     ]);
     assert.equal(result.ok, false);
     if (!result.ok) assert.match(result.error, /not implemented/);

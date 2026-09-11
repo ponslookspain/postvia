@@ -1,0 +1,57 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { getApiUser } from "@/lib/auth";
+import {
+  ensureFreshTiktokToken,
+  queryTiktokCreatorInfo,
+  tiktokErrorMessage,
+} from "@/lib/social/tiktok";
+
+/**
+ * Live per-account posting settings for the composer. Options come straight
+ * from TikTok creator info — the UI must not hardcode privacy levels.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    const accountId = request.nextUrl.searchParams.get("accountId");
+    if (!accountId) {
+      return NextResponse.json({ error: "accountId is required" }, { status: 400 });
+    }
+
+    const account = await prisma.socialAccount.findFirst({
+      where: { id: accountId, userId: user.id, platform: "TIKTOK" },
+    });
+    if (!account) {
+      return NextResponse.json({ error: "TikTok account not found" }, { status: 404 });
+    }
+
+    const accessToken = await ensureFreshTiktokToken(account);
+    const info = await queryTiktokCreatorInfo(accessToken);
+
+    if (info.creatorUsername && info.creatorUsername !== account.username) {
+      await prisma.socialAccount.update({
+        where: { id: account.id },
+        data: { username: info.creatorUsername },
+      });
+    }
+
+    return NextResponse.json({
+      username: info.creatorUsername || account.username,
+      nickname: info.creatorNickname,
+      privacyLevelOptions: info.privacyLevelOptions,
+      commentDisabled: info.commentDisabled,
+      duetDisabled: info.duetDisabled,
+      stitchDisabled: info.stitchDisabled,
+      maxVideoPostDurationSec: info.maxVideoPostDurationSec,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: tiktokErrorMessage(error) },
+      { status: 502 }
+    );
+  }
+}

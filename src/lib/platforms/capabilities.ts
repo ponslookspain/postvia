@@ -1,13 +1,14 @@
 import type { Platform } from "@prisma/client";
 import type { MediaKind } from "@/lib/media";
 
-export type CapabilityFieldType = "text" | "boolean" | "enum";
+export type CapabilityFieldType = "text" | "boolean" | "enum" | "number";
 
 export type CapabilityField = {
   key: string;
   label: string;
   type: CapabilityFieldType;
   maxLength?: number;
+  min?: number;
   required?: boolean;
   options?: readonly string[];
   mediaKinds?: readonly MediaKind[];
@@ -22,6 +23,7 @@ export type PlatformCapabilities = {
     image: boolean;
     video: boolean;
     maxItems: number;
+    requiredKind?: MediaKind;
     mimeTypes?: readonly string[];
   };
   fields: readonly CapabilityField[];
@@ -59,13 +61,15 @@ const X: PlatformCapabilities = {
 const TIKTOK: PlatformCapabilities = {
   platform: "TIKTOK",
   label: "TikTok",
-  implemented: false,
+  implemented: true,
+  // TikTok Direct Post requires media: exactly one video in the first scope.
   supportsText: false,
   media: {
-    image: true,
+    image: false,
     video: true,
     maxItems: 1,
-    mimeTypes: ["image/jpeg", "image/png", "video/mp4"],
+    requiredKind: "VIDEO",
+    mimeTypes: ["video/mp4", "video/webm", "video/quicktime"],
   },
   fields: [
     { key: "title", label: "Title", type: "text", maxLength: 2200 },
@@ -74,6 +78,8 @@ const TIKTOK: PlatformCapabilities = {
       label: "Privacy",
       type: "enum",
       required: true,
+      // Fallback whitelist only: the real options are served per-account by
+      // /api/social/tiktok/creator-info and must drive the UI.
       options: [
         "PUBLIC_TO_EVERYONE",
         "MUTUAL_FOLLOW_FRIENDS",
@@ -84,6 +90,12 @@ const TIKTOK: PlatformCapabilities = {
     { key: "disable_comment", label: "Allow comments", type: "boolean" },
     { key: "disable_duet", label: "Allow Duet", type: "boolean", mediaKinds: ["VIDEO"] },
     { key: "disable_stitch", label: "Allow Stitch", type: "boolean", mediaKinds: ["VIDEO"] },
+    {
+      key: "video_cover_timestamp_ms",
+      label: "Cover timestamp (ms)",
+      type: "number",
+      min: 0,
+    },
   ],
 };
 

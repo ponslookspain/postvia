@@ -69,13 +69,22 @@ function validateField(
 ): string | null {
   if (field.type === "text") {
     if (typeof value !== "string") return `${field.key} must be a string`;
-    if (field.maxLength !== undefined && value.length > field.maxLength) {
+    if (field.maxLength !== undefined && Array.from(value).length > field.maxLength) {
       return `${field.key} exceeds the ${field.maxLength} character limit`;
     }
     return null;
   }
   if (field.type === "boolean") {
     return typeof value === "boolean" ? null : `${field.key} must be a boolean`;
+  }
+  if (field.type === "number") {
+    if (typeof value !== "number" || !Number.isInteger(value)) {
+      return `${field.key} must be an integer`;
+    }
+    if (field.min !== undefined && value < field.min) {
+      return `${field.key} must be at least ${field.min}`;
+    }
+    return null;
   }
   if (field.type === "enum") {
     if (typeof value !== "string") return `${field.key} must be a string`;
@@ -149,16 +158,24 @@ export function validateTargetMedia(
       error: `${caps.label} does not support image or video media publishing yet`,
     };
   }
+  if (media.length === 0) {
+    return caps.supportsText
+      ? { ok: true }
+      : { ok: false, error: `${caps.label} requires exactly one media item` };
+  }
   if (media.length > caps.media.maxItems) {
     return {
       ok: false,
       error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
     };
   }
-  if (media.length === 0) {
-    return caps.supportsText
-      ? { ok: true }
-      : { ok: false, error: `${caps.label} requires media` };
+  if (caps.media.requiredKind && caps.media.requiredKind === "VIDEO") {
+    if (media.some((item) => item.type !== "VIDEO")) {
+      return {
+        ok: false,
+        error: `${caps.label} requires exactly one MP4/WebM video.`,
+      };
+    }
   }
   if (!caps.implemented) {
     return { ok: false, error: `${caps.label} publishing is not implemented yet` };
@@ -171,7 +188,10 @@ export function validateTargetMedia(
       return { ok: false, error: `${caps.label} does not support video media yet` };
     }
     if (caps.media.mimeTypes && !caps.media.mimeTypes.includes(item.mimeType)) {
-      return { ok: false, error: `${caps.label} does not support ${item.mimeType}` };
+      return {
+        ok: false,
+        error: `${caps.label} does not support ${item.mimeType}. ${caps.label} requires exactly one MP4/WebM video.`,
+      };
     }
   }
   return { ok: true };

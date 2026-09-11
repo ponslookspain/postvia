@@ -83,6 +83,30 @@ describe("multi-target effective content", () => {
     });
     assert.equal(result.ok, false);
   });
+
+  test("TikTok settings are validated against the capability whitelist", () => {
+    assert.ok(
+      validateTargetOverrides("TIKTOK", {
+        settings: {
+          privacy_level: "SELF_ONLY",
+          disable_duet: false,
+          video_cover_timestamp_ms: 1000,
+        },
+      }).ok
+    );
+    assert.equal(
+      validateTargetOverrides("TIKTOK", { settings: { privacy_level: "EVERYONE" } }).ok,
+      false
+    );
+    assert.equal(
+      validateTargetOverrides("TIKTOK", { settings: { video_cover_timestamp_ms: -5 } }).ok,
+      false
+    );
+    assert.equal(
+      validateTargetOverrides("TIKTOK", { settings: { video_cover_timestamp_ms: 1.5 } }).ok,
+      false
+    );
+  });
 });
 
 describe("multi-account target selection security", () => {

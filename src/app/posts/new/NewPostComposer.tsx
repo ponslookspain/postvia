@@ -7,7 +7,7 @@ import { validateMediaInput } from "@/lib/media";
 import { buildComposerPreviews } from "@/lib/composer-previews";
 import { uploadPresigned } from "@vercel/blob/client";
 
-type Platform = "X" | "THREADS";
+type Platform = "X" | "THREADS" | "TIKTOK";
 
 type PublishResult = {
   ok: boolean;
@@ -36,7 +36,20 @@ type ConnectedAccount = {
   implemented: boolean;
 };
 
-type TargetOverrideState = Record<string, string>;
+type TargetOverrideState = Record<
+  string,
+  { text?: string; title?: string; settings?: Record<string, unknown> }
+>;
+
+type TiktokCreatorInfo = {
+  username: string;
+  nickname: string;
+  privacyLevelOptions: string[];
+  commentDisabled: boolean;
+  duetDisabled: boolean;
+  stitchDisabled: boolean;
+  maxVideoPostDurationSec: number;
+};
 
 const MAX_MEDIA = 4;
 
@@ -171,6 +184,10 @@ export default function NewPostComposer({
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [targetOverrides, setTargetOverrides] = useState<TargetOverrideState>({});
   const [customizingIds, setCustomizingIds] = useState<string[]>([]);
+  const [creatorInfos, setCreatorInfos] = useState<
+    Record<string, TiktokCreatorInfo | null>
+  >({});
+  const requestedCreatorInfo = useRef<Set<string>>(new Set());
   const [mediaUploadNote, setMediaUploadNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -194,24 +211,60 @@ export default function NewPostComposer({
   const previews = buildComposerPreviews(
     selectedAccounts,
     text,
-    Object.entries(targetOverrides).map(([accountId, value]) => ({
-      accountId,
-      text: value,
-    }))
+    selectedAccountIds.map((accountId) => {
+      const account = accounts.find((item) => item.id === accountId);
+      const override = targetOverrides[accountId];
+      return {
+        accountId,
+        text: account?.platform === "TIKTOK" ? override?.title : override?.text,
+      };
+    })
   );
   const hasOverLimit = previews.some((preview) => preview.overLimit);
+  const hasTikTok = selectedAccounts.some(
+    (account) => account.platform === "TIKTOK"
+  );
+  const videoMediaCount = media.filter((item) => item.kind === "VIDEO").length;
+  const tiktokMediaError =
+    hasTikTok && (media.length !== 1 || videoMediaCount !== 1)
+      ? "TikTok requires exactly one MP4/WebM video."
+      : null;
   const canSave =
     text.trim().length > 0 &&
     !hasOverLimit &&
+    !tiktokMediaError &&
     selectedAccountIds.length > 0 &&
     !saving;
   const canPublish =
     text.trim().length > 0 &&
     !hasOverLimit &&
+    !tiktokMediaError &&
     selectedAccountIds.length > 0 &&
     !publishing &&
     !saving;
   const schedulingForX = selectedAccounts.some((account) => account.platform === "X");
+
+  useEffect(() => {
+    for (const account of selectedAccounts) {
+      if (account.platform !== "TIKTOK") continue;
+      if (requestedCreatorInfo.current.has(account.id)) continue;
+      requestedCreatorInfo.current.add(account.id);
+      fetch(
+        `/api/social/tiktok/creator-info?accountId=${encodeURIComponent(account.id)}`
+      )
+        .then((response) =>
+          response.ok
+            ? (response.json() as Promise<TiktokCreatorInfo | null>)
+            : null
+        )
+        .then((info) =>
+          setCreatorInfos((current) => ({ ...current, [account.id]: info }))
+        )
+        .catch(() =>
+          setCreatorInfos((current) => ({ ...current, [account.id]: null }))
+        );
+    }
+  }, [selectedAccounts]);
 
   useEffect(() => {
     let cancelled = false;
@@ -241,14 +294,53 @@ export default function NewPostComposer({
       hasMedia: media.length > 0,
       accountIds: selectedAccountIds,
       targets: selectedAccountIds.map((accountId) => {
+        const account = accounts.find((item) => item.id === accountId);
         const override = targetOverrides[accountId];
+        if (!override) return { accountId, overrides: null };
+        const content =
+          account?.platform === "TIKTOK"
+            ? override.title
+              ? { title: override.title }
+              : {}
+            : override.text
+              ? { text: override.text }
+              : {};
+        const settings = override.settings ?? {};
+        const hasContent = Object.keys(content).length > 0;
+        const hasSettings = Object.keys(settings).length > 0;
         return {
           accountId,
-          overrides: override ? { content: { text: override } } : null,
+          overrides:
+            hasContent || hasSettings ? { content, settings } : null,
         };
       }),
       ...(nextScheduledAt ? { scheduledAt: nextScheduledAt } : {}),
     };
+  }
+
+  function updateOverride(
+    accountId: string,
+    patch: {
+      text?: string;
+      title?: string;
+      settings?: Record<string, unknown>;
+    }
+  ) {
+    setTargetOverrides((current) => {
+      const next = { ...current };
+      const merged = { ...(next[accountId] ?? {}), ...patch };
+      const hasText = Boolean(merged.text);
+      const hasTitle = Boolean(merged.title);
+      const hasSettings = Boolean(
+        merged.settings && Object.keys(merged.settings).length > 0
+      );
+      if (!hasText && !hasTitle && !hasSettings) {
+        delete next[accountId];
+      } else {
+        next[accountId] = merged;
+      }
+      return next;
+    });
   }
 
   function clearTargetOverride(accountId: string) {
@@ -794,7 +886,14 @@ export default function NewPostComposer({
                 const selected = selectedAccountIds.includes(account.id);
                 const blockedByMedia = media.length > 0 && account.platform === "X";
                 const disabled = !account.implemented || blockedByMedia;
-                const customized = Boolean(targetOverrides[account.id]);
+                const overrideEntry = targetOverrides[account.id];
+                const customized = Boolean(
+                  overrideEntry &&
+                    (overrideEntry.text ||
+                      overrideEntry.title ||
+                      (overrideEntry.settings &&
+                        Object.keys(overrideEntry.settings).length > 0))
+                );
                 return (
                   <div key={account.id} className="border border-border rounded-md p-3">
                     <label className="flex items-center gap-3">
@@ -832,6 +931,9 @@ export default function NewPostComposer({
             <p className="text-xs text-red-600 mt-2">
               Select at least one connected account.
             </p>
+          )}
+          {tiktokMediaError && (
+            <p className="text-xs text-red-600 mt-2">{tiktokMediaError}</p>
           )}
         </div>
 
@@ -1052,18 +1154,161 @@ export default function NewPostComposer({
                     {isCustomizing ? (
                       <div>
                         <textarea
-                          value={targetOverrides[preview.accountId] ?? preview.text}
+                          value={
+                            (preview.platform === "TIKTOK"
+                              ? targetOverrides[preview.accountId]?.title
+                              : targetOverrides[preview.accountId]?.text) ??
+                            preview.text
+                          }
                           rows={4}
-                          placeholder={`Text for ${preview.label}`}
+                          placeholder={
+                            preview.platform === "TIKTOK"
+                              ? "Title / caption for TikTok"
+                              : `Text for ${preview.label}`
+                          }
                           onChange={(event) => {
                             const value = event.target.value;
-                            setTargetOverrides((current) => ({
-                              ...current,
-                              [preview.accountId]: value,
-                            }));
+                            updateOverride(
+                              preview.accountId,
+                              preview.platform === "TIKTOK"
+                                ? { title: value }
+                                : { text: value }
+                            );
                           }}
                           className="w-full border border-border rounded-md p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
                         />
+                        {preview.platform === "TIKTOK" && (
+                          <div className="mt-3 space-y-2">
+                            {(() => {
+                              const info = creatorInfos[preview.accountId];
+                              const settings =
+                                targetOverrides[preview.accountId]?.settings ??
+                                {};
+                              const privacyOptions =
+                                info && info.privacyLevelOptions.length > 0
+                                  ? info.privacyLevelOptions
+                                  : ["SELF_ONLY"];
+                              const currentPrivacy =
+                                typeof settings.privacy_level === "string"
+                                  ? settings.privacy_level
+                                  : privacyOptions[0];
+                              const setSetting = (
+                                patch: Record<string, unknown>
+                              ) =>
+                                updateOverride(preview.accountId, {
+                                  settings: { ...settings, ...patch },
+                                });
+                              const allowToggle = (
+                                key: "disable_comment" | "disable_duet" | "disable_stitch",
+                                creatorDisabled: boolean | undefined,
+                                label: string
+                              ) => (
+                                <label className="flex items-center gap-2 text-xs">
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      settings[key] !== true &&
+                                      !creatorDisabled
+                                    }
+                                    disabled={Boolean(creatorDisabled)}
+                                    onChange={(event) =>
+                                      setSetting({
+                                        [key]: !event.target.checked,
+                                      })
+                                    }
+                                  />
+                                  {label}
+                                  {creatorDisabled && (
+                                    <span className="text-muted-foreground">
+                                      (off in account privacy settings)
+                                    </span>
+                                  )}
+                                </label>
+                              );
+                              return (
+                                <>
+                                  {info ? (
+                                    <>
+                                      <label className="block text-xs font-medium text-muted-foreground">
+                                        Privacy
+                                        <select
+                                          value={currentPrivacy}
+                                          onChange={(event) =>
+                                            setSetting({
+                                              privacy_level: event.target.value,
+                                            })
+                                          }
+                                          className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm bg-background"
+                                        >
+                                          {privacyOptions.map((option) => (
+                                            <option key={option} value={option}>
+                                              {option
+                                                .replaceAll("_", " ")
+                                                .toLowerCase()
+                                                .replace(/^./, (c) =>
+                                                  c.toUpperCase()
+                                                )}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+                                      {allowToggle(
+                                        "disable_comment",
+                                        info.commentDisabled,
+                                        "Allow comments"
+                                      )}
+                                      {allowToggle(
+                                        "disable_duet",
+                                        info.duetDisabled,
+                                        "Allow Duet"
+                                      )}
+                                      {allowToggle(
+                                        "disable_stitch",
+                                        info.stitchDisabled,
+                                        "Allow Stitch"
+                                      )}
+                                      <label className="block text-xs font-medium text-muted-foreground">
+                                        Cover timestamp (ms, optional)
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={1000}
+                                          value={
+                                            typeof settings.video_cover_timestamp_ms ===
+                                            "number"
+                                              ? String(settings.video_cover_timestamp_ms)
+                                              : ""
+                                          }
+                                          onChange={(event) => {
+                                            const raw = event.target.value;
+                                            setSetting({
+                                              video_cover_timestamp_ms:
+                                                raw === ""
+                                                  ? undefined
+                                                  : Math.max(0, Math.floor(Number(raw) || 0)),
+                                            });
+                                          }}
+                                          className="mt-1 w-full border border-border rounded-md px-2 py-1.5 text-sm"
+                                        />
+                                      </label>
+                                      {info.maxVideoPostDurationSec > 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Max video length for this account:{" "}
+                                          {info.maxVideoPostDurationSec}s
+                                        </p>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <p className="text-xs text-amber-700">
+                                      TikTok posting options unavailable (default:
+                                      private post). Retry or reconnect TikTok.
+                                    </p>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between mt-2">
                           <span
                             className={`text-xs font-mono ${
@@ -1075,7 +1320,7 @@ export default function NewPostComposer({
                             {preview.text.length} / {preview.maxLength}
                           </span>
                           <div className="flex items-center gap-3">
-                            {preview.customized && (
+                            {targetOverrides[preview.accountId] && (
                               <button
                                 type="button"
                                 onClick={() =>

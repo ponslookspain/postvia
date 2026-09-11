@@ -129,16 +129,18 @@ model PostTarget {
   platform        Platform
   status          PostTargetStatus @default(PENDING)
   externalPostId  String?
+  externalJobId   String?
   publishedAt     DateTime?
   errorMessage    String?
   overrides       Json?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @default(now()) @updatedAt
+  createdAt       DateTime         @default(now()) @db.Timestamp(3)
+  updatedAt       DateTime         @default(now()) @updatedAt @db.Timestamp(3)
   post            Post             @relation(fields: [postId], references: [id], onDelete: Cascade)
   socialAccount   SocialAccount?   @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
 
   @@index([postId])
   @@index([socialAccountId])
+  @@index([externalJobId])
 }
 
 model Media {

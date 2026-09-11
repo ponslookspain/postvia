@@ -7,6 +7,16 @@ import {
 } from "@/lib/social/threads";
 import type { PublishMedia, SocialProvider } from "@/lib/social/provider";
 import {
+  TiktokApiError,
+  ensureFreshTiktokToken,
+  fetchTiktokPublishStatus,
+  publishTiktokDirectVideo,
+  tiktokErrorMessage,
+  TIKTOK_STATUS_COMPLETE,
+  TIKTOK_STATUS_FAILED,
+  type TiktokPublishSettings,
+} from "@/lib/social/tiktok";
+import {
   getPlatformCapabilities,
   type PlatformCapabilities,
 } from "@/lib/platforms/capabilities";
@@ -104,6 +114,7 @@ type PublishPost = {
     type: MediaKind;
     pathname: string;
     mimeType: string;
+    size: number;
   }[];
 };
 
@@ -113,6 +124,7 @@ type PublishTarget = {
   status: string;
   socialAccountId: string | null;
   overrides: unknown;
+  externalJobId: string | null;
 };
 
 type PublishAccount = {
@@ -122,6 +134,8 @@ type PublishAccount = {
   accessToken: string;
   externalId: string;
   username: string;
+  refreshToken: string | null;
+  expiresAt: Date | null;
 };
 
 export function derivePostStatus(
@@ -216,6 +230,11 @@ async function executeTargetPublish(
     return failedOutcome(target, overrideValidation.error);
   }
   const effective = resolveEffectiveTargetContent(post.text, overrideValidation.overrides);
+
+  if (target.platform === "TIKTOK") {
+    return executeTiktokTarget(post, target, account, effective);
+  }
+
   const resolvedMedia = await resolveTargetMedia(post, target, caps);
   if (resolvedMedia.error) {
     await updateTargetFailure(post.id, target.id, resolvedMedia.error);
@@ -252,6 +271,190 @@ async function executeTargetPublish(
   };
 }
 
+const TIKTOK_MEDIA_READ_TTL_MS = 30 * 60_000;
+
+function tiktokSettingsFromRaw(settings: Record<string, unknown>): TiktokPublishSettings {
+  return {
+    privacyLevel: typeof settings.privacy_level === "string" ? settings.privacy_level : undefined,
+    disableComment: typeof settings.disable_comment === "boolean" ? settings.disable_comment : undefined,
+    disableDuet: typeof settings.disable_duet === "boolean" ? settings.disable_duet : undefined,
+    disableStitch: typeof settings.disable_stitch === "boolean" ? settings.disable_stitch : undefined,
+    videoCoverTimestampMs:
+      typeof settings.video_cover_timestamp_ms === "number" &&
+      Number.isInteger(settings.video_cover_timestamp_ms)
+        ? settings.video_cover_timestamp_ms
+        : undefined,
+  };
+}
+
+async function executeTiktokTarget(
+  post: PublishPost,
+  target: PublishTarget,
+  account: PublishAccount,
+  effective: { text: string; content: Record<string, unknown>; settings: Record<string, unknown> }
+): Promise<PublishOutcome> {
+  const caps = getPlatformCapabilities("TIKTOK");
+  const mediaValidation = validateTargetMedia(caps, post.media);
+  if (!mediaValidation.ok) {
+    await updateTargetFailure(post.id, target.id, mediaValidation.error);
+    return failedOutcome(target, mediaValidation.error);
+  }
+  const video = post.media[0];
+  const title =
+    typeof effective.content.title === "string" && effective.content.title.trim().length > 0
+      ? effective.content.title
+      : post.text;
+
+  let accessToken: string;
+  let mediaReadUrl: string;
+  try {
+    accessToken = await ensureFreshTiktokToken({
+      id: account.id,
+      accessToken: account.accessToken,
+      refreshToken: account.refreshToken,
+      expiresAt: account.expiresAt,
+    });
+    mediaReadUrl = await createSignedGetUrl({
+      pathname: video.pathname,
+      ttlMs: TIKTOK_MEDIA_READ_TTL_MS,
+    });
+  } catch (error) {
+    const message = tiktokErrorMessage(error);
+    await updateTargetFailure(post.id, target.id, message);
+    return failedOutcome(target, message);
+  }
+
+  const outcome = await publishTiktokDirectVideo(
+    accessToken,
+    {
+      title,
+      settings: tiktokSettingsFromRaw(effective.settings),
+      videoSize: video.size,
+      videoContentType: video.mimeType,
+      existingPublishId: target.externalJobId,
+    },
+    {
+      readChunk: async (range) => {
+        const res = await fetch(mediaReadUrl, {
+          headers: { Range: `bytes=${range.start}-${range.end}` },
+        });
+        if (!res.ok && res.status !== 206) {
+          throw new Error("Failed to read the stored video from private media storage");
+        }
+        return res.arrayBuffer();
+      },
+      onPublishId: async (publishId) => {
+        await prisma.postTarget.update({
+          where: { id: target.id },
+          data: { externalJobId: publishId },
+        });
+      },
+    }
+  );
+
+  switch (outcome.state) {
+    case "published": {
+      await prisma.postTarget.update({
+        where: { id: target.id },
+        data: {
+          status: "PUBLISHED",
+          externalPostId: outcome.externalPostId ?? null,
+          publishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      return {
+        ok: true,
+        externalPostId: outcome.externalPostId,
+        username: account.username,
+        platform: "TIKTOK",
+      };
+    }
+    case "invalid":
+    case "failed": {
+      await updateTargetFailure(post.id, target.id, outcome.error);
+      return failedOutcome(target, outcome.error);
+    }
+    case "processing": {
+      // externalJobId is persisted; the next cron tick/resume or a manual
+      // retry continues with status/fetch — never a second init.
+      return {
+        ok: false,
+        error: "TikTok is still processing this video. Publishing continues automatically — do not reinitialize.",
+        platform: "TIKTOK",
+      };
+    }
+  }
+}
+
+/**
+ * Resume entry point used by the scheduler's stale-recovery: a TikTok target
+ * stuck in PUBLISHING with a known publish_id is resolved via status/fetch,
+ * never by re-publishing.
+ */
+export async function resumeTiktokTarget(
+  targetId: string
+): Promise<"complete" | "failed" | "pending" | "skip"> {
+  const target = await prisma.postTarget.findUnique({
+    where: { id: targetId },
+    include: { socialAccount: true },
+  });
+  if (
+    !target ||
+    target.platform !== "TIKTOK" ||
+    !target.externalJobId ||
+    target.status !== "PUBLISHING" ||
+    !target.socialAccount
+  ) {
+    return "skip";
+  }
+  const account = target.socialAccount;
+  try {
+    const accessToken = await ensureFreshTiktokToken(account);
+    const status = await fetchTiktokPublishStatus(accessToken, target.externalJobId);
+    if (status.status === TIKTOK_STATUS_COMPLETE) {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "PUBLISHED",
+          externalPostId: status.postIds[0] ?? null,
+          publishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      return "complete";
+    }
+    if (status.status === TIKTOK_STATUS_FAILED) {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "FAILED",
+          errorMessage: status.failReason
+            ? `TikTok could not publish the video: ${status.failReason}`
+            : "TikTok rejected the video post.",
+        },
+      });
+      return "failed";
+    }
+    return "pending";
+  } catch (error) {
+    const code = error instanceof TiktokApiError ? error.code : "";
+    if (
+      code === "scope_not_authorized" ||
+      code === "token_expired" ||
+      code === "invalid_refresh_token" ||
+      code === "refresh_token_expired"
+    ) {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: { status: "FAILED", errorMessage: tiktokErrorMessage(error) },
+      });
+      return "failed";
+    }
+    return "pending";
+  }
+}
+
 async function finalizePostStatus(postId: string, fallback: AggregatePostStatus): Promise<PublishOutcome> {
   const current = await prisma.post.findUnique({
     where: { id: postId },
@@ -272,10 +475,17 @@ async function finalizePostStatus(postId: string, fallback: AggregatePostStatus)
     },
   });
   const published = current.targets.find((target) => target.status === "PUBLISHED");
+  const stillProcessing = current.targets.some((target) => target.status === "PUBLISHING");
   return {
     ok: status === "PUBLISHED",
     externalPostId: published?.externalPostId ?? undefined,
-    error: status === "PUBLISHED" ? undefined : errors || "Publication failed",
+    error:
+      status === "PUBLISHED"
+        ? undefined
+        : errors ||
+          (stillProcessing
+            ? "Some platforms are still processing. Do not retry yet — publishing continues automatically."
+            : "Publication failed"),
   };
 }
 
@@ -298,6 +508,7 @@ export async function publishPostTargets(
       status: target.status,
       socialAccountId: target.socialAccountId,
       overrides: target.overrides,
+      externalJobId: target.externalJobId,
     }));
   if (targets.length === 0) {
     return finalizePostStatus(postId, post.status as AggregatePostStatus);

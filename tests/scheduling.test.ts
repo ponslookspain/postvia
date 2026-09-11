@@ -23,6 +23,7 @@ type TargetRow = {
   externalPostId: string | null;
   publishedAt: Date | null;
   errorMessage?: string | null;
+  externalJobId?: string | null;
 };
 
 type PostRow = {
@@ -455,5 +456,81 @@ describe("stale PUBLISHING recovery", () => {
     const { db } = createFakeDb({ posts: [] });
     const stats = await recoverStalePublishing(db, NOW);
     assert.deepEqual(stats, { recovered: 0, finalized: 0, expired: 0 });
+  });
+});
+
+describe("stale TikTok job resume (duplicate protection)", () => {
+  function tiktokStuckRow(overrides: Partial<PostRow> = {}): PostRow {
+    return {
+      ...scheduledPost({
+        status: "PUBLISHING",
+        updatedAt: new Date(NOW.getTime() - STALE_PUBLISHING_MS - 60_000),
+        scheduledAt: new Date(NOW.getTime() - 60 * MIN),
+      }),
+      targets: [
+        {
+          id: "t1",
+          postId: "p1",
+          status: "PUBLISHING",
+          platform: "TIKTOK",
+          externalPostId: null,
+          publishedAt: null,
+          externalJobId: "PUB-1",
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  test("a pending job blocks any reset: the post keeps waiting for TikTok", async () => {
+    const { db, posts } = createFakeDb({ posts: [tiktokStuckRow()] });
+    const resumeCalls: string[] = [];
+    const stats = await recoverStalePublishing(db, NOW, {
+      resumeJob: async (target) => {
+        resumeCalls.push(String((target as { externalJobId?: string }).externalJobId));
+        return "pending";
+      },
+    });
+    assert.equal(stats.recovered + stats.finalized + stats.expired, 0);
+    assert.equal(posts[0].status, "PUBLISHING");
+    assert.equal(posts[0].targets[0].status, "PUBLISHING");
+  });
+
+  test("a resumed COMPLETE job finalizes the post", async () => {
+    const { db, posts } = createFakeDb({ posts: [tiktokStuckRow()] });
+    const stats = await recoverStalePublishing(db, NOW, {
+      resumeJob: async (target) => {
+        const row = posts[0].targets.find((t) => t.id === target.id)!;
+        row.status = "PUBLISHED";
+        row.externalPostId = "9001";
+        row.publishedAt = NOW;
+        return "complete";
+      },
+    });
+    assert.equal(stats.finalized, 1);
+    assert.equal(posts[0].status, "PUBLISHED");
+  });
+
+  test("a resumed FAILED job fails all-failed posts without rescheduling", async () => {
+    const { db, posts } = createFakeDb({ posts: [tiktokStuckRow()] });
+    const stats = await recoverStalePublishing(db, NOW, {
+      resumeJob: async (target) => {
+        const row = posts[0].targets.find((t) => t.id === target.id)!;
+        row.status = "FAILED";
+        row.errorMessage = "TikTok rejected the video";
+        return "failed";
+      },
+    });
+    assert.equal(stats.finalized, 1);
+    assert.equal(posts[0].status, "FAILED");
+    assert.equal(posts[0].errorMessage, "All publish attempts failed.");
+  });
+
+  test("without a resume handler a target holding an externalJobId is never re-initialized or reset", async () => {
+    const { db, posts } = createFakeDb({ posts: [tiktokStuckRow()] });
+    const stats = await recoverStalePublishing(db, NOW);
+    assert.equal(stats.recovered, 0, "must not blind-reset a job we cannot check");
+    assert.equal(posts[0].status, "PUBLISHING");
+    assert.equal(posts[0].targets[0].status, "PUBLISHING");
   });
 });

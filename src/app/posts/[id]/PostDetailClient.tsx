@@ -280,6 +280,21 @@ export default function PostDetailPage({
     FAILED: "bg-red-50 text-red-700",
   };
 
+  function targetPostUrl(targetItem: Post["targets"][number]): string | null {
+    if (!targetItem.externalPostId) return null;
+    const handle = targetItem.socialAccount?.username;
+    if (targetItem.platform === "THREADS") {
+      return threadsPostUrl(handle ?? post.username ?? "", targetItem.externalPostId);
+    }
+    if (targetItem.platform === "X") {
+      return `https://x.com/i/status/${targetItem.externalPostId}`;
+    }
+    if (targetItem.platform === "TIKTOK" && handle) {
+      return `https://www.tiktok.com/@${handle}/video/${targetItem.externalPostId}`;
+    }
+    return null;
+  }
+
   return (
     <div className="p-8 max-w-3xl">
       <h1 className="text-2xl font-semibold mb-8">Post</h1>
@@ -468,6 +483,16 @@ export default function PostDetailPage({
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {targetItem.status === "PUBLISHED" && targetPostUrl(targetItem) && (
+                    <a
+                      href={targetPostUrl(targetItem)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs underline hover:text-foreground text-muted-foreground"
+                    >
+                      View
+                    </a>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {targetItem.status.toLowerCase()}
                   </span>
