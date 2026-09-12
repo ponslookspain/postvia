@@ -30,6 +30,7 @@ import {
   canSubmitComposer,
   continueEditingFromSaved,
   getFailedPublishActions,
+  hasUnsavedChanges,
   mapWithConcurrencyLimit,
   MEDIA_UPLOAD_CONCURRENCY,
   planMediaAdd,
@@ -69,6 +70,7 @@ import { AccountList } from "./_components/AccountList";
 import { MediaGrid } from "./_components/MediaGrid";
 import { PreviewCard } from "./_components/PreviewCard";
 import { PublishCard } from "./_components/PublishCard";
+import { MobileComposerBar } from "./_components/MobileComposerBar";
 import { ScheduleDialog } from "./_components/ScheduleDialog";
 import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
 
@@ -307,6 +309,21 @@ export default function NewPostComposer({
     };
   }, []);
 
+  // Warn before losing unsaved composer content (refresh, tab close).
+  // Active only in the editor branch with content the server lacks;
+  // terminal screens (saved/published/scheduled) hold server state.
+  const isEditing =
+    !publishWatchId && !publishResult && !(saved && savedId);
+  const isDirty = hasUnsavedChanges(text, media.length);
+  useEffect(() => {
+    if (!isEditing || !isDirty) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isEditing, isDirty]);
+
   function buildPostBody(nextScheduledAt?: string) {
     return {
       text: text.trim(),
@@ -423,6 +440,9 @@ export default function NewPostComposer({
         title: "File not added",
         description: `${item.name}: ${item.error}`,
         type: "error",
+        // Urgent announcement: Base UI only mirrors high-priority
+        // toasts into a role="alert" live region.
+        priority: "high",
       });
     }
     if (plan.limitExceeded) {
@@ -586,10 +606,22 @@ export default function NewPostComposer({
         title: "Failed to save draft",
         description: "Please try again.",
         type: "error",
+        priority: "high",
       });
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleScheduleClick() {
+    // X-only never opens the dialog and never no-ops: it
+    // shows the inline explanation above instead.
+    if (resolveScheduleClick(schedulingForX) === "show-x-hint") {
+      setXScheduleHint(true);
+      return;
+    }
+    setScheduleMode(true);
+    setScheduleError(null);
   }
 
   async function handleSchedule() {
@@ -1168,7 +1200,7 @@ export default function NewPostComposer({
                   </EmptyHeader>
                 </Empty>
               ) : (
-                <ScrollArea className={previews.length > 3 ? "h-120" : undefined}>
+                <ScrollArea className={previews.length > 3 ? "lg:h-120" : undefined}>
                   <div className="flex flex-col gap-4">
                     {previews.map((preview) => (
                       <PreviewCard
@@ -1252,18 +1284,7 @@ export default function NewPostComposer({
             saving={saving}
             scheduling={scheduling}
             onSaveDraft={handleSaveDraft}
-            onScheduleClick={() => {
-              // X-only never opens the dialog and never no-ops: it
-              // shows the inline explanation above instead.
-              if (
-                resolveScheduleClick(schedulingForX) === "show-x-hint"
-              ) {
-                setXScheduleHint(true);
-                return;
-              }
-              setScheduleMode(true);
-              setScheduleError(null);
-            }}
+            onScheduleClick={handleScheduleClick}
             onPublish={handlePublish}
             onAbort={() => publishAbortRef.current?.abort()}
             onDismissXHint={() => setXScheduleHint(false)}
@@ -1297,6 +1318,19 @@ export default function NewPostComposer({
         }}
         onConfirm={handleSchedule}
         onOpenDraft={(postId) => router.push(`/posts/${postId}`)}
+      />
+      {/* Spacer so the fixed mobile bar never covers content. */}
+      <div aria-hidden="true" className="h-20 lg:hidden" />
+      <MobileComposerBar
+        canSave={canSave}
+        canPublish={canPublish}
+        saving={saving}
+        scheduling={scheduling}
+        publishing={publishing}
+        schedulingForX={schedulingForX}
+        onSaveDraft={handleSaveDraft}
+        onScheduleClick={handleScheduleClick}
+        onPublish={handlePublish}
       />
     </div>
   );

@@ -62,6 +62,7 @@ export function MediaGrid({
                     src={item.previewUrl}
                     className="size-full object-cover"
                     muted
+                    aria-label={`Video preview of ${item.name}`}
                   />
                 )}
                 {item.status === "uploading" && (

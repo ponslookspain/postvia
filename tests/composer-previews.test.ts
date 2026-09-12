@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildComposerPreviews,
   countCharacters,
+  remainingCharacters,
   type PreviewAccount,
   type PreviewOverride,
 } from "../src/lib/composer-previews";
@@ -196,5 +197,13 @@ describe("countCharacters", () => {
     assert.equal(fits[0].overLimit, false);
     const over = buildComposerPreviews([X], "🚀".repeat(281), []);
     assert.equal(over[0].overLimit, true);
+  });
+});
+
+describe("remainingCharacters", () => {
+  test("reports what is left, clamped at zero", () => {
+    assert.equal(remainingCharacters("hello", 280), 275);
+    assert.equal(remainingCharacters("🚀".repeat(279), 280), 1);
+    assert.equal(remainingCharacters("a".repeat(300), 280), 0);
   });
 });

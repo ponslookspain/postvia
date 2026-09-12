@@ -4,6 +4,7 @@ import {
   canSubmitComposer,
   continueEditingFromSaved,
   getFailedPublishActions,
+  hasUnsavedChanges,
   isTikTokReconnectNeeded,
   mapWithConcurrencyLimit,
   MEDIA_UPLOAD_CONCURRENCY,
@@ -136,8 +137,7 @@ describe("getFailedPublishActions", () => {
   });
 });
 
-describe("continueEditingFromSaved", () => {
-  test("flips only the screen flags — text and media have no setters in reach", () => {
+describe("continueEditingFromSaved", () => {  test("flips only the screen flags — text and media have no setters in reach", () => {
     const calls: string[] = [];
     continueEditingFromSaved({
       setSaved: (value) => {
@@ -273,5 +273,18 @@ describe("isTikTokReconnectNeeded", () => {
     );
     assert.equal(isTikTokReconnectNeeded(null), false);
     assert.equal(isTikTokReconnectNeeded(""), false);
+  });
+});
+
+describe("hasUnsavedChanges", () => {
+  test("empty composer has nothing to lose", () => {
+    assert.equal(hasUnsavedChanges("", 0), false);
+    assert.equal(hasUnsavedChanges("   ", 0), false);
+  });
+
+  test("text or media counts as unsaved", () => {
+    assert.equal(hasUnsavedChanges("hello", 0), true);
+    assert.equal(hasUnsavedChanges("", 2), true);
+    assert.equal(hasUnsavedChanges("hello", 1), true);
   });
 });

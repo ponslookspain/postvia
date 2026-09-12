@@ -44,6 +44,15 @@ export function countCharacters(text: string): number {
 }
 
 /**
+ * Characters left before a platform limit, clamped at zero so screen
+ * readers hear "0 remaining" instead of a negative count (the over-limit
+ * error itself is announced separately).
+ */
+export function remainingCharacters(text: string, maxLength: number): number {
+  return Math.max(0, maxLength - countCharacters(text));
+}
+
+/**
  * The single source of truth for the composer preview model:
  * one preview per selected account, global text by default, and a
  * per-account override that only affects that account's preview.

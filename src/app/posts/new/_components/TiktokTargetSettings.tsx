@@ -153,7 +153,12 @@ export function TiktokTargetSettings({
                 });
               }}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              aria-describedby={`${accountId}-cover-hint`}
             />
+            <FieldDescription id={`${accountId}-cover-hint`}>
+              Video frame shown as cover, in milliseconds — e.g. 1500 for
+              1.5 seconds in. Leave empty for the default cover.
+            </FieldDescription>
           </Field>
           {info.maxVideoPostDurationSec > 0 && (
             <FieldDescription>

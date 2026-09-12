@@ -14,7 +14,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { countCharacters } from "@/lib/composer-previews";
+import {
+  countCharacters,
+  remainingCharacters,
+} from "@/lib/composer-previews";
 import type { ComposerPreview } from "@/lib/composer-previews";
 import { TiktokTargetSettings } from "./TiktokTargetSettings";
 import type { DraftMedia, TiktokCreatorInfo } from "./types";
@@ -23,6 +26,7 @@ import type { DraftMedia, TiktokCreatorInfo } from "./types";
  * Stage H5: one platform preview card moved 1:1 from NewPostComposer
  * (header, customize editor incl. TikTok settings, read view with
  * counters, TikTok title hint and over-limit error).
+ * Stage I: counters expose remaining characters to screen readers.
  */
 export function PreviewCard({
   preview,
@@ -63,6 +67,12 @@ export function PreviewCard({
   onDone: () => void;
   onCustomize: () => void;
 }) {
+  const remainingLabel =
+    remainingCharacters(preview.text, preview.maxLength) +
+    " characters remaining of " +
+    preview.maxLength +
+    " for " +
+    preview.label;
   return (
     <div
       key={preview.accountId}
@@ -105,7 +115,7 @@ export function PreviewCard({
               aria-invalid={preview.overLimit || undefined}
               onChange={(event) => onCustomTextChange(event.target.value)}
             />
-            <FieldDescription>
+            <FieldDescription aria-label={remainingLabel}>
               {countCharacters(preview.text)} / {preview.maxLength}
             </FieldDescription>
             {preview.overLimit && (
@@ -162,6 +172,7 @@ export function PreviewCard({
                     key={item.key}
                     src={item.previewUrl}
                     muted
+                    aria-label={"Video preview of " + item.name}
                     className="size-10 rounded border object-cover"
                   />
                 )
@@ -176,7 +187,7 @@ export function PreviewCard({
             )}
           </p>
           <div className="flex items-center justify-between gap-2">
-            <FieldDescription>
+            <FieldDescription aria-label={remainingLabel}>
               {countCharacters(preview.text)} / {preview.maxLength}
             </FieldDescription>
             {preview.customized && (

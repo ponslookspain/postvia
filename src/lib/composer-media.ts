@@ -134,6 +134,14 @@ export function continueEditingFromSaved(controls: {
   controls.setSavedId(null);
 }
 
+/**
+ * Unsaved-changes guard input: the composer holds content the server does
+ * not have yet (draft creation happens on explicit save/schedule/publish).
+ */
+export function hasUnsavedChanges(text: string, mediaCount: number): boolean {
+  return text.trim().length > 0 || mediaCount > 0;
+}
+
 /** Upload parallelism: faster batches without hammering the webhook. */
 export const MEDIA_UPLOAD_CONCURRENCY = 2;
 
