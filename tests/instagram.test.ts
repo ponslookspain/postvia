@@ -86,7 +86,7 @@ describe("Instagram social layer", () => {
       );
       assert.equal(
         params.get("redirect_uri"),
-        "https://postvia.vercel.app/api/auth/instagram/callback"
+        "https://postvia.online/api/auth/instagram/callback"
       );
       assert.equal(params.get("state"), "st-42");
       assert.ok(!url.includes("ig-client-secret"), "secret never in the URL");
@@ -107,7 +107,7 @@ describe("Instagram social layer", () => {
       assert.equal(firstBody.get("code"), "the-code");
       assert.equal(
         firstBody.get("redirect_uri"),
-        "https://postvia.vercel.app/api/auth/instagram/callback"
+        "https://postvia.online/api/auth/instagram/callback"
       );
       assert.ok(tokens.expiresAt.getTime() > Date.now());
     });

@@ -47,7 +47,7 @@ describe("verification email template", () => {
 
   test("preserves the token and callbackURL together when rendering a full Better Auth URL", () => {
     const url =
-      "https://postvia.vercel.app/api/auth/verify-email?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20ifQ.signaturePayload&callbackURL=%2Fverify-email";
+      "https://postvia.online/api/auth/verify-email?token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20ifQ.signaturePayload&callbackURL=%2Fverify-email";
     const { html, text } = renderVerificationEmail(url);
 
     const decodedHref = html
@@ -155,16 +155,16 @@ describe("Better Auth base URL resolution", () => {
         BETTER_AUTH_URL: "https://custom.example.com",
         VERCEL_ENV: "production",
         VERCEL_URL: "postvia-abc123-postvia.vercel.app",
-        VERCEL_PROJECT_PRODUCTION_URL: "postvia.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "postvia.online",
       }),
       "https://custom.example.com"
     );
   });
 
-  test("production resolves to the deterministic production alias (guards Google redirect_uri_mismatch)", () => {
+  test("production resolves to the deterministic production domain (guards Google redirect_uri_mismatch)", () => {
     assert.equal(
       resolveBaseURL({ VERCEL_ENV: "production", VERCEL_URL: "deploy-a4wvan4ds-postvia.vercel.app" }),
-      "https://postvia.vercel.app"
+      "https://postvia.online"
     );
   });
 
@@ -173,9 +173,9 @@ describe("Better Auth base URL resolution", () => {
       resolveBaseURL({
         VERCEL_ENV: "production",
         VERCEL_URL: "deploy-a4wvan4ds-postvia.vercel.app",
-        VERCEL_PROJECT_PRODUCTION_URL: "postvia.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "postvia.online",
       }),
-      "https://postvia.vercel.app"
+      "https://postvia.online"
     );
   });
 
@@ -190,12 +190,12 @@ describe("Better Auth base URL resolution", () => {
     assert.equal(resolveBaseURL({}), undefined);
   });
 
-  test("Google OAuth redirect URI for production matches the registered alias", () => {
+  test("Google OAuth redirect URI for production matches the registered domain", () => {
     const base = resolveBaseURL({ VERCEL_ENV: "production" })!;
     assert.equal(base, PRODUCTION_URL);
     assert.equal(
       `${base}/api/auth/callback/google`,
-      "https://postvia.vercel.app/api/auth/callback/google"
+      "https://postvia.online/api/auth/callback/google"
     );
   });
 });

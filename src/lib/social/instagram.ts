@@ -20,7 +20,7 @@ const TIK = {
 };
 
 const INSTAGRAM_SCOPES = ["instagram_business_basic", "instagram_business_content_publish"];
-const DEFAULT_REDIRECT_URI = "https://postvia.vercel.app/api/auth/instagram/callback";
+const DEFAULT_REDIRECT_URI = "https://postvia.online/api/auth/instagram/callback";
 
 export function getInstagramCredentials():
   | { clientId: string; clientSecret: string }

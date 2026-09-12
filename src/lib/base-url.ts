@@ -1,4 +1,4 @@
-export const PRODUCTION_URL = "https://postvia.vercel.app";
+export const PRODUCTION_URL = "https://postvia.online";
 
 export function resolveBaseURL(
   env: Record<string, string | undefined> = process.env

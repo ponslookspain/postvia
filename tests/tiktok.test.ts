@@ -127,7 +127,7 @@ describe("TikTok social layer", () => {
 
       assert.equal(
         params.get("redirect_uri"),
-        "https://postvia.vercel.app/api/auth/tiktok/callback"
+        "https://postvia.online/api/auth/tiktok/callback"
       );
       assert.equal(params.get("state"), "state-123");
       assert.ok(!url.includes("test-client-secret"), "secret never in the URL");
@@ -148,7 +148,7 @@ describe("TikTok social layer", () => {
       assert.equal(form.get("client_secret"), "test-client-secret");
       assert.equal(
         form.get("redirect_uri"),
-        "https://postvia.vercel.app/api/auth/tiktok/callback"
+        "https://postvia.online/api/auth/tiktok/callback"
       );
     });
 

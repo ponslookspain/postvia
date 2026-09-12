@@ -5,7 +5,7 @@ const TIKTOK_AUTHORIZE_URL = "https://www.tiktok.com/v2/auth/authorize/";
 const TIKTOK_API_BASE = "https://open.tiktokapis.com";
 const TIKTOK_SCOPES = ["user.info.basic", "video.publish"];
 
-const DEFAULT_REDIRECT_URI = "https://postvia.vercel.app/api/auth/tiktok/callback";
+const DEFAULT_REDIRECT_URI = "https://postvia.online/api/auth/tiktok/callback";
 
 export function getTiktokCredentials(): { clientKey: string; clientSecret: string } | null {
   const clientKey = process.env.TIKTOK_CLIENT_KEY?.trim() ?? "";
