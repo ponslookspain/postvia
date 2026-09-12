@@ -221,6 +221,11 @@ export async function queryTiktokCreatorInfo(
 /**
  * Returns a fresh access token for a stored TikTok account, refreshing and
  * persisting rotated tokens when close to expiry. Never logs secrets.
+ *
+ * TikTok rotates the refresh token on every refresh, so parallel targets of
+ * the same account must not refresh twice with the same token. The stored
+ * row is re-read first: if a concurrent worker already rotated the tokens
+ * (different access token, still valid), its result is reused.
  */
 export async function ensureFreshTiktokToken(account: {
   id: string;
@@ -232,14 +237,28 @@ export async function ensureFreshTiktokToken(account: {
   if (account.expiresAt && account.expiresAt.getTime() > now + 5 * 60_000) {
     return account.accessToken;
   }
-  if (!account.refreshToken) {
+  const stored = await prisma.socialAccount.findUnique({
+    where: { id: account.id },
+    select: { accessToken: true, refreshToken: true, expiresAt: true },
+  });
+  const current = stored ?? account;
+  if (
+    current.expiresAt &&
+    current.expiresAt.getTime() > Date.now() + 5 * 60_000 &&
+    current.accessToken !== account.accessToken
+  ) {
+    // Another worker refreshed concurrently; reuse its rotated tokens.
+    return current.accessToken;
+  }
+  const refreshToken = current.refreshToken;
+  if (!refreshToken) {
     throw new TiktokApiError(
       "token_expired",
       "TikTok access expired. Reconnect your TikTok account.",
       401
     );
   }
-  const tokens = await refreshTiktokToken(account.refreshToken);
+  const tokens = await refreshTiktokToken(refreshToken);
   await prisma.socialAccount.update({
     where: { id: account.id },
     data: {

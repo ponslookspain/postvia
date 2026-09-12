@@ -523,7 +523,7 @@ describe("stale TikTok job resume (duplicate protection)", () => {
     });
     assert.equal(stats.finalized, 1);
     assert.equal(posts[0].status, "FAILED");
-    assert.equal(posts[0].errorMessage, "All publish attempts failed.");
+    assert.equal(posts[0].errorMessage, "TIKTOK: TikTok rejected the video");
   });
 
   test("without a resume handler a target holding an externalJobId is never re-initialized or reset", async () => {
@@ -532,5 +532,136 @@ describe("stale TikTok job resume (duplicate protection)", () => {
     assert.equal(stats.recovered, 0, "must not blind-reset a job we cannot check");
     assert.equal(posts[0].status, "PUBLISHING");
     assert.equal(posts[0].targets[0].status, "PUBLISHING");
+  });
+});
+
+describe("stale recovery correctness fixes", () => {
+  function staleRow(overrides: Partial<PostRow> = {}): PostRow {
+    return scheduledPost({
+      status: "PUBLISHING",
+      updatedAt: new Date(NOW.getTime() - STALE_PUBLISHING_MS - MIN),
+      ...overrides,
+    });
+  }
+
+  test("unscheduled stuck post resets to DRAFT, not SCHEDULED", async () => {
+    const { db, posts } = createFakeDb({
+      posts: [
+        staleRow({
+          scheduledAt: null,
+          targets: [
+            { id: "t1", postId: "p1", status: "PUBLISHING", platform: "X", externalPostId: null, publishedAt: null },
+          ],
+        }),
+      ],
+    });
+    const stats = await recoverStalePublishing(db, NOW);
+    assert.equal(stats.recovered, 1);
+    assert.equal(posts[0].status, "DRAFT");
+    assert.equal(posts[0].targets[0].status, "PENDING");
+  });
+
+  test("partial recovery keeps per-target errors on the post", async () => {
+    const { db, posts } = createFakeDb({
+      posts: [
+        staleRow({
+          targets: [
+            { id: "t1", postId: "p1", status: "PUBLISHED", platform: "THREADS", externalPostId: "e1", publishedAt: NOW },
+            { id: "t2", postId: "p1", status: "FAILED", platform: "X", externalPostId: null, publishedAt: null, errorMessage: "X exploded" },
+          ],
+        }),
+      ],
+    });
+    const stats = await recoverStalePublishing(db, NOW);
+    assert.equal(stats.finalized, 1);
+    assert.equal(posts[0].status, "PARTIALLY_PUBLISHED");
+    assert.match(posts[0].errorMessage ?? "", /X exploded/);
+  });
+
+  test("concurrent completion wins: reset never overwrites a finalized post", async () => {
+    const seed = staleRow({
+      targets: [
+        { id: "t1", postId: "p1", status: "PUBLISHING", platform: "THREADS", externalPostId: null, publishedAt: null },
+      ],
+    });
+    const { db, posts } = createFakeDb({ posts: [seed] });
+    // Simulate a slow publish finishing after the stale snapshot: the
+    // conditional writes must not resurrect it as SCHEDULED/PENDING.
+    const originalFindMany = db.post.findMany;
+    let calls = 0;
+    db.post.findMany = (async (args: { where: Record<string, unknown>; include: { targets: true } }) => {
+      calls++;
+      const rows = await originalFindMany(args);
+      if (calls === 1) {
+        for (const p of posts) {
+          if (p.id === "p1") {
+            p.status = "PUBLISHED";
+            p.targets[0].status = "PUBLISHED";
+            p.targets[0].externalPostId = "e1";
+          }
+        }
+      }
+      return rows;
+    }) as typeof db.post.findMany;
+    const stats = await recoverStalePublishing(db, NOW);
+    assert.equal(stats.recovered, 0);
+    assert.equal(stats.finalized, 0);
+    assert.equal(posts[0].status, "PUBLISHED");
+    assert.equal(posts[0].targets[0].status, "PUBLISHED");
+  });
+});
+
+describe("tick unexpected-throw recompute", () => {
+  test("throw with a published sibling yields PARTIALLY_PUBLISHED, not blind FAILED", async () => {
+    const { db, posts } = createFakeDb({
+      posts: [
+        scheduledPost({
+          targets: [
+            { id: "t1", postId: "p1", status: "PUBLISHED", platform: "THREADS", externalPostId: "e1", publishedAt: NOW },
+            { id: "t2", postId: "p1", status: "FAILED", platform: "X", externalPostId: null, publishedAt: null, errorMessage: "X down" },
+          ],
+        }),
+      ],
+      accounts: { "alice:THREADS": THREADS_ACCOUNT },
+    });
+    const stats = await runScheduledPublishTick({
+      db,
+      publish: async () => {
+        throw new Error("worker exploded");
+      },
+      now: NOW,
+    });
+    assert.equal(stats.failed, 1);
+    assert.equal(posts[0].status, "PARTIALLY_PUBLISHED");
+    assert.match(posts[0].errorMessage ?? "", /X down/);
+  });
+
+  test("throw with nothing published fails the post and its claimed targets", async () => {
+    const { db, posts } = createFakeDb({
+      posts: [
+        scheduledPost({
+          targets: [
+            { id: "t1", postId: "p1", status: "FAILED", platform: "X", externalPostId: null, publishedAt: null, errorMessage: "old" },
+            { id: "t2", postId: "p1", status: "PENDING", platform: "THREADS", externalPostId: null, publishedAt: null },
+          ],
+        }),
+      ],
+      accounts: { "alice:THREADS": THREADS_ACCOUNT },
+    });
+    const stats = await runScheduledPublishTick({
+      db,
+      // Simulates executePublish claiming t2, then crashing before finalize.
+      publish: async () => {
+        posts[0].targets.find((t) => t.id === "t2")!.status = "PUBLISHING";
+        throw new Error("worker exploded");
+      },
+      now: NOW,
+    });
+    assert.equal(stats.failed, 1);
+    assert.equal(posts[0].status, "FAILED");
+    assert.equal(
+      posts[0].targets.find((t) => t.id === "t2")!.status,
+      "FAILED"
+    );
   });
 });

@@ -42,6 +42,28 @@ describe("multi-target status and claiming", () => {
     assert.equal(derivePostStatus([{ status: "FAILED" }, { status: "FAILED" }]), "FAILED");
   });
 
+  test("leftover PENDING next to settled siblings means still in flight", () => {
+    assert.equal(
+      derivePostStatus([{ status: "PUBLISHED" }, { status: "PENDING" }]),
+      "PUBLISHING"
+    );
+    assert.equal(
+      derivePostStatus([{ status: "FAILED" }, { status: "PENDING" }]),
+      "PUBLISHING"
+    );
+  });
+
+  test("all PENDING keeps the fallback (nothing happened yet)", () => {
+    assert.equal(
+      derivePostStatus([{ status: "PENDING" }, { status: "PENDING" }]),
+      "DRAFT"
+    );
+    assert.equal(
+      derivePostStatus([{ status: "PENDING" }], "SCHEDULED"),
+      "SCHEDULED"
+    );
+  });
+
   test("target publish runs in parallel and isolates one failure", async () => {
     const started: string[] = [];
     const results = await publishTargetsInParallel(

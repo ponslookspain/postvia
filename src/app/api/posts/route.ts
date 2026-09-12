@@ -16,6 +16,18 @@ export async function GET(request: NextRequest) {
     }
     const status = request.nextUrl.searchParams.get("status");
 
+    const VALID_STATUSES = [
+      "DRAFT",
+      "SCHEDULED",
+      "PUBLISHING",
+      "PUBLISHED",
+      "PARTIALLY_PUBLISHED",
+      "FAILED",
+    ];
+    if (status !== null && !VALID_STATUSES.includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
     const posts = await prisma.post.findMany({
       where: {
         userId: user.id,

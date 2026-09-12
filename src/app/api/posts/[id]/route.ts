@@ -87,9 +87,14 @@ export async function PATCH(
     }
 
     if (body.scheduledAt !== undefined) {
+      // The X-scheduling ban applies to the whole post, not just the first
+      // target (matching the create route, which checks every account).
+      const hasXTarget = existing.targets.some(
+        (target) => target.platform === "X"
+      );
       const resolution = resolveScheduledAtUpdate({
         currentStatus: existing.status,
-        platform: existing.targets[0]?.platform ?? "",
+        platform: hasXTarget ? "X" : (existing.targets[0]?.platform ?? ""),
         rawScheduledAt: body.scheduledAt,
       });
       if (!resolution.ok) {

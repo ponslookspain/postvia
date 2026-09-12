@@ -43,6 +43,7 @@ export type StoredPostTarget = {
   externalPostId: string | null;
   publishedAt: Date | null;
   externalJobId?: string | null;
+  errorMessage?: string | null;
 };
 
 export type StaleJobResumeResult = "complete" | "failed" | "pending" | "skip";
@@ -158,42 +159,48 @@ export async function recoverStalePublishing(
     const published = current.targets.filter((t) => t.status === "PUBLISHED");
     const failed = current.targets.filter((t) => t.status === "FAILED");
     const total = current.targets.length;
+    const targetErrors = current.targets
+      .filter((t) => t.status === "FAILED" && t.errorMessage)
+      .map((t) => `${t.platform}: ${t.errorMessage}`)
+      .join("; ");
 
+    // All writes below are conditional on the post still being PUBLISHING:
+    // a slow publish may have completed concurrently since the snapshot.
     if (total > 0 && published.length === total) {
       const latest = Math.max(
         ...published.map((t) => (t.publishedAt ?? now).getTime())
       );
-      await db.post.update({
-        where: { id: post.id },
+      const claimed = await db.post.updateMany({
+        where: { id: post.id, status: "PUBLISHING" },
         data: {
           status: "PUBLISHED",
           publishedAt: new Date(latest),
           errorMessage: null,
         },
       });
-      stats.finalized++;
+      if (claimed.count > 0) stats.finalized++;
       continue;
     }
 
     if (total > 0 && published.length > 0 && failed.length === total - published.length) {
-      await db.post.update({
-        where: { id: post.id },
+      const claimed = await db.post.updateMany({
+        where: { id: post.id, status: "PUBLISHING" },
         data: {
           status: "PARTIALLY_PUBLISHED",
           publishedAt: null,
-          errorMessage: null,
+          errorMessage: targetErrors || null,
         },
       });
-      stats.finalized++;
+      if (claimed.count > 0) stats.finalized++;
       continue;
     }
 
     if (total > 0 && failed.length === total) {
-      await db.post.update({
-        where: { id: post.id },
-        data: { status: "FAILED", errorMessage: "All publish attempts failed." },
+      const claimed = await db.post.updateMany({
+        where: { id: post.id, status: "PUBLISHING" },
+        data: { status: "FAILED", errorMessage: targetErrors || "All publish attempts failed." },
       });
-      stats.finalized++;
+      if (claimed.count > 0) stats.finalized++;
       continue;
     }
 
@@ -206,11 +213,11 @@ export async function recoverStalePublishing(
         where: { postId: post.id, status: "PUBLISHING" },
         data: { status: "FAILED", errorMessage: TIMEOUT_MESSAGE },
       });
-      await db.post.update({
-        where: { id: post.id },
+      const claimed = await db.post.updateMany({
+        where: { id: post.id, status: "PUBLISHING" },
         data: { status: "FAILED", errorMessage: TIMEOUT_MESSAGE },
       });
-      stats.expired++;
+      if (claimed.count > 0) stats.expired++;
       continue;
     }
 
@@ -218,11 +225,14 @@ export async function recoverStalePublishing(
       where: { postId: post.id, status: "PUBLISHING" },
       data: { status: "PENDING", errorMessage: null },
     });
-    await db.post.update({
-      where: { id: post.id },
-      data: { status: "SCHEDULED", errorMessage: null },
+    // A manually published (never scheduled) post has no due date to be
+    // re-queued on — resetting it to SCHEDULED would strand it forever.
+    const resetStatus = post.scheduledAt === null ? "DRAFT" : "SCHEDULED";
+    const claimed = await db.post.updateMany({
+      where: { id: post.id, status: "PUBLISHING" },
+      data: { status: resetStatus, errorMessage: null },
     });
-    stats.recovered++;
+    if (claimed.count > 0) stats.recovered++;
   }
 
   return stats;
@@ -312,18 +322,49 @@ export async function runScheduledPublishTick(deps: {
         stats.failed++;
       }
     } catch (error) {
+      // The publish function threw outside the per-target flow: never blindly
+      // mark the post FAILED — sibling targets may already be PUBLISHED.
+      // Re-read and derive the truthful aggregate status instead.
       const message =
         error instanceof Error ? error.message : "Publication failed";
-      await db.post.update({
-        where: { id: post.id },
-        data: { status: "FAILED", errorMessage: message },
-      });
-      if (target) {
-        await db.postTarget.update({
-          where: { id: target.id },
+      const fresh =
+        (await db.post.findMany({ where: { id: post.id }, include: { targets: true } }))[0] ?? post;
+      const publishedCount = fresh.targets.filter((t) => t.status === "PUBLISHED").length;
+      const failedTargets = fresh.targets.filter((t) => t.status === "FAILED");
+      if (publishedCount > 0 && failedTargets.length > 0) {
+        await db.post.updateMany({
+          where: { id: post.id, status: "PUBLISHING" },
+          data: {
+            status: "PARTIALLY_PUBLISHED",
+            errorMessage:
+              failedTargets
+                .filter((t) => t.errorMessage)
+                .map((t) => `${t.platform}: ${t.errorMessage}`)
+                .join("; ") || message,
+          },
+        });
+      } else if (publishedCount === 0) {
+        await db.post.updateMany({
+          where: { id: post.id, status: "PUBLISHING" },
           data: { status: "FAILED", errorMessage: message },
         });
+        // Every target the failed run had claimed is stuck in PUBLISHING
+        // (the claim happened inside publish, the finalize never ran).
+        await db.postTarget.updateMany({
+          where: { postId: post.id, status: "PUBLISHING" },
+          data: { status: "FAILED", errorMessage: message },
+        });
+        // The target handed to the failed worker is marked FAILED
+        // unconditionally: it was given to publish, so from the user's
+        // perspective this attempt failed and stays manually retryable.
+        if (target) {
+          await db.postTarget.update({
+            where: { id: target.id },
+            data: { status: "FAILED", errorMessage: message },
+          });
+        }
       }
+      // If everything is already PUBLISHED, there is nothing to repair.
       stats.failed++;
     }
   }

@@ -102,4 +102,6 @@ npm test           # node --test suite (219 tests)
 Connected Vercel project `postvia` (see `.vercel/project.json`). Pushing to
 `main` deploys via the linked project; `vercel --prod` deploys the working
 tree explicitly. Scheduled publishing runs on the cron defined in
-`vercel.json`.
+`vercel.json` (daily at 03:00 UTC — the maximum frequency on the current
+Hobby plan, so scheduled posts can go out up to ~24h late; a paid plan
+unlocks sub-daily schedules).

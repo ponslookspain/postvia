@@ -18,6 +18,7 @@ import {
 } from "@/lib/social/tiktok";
 import {
   ensureFreshInstagramToken,
+  InstagramApiError,
   InstagramProvider,
   instagramErrorMessage,
   monitorInstagramContainer,
@@ -155,9 +156,13 @@ export function derivePostStatus(
   const published = targets.filter((target) => target.status === "PUBLISHED").length;
   const failed = targets.filter((target) => target.status === "FAILED").length;
   const publishing = targets.some((target) => target.status === "PUBLISHING");
+  const pending = targets.some((target) => target.status === "PENDING");
   if (published === targets.length) return "PUBLISHED";
   if (published > 0 && failed > 0) return "PARTIALLY_PUBLISHED";
-  if (publishing) return "PUBLISHING";
+  // A leftover PENDING alongside settled/in-flight siblings means a
+  // concurrent run owns it — the post is still in flight, not a draft.
+  // All-PENDING (nothing happened yet) keeps the fallback.
+  if (publishing || (pending && (published > 0 || failed > 0))) return "PUBLISHING";
   if (failed === targets.length) return "FAILED";
   return fallback === "SCHEDULED" ? "SCHEDULED" : "DRAFT";
 }
@@ -423,7 +428,12 @@ async function executeInstagramTarget(
   const caps = getPlatformCapabilities("INSTAGRAM");
   const mediaValidation = validateTargetMedia(caps, post.media);
   if (!mediaValidation.ok) {
-    await updateTargetFailure(post.id, target.id, mediaValidation.error);
+    // A stale container id from an earlier attempt must not survive a
+    // validation failure: the next retry would otherwise poll a dead
+    // container instead of creating a fresh one.
+    await updateTargetFailure(post.id, target.id, mediaValidation.error, {
+      clearJobId: true,
+    });
     return failedOutcome(target, mediaValidation.error);
   }
   const media = post.media[0];
@@ -632,15 +642,24 @@ export async function resumeInstagramTarget(
     }
     return "pending";
   } catch (error) {
-    await prisma.postTarget.update({
-      where: { id: targetId },
-      data: {
-        status: "FAILED",
-        externalJobId: null,
-        errorMessage: instagramErrorMessage(error),
-      },
-    });
-    return "failed";
+    // Mirror the TikTok resume: only terminal auth failures fail the
+    // target (and drop the job id). Transient network/storage blips keep
+    // the container id so the next tick resumes polling it.
+    if (
+      error instanceof InstagramApiError &&
+      (error.code === "190" || /token|session|revoked/i.test(error.message))
+    ) {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "FAILED",
+          externalJobId: null,
+          errorMessage: instagramErrorMessage(error),
+        },
+      });
+      return "failed";
+    }
+    return "pending";
   }
 }
 

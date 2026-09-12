@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { publishPostTargets } from "@/lib/publish";
+import { STALE_PUBLISHING_MS } from "@/lib/scheduling";
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 
 // Retrying a video target can again take minutes; same background pattern
@@ -33,7 +34,9 @@ export async function POST(
       where: { id },
       select: {
         userId: true,
-        targets: { select: { id: true, status: true } },
+        status: true,
+        updatedAt: true,
+        targets: { select: { id: true, status: true, externalJobId: true } },
       },
     });
 
@@ -44,9 +47,30 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const target = requestedTargetId
+    const staleCutoff = new Date(Date.now() - STALE_PUBLISHING_MS);
+    // A post stuck in PUBLISHING past the stale threshold has no running
+    // function behind it (maxDuration 300s < STALE_PUBLISHING_MS): its
+    // jobless sync targets (X/Threads) are safe to re-queue, while targets
+    // holding a platform job id stay with the cron resume path.
+    const isStalePublishing =
+      post.status === "PUBLISHING" && post.updatedAt < staleCutoff;
+
+    let target = requestedTargetId
       ? post.targets.find((t) => t.id === requestedTargetId && t.status === "FAILED")
       : post.targets.find((t) => t.status === "FAILED");
+
+    if (!target && isStalePublishing) {
+      await prisma.postTarget.updateMany({
+        where: { postId: id, status: "PUBLISHING", externalJobId: null },
+        data: { status: "PENDING", errorMessage: null },
+      });
+      const refreshed = await prisma.post.findFirst({
+        where: { id },
+        select: { targets: { select: { id: true, status: true, externalJobId: true } } },
+      });
+      target = refreshed?.targets.find((t) => t.status === "PENDING") ?? undefined;
+    }
+
     if (!target) {
       return NextResponse.json(
         { error: "No failed target found for this retry" },
@@ -55,11 +79,18 @@ export async function POST(
     }
 
     // Retry is allowed when the post overall failed OR partially failed
-    // (some platforms published, others failed). PUBLISHED targets are
+    // (some platforms published, others failed), or when it is stale in
+    // PUBLISHING with no live function behind it. PUBLISHED targets are
     // never re-published: publishPostTargets only claims PENDING/FAILED
     // targets, and a target-level atomic claim is taken inside it.
     const claim = await prisma.post.updateMany({
-      where: { id, status: { in: ["FAILED", "PARTIALLY_PUBLISHED"] } },
+      where: {
+        id,
+        OR: [
+          { status: { in: ["FAILED", "PARTIALLY_PUBLISHED"] } },
+          { status: "PUBLISHING", updatedAt: { lt: staleCutoff } },
+        ],
+      },
       data: { status: "PUBLISHING", errorMessage: null },
     });
 
