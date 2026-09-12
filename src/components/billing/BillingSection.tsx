@@ -290,11 +290,7 @@ export function BillingSection({
                         disabled={redirecting !== null}
                         onClick={() => void startCheckout(paidId)}
                       >
-                        {redirecting === paidId
-                          ? "Redirecting…"
-                          : paidId === "scale"
-                            ? "Subscribe"
-                            : "Upgrade"}
+                        {redirecting === paidId ? "Redirecting…" : "Subscribe"}
                       </Button>
                     )}
                   </div>
