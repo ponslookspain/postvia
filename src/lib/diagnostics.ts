@@ -1,12 +1,3 @@
-export function hasEnv(name: string): boolean {
-  try {
-    const value = process.env[name];
-    return typeof value === "string" && value.trim() !== "";
-  } catch {
-    return false;
-  }
-}
-
 export function safePathname(pathname: string): string {
   const parts = pathname.replace(/^\/+/, "").split("/");
   if (parts[0] === "media" && parts[1]) {
@@ -35,14 +26,5 @@ export function logErrorDiagnostic(
     ...(extra ?? {}),
     errorName: name,
     errorMessage: message,
-  });
-}
-
-export function logBlobAuthEnvPresence(): void {
-  logDiagnostic("blob", "auth env presence (names only)", {
-    BLOB_STORE_ID: hasEnv("BLOB_STORE_ID"),
-    VERCEL_OIDC_TOKEN: hasEnv("VERCEL_OIDC_TOKEN"),
-    BLOB_READ_WRITE_TOKEN: hasEnv("BLOB_READ_WRITE_TOKEN"),
-    BLOB_API_URL: hasEnv("BLOB_API_URL"),
   });
 }

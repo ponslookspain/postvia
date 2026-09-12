@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { logErrorDiagnostic } from "@/lib/diagnostics";
 
 const EMAIL_FROM =
   process.env.EMAIL_FROM ?? "Postvia <onboarding@resend.dev>";
@@ -72,9 +73,11 @@ export async function sendVerificationEmail(
 ): Promise<void> {
   const resend = getResend();
   if (!resend) {
-    console.warn(
-      "[email] RESEND_API_KEY not set — skipping verification email to",
-      user.email
+    // Never log the recipient address (PII): the missing-key fact is enough.
+    logErrorDiagnostic(
+      "email",
+      "RESEND_API_KEY not set — skipping verification email",
+      new Error("Missing RESEND_API_KEY")
     );
     return;
   }

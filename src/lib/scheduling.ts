@@ -1,4 +1,5 @@
 import type { PublishOutcome } from "@/lib/publish";
+import { selectPublishableTargetIds } from "@/lib/publish";
 
 const AUTH_PREFIX = "Bearer ";
 
@@ -306,8 +307,9 @@ export async function runScheduledPublishTick(deps: {
       continue;
     }
 
-    const target = post.targets.find(
-      (candidate) => candidate.status === "PENDING" || candidate.status === "FAILED"
+    const publishableIds = selectPublishableTargetIds(post.targets);
+    const target = post.targets.find((candidate) =>
+      publishableIds.includes(candidate.id)
     );
 
     try {

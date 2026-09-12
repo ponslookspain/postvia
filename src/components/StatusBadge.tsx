@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { formatStatusLabel } from "@/lib/utils";
 
 const STATUS_VARIANT = {
   DRAFT: "ghost",
@@ -12,7 +13,7 @@ const STATUS_VARIANT = {
 export function StatusBadge({ status }: { status: string }) {
   return (
     <Badge variant={STATUS_VARIANT[status as keyof typeof STATUS_VARIANT] ?? "ghost"}>
-      {status.charAt(0) + status.slice(1).toLowerCase().replaceAll("_", " ")}
+      {formatStatusLabel(status)}
     </Badge>
   );
 }

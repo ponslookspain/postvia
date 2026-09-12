@@ -24,6 +24,7 @@ import {
   buildComposerMediaErrors,
 } from "@/lib/composer-previews";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -273,30 +274,6 @@ function toLocalInputValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
     date.getDate()
   )}`;
-}
-
-function PlatformGlyph({ platform }: { platform: Platform }) {
-  if (platform === "THREADS") {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="8.5" />
-        <circle cx="12" cy="12" r="4" />
-        <circle cx="15" cy="9" r="0.75" fill="currentColor" stroke="none" />
-      </svg>
-    );
-  }
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
 }
 
 export default function NewPostComposer({
@@ -782,7 +759,7 @@ export default function NewPostComposer({
                   {publishResult.ok ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
-                        <PlatformGlyph platform={resultPlatform} />
+                        <PlatformIcon platform={resultPlatform} />
                       </span>
                       @{publishResult.username} · Published
                     </span>
@@ -1262,7 +1239,7 @@ export default function NewPostComposer({
                             <Avatar>
                               <AvatarFallback aria-label={preview.label}>
                                 <span className="flex size-4 items-center justify-center [&_svg]:size-4">
-                                  <PlatformGlyph platform={preview.platform} />
+                                  <PlatformIcon platform={preview.platform} />
                                 </span>
                               </AvatarFallback>
                             </Avatar>

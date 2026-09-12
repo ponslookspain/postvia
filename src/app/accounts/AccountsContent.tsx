@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { TriangleAlertIcon } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -40,57 +41,6 @@ interface PlatformConfig {
   connectLabel: string;
   connectEndpoint: string;
   disconnectEndpoint: string;
-  icon: React.ReactNode;
-}
-
-function XGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-function ThreadsGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="8.5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="15" cy="9" r="0.75" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function TiktokGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.59 2.59 0 1 1 .77-5.05v-3.15a5.74 5.74 0 0 0-.77-.05A5.72 5.72 0 1 0 15.54 15V8.5a7.27 7.27 0 0 0 4.28 1.38V6.79a4.3 4.3 0 0 1-3.22-.97Z" />
-    </svg>
-  );
-}
-
-function InstagramGlyph() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="18" height="18" rx="5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
 }
 
 const SINGLE_PLATFORMS: PlatformConfig[] = [
@@ -100,7 +50,6 @@ const SINGLE_PLATFORMS: PlatformConfig[] = [
     connectLabel: "Connect X",
     connectEndpoint: "/api/auth/x/connect",
     disconnectEndpoint: "/api/accounts/x",
-    icon: <XGlyph />,
   },
   {
     platform: "THREADS",
@@ -108,7 +57,6 @@ const SINGLE_PLATFORMS: PlatformConfig[] = [
     connectLabel: "Connect Threads",
     connectEndpoint: "/api/auth/threads/connect",
     disconnectEndpoint: "/api/accounts/threads",
-    icon: <ThreadsGlyph />,
   },
 ];
 
@@ -120,7 +68,6 @@ const MULTI_PLATFORMS: PlatformConfig[] = [
     connectLabel: "Connect TikTok",
     connectEndpoint: "/api/auth/tiktok/connect",
     disconnectEndpoint: "/api/accounts/tiktok",
-    icon: <TiktokGlyph />,
   },
   {
     platform: "INSTAGRAM",
@@ -128,7 +75,6 @@ const MULTI_PLATFORMS: PlatformConfig[] = [
     connectLabel: "Connect Instagram",
     connectEndpoint: "/api/auth/instagram/connect",
     disconnectEndpoint: "/api/accounts/instagram",
-    icon: <InstagramGlyph />,
   },
 ];
 
@@ -323,7 +269,7 @@ export default function AccountsContent({
                           }
                         >
                           <span className="flex size-5 items-center justify-center [&_svg]:size-5">
-                            {config.icon}
+                            <PlatformIcon platform={config.platform} />
                           </span>
                         </AvatarFallback>
                       </Avatar>
@@ -423,7 +369,7 @@ export default function AccountsContent({
                           }
                         >
                           <span className="flex size-5 items-center justify-center [&_svg]:size-5">
-                            {config.icon}
+                            <PlatformIcon platform={config.platform} />
                           </span>
                         </AvatarFallback>
                       </Avatar>

@@ -104,7 +104,7 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (219 tests)
+npm test           # node --test suite (238 tests)
 ```
 
 ## Deploy

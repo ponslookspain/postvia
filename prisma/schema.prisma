@@ -120,6 +120,10 @@ model Post {
   user         User         @relation(fields: [userId], references: [id])
   targets      PostTarget[]
   media        Media[]
+
+  @@index([userId, status])
+  @@index([status, scheduledAt])
+  @@index([status, updatedAt])
 }
 
 model PostTarget {

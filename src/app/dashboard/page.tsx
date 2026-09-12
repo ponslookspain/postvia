@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
-import { formatPlatformName } from "@/lib/utils";
+import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/empty";
 import {
   DashboardPostFilter,
-  statusLabel,
 } from "@/app/dashboard/DashboardPostFilter";
 
 export const dynamic = "force-dynamic";
@@ -404,8 +403,8 @@ export default async function DashboardPage({
                       <EmptyTitle>No matching posts</EmptyTitle>
                       <EmptyDescription>
                         {q
-                          ? `Nothing matches “${q}”${statusFilter !== "all" ? ` with status ${statusLabel(statusFilter).toLowerCase()}` : ""}.`
-                          : `No ${statusLabel(statusFilter).toLowerCase()} posts yet.`}
+                          ? `Nothing matches “${q}”${statusFilter !== "all" ? ` with status ${formatStatusLabel(statusFilter).toLowerCase()}` : ""}.`
+                          : `No ${formatStatusLabel(statusFilter).toLowerCase()} posts yet.`}
                       </EmptyDescription>
                     </EmptyHeader>
                     <EmptyContent>

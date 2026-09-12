@@ -29,14 +29,12 @@ export function formatPlatformName(platform: string): string {
   return platform;
 }
 
-export function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 export function isFutureIso(isoDate: string): boolean {
   return new Date(isoDate).getTime() > Date.now();
+}
+
+/** Human label for post/target status enums: FAILED -> "Failed". */
+export function formatStatusLabel(status: string): string {
+  if (status === "all") return "All statuses";
+  return status.charAt(0) + status.slice(1).toLowerCase().replaceAll("_", " ");
 }

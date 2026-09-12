@@ -725,8 +725,9 @@ export async function publishPostTargets(
   });
   if (!post) return { ok: false, error: "Post not found" };
 
+  const publishableIds = new Set(selectPublishableTargetIds(post.targets));
   const targets = post.targets
-    .filter((target) => target.status === "PENDING" || target.status === "FAILED")
+    .filter((target) => publishableIds.has(target.id))
     .filter((target) => !targetId || target.id === targetId)
     .map((target) => ({
       id: target.id,

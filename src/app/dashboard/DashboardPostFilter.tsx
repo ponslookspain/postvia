@@ -4,6 +4,7 @@ import { useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SearchIcon } from "lucide-react";
+import { formatStatusLabel } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -23,11 +24,6 @@ const STATUS_OPTIONS = [
   "PARTIALLY_PUBLISHED",
   "FAILED",
 ];
-
-export function statusLabel(status: string): string {
-  if (status === "all") return "All statuses";
-  return status.charAt(0) + status.slice(1).toLowerCase().replaceAll("_", " ");
-}
 
 export function DashboardPostFilter({
   q,
@@ -96,7 +92,7 @@ export function DashboardPostFilter({
             <SelectGroup>
               {STATUS_OPTIONS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {statusLabel(option)}
+                  {formatStatusLabel(option)}
                 </SelectItem>
               ))}
             </SelectGroup>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FileTextIcon, PlusIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { formatPlatformName } from "@/lib/utils";
+import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
@@ -27,10 +27,6 @@ const STATUS_FILTERS = [
   "PARTIALLY_PUBLISHED",
   "FAILED",
 ];
-
-function statusLabel(status: string): string {
-  return status.charAt(0) + status.slice(1).toLowerCase().replaceAll("_", " ");
-}
 
 export default async function PostsPage({
   searchParams,
@@ -90,7 +86,7 @@ export default async function PostsPage({
                   : "rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
               }
             >
-              {statusLabel(option)}
+              {formatStatusLabel(option)}
             </Link>
           ))}
         </nav>
@@ -103,7 +99,7 @@ export default async function PostsPage({
                   <FileTextIcon />
                 </EmptyMedia>
                 <EmptyTitle>
-                  No {statusLabel(statusFilter).toLowerCase()} posts
+                  No {formatStatusLabel(statusFilter).toLowerCase()} posts
                 </EmptyTitle>
                 <EmptyDescription>
                   Nothing here yet.{" "}
