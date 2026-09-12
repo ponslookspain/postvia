@@ -1,11 +1,40 @@
 import { Resend } from "resend";
+import { PRODUCTION_URL } from "@/lib/base-url";
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 
-const EMAIL_FROM =
-  process.env.EMAIL_FROM ?? "Postvia <onboarding@resend.dev>";
+// NOTE: server-only by construction — this module reads RESEND_API_KEY and is
+// imported exclusively from server modules (auth config, route handlers).
+// Never import it from a Client Component and never prefix its env vars with
+// NEXT_PUBLIC_, otherwise the API key would ship in the client bundle.
 
-function getResend(): Resend | null {
-  const key = process.env.RESEND_API_KEY;
+/** Production sender identity for the verified postvia.online domain. */
+export const PRODUCTION_EMAIL_FROM = "Postvia <hello@postvia.online>";
+
+/** Reply-To for all transactional mail. Monitored inbox. */
+export const PRODUCTION_REPLY_TO = "hello@postvia.online";
+
+type EnvLike = Record<string, string | undefined>;
+
+export function getEmailFrom(
+  env: EnvLike = process.env as EnvLike
+): string {
+  const override = env.EMAIL_FROM?.trim();
+  return override ? override : PRODUCTION_EMAIL_FROM;
+}
+
+export function getEmailReplyTo(
+  env: EnvLike = process.env as EnvLike
+): string {
+  const override = env.EMAIL_REPLY_TO?.trim();
+  return override ? override : PRODUCTION_REPLY_TO;
+}
+
+function isProductionEnv(env: EnvLike): boolean {
+  return env.NODE_ENV === "production" || env.VERCEL_ENV === "production";
+}
+
+function getResend(env: EnvLike): Resend | null {
+  const key = env.RESEND_API_KEY;
   if (!key) return null;
   return new Resend(key);
 }
@@ -49,6 +78,11 @@ export function renderVerificationEmail(
       This link expires in ${minutes} minutes. If you did not create an account, you can safely ignore this email.
     </p>
   </td></tr>
+  <tr><td style="text-align:center;padding-top:24px;font-size:12px;line-height:1.6;color:#a1a1aa;">
+    <a href="${PRODUCTION_URL}" style="color:#71717a;text-decoration:none;">postvia.online</a>
+    &nbsp;·&nbsp;
+    <a href="mailto:${PRODUCTION_REPLY_TO}" style="color:#71717a;text-decoration:none;">${PRODUCTION_REPLY_TO}</a>
+  </td></tr>
 </table>
 </td></tr>
 </table>
@@ -62,31 +96,72 @@ Click the link below to verify your email address and complete your Postvia acco
 ${url}
 
 This link expires in ${minutes} minutes.
-If you did not create an account, you can safely ignore this email.`;
+If you did not create an account, you can safely ignore this email.
+
+Postvia — ${PRODUCTION_URL}
+Need help? Contact ${PRODUCTION_REPLY_TO}`;
 
   return { html, text };
 }
 
+export class VerificationEmailError extends Error {
+  constructor(message = "Failed to send verification email") {
+    super(message);
+    this.name = "VerificationEmailError";
+  }
+}
+
+export type EmailClient = Pick<Resend, "emails">;
+
 export async function sendVerificationEmail(
   user: { name?: string; email: string },
-  url: string
+  url: string,
+  options?: { env?: EnvLike; client?: EmailClient }
 ): Promise<void> {
-  const resend = getResend();
+  const env = options?.env ?? (process.env as EnvLike);
+  const resend = options?.client ?? getResend(env);
   if (!resend) {
-    // Never log the recipient address (PII): the missing-key fact is enough.
+    // Never log the recipient address (PII) or the verification URL (secret):
+    // the missing-key fact is enough.
     logErrorDiagnostic(
       "email",
       "RESEND_API_KEY not set — skipping verification email",
       new Error("Missing RESEND_API_KEY")
     );
+    if (isProductionEnv(env)) {
+      // In production a silent skip would look like a successful signup while
+      // the user can never verify. Fail loudly so the error surfaces.
+      throw new VerificationEmailError(
+        "Email service is not configured. Please try again later."
+      );
+    }
     return;
   }
   const { html, text } = renderVerificationEmail(url);
-  await resend.emails.send({
-    from: EMAIL_FROM,
-    to: user.email,
-    subject: "Verify your email — Postvia",
-    html,
-    text,
-  });
+  try {
+    const { error } = await resend.emails.send({
+      from: getEmailFrom(env),
+      to: user.email,
+      replyTo: getEmailReplyTo(env),
+      subject: "Verify your email — Postvia",
+      html,
+      text,
+    });
+    if (error) {
+      // Resend resolves (does not throw) on API errors. Never attach the
+      // recipient, the URL, or the key — only the provider's error summary.
+      logErrorDiagnostic(
+        "email",
+        "Resend rejected verification email",
+        new Error(error.message)
+      );
+      throw new VerificationEmailError();
+    }
+  } catch (err) {
+    if (err instanceof VerificationEmailError) throw err;
+    // Transport failure (network, timeout, invalid key at send time).
+    // Keep the verification URL and recipient PII out of the logs.
+    logErrorDiagnostic("email", "Failed to send verification email", err);
+    throw new VerificationEmailError();
+  }
 }
