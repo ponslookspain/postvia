@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
@@ -30,12 +29,13 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
+  // The root route always renders the public landing — including for
+  // signed-in visitors. /dashboard stays a separate route.
   const user = await getSessionUser();
-  if (user) redirect("/dashboard");
 
   return (
     <div className="min-h-screen overflow-x-clip bg-background text-foreground antialiased">
-      <Navbar />
+      <Navbar isLoggedIn={user !== null} />
       <main>
         <Hero />
         <Benefits />

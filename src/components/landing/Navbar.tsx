@@ -18,7 +18,7 @@ const links = [
   { href: "#faq", label: "FAQ" },
 ];
 
-export function Navbar() {
+export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-md">
@@ -41,16 +41,24 @@ export function Navbar() {
           ))}
         </nav>
         <div className="hidden items-center gap-2 md:flex">
-          <Button
-            variant="ghost"
-            nativeButton={false}
-            render={<Link href="/login" />}
-          >
-            Sign in
-          </Button>
-          <Button nativeButton={false} render={<Link href="/signup" />}>
-            Get started
-          </Button>
+          {isLoggedIn ? (
+            <Button nativeButton={false} render={<Link href="/dashboard" />}>
+              Dashboard
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                nativeButton={false}
+                render={<Link href="/login" />}
+              >
+                Sign in
+              </Button>
+              <Button nativeButton={false} render={<Link href="/signup" />}>
+                Get started
+              </Button>
+            </>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -82,16 +90,24 @@ export function Navbar() {
             ))}
           </nav>
           <div className="flex flex-col gap-2 border-t border-border pt-4">
-            <Button nativeButton={false} render={<Link href="/signup" />}>
-              Get started
-            </Button>
-            <Button
-              variant="outline"
-              nativeButton={false}
-              render={<Link href="/login" />}
-            >
-              Sign in
-            </Button>
+            {isLoggedIn ? (
+              <Button nativeButton={false} render={<Link href="/dashboard" />}>
+                Dashboard
+              </Button>
+            ) : (
+              <>
+                <Button nativeButton={false} render={<Link href="/signup" />}>
+                  Get started
+                </Button>
+                <Button
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href="/login" />}
+                >
+                  Sign in
+                </Button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
