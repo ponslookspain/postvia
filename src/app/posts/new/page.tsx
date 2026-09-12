@@ -1,6 +1,12 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCapabilitiesRegistry } from "@/lib/platforms/capabilities";
+import {
+  getEffectivePlan,
+  getRemainingQuota,
+  getUpgradeTarget,
+  getUsage,
+} from "@/lib/entitlements";
 import { AppShell } from "@/components/AppShell";
 import NewPostComposer from "./NewPostComposer";
 
@@ -16,11 +22,16 @@ export default async function NewPostPage() {
   const implemented = new Set(
     registry.filter((capability) => capability.implemented).map((c) => c.platform)
   );
-  const accounts = await prisma.socialAccount.findMany({
-    where: { userId: user.id },
-    select: { id: true, platform: true, username: true },
-    orderBy: [{ platform: "asc" }, { username: "asc" }],
-  });
+  const [accounts, effective, usage] = await Promise.all([
+    prisma.socialAccount.findMany({
+      where: { userId: user.id },
+      select: { id: true, platform: true, username: true },
+      orderBy: [{ platform: "asc" }, { username: "asc" }],
+    }),
+    getEffectivePlan({ userId: user.id, userEmail: user.email }),
+    getUsage(user.id),
+  ]);
+  const quota = getRemainingQuota(effective, usage);
 
   return (
     <AppShell user={user}>
@@ -30,6 +41,10 @@ export default async function NewPostPage() {
           ...account,
           implemented: implemented.has(account.platform),
         }))}
+        quota={{
+          postsLeft: quota.postsLeft,
+          upgradeTo: getUpgradeTarget(effective.plan),
+        }}
       />
     </AppShell>
   );

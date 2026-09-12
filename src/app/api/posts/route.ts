@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { validateScheduledAt } from "@/lib/schedule";
 import {
+  canCreatePost,
+  getEffectivePlan,
+  getUsage,
+} from "@/lib/entitlements";
+import {
   validateTargetAccountSelection,
   validateTargetOverrides,
 } from "@/lib/platforms/overrides";
@@ -50,6 +55,18 @@ export async function POST(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Plan gate: monthly post quota is enforced server-side, per created
+    // post — bulk included, since every bulk item comes through here.
+    const effective = await getEffectivePlan({ userId: user.id, userEmail: user.email });
+    const usage = await getUsage(user.id);
+    const allowed = canCreatePost(effective, usage);
+    if (!allowed.ok) {
+      return NextResponse.json(
+        { code: allowed.code, reason: allowed.reason, upgradeTo: allowed.upgradeTo },
+        { status: 403 }
+      );
     }
 
     const {

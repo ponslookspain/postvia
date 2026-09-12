@@ -34,6 +34,23 @@ enum PostTargetStatus {
   FAILED
 }
 
+enum Plan {
+  STARTER
+  GROWTH
+  SCALE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+}
+
+enum TestMode {
+  BYPASS
+  ENFORCEMENT
+}
+
 enum MediaType {
   IMAGE
   VIDEO
@@ -53,6 +70,8 @@ model User {
   authAccounts   Account[]
   preferences    UserPreferences?
   media          Media[]
+  subscription   Subscription?
+  testOverride   BillingTestOverride?
 }
 
 model UserPreferences {
@@ -63,6 +82,38 @@ model UserPreferences {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  plan               Plan               @default(STARTER)
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  stripeCustomerId   String?
+  stripeSubId        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/**
+ * Developer test state, strictly separated from the real Subscription.
+ * Only ever consulted when the user passes the server-side admin gate;
+ * ordinary flows never read this table.
+ */
+model BillingTestOverride {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  mode               TestMode
+  plan               Plan               @default(GROWTH)
+  subStatus          SubscriptionStatus @default(ACTIVE)
+  cancelAtPeriodEnd  Boolean            @default(false)
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Session {

@@ -30,7 +30,9 @@ import {
   zonedTimeToIso,
   type BulkAccountRef,
 } from "@/lib/bulk-schedule";
+import type { PlanId } from "@/lib/plans";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { UpgradeCta } from "@/components/billing/BillingWidgets";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -148,7 +150,18 @@ async function waitForMediaRegistration(
   return "Upload did not finish registering in time. Please try again.";
 }
 
-export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
+export function BulkScheduler({
+  accounts,
+  billing,
+}: {
+  accounts: BulkAccountRef[];
+  billing: {
+    bulk: boolean;
+    maxBulk: number;
+    postsLeft: number | null;
+    upgradeTo: PlanId | null;
+  };
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const detectedZone = useDetectedTimeZone();
@@ -172,6 +185,8 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
   const selectedAccounts = accounts.filter((account) =>
     selectedAccountIds.includes(account.id)
   );
+  // Plan cap first, system cap as the ceiling — never the other way round.
+  const batchCap = Math.min(BULK_MAX_VIDEOS, billing.maxBulk);
 
   const startIso = useMemo(() => {
     if (!scheduleDate || !scheduleTime) return null;
@@ -215,12 +230,12 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
 
   function appendFiles(files: File[]) {
     setItems((prev) => {
-      const room = BULK_MAX_VIDEOS - prev.length;
+      const room = batchCap - prev.length;
       const capped = files.slice(0, Math.max(0, room));
       if (files.length > capped.length) {
         toast.add({
           title: "Batch is full",
-          description: `A batch holds at most ${BULK_MAX_VIDEOS} videos.`,
+          description: `A batch holds at most ${batchCap} videos.`,
           type: "warning",
         });
       }
@@ -446,6 +461,14 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
       retryOnly ? item.status === "error" : item.status !== "done"
     );
     if (queue.length === 0) return;
+    // Monthly quota is enforced per post server-side; check up front so a
+    // run never starts that it cannot finish.
+    if (billing.postsLeft !== null && queue.length > billing.postsLeft) {
+      setConfigError(
+        `Only ${billing.postsLeft} monthly ${billing.postsLeft === 1 ? "post" : "posts"} left — this run needs ${queue.length}.`
+      );
+      return;
+    }
     const isos = computeBulkSchedule(
       new Date(startIso).getTime(),
       intervalMinutes,
@@ -522,6 +545,27 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
     );
   }
 
+  if (!billing.bulk) {
+    return (
+      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ClapperboardIcon />
+            </EmptyMedia>
+            <EmptyTitle>Bulk scheduling needs a bigger plan</EmptyTitle>
+            <EmptyDescription>
+              <UpgradeCta
+                reason="Bulk video scheduling is not included in your current plan."
+                upgradeTo={billing.upgradeTo}
+              />
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
       <div className="mb-6">
@@ -581,12 +625,12 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
                 Videos
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                MP4 or WebM, up to {BULK_MAX_VIDEOS} per batch. Each file is
+                MP4 or WebM, up to {batchCap} per batch. Each file is
                 uploaded separately with its own progress.
               </p>
             </div>
             <Badge variant="secondary">
-              {items.length}/{BULK_MAX_VIDEOS}
+              {items.length}/{batchCap}
             </Badge>
           </div>
           <div className="flex flex-col gap-3">
@@ -637,7 +681,7 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
                   )}
                 </div>
               ))}
-              {items.length < BULK_MAX_VIDEOS && !running && (
+              {items.length < batchCap && !running && (
                 <Button
                   type="button"
                   variant="outline"

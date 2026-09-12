@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import {
   getCapabilitiesRegistry,
 } from "@/lib/platforms/capabilities";
+import {
+  getEffectivePlan,
+  getRemainingQuota,
+  getUpgradeTarget,
+  getUsage,
+} from "@/lib/entitlements";
 import { AppShell } from "@/components/AppShell";
 import { BulkScheduler } from "./BulkScheduler";
 
@@ -21,11 +27,16 @@ export default async function BulkPostsPage() {
       )
       .map((capability) => capability.platform)
   );
-  const accounts = await prisma.socialAccount.findMany({
-    where: { userId: user.id },
-    select: { id: true, platform: true, username: true },
-    orderBy: [{ platform: "asc" }, { username: "asc" }],
-  });
+  const [accounts, effective, usage] = await Promise.all([
+    prisma.socialAccount.findMany({
+      where: { userId: user.id },
+      select: { id: true, platform: true, username: true },
+      orderBy: [{ platform: "asc" }, { username: "asc" }],
+    }),
+    getEffectivePlan({ userId: user.id, userEmail: user.email }),
+    getUsage(user.id),
+  ]);
+  const quota = getRemainingQuota(effective, usage);
 
   return (
     <AppShell user={user}>
@@ -33,6 +44,14 @@ export default async function BulkPostsPage() {
         accounts={accounts
           .filter((account) => videoCapable.has(account.platform))
           .map((account) => ({ ...account }))}
+        billing={{
+          bulk: effective.bypass || effective.entitlements.bulk,
+          maxBulk: effective.bypass
+            ? Number.MAX_SAFE_INTEGER
+            : effective.entitlements.maxBulkVideos,
+          postsLeft: quota.postsLeft,
+          upgradeTo: getUpgradeTarget(effective.plan),
+        }}
       />
     </AppShell>
   );

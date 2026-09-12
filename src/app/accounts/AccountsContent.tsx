@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { TriangleAlertIcon } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { UpgradeCta } from "@/components/billing/BillingWidgets";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -81,12 +82,24 @@ const MULTI_PLATFORMS: PlatformConfig[] = [
 function getSearchParamMessage(searchParams: URLSearchParams): {
   text: string;
   error: boolean;
+  upgradeTo?: string | null;
 } | null {
   const connected = searchParams.get("connected");
   const error = searchParams.get("error");
 
   if (connected) return { text: "Account connected successfully", error: false };
   if (error) {
+    if (error === "account_limit_reached") {
+      const upgradeTo = searchParams.get("upgradeTo");
+      return {
+        text: "Account limit reached for this platform on your current plan.",
+        error: true,
+        upgradeTo:
+          upgradeTo === "starter" || upgradeTo === "growth" || upgradeTo === "scale"
+            ? upgradeTo
+            : null,
+      };
+    }
     const errors: Record<string, string> = {
       access_denied: "Authorization was denied by the user",
       invalid_state: "Invalid OAuth state. Please try again.",
@@ -140,6 +153,7 @@ export default function AccountsContent({
   const [message, setMessage] = useState<{
     text: string;
     error: boolean;
+    upgradeTo?: string | null;
   } | null>(() => getSearchParamMessage(searchParams));
   const [pendingDisconnect, setPendingDisconnect] =
     useState<PendingDisconnect>(null);
@@ -244,7 +258,24 @@ export default function AccountsContent({
         >
           <TriangleAlertIcon />
           <AlertTitle>{message.error ? "Connection issue" : "Accounts"}</AlertTitle>
-          <AlertDescription>{message.text}</AlertDescription>
+          <AlertDescription>
+            {message.text}
+            {message.upgradeTo && (
+              <span className="mt-2 block">
+                <UpgradeCta
+                  reason="Upgrade to connect more accounts on this platform."
+                  upgradeTo={
+                    message.upgradeTo === "starter" ||
+                    message.upgradeTo === "growth" ||
+                    message.upgradeTo === "scale"
+                      ? message.upgradeTo
+                      : null
+                  }
+                  compact
+                />
+              </span>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 

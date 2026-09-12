@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { publishPostTargets } from "@/lib/publish";
+import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { STALE_PUBLISHING_MS } from "@/lib/scheduling";
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 
@@ -19,6 +20,16 @@ export async function POST(
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const retryGate = canRetry(
+      await getEffectivePlan({ userId: user.id, userEmail: user.email })
+    );
+    if (!retryGate.ok) {
+      return NextResponse.json(
+        { code: retryGate.code, reason: retryGate.reason, upgradeTo: retryGate.upgradeTo },
+        { status: 403 }
+      );
     }
 
     let requestedTargetId: string | null = null;

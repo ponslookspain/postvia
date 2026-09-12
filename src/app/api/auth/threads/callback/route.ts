@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { assertCanConnectAccount } from "@/lib/entitlements";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -69,6 +70,20 @@ export async function GET(request: NextRequest) {
         data: accountData,
       });
     } else {
+      // New connections consume plan quota; reconnects (above) never do.
+      const gate = await assertCanConnectAccount({
+        userId: user.id,
+        userEmail: user.email,
+        platform: "THREADS",
+      });
+      if (!gate.ok) {
+        return NextResponse.redirect(
+          new URL(
+            `/accounts?error=account_limit_reached${gate.upgradeTo ? `&upgradeTo=${gate.upgradeTo}` : ""}`,
+            request.url
+          )
+        );
+      }
       await prisma.socialAccount.create({
         data: { userId: user.id, platform: "THREADS", ...accountData },
       });

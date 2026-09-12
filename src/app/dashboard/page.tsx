@@ -3,8 +3,11 @@ import { FileTextIcon, PlusIcon, UsersIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
+import { getEffectivePlan, getRemainingQuota, getUsage } from "@/lib/entitlements";
+import { getPlan } from "@/lib/plans";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { PlanBadge } from "@/components/billing/BillingWidgets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +60,8 @@ export default async function DashboardPage({
     upcomingPosts,
     accounts,
     platformGroups,
+    effective,
+    usage,
   ] = await Promise.all([
     prisma.post.groupBy({
       by: ["status"],
@@ -98,6 +103,8 @@ export default async function DashboardPage({
       where: { post: { userId: user.id } },
       _count: { _all: true },
     }),
+    getEffectivePlan({ userId: user.id, userEmail: user.email }),
+    getUsage(user.id),
   ]);
 
   const countsByStatus = Object.fromEntries(
@@ -135,6 +142,11 @@ export default async function DashboardPage({
 
   const isOnboarding = totalPosts === 0 && accounts.length === 0;
   const isFiltered = q !== "" || statusFilter !== "all";
+  const quota = getRemainingQuota(effective, usage);
+  const planLabel =
+    quota.postsLeft === null
+      ? `${getPlan(effective.plan).name} · unlimited posts`
+      : `${getPlan(effective.plan).name} · ${usage.postsThisMonth}/${effective.entitlements.monthlyPosts} posts`;
 
   return (
     <AppShell user={user}>
@@ -352,7 +364,16 @@ export default async function DashboardPage({
               aria-label="Publishing stats"
               className="border-t border-border pt-5"
             >
-              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <PlanBadge plan={effective.plan} status={effective.status} />
+                <Link
+                  href="/settings#billing"
+                  className="rounded-sm text-xs text-muted-foreground underline underline-offset-4 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  {planLabel} · Manage plan
+                </Link>
+              </div>
+              <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
                 {stats.map((stat) => (
                   <p key={stat.label} className="text-sm">
                     <span className="font-semibold tabular-nums">

@@ -1,7 +1,17 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/AppShell";
+import { canUseCalendar, getEffectivePlan } from "@/lib/entitlements";
 import { parseMonthParam, type CalendarPost } from "@/lib/calendar";
+import { UpgradeCta } from "@/components/billing/BillingWidgets";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { CalendarClockIcon } from "lucide-react";
 import { CalendarView } from "./CalendarView";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +29,31 @@ export default async function CalendarPage({
   const { year, monthIndex } = parseMonthParam(
     typeof params.month === "string" ? params.month : undefined
   );
+
+  const effective = await getEffectivePlan({ userId: user.id, userEmail: user.email });
+  const calendarGate = canUseCalendar(effective);
+  if (!calendarGate.ok) {
+    return (
+      <AppShell user={user}>
+        <div className="mx-auto w-full max-w-6xl p-4 md:p-8">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <CalendarClockIcon />
+              </EmptyMedia>
+              <EmptyTitle>Calendar needs a bigger plan</EmptyTitle>
+              <EmptyDescription>
+                <UpgradeCta
+                  reason="The visual content calendar is not included in your current plan."
+                  upgradeTo={calendarGate.upgradeTo}
+                />
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </div>
+      </AppShell>
+    );
+  }
 
   // Visible grid spans the month plus leading/trailing week days: pad the
   // query by a week on each side so edge cells are populated.

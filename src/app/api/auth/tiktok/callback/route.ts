@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { assertCanConnectAccount } from "@/lib/entitlements";
 import {
   exchangeTiktokCode,
   fetchTiktokUserInfo,
@@ -81,6 +82,16 @@ export async function GET(request: NextRequest) {
         data: accountData,
       });
     } else {
+      const gate = await assertCanConnectAccount({
+        userId: user.id,
+        userEmail: user.email,
+        platform: "TIKTOK",
+      });
+      if (!gate.ok) {
+        return response(
+          `/accounts?error=account_limit_reached${gate.upgradeTo ? `&upgradeTo=${gate.upgradeTo}` : ""}`
+        );
+      }
       await prisma.socialAccount.create({
         data: {
           userId: user.id,

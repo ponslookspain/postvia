@@ -26,6 +26,8 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { BillingSection, type BillingView } from "@/components/billing/BillingSection";
+import { AdminBillingPanel } from "@/components/billing/AdminBillingPanel";
 
 const CONFIRMATION_PHRASE = "delete";
 
@@ -73,6 +75,8 @@ export function SettingsClient({
   hasPassword,
   hasGoogle,
   preferences: initialPreferences,
+  billing,
+  isAdmin,
 }: {
   name: string;
   email: string;
@@ -80,6 +84,8 @@ export function SettingsClient({
   hasPassword: boolean;
   hasGoogle: boolean;
   preferences: { emailNotifications: boolean; productUpdates: boolean };
+  billing: BillingView;
+  isAdmin: boolean;
 }) {
   const router = useRouter();
 
@@ -547,6 +553,10 @@ export function SettingsClient({
             </FieldGroup>
           </div>
         </section>
+
+        <BillingSection initial={billing} />
+
+        {isAdmin && <AdminBillingPanel />}
 
         <section aria-labelledby="settings-danger">
           <Separator className="mb-10" />

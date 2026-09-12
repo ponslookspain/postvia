@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { deleteBlobs } from "@/lib/blob";
 import { resolveScheduledAtUpdate } from "@/lib/schedule";
+import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 
 async function findOwnedPost(id: string, userId: string) {
   return prisma.post.findFirst({
@@ -87,6 +88,19 @@ export async function PATCH(
     }
 
     if (body.scheduledAt !== undefined) {
+      const rescheduleGate = canRetry(
+        await getEffectivePlan({ userId: user.id, userEmail: user.email })
+      );
+      if (!rescheduleGate.ok) {
+        return NextResponse.json(
+          {
+            code: rescheduleGate.code,
+            reason: rescheduleGate.reason,
+            upgradeTo: rescheduleGate.upgradeTo,
+          },
+          { status: 403 }
+        );
+      }
       // The X-scheduling ban applies to the whole post, not just the first
       // target (matching the create route, which checks every account).
       const hasXTarget = existing.targets.some(

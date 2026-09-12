@@ -18,12 +18,14 @@ import {
   XIcon,
 } from "lucide-react";
 import { threadsPostUrl, isFutureIso } from "@/lib/utils";
+import type { PlanId } from "@/lib/plans";
 import { validateMediaInput } from "@/lib/media";
 import {
   buildComposerPreviews,
   buildComposerMediaErrors,
 } from "@/lib/composer-previews";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { UpgradeCta } from "@/components/billing/BillingWidgets";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -278,9 +280,11 @@ function toLocalInputValue(date: Date): string {
 export default function NewPostComposer({
   userName,
   accounts,
+  quota,
 }: {
   userName: string;
   accounts: ConnectedAccount[];
+  quota: { postsLeft: number | null; upgradeTo: PlanId | null };
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -311,6 +315,12 @@ export default function NewPostComposer({
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
+  const [quotaError, setQuotaError] = useState<{
+    reason: string;
+    upgradeTo: PlanId | null;
+  } | null>(null);
+
+  const quotaBlocked = quota.postsLeft !== null && quota.postsLeft <= 0;
 
   const selectedAccounts = accounts.filter((account) =>
     selectedAccountIds.includes(account.id)
@@ -548,9 +558,31 @@ export default function NewPostComposer({
     return errors;
   }
 
+  async function readDenial(
+    res: Response
+  ): Promise<{ reason: string; upgradeTo: PlanId | null } | null> {
+    if (res.status !== 403) return null;
+    const data = await res.json().catch(() => null);
+    if (data && data.code === "UPGRADE_REQUIRED") {
+      const upgradeTo =
+        data.upgradeTo === "starter" ||
+        data.upgradeTo === "growth" ||
+        data.upgradeTo === "scale"
+          ? (data.upgradeTo as PlanId)
+          : null;
+      return {
+        reason:
+          typeof data.reason === "string" ? data.reason : "Plan limit reached.",
+        upgradeTo,
+      };
+    }
+    return null;
+  }
+
   async function handleSaveDraft() {
     if (!canSave) return;
     setSaving(true);
+    setQuotaError(null);
 
     try {
       const res = await fetch("/api/posts", {
@@ -559,6 +591,11 @@ export default function NewPostComposer({
           body: JSON.stringify(buildPostBody()),
       });
 
+      const denial = await readDenial(res.clone());
+      if (denial) {
+        setQuotaError(denial);
+        return;
+      }
       if (!res.ok) throw new Error("Failed to save");
 
       const data = await res.json();
@@ -610,6 +647,27 @@ export default function NewPostComposer({
       const data = await res.json();
 
       if (!res.ok) {
+        const denial =
+          res.status === 403 && data?.code === "UPGRADE_REQUIRED"
+            ? {
+                reason:
+                  typeof data.reason === "string"
+                    ? data.reason
+                    : "Plan limit reached.",
+                upgradeTo: (
+                  data.upgradeTo === "starter" ||
+                  data.upgradeTo === "growth" ||
+                  data.upgradeTo === "scale"
+                    ? data.upgradeTo
+                    : null
+                ) as PlanId | null,
+              }
+            : null;
+        if (denial) {
+          setQuotaError(denial);
+          setScheduleMode(false);
+          return;
+        }
         setScheduleError(data.error || "Failed to schedule post.");
         return;
       }
@@ -639,6 +697,7 @@ export default function NewPostComposer({
     if (!canPublish) return;
     setPublishing(true);
     setPublishResult(null);
+    setQuotaError(null);
 
     try {
       const createRes = await fetch("/api/posts", {
@@ -647,6 +706,11 @@ export default function NewPostComposer({
           body: JSON.stringify(buildPostBody()),
       });
 
+      const denial = await readDenial(createRes.clone());
+      if (denial) {
+        setQuotaError(denial);
+        return;
+      }
       if (!createRes.ok) throw new Error("Failed to create post");
       const postData = await createRes.json();
 
@@ -1614,6 +1678,20 @@ export default function NewPostComposer({
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
+              {(quotaBlocked || quotaError) && (
+                <Alert>
+                  <AlertTitle>Monthly post limit reached</AlertTitle>
+                  <AlertDescription>
+                    <UpgradeCta
+                      reason={
+                        quotaError?.reason ??
+                        "This plan includes a fixed number of posts per month."
+                      }
+                      upgradeTo={quotaError?.upgradeTo ?? quota.upgradeTo}
+                    />
+                  </AlertDescription>
+                </Alert>
+              )}
               {schedulingForX && scheduleMode && (
                 <Alert variant="destructive">
                   <TriangleAlertIcon />

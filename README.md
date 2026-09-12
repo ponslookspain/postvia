@@ -76,6 +76,33 @@ composer changes.
   cron tick in capped batches. Post and media deletion remove their blobs
   eagerly.
 
+## Billing / Plans (test mode)
+
+- Plans: Starter ($10), Growth ($20), Scale ($50). Single source of truth:
+  `src/lib/plans.ts` (prices, features, entitlements) — never duplicated.
+- Limits: Starter `{1 account/platform, 30 posts/month, no bulk}`,
+  Growth `{5/platform, 300/month, 10-video bulk}`, Scale `{unlimited
+  accounts/posts, 10-video bulk}`. Media limits stay global.
+- Data: `Subscription` row per user (plan, status, period end,
+  cancel-at-period-end, Stripe fields reserved). No row → active Starter.
+  Downgrades never delete data; only new actions are gated.
+- Enforcement lives in `src/lib/entitlements.ts` and is applied
+  server-side: `POST /api/posts` (monthly quota → 403 `UPGRADE_REQUIRED`),
+  OAuth callbacks (per-platform account quota, reconnects exempt), retry +
+  reschedule PATCH, calendar page, bulk (plan cap + quota pre-check, with
+  per-post server backstop). UI only reflects denials.
+- Test-mode billing API: `POST /api/billing/change` (ACTIVE, +30d),
+  `POST /api/billing/cancel` (cancel-at-period-end; Starter after expiry).
+  No Stripe, no charges.
+- Admin testing without paying: `ADMIN_EMAILS` env (server-side only).
+  With a `BillingTestOverride` row an admin gets BYPASS (unlimited) or
+  ENFORCEMENT (chosen plan enforced exactly like a real user), plus
+  cancellation/expiration simulation in Settings → Developer billing
+  testing. Ordinary users can never activate it (403 + hidden UI).
+- Stripe later: fill `stripeCustomerId`/`stripeSubId` and map webhooks onto
+  the same `Subscription` fields (`plan`, `status`, `currentPeriodEnd`,
+  `cancelAtPeriodEnd`) — UI and entitlements stay unchanged.
+
 ## Design system
 
 - Nova neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
@@ -110,7 +137,7 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (238 tests)
+npm test           # node --test suite (296 tests)
 ```
 
 ## Deploy

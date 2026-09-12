@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { assertCanConnectAccount } from "@/lib/entitlements";
 import {
   exchangeInstagramCode,
   fetchInstagramProfile,
@@ -87,6 +88,21 @@ export async function GET(request: NextRequest) {
         data: accountData,
       });
     } else {
+      const gate = await assertCanConnectAccount({
+        userId: user.id,
+        userEmail: user.email,
+        platform: "INSTAGRAM",
+      });
+      if (!gate.ok) {
+        return clearState(
+          NextResponse.redirect(
+            new URL(
+              `/accounts?error=account_limit_reached${gate.upgradeTo ? `&upgradeTo=${gate.upgradeTo}` : ""}`,
+              request.url
+            )
+          )
+        );
+      }
       await prisma.socialAccount.create({
         data: {
           userId: user.id,
