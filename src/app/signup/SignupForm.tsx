@@ -7,6 +7,7 @@ import { MailCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { GoogleButton } from "@/components/GoogleButton";
 import { AuthShell } from "@/components/AuthShell";
+import { PLAN_STORAGE_KEY, type PlanId } from "@/lib/plans";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 
-export function SignupForm() {
+export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -42,6 +43,17 @@ export function SignupForm() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+
+    // Persist the landing-selected plan for the welcome step (test mode:
+    // local only, no backend). Done in the submit handler, not an effect.
+    if (plan) {
+      try {
+        localStorage.setItem(PLAN_STORAGE_KEY, plan);
+      } catch {
+        // Private mode: the ?plan= URL param still carries it forward.
+      }
+    }
+    const planQuery = plan ? `?plan=${plan}` : "";
 
     const { data, error: signUpError } = await authClient.signUp.email({
       name,
@@ -62,7 +74,7 @@ export function SignupForm() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(`/welcome${planQuery}`);
     router.refresh();
   }
 
@@ -123,6 +135,14 @@ export function SignupForm() {
             Sign in
           </Link>
         </p>
+        <Button
+          nativeButton={false}
+          render={<Link href={plan ? `/welcome?plan=${plan}` : "/welcome"} />}
+          className="mt-4 w-full"
+          variant="outline"
+        >
+          Continue to plan selection
+        </Button>
       </AuthShell>
     );
   }
