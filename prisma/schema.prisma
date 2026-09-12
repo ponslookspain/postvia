@@ -159,6 +159,9 @@ model Media {
 
   @@index([postId])
   @@index([userId])
+  // One stored object per pathname: concurrent upload-completed webhooks
+  // for the same key collapse into a single row (P2002 = already registered).
+  @@unique([pathname])
 }
 
 model SocialAccount {

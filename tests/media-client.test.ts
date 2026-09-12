@@ -12,11 +12,13 @@ import {
   authorizeMediaUpload,
   buildUploadTokenPayload,
   CLIENT_UPLOAD_TTL_MS,
+  isDuplicatePathnameError,
   parseClientPayload,
   parseUploadTokenPayload,
   validateCompletedUpload,
   validateReservedPathname,
 } from "../src/lib/media-upload";
+import { Prisma } from "@prisma/client";
 import { buildGetPresignOptions } from "../src/lib/blob";
 import {
   THREADS_PUBLISH_IMAGE_TTL_MS,
@@ -368,5 +370,26 @@ describe("safe pathname logging", () => {
       "media/alice/***"
     );
     assert.equal(safePathname("not-a-media-path"), "***");
+  });
+});
+
+describe("duplicate webhook collapse (unique pathname)", () => {
+  test("P2002 on Media create is a duplicate delivery, not a failure", () => {
+    const duplicate = new Prisma.PrismaClientKnownRequestError(
+      "Unique constraint failed on the fields: (`pathname`)",
+      { code: "P2002", clientVersion: "6.19.3" }
+    );
+    assert.equal(isDuplicatePathnameError(duplicate), true);
+  });
+
+  test("other prisma errors and generic errors are not duplicates", () => {
+    const notFound = new Prisma.PrismaClientKnownRequestError(
+      "Record not found",
+      { code: "P2025", clientVersion: "6.19.3" }
+    );
+    assert.equal(isDuplicatePathnameError(notFound), false);
+    assert.equal(isDuplicatePathnameError(new Error("boom")), false);
+    assert.equal(isDuplicatePathnameError(null), false);
+    assert.equal(isDuplicatePathnameError("P2002"), false);
   });
 });

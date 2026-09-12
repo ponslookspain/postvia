@@ -4,9 +4,11 @@ import {
   get,
   head,
   issueSignedToken,
+  list,
   presignUrl,
+  putImage,
 } from "@vercel/blob";
-import type { GetBlobResult } from "@vercel/blob";
+import type { GetBlobResult, ListBlobResult } from "@vercel/blob";
 import { isAscii } from "@/lib/media";
 import {
   logDiagnostic,
@@ -42,6 +44,92 @@ export async function deleteBlobs(
 ): Promise<void> {
   if (pathnamesOrUrls.length === 0) return;
   await del(pathnamesOrUrls);
+}
+
+export type ListedBlob = {
+  pathname: string;
+  url: string;
+  size: number;
+  uploadedAt: Date;
+};
+
+export type ListMediaPage = {
+  blobs: ListedBlob[];
+  cursor?: string;
+  hasMore: boolean;
+};
+
+/**
+ * Paginated listing of everything under the `media/` scope, used by the
+ * orphan-blob sweep. Narrow rows keep the scan cheap.
+ */
+export async function listMediaBlobs(cursor?: string): Promise<ListMediaPage> {
+  const page: ListBlobResult = await list({
+    prefix: "media/",
+    limit: 500,
+    ...(cursor ? { cursor } : {}),
+  });
+  return {
+    blobs: page.blobs
+      .filter((blob) => blob.pathname.startsWith("media/"))
+      .map((blob) => ({
+        pathname: blob.pathname,
+        url: blob.url,
+        size: blob.size,
+        uploadedAt: blob.uploadedAt,
+      })),
+    cursor: page.cursor,
+    hasMore: page.hasMore,
+  };
+}
+
+export type CanonicalImageResult = {
+  url: string;
+  pathname: string;
+  contentType: string;
+};
+
+/**
+ * Stores the optimized canonical version of an already-uploaded image at
+ * the SAME pathname (overwrite), so Media rows, reserved-path validation
+ * and composer status polling keep working unchanged. Requires OIDC
+ * (production); throws otherwise and the caller must fall back to the
+ * original bytes.
+ */
+export async function putCanonicalImage(input: {
+  pathname: string;
+  bytes: ArrayBuffer;
+  width: number;
+  quality: number;
+}): Promise<CanonicalImageResult> {
+  if (!isAscii(input.pathname)) {
+    throw nonAsciiPathnameError();
+  }
+  try {
+    const stored = await putImage(input.pathname, input.bytes, {
+      access: "private",
+      allowOverwrite: true,
+      optimizeImage: {
+        width: input.width,
+        quality: input.quality,
+        format: "jpeg",
+      },
+    });
+    logDiagnostic("blob", "stored canonical image", {
+      pathname: safePathname(input.pathname),
+      contentType: stored.contentType,
+    });
+    return {
+      url: stored.url,
+      pathname: stored.pathname,
+      contentType: stored.contentType,
+    };
+  } catch (error) {
+    logErrorDiagnostic("blob", "canonical image put failed", error, {
+      pathname: safePathname(input.pathname),
+    });
+    throw error;
+  }
 }
 
 export async function fetchPrivateBlob(

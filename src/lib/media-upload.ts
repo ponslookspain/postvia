@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import {
   isAscii,
   makeBlobPathname,
@@ -6,7 +7,13 @@ import {
   sanitizeFilename,
   validateMediaInput,
 } from "@/lib/media";
-import { deleteBlobs, headPrivateBlob } from "@/lib/blob";
+import {
+  deleteBlobs,
+  fetchPrivateBlob,
+  headPrivateBlob,
+  putCanonicalImage,
+} from "@/lib/blob";
+import { selectImageOptimization } from "@/lib/media-optimize";
 import {
   logDiagnostic,
   logErrorDiagnostic,
@@ -299,9 +306,14 @@ export function validateCompletedUpload(input: {
 /**
  * Step 4 of the official flow: called by `handleUploadPresigned` when
  * Vercel Blob reports the browser upload finished (webhook, Ed25519
- * signature-verified). Verifies the object in the PRIVATE store, then
- * creates the Media row. Throws on any problem so the webhook retries.
+ * signature-verified). Verifies the object in the PRIVATE store, replaces
+ * still images with their optimized canonical version (same pathname, so
+ * validation, polling and Media rows keep working unchanged), then creates
+ * the Media row. Throws on any problem so the webhook retries.
  * Idempotent: a retried webhook for the same pathname is a no-op.
+ *
+ * Availability first: if canonicalization fails, the original bytes are
+ * registered instead of failing the upload.
  */
 export async function registerCompletedUpload(payload: {
   blob: CompletedBlobInfo;
@@ -348,13 +360,117 @@ export async function registerCompletedUpload(payload: {
     return;
   }
 
-  await prisma.media.create({ data: outcome.createInput });
+  const canonical = await canonicalizeStoredImage({
+    pathname: meta.pathname,
+    originalUrl: meta.url,
+    contentType: meta.contentType,
+    size: meta.size,
+  });
+
+  try {
+    await prisma.media.create({
+      data: {
+        ...outcome.createInput,
+        url: canonical.url,
+        mimeType: canonical.contentType,
+        size: canonical.size,
+      },
+    });
+  } catch (error) {
+    if (isDuplicatePathnameError(error)) {
+      // A concurrent webhook delivery already registered this pathname
+      // (unique index): the upload is complete, this delivery is a no-op.
+      logDiagnostic("media", "duplicate webhook collapsed to no-op", {
+        stage: "media-create",
+        pathname: safePathname(meta.pathname),
+      });
+      return;
+    }
+    throw error;
+  }
   logDiagnostic("media", "media record created from client upload", {
     stage: "media-create",
-    size: meta.size,
-    mimeType: meta.contentType,
+    size: canonical.size,
+    mimeType: canonical.contentType,
     pathname: safePathname(meta.pathname),
   });
+}
+
+/**
+ * Replaces a stored still image with its canonical optimized version at
+ * the same pathname and returns the canonical meta. GIFs, videos and
+ * already-small JPEGs pass through untouched. Any failure falls back to
+ * the original bytes (logged) so uploads never break on optimization.
+ */
+async function canonicalizeStoredImage(input: {
+  pathname: string;
+  originalUrl: string;
+  contentType: string;
+  size: number;
+}): Promise<{ url: string; contentType: string; size: number }> {
+  const spec = selectImageOptimization({
+    mimeType: input.contentType,
+    size: input.size,
+  });
+  if (!spec) {
+    const current = await headPrivateBlob(input.pathname).catch(() => null);
+    return {
+      url: current?.url ?? input.originalUrl,
+      contentType: current?.contentType ?? input.contentType,
+      size: current?.size ?? input.size,
+    };
+  }
+  try {
+    const source = await fetchPrivateBlob(input.pathname);
+    if (!source?.stream) {
+      throw new Error("Stored image could not be read back for optimization");
+    }
+    const bytes = await new Response(source.stream).arrayBuffer();
+    const stored = await putCanonicalImage({
+      pathname: input.pathname,
+      bytes,
+      width: spec.width,
+      quality: spec.quality,
+    });
+    const canonicalMeta = await headPrivateBlob(input.pathname);
+    if (!canonicalMeta) {
+      throw new Error("Canonical image missing after overwrite");
+    }
+    logDiagnostic("media", "canonical image stored", {
+      stage: "media-optimize",
+      pathname: safePathname(input.pathname),
+      originalSize: input.size,
+      canonicalSize: canonicalMeta.size,
+    });
+    return {
+      url: stored.url,
+      contentType: canonicalMeta.contentType,
+      size: canonicalMeta.size,
+    };
+  } catch (error) {
+    logErrorDiagnostic("media", "canonicalization failed, keeping original", error, {
+      stage: "media-optimize",
+      pathname: safePathname(input.pathname),
+    });
+    const current = await headPrivateBlob(input.pathname).catch(() => null);
+    return {
+      url: current?.url ?? input.originalUrl,
+      contentType: current?.contentType ?? input.contentType,
+      size: current?.size ?? input.size,
+    };
+  }
+}
+
+/**
+ * True when a Media insert failed only because a concurrent webhook already
+ * registered the same pathname (`@@unique([pathname])`). The upload is
+ * complete either way, so the caller treats it as a successful no-op.
+ */
+export function isDuplicatePathnameError(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
 }
 
 /**

@@ -59,6 +59,16 @@ composer changes.
 - Media uploads go through `/api/media/prepare` (authorized pathname) →
   presigned Blob upload → server-side webhook registration, with client
   polling for registration before publishing.
+- Canonical media: the webhook replaces still images (JPEG/PNG/WebP) with an
+  optimized JPEG (max 2048px, quality 82) at the same pathname via
+  `putImage` — only the canonical bytes are stored, the original is gone.
+  GIFs stay byte-identical (animation), tiny JPEGs skip the transform, and
+  any optimization failure falls back to the original instead of failing
+  the upload. Videos pass through untouched (no heavy transcoding in a
+  request); the webhook + polling + cron recovery is their async pipeline.
+- Orphan blobs (bytes without a Media row, older than 24h) are swept by the
+  cron tick in capped batches. Post and media deletion remove their blobs
+  eagerly.
 
 ## Design system
 

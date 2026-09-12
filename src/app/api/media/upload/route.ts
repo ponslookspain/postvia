@@ -15,6 +15,13 @@ import {
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 
 /**
+ * The upload-completed webhook may canonicalize a still image
+ * (server-side optimize + overwrite) before registering the Media row.
+ * Bumped for headroom; the platform clamps to the plan maximum.
+ */
+export const maxDuration = 60;
+
+/**
  * Official Vercel Blob client-upload endpoint for the PRIVATE store.
  *
  * Browser requests  -> `blob.generate-presigned-url`:

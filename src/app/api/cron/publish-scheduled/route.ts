@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { executePublish, resumeJobTarget } from "@/lib/publish";
+import { deleteBlobs, listMediaBlobs } from "@/lib/blob";
+import { sweepOrphanBlobs } from "@/lib/media-cleanup";
 import {
   isCronAuthorized,
   runScheduledPublishTick,
@@ -23,7 +25,24 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
       publish: executePublish,
       resumeJob: (target) => resumeJobTarget(target.id),
     });
-    return NextResponse.json({ ok: true, ...stats });
+    // Orphan sweep is best-effort and capped: it must never fail the tick.
+    let orphans = { scanned: 0, removed: 0, hasMore: false };
+    try {
+      orphans = await sweepOrphanBlobs({
+        listBlobs: (cursor) => listMediaBlobs(cursor),
+        findRegistered: async (pathnames) => {
+          const rows = await prisma.media.findMany({
+            where: { pathname: { in: pathnames } },
+            select: { pathname: true },
+          });
+          return new Set(rows.map((row) => row.pathname));
+        },
+        removeBlobs: (pathnames) => deleteBlobs(pathnames),
+      });
+    } catch {
+      // Sweep failures are logged inside; the tick result stands.
+    }
+    return NextResponse.json({ ok: true, ...stats, orphans });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Cron run failed";
     return NextResponse.json({ error: message }, { status: 500 });
