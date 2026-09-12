@@ -43,8 +43,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid multipart body" }, { status: 400 });
   }
   const file = form.get("file");
-  const accountId = form.get("accountId");
-  if (!(file instanceof Blob) || typeof accountId !== "string" || !accountId) {
+  const rawAccountId = form.get("accountId");
+  if (!(file instanceof Blob) || typeof rawAccountId !== "string") {
+    return NextResponse.json(
+      { error: "Expected multipart fields: file (.mov) and accountId" },
+      { status: 400 }
+    );
+  }
+  const accountId = rawAccountId.trim();
+  if (!accountId) {
     return NextResponse.json(
       { error: "Expected multipart fields: file (.mov) and accountId" },
       { status: 400 }
@@ -71,8 +78,27 @@ export async function POST(request: NextRequest) {
     select: { id: true, accessToken: true, refreshToken: true, expiresAt: true },
   });
   if (!account) {
+    // Same data /api/accounts already shows this admin; listing it here
+    // pinpoints a wrong-platform or foreign id without leaking anything
+    // beyond the caller's own accounts. Gate and ownership stay strict.
+    const own = await prisma.socialAccount.findMany({
+      where: { userId: user.id },
+      select: { id: true, platform: true, username: true },
+    });
+    const sameId = own.find((entry) => entry.id === accountId);
     return NextResponse.json(
-      { ok: false, stage: "account", error: "TikTok account not found" },
+      {
+        ok: false,
+        stage: "account",
+        error: sameId
+          ? `Account ${accountId} is ${sameId.platform}, not TIKTOK. Use a TikTok account id from yourAccounts.`
+          : "TikTok account not found. Use an account id from yourAccounts.",
+        yourAccounts: own.map((entry) => ({
+          id: entry.id,
+          platform: entry.platform,
+          username: entry.username,
+        })),
+      },
       { status: 404 }
     );
   }
