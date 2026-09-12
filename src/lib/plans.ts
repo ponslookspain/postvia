@@ -9,7 +9,7 @@
  * plan writes it server-side (see /api/billing/*).
  */
 
-export type PlanId = "starter" | "growth" | "scale";
+export type PlanId = "free" | "growth" | "scale";
 
 export type PlanEntitlements = {
   /** Max connected social accounts per platform (null = unlimited). */
@@ -36,11 +36,11 @@ export type Plan = {
 
 export const PLANS: Plan[] = [
   {
-    id: "starter",
-    name: "Starter",
-    price: 10,
+    id: "free",
+    name: "Free",
+    price: 0,
     period: "month",
-    description: "For trying the full workflow on your own channels.",
+    description: "Start publishing right away, no card required.",
     features: [
       "Publish to Instagram, Threads, TikTok and X",
       "Schedule posts ahead",
@@ -49,7 +49,7 @@ export const PLANS: Plan[] = [
     ],
     entitlements: {
       maxAccountsPerPlatform: 1,
-      monthlyPosts: 30,
+      monthlyPosts: 15,
       maxBulkVideos: 0,
       calendar: true,
       bulk: false,
@@ -63,7 +63,7 @@ export const PLANS: Plan[] = [
     period: "month",
     description: "For creators publishing every week.",
     features: [
-      "Everything in Starter",
+      "Everything in Free",
       "Visual content calendar",
       "Bulk video scheduling up to 10 videos",
       "Multiple accounts per platform",
@@ -105,7 +105,7 @@ export const PLANS: Plan[] = [
 export const PLAN_STORAGE_KEY = "postvia:selected-plan";
 
 export function parsePlanParam(raw: unknown): PlanId | null {
-  if (raw === "starter" || raw === "growth" || raw === "scale") return raw;
+  if (raw === "free" || raw === "growth" || raw === "scale") return raw;
   return null;
 }
 

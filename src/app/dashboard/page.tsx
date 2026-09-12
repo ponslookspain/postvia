@@ -367,7 +367,7 @@ export default async function DashboardPage({
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <PlanBadge plan={effective.plan} status={effective.status} />
                 <Link
-                  href="/settings#billing"
+                  href="/billing"
                   className="rounded-sm text-xs text-muted-foreground underline underline-offset-4 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
                   {planLabel} · Manage plan

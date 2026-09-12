@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { threadsPostUrl, isFutureIso } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
+import { parsePlanParam } from "@/lib/plans";
 import { validateMediaInput } from "@/lib/media";
 import {
   buildComposerPreviews,
@@ -564,16 +565,10 @@ export default function NewPostComposer({
     if (res.status !== 403) return null;
     const data = await res.json().catch(() => null);
     if (data && data.code === "UPGRADE_REQUIRED") {
-      const upgradeTo =
-        data.upgradeTo === "starter" ||
-        data.upgradeTo === "growth" ||
-        data.upgradeTo === "scale"
-          ? (data.upgradeTo as PlanId)
-          : null;
       return {
         reason:
           typeof data.reason === "string" ? data.reason : "Plan limit reached.",
-        upgradeTo,
+        upgradeTo: parsePlanParam(data.upgradeTo),
       };
     }
     return null;
@@ -654,13 +649,7 @@ export default function NewPostComposer({
                   typeof data.reason === "string"
                     ? data.reason
                     : "Plan limit reached.",
-                upgradeTo: (
-                  data.upgradeTo === "starter" ||
-                  data.upgradeTo === "growth" ||
-                  data.upgradeTo === "scale"
-                    ? data.upgradeTo
-                    : null
-                ) as PlanId | null,
+                upgradeTo: parsePlanParam(data.upgradeTo),
               }
             : null;
         if (denial) {

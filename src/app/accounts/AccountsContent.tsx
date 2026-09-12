@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { TriangleAlertIcon } from "lucide-react";
+import { parsePlanParam } from "@/lib/plans";
 import { PageHeader } from "@/components/PageHeader";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
@@ -94,10 +95,7 @@ function getSearchParamMessage(searchParams: URLSearchParams): {
       return {
         text: "Account limit reached for this platform on your current plan.",
         error: true,
-        upgradeTo:
-          upgradeTo === "starter" || upgradeTo === "growth" || upgradeTo === "scale"
-            ? upgradeTo
-            : null,
+        upgradeTo: parsePlanParam(upgradeTo),
       };
     }
     const errors: Record<string, string> = {
@@ -264,13 +262,7 @@ export default function AccountsContent({
               <span className="mt-2 block">
                 <UpgradeCta
                   reason="Upgrade to connect more accounts on this platform."
-                  upgradeTo={
-                    message.upgradeTo === "starter" ||
-                    message.upgradeTo === "growth" ||
-                    message.upgradeTo === "scale"
-                      ? message.upgradeTo
-                      : null
-                  }
+                  upgradeTo={parsePlanParam(message.upgradeTo)}
                   compact
                 />
               </span>

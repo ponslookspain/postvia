@@ -39,22 +39,23 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resending, setResending] = useState(false);
 
+  // Paid plan intent from the landing (?plan=); free signups carry none.
+  const planQuery = plan && plan !== "free" ? `?plan=${plan}` : "";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
 
-    // Persist the landing-selected plan for the welcome step (test mode:
-    // local only, no backend). Done in the submit handler, not an effect.
-    if (plan) {
+    // Persist a paid plan intent for the billing step (test mode: local
+    // only, no backend). Free signups land straight on the dashboard.
+    if (plan && plan !== "free") {
       try {
         localStorage.setItem(PLAN_STORAGE_KEY, plan);
       } catch {
         // Private mode: the ?plan= URL param still carries it forward.
       }
     }
-    const planQuery = plan ? `?plan=${plan}` : "";
-
     const { data, error: signUpError } = await authClient.signUp.email({
       name,
       email,
@@ -74,7 +75,7 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
       return;
     }
 
-    router.push(`/welcome${planQuery}`);
+    router.push(plan && plan !== "free" ? `/billing${planQuery}` : "/dashboard");
     router.refresh();
   }
 
@@ -137,11 +138,17 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
         </p>
         <Button
           nativeButton={false}
-          render={<Link href={plan ? `/welcome?plan=${plan}` : "/welcome"} />}
+          render={
+            <Link
+              href={
+                plan && plan !== "free" ? `/billing${planQuery}` : "/dashboard"
+              }
+            />
+          }
           className="mt-4 w-full"
           variant="outline"
         >
-          Continue to plan selection
+          Continue{plan && plan !== "free" ? " to billing" : " to dashboard"}
         </Button>
       </AuthShell>
     );

@@ -157,11 +157,19 @@ export function Pricing() {
               </ul>
               <Button
                 nativeButton={false}
-                render={<Link href={`/signup?plan=${plan.id}`} />}
+                render={
+                  <Link
+                    href={
+                      plan.id === "free" ? "/signup" : `/signup?plan=${plan.id}`
+                    }
+                  />
+                }
                 variant={plan.highlighted ? "default" : "outline"}
                 className="mt-6 w-full"
               >
-                Get started
+                {plan.id === "free"
+                  ? "Get started free"
+                  : `Choose ${plan.name}`}
               </Button>
             </div>
           </Reveal>

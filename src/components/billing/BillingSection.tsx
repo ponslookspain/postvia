@@ -186,7 +186,9 @@ export function BillingSection({ initial }: { initial: BillingView }) {
             })}
           </div>
         </div>
-        {initial.status !== "CANCELED" && initial.status !== "EXPIRED" && (
+        {initial.plan !== "free" &&
+          initial.status !== "CANCELED" &&
+          initial.status !== "EXPIRED" && (
           <div>
             <Button
               variant="outline"

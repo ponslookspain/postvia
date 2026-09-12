@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import { LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SparklesIcon } from "lucide-react";
 import { cn } from "cn";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
+import type { PlanId } from "@/lib/plans";
 import { isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -15,10 +16,12 @@ import { Separator } from "@/components/ui/separator";
 export function Sidebar({
   userName,
   userEmail,
+  plan,
   className,
 }: {
   userName: string;
   userEmail: string;
+  plan: PlanId;
   className?: string;
 }) {
   const pathname = usePathname();
@@ -118,6 +121,25 @@ export function Sidebar({
           );
         })}
       </nav>
+      {plan === "free" && !collapsed && (
+        <div className="px-3 pb-1">
+          <Link
+            href="/billing"
+            className="block rounded-lg border border-border bg-muted/40 p-3 outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <p className="flex items-center gap-1.5 text-sm font-medium">
+              <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
+              Unlock more with Postvia
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              More posts, more accounts and Bulk scheduling.
+            </p>
+            <p className="mt-2 text-xs font-medium underline underline-offset-4">
+              View plans
+            </p>
+          </Link>
+        </div>
+      )}
       <div className={cn("border-t border-border", collapsed ? "p-3" : "p-4")}>
         <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
           <Avatar>

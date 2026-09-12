@@ -75,7 +75,7 @@ export function UpgradeCta({
         size="sm"
         variant={compact ? "link" : "outline"}
         nativeButton={false}
-        render={<Link href="/settings#billing" />}
+        render={<Link href="/billing" />}
         className={compact ? "h-auto p-0 text-xs" : "w-fit"}
       >
         {upgradeTo ? `Upgrade to ${getPlan(upgradeTo).name}` : "Manage plan"}

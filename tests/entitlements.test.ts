@@ -13,6 +13,7 @@ import {
   resolveEffectiveFromRows,
   toDbPlan,
   toPlanId,
+  toPlanIdSafe,
   type EffectiveSubscription,
 } from "../src/lib/entitlements";
 import { getPlan } from "../src/lib/plans";
@@ -46,32 +47,52 @@ function usage(postsThisMonth = 0, accounts: Record<string, number> = {}) {
   };
 }
 
+function storedRow(
+  plan: "FREE" | "GROWTH" | "SCALE",
+  extra: Record<string, unknown> = {}
+) {
+  return {
+    plan,
+    status: "ACTIVE" as const,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    stripeCustomerId: null,
+    stripeSubId: null,
+    ...extra,
+  };
+}
+
 describe("plan mapping and upgrade targets", () => {
   test("db <-> plan id mapping round-trips", () => {
-    assert.equal(toPlanId("STARTER"), "starter");
+    assert.equal(toPlanId("FREE"), "free");
     assert.equal(toPlanId("SCALE"), "scale");
     assert.equal(toDbPlan("growth"), "GROWTH");
   });
-  test("upgrade path starter -> growth -> scale -> null", () => {
-    assert.equal(getUpgradeTarget("starter"), "growth");
+  test("legacy STARTER safely resolves to free", () => {
+    assert.equal(toPlanIdSafe("STARTER"), "free");
+    assert.equal(toPlanIdSafe("GROWTH"), "growth");
+    assert.equal(toPlanIdSafe("whatever"), "free");
+  });
+  test("upgrade path free -> growth -> scale -> null", () => {
+    assert.equal(getUpgradeTarget("free"), "growth");
     assert.equal(getUpgradeTarget("growth"), "scale");
     assert.equal(getUpgradeTarget("scale"), null);
   });
 });
 
-describe("missing subscription defaults to starter", () => {
-  test("no row means active starter from default source", () => {
+describe("default user resolves to FREE", () => {
+  test("missing subscription means active free from default source", () => {
     const resolved = resolveEffectiveFromRows({
       subscription: null,
       testOverride: null,
       isAdmin: false,
       nowMs: NOW,
     });
-    assert.equal(resolved.plan, "starter");
+    assert.equal(resolved.plan, "free");
     assert.equal(resolved.status, "ACTIVE");
     assert.equal(resolved.source, "default");
     assert.equal(resolved.bypass, false);
-    assert.equal(resolved.entitlements.monthlyPosts, 30);
+    assert.equal(resolved.entitlements.monthlyPosts, 15);
   });
 });
 
@@ -94,19 +115,25 @@ describe("period rules", () => {
     assert.equal(r.expired, false);
     assert.equal(r.plan, "growth");
   });
-  test("past end means EXPIRED starter", () => {
-    const r = applyPeriodRules(
+  test("paid cancellation keeps access until the end, then FREE", () => {
+    const before = applyPeriodRules(
+      { plan: "SCALE", status: "ACTIVE", cancelAtPeriodEnd: true, currentPeriodEnd: future },
+      NOW
+    );
+    assert.equal(before.status, "CANCELLING");
+    assert.equal(canCreatePost(eff("scale"), usage(9999)).ok, true);
+    const after = applyPeriodRules(
       { plan: "SCALE", status: "ACTIVE", cancelAtPeriodEnd: true, currentPeriodEnd: past },
       NOW
     );
-    assert.deepEqual(r, { plan: "starter", status: "EXPIRED", expired: true });
+    assert.deepEqual(after, { plan: "free", status: "EXPIRED", expired: true });
   });
-  test("CANCELED status means expired starter", () => {
+  test("CANCELED status means expired free", () => {
     const r = applyPeriodRules(
       { plan: "GROWTH", status: "CANCELED", cancelAtPeriodEnd: false, currentPeriodEnd: null },
       NOW
     );
-    assert.deepEqual(r, { plan: "starter", status: "CANCELED", expired: true });
+    assert.deepEqual(r, { plan: "free", status: "CANCELED", expired: true });
   });
   test("PAST_DUE keeps the plan flagged", () => {
     const r = applyPeriodRules(
@@ -117,56 +144,84 @@ describe("period rules", () => {
   });
 });
 
-describe("monthly post quota", () => {
-  test("starter allows below the limit, denies at the limit with upgrade", () => {
-    assert.deepEqual(canCreatePost(eff("starter"), usage(29)), { ok: true });
-    const denied = canCreatePost(eff("starter"), usage(30));
+describe("free 15 post quota", () => {
+  test("allows below the limit, denies at the limit with upgrade to growth", () => {
+    assert.deepEqual(canCreatePost(eff("free"), usage(14)), { ok: true });
+    const denied = canCreatePost(eff("free"), usage(15));
     assert.equal(denied.ok, false);
     if (!denied.ok) {
       assert.equal(denied.code, "UPGRADE_REQUIRED");
       assert.equal(denied.upgradeTo, "growth");
-      assert.match(denied.reason, /30/);
+      assert.match(denied.reason, /15/);
     }
   });
-  test("scale has no post cap", () => {
-    assert.deepEqual(
-      canCreatePost(eff("scale"), usage(10_000)),
-      { ok: true }
-    );
+  test("growth allows 300, scale unlimited", () => {
+    assert.deepEqual(canCreatePost(eff("growth"), usage(299)), { ok: true });
+    assert.equal(canCreatePost(eff("growth"), usage(300)).ok, false);
+    assert.deepEqual(canCreatePost(eff("scale"), usage(10_000)), { ok: true });
+  });
+  test("denial contract shape matches the API contract", () => {
+    const denied = canCreatePost(eff("free"), usage(99));
+    assert.equal(denied.ok, false);
+    if (!denied.ok) {
+      assert.deepEqual(Object.keys(denied).sort(), [
+        "code",
+        "ok",
+        "reason",
+        "upgradeTo",
+      ]);
+    }
   });
 });
 
 describe("account quota", () => {
-  test("starter allows one per platform, second needs growth", () => {
-    assert.deepEqual(canConnectAccount(eff("starter"), "THREADS", 0), { ok: true });
-    const denied = canConnectAccount(eff("starter"), "THREADS", 1);
+  test("free allows one per platform, second needs growth", () => {
+    assert.deepEqual(canConnectAccount(eff("free"), "THREADS", 0), { ok: true });
+    const denied = canConnectAccount(eff("free"), "THREADS", 1);
     assert.equal(denied.ok, false);
     if (!denied.ok) assert.equal(denied.upgradeTo, "growth");
   });
-  test("scale connects unlimited", () => {
+  test("growth allows five, scale unlimited", () => {
+    assert.deepEqual(canConnectAccount(eff("growth"), "THREADS", 4), { ok: true });
+    assert.equal(canConnectAccount(eff("growth"), "THREADS", 5).ok, false);
     assert.deepEqual(canConnectAccount(eff("scale"), "X", 99), { ok: true });
   });
 });
 
 describe("bulk, calendar, retry", () => {
-  test("starter cannot bulk, growth caps at 10", () => {
-    const denied = canBulkSchedule(eff("starter"), 3);
+  test("free bulk denied, growth caps at 10, scale caps at 10", () => {
+    const denied = canBulkSchedule(eff("free"), 3);
     assert.equal(denied.ok, false);
     if (!denied.ok) assert.equal(denied.upgradeTo, "growth");
     assert.deepEqual(canBulkSchedule(eff("growth"), 10), { ok: true });
     assert.equal(canBulkSchedule(eff("growth"), 11).ok, false);
+    assert.deepEqual(canBulkSchedule(eff("scale"), 10), { ok: true });
+    assert.equal(canBulkSchedule(eff("scale"), 11).ok, false);
   });
-  test("calendar and retry follow flags", () => {
-    assert.deepEqual(canUseCalendar(eff("starter")), { ok: true });
-    assert.deepEqual(canRetry(eff("starter")), { ok: true });
+  test("calendar and retry follow flags on every plan", () => {
+    for (const plan of ["free", "growth", "scale"] as const) {
+      assert.deepEqual(canUseCalendar(eff(plan)), { ok: true });
+      assert.deepEqual(canRetry(eff(plan)), { ok: true });
+    }
   });
 });
 
 describe("remaining quota", () => {
-  test("starter shows countdown, scale shows null", () => {
-    assert.equal(getRemainingQuota(eff("starter"), usage(29)).postsLeft, 1);
-    assert.equal(getRemainingQuota(eff("starter"), usage(30)).postsLeft, 0);
+  test("free counts down, scale shows null", () => {
+    assert.equal(getRemainingQuota(eff("free"), usage(12)).postsLeft, 3);
+    assert.equal(getRemainingQuota(eff("free"), usage(15)).postsLeft, 0);
     assert.equal(getRemainingQuota(eff("scale"), usage(500)).postsLeft, null);
+  });
+});
+
+describe("downgrade preserves data (gates only new actions)", () => {
+  test("over-limit usage still reads fine, only creation is denied", () => {
+    // A user downgraded to free with 18 posts keeps everything; only new
+    // posts are blocked.
+    const denied = canCreatePost(eff("free"), usage(18));
+    assert.equal(denied.ok, false);
+    const quota = getRemainingQuota(eff("free"), usage(18));
+    assert.equal(quota.postsLeft, 0);
   });
 });
 
@@ -180,17 +235,10 @@ describe("admin bypass", () => {
   });
   test("bypass resolves only for admins with an override row", () => {
     const resolved = resolveEffectiveFromRows({
-      subscription: {
-        plan: "STARTER",
-        status: "ACTIVE",
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
-        stripeCustomerId: null,
-        stripeSubId: null,
-      },
+      subscription: storedRow("FREE"),
       testOverride: {
         mode: "BYPASS",
-        plan: "STARTER",
+        plan: "FREE",
         subStatus: "ACTIVE",
         cancelAtPeriodEnd: false,
         currentPeriodEnd: null,
@@ -203,14 +251,7 @@ describe("admin bypass", () => {
   });
   test("non-admins never see the override, even if a row exists", () => {
     const resolved = resolveEffectiveFromRows({
-      subscription: {
-        plan: "STARTER",
-        status: "ACTIVE",
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
-        stripeCustomerId: null,
-        stripeSubId: null,
-      },
+      subscription: storedRow("FREE"),
       testOverride: {
         mode: "BYPASS",
         plan: "SCALE",
@@ -222,14 +263,14 @@ describe("admin bypass", () => {
       nowMs: NOW,
     });
     assert.equal(resolved.bypass, false);
-    assert.equal(resolved.plan, "starter");
+    assert.equal(resolved.plan, "free");
     assert.equal(resolved.source, "subscription");
   });
 });
 
 describe("admin plan enforcement", () => {
   function enforced(
-    plan: "STARTER" | "GROWTH" | "SCALE",
+    plan: "FREE" | "GROWTH" | "SCALE",
     extra: Record<string, unknown> = {}
   ) {
     return resolveEffectiveFromRows({
@@ -246,15 +287,12 @@ describe("admin plan enforcement", () => {
       nowMs: NOW,
     });
   }
-  test("STARTER enforcement behaves like starter", () => {
-    const resolved = enforced("STARTER");
-    assert.equal(resolved.plan, "starter");
+  test("FREE enforcement behaves like free", () => {
+    const resolved = enforced("FREE");
+    assert.equal(resolved.plan, "free");
     assert.equal(resolved.bypass, false);
-    assert.equal(
-      canConnectAccount(resolved, "THREADS", 1).ok,
-      false
-    );
-    assert.equal(canCreatePost(resolved, usage(30)).ok, false);
+    assert.equal(canConnectAccount(resolved, "THREADS", 1).ok, false);
+    assert.equal(canCreatePost(resolved, usage(15)).ok, false);
     assert.equal(canBulkSchedule(resolved, 1).ok, false);
   });
   test("GROWTH enforcement behaves like growth", () => {
@@ -279,14 +317,14 @@ describe("admin plan enforcement", () => {
     assert.equal(resolved.plan, "growth");
     assert.deepEqual(canCreatePost(resolved, usage(0)), { ok: true });
   });
-  test("admin expiration simulation drops to starter", () => {
+  test("admin expiration simulation drops to free", () => {
     const past = new Date(NOW - DAY);
     const resolved = enforced("GROWTH", {
       cancelAtPeriodEnd: true,
       currentPeriodEnd: past,
     });
     assert.equal(resolved.status, "EXPIRED");
-    assert.equal(resolved.plan, "starter");
+    assert.equal(resolved.plan, "free");
   });
 });
 

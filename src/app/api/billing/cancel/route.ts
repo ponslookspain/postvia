@@ -15,11 +15,18 @@ export async function POST() {
     }
     const existing = await prisma.subscription.findUnique({
       where: { userId: user.id },
-      select: { id: true },
+      select: { id: true, plan: true },
     });
     if (!existing) {
       return NextResponse.json(
         { error: "No subscription to cancel" },
+        { status: 400 }
+      );
+    }
+    // Free is permanent and needs no cancellation.
+    if (existing.plan === "FREE") {
+      return NextResponse.json(
+        { error: "The Free plan cannot be cancelled" },
         { status: 400 }
       );
     }

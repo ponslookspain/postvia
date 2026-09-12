@@ -35,7 +35,7 @@ enum PostTargetStatus {
 }
 
 enum Plan {
-  STARTER
+  FREE
   GROWTH
   SCALE
 }
@@ -87,7 +87,7 @@ model UserPreferences {
 model Subscription {
   id                 String             @id @default(cuid())
   userId             String             @unique
-  plan               Plan               @default(STARTER)
+  plan               Plan               @default(FREE)
   status             SubscriptionStatus @default(ACTIVE)
   currentPeriodEnd   DateTime?
   cancelAtPeriodEnd  Boolean            @default(false)

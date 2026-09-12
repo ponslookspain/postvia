@@ -78,27 +78,32 @@ composer changes.
 
 ## Billing / Plans (test mode)
 
-- Plans: Starter ($10), Growth ($20), Scale ($50). Single source of truth:
+- Plans: Free ($0), Growth ($20), Scale ($50). Single source of truth:
   `src/lib/plans.ts` (prices, features, entitlements) — never duplicated.
-- Limits: Starter `{1 account/platform, 30 posts/month, no bulk}`,
+- Limits: Free `{1 account/platform, 15 posts/month, no bulk}`,
   Growth `{5/platform, 300/month, 10-video bulk}`, Scale `{unlimited
   accounts/posts, 10-video bulk}`. Media limits stay global.
+- New users start on Free automatically — no plan selection, no checkout.
+  Paid landing CTAs route signup → `/billing` for an instant upgrade.
 - Data: `Subscription` row per user (plan, status, period end,
-  cancel-at-period-end, Stripe fields reserved). No row → active Starter.
-  Downgrades never delete data; only new actions are gated.
+  cancel-at-periodEnd, Stripe fields reserved). No row → active Free.
+  Downgrades and expirations never delete data; only new actions are gated.
 - Enforcement lives in `src/lib/entitlements.ts` and is applied
   server-side: `POST /api/posts` (monthly quota → 403 `UPGRADE_REQUIRED`),
   OAuth callbacks (per-platform account quota, reconnects exempt), retry +
   reschedule PATCH, calendar page, bulk (plan cap + quota pre-check, with
   per-post server backstop). UI only reflects denials.
-- Test-mode billing API: `POST /api/billing/change` (ACTIVE, +30d),
-  `POST /api/billing/cancel` (cancel-at-period-end; Starter after expiry).
-  No Stripe, no charges.
+- Test-mode billing API: `POST /api/billing/change` (any of the three
+  plans, ACTIVE, +30d), `POST /api/billing/cancel` (paid only,
+  cancel-at-period-end; Free afterwards). No Stripe, no charges.
+- Plan management lives on `/billing` (current plan, usage, change,
+  cancel); Settings stays account-only. Dashboard shows a compact
+  `Plan · usage` line linking to `/billing`.
 - Admin testing without paying: `ADMIN_EMAILS` env (server-side only).
   With a `BillingTestOverride` row an admin gets BYPASS (unlimited) or
   ENFORCEMENT (chosen plan enforced exactly like a real user), plus
-  cancellation/expiration simulation in Settings → Developer billing
-  testing. Ordinary users can never activate it (403 + hidden UI).
+  cancellation/expiration simulation on `/billing`. Ordinary users can
+  never activate it (403 + hidden UI).
 - Stripe later: fill `stripeCustomerId`/`stripeSubId` and map webhooks onto
   the same `Subscription` fields (`plan`, `status`, `currentPeriodEnd`,
   `cancelAtPeriodEnd`) — UI and entitlements stay unchanged.
@@ -137,7 +142,7 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (296 tests)
+npm test           # node --test suite (300 tests)
 ```
 
 ## Deploy

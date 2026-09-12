@@ -86,7 +86,7 @@ export function Hero() {
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button size="lg" nativeButton={false} render={<Link href="/signup" />}>
-              Get started
+              Get started free
             </Button>
             <Button size="lg" variant="outline" onClick={scrollToHow}>
               See how it works

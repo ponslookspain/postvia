@@ -14,7 +14,7 @@ import {
  * No React, no Next.js — pure logic + Prisma reads. UI stays thin.
  */
 
-export type DbPlan = "STARTER" | "GROWTH" | "SCALE";
+export type DbPlan = "FREE" | "GROWTH" | "SCALE";
 export type DbSubStatus = "ACTIVE" | "CANCELED" | "PAST_DUE";
 
 export type SubscriptionRow = {
@@ -74,13 +74,13 @@ export type Usage = {
 };
 
 const DB_TO_PLAN: Record<DbPlan, PlanId> = {
-  STARTER: "starter",
+  FREE: "free",
   GROWTH: "growth",
   SCALE: "scale",
 };
 
 const PLAN_TO_DB: Record<PlanId, DbPlan> = {
-  starter: "STARTER",
+  free: "FREE",
   growth: "GROWTH",
   scale: "SCALE",
 };
@@ -93,9 +93,19 @@ export function toDbPlan(plan: PlanId): DbPlan {
   return PLAN_TO_DB[plan];
 }
 
+/**
+ * Legacy safety net: any unknown or retired plan code (e.g. STARTER rows
+ * created before the Free migration) resolves to Free, never to paid.
+ */
+export function toPlanIdSafe(plan: string): PlanId {
+  if (plan === "GROWTH") return "growth";
+  if (plan === "SCALE") return "scale";
+  return "free";
+}
+
 /** Next paid tier, or null when already on top. */
 export function getUpgradeTarget(plan: PlanId): Exclude<PlanId, "scale"> | "scale" | null {
-  if (plan === "starter") return "growth";
+  if (plan === "free") return "growth";
   if (plan === "growth") return "scale";
   return null;
 }
@@ -168,17 +178,17 @@ export function applyPeriodRules(
   base: ResolvedBase | null,
   nowMs: number
 ): { plan: PlanId; status: EffectiveStatus; expired: boolean } {
-  if (!base) return { plan: "starter", status: "ACTIVE", expired: false };
-  const plan = toPlanId(base.plan);
+  if (!base) return { plan: "free", status: "ACTIVE", expired: false };
+  const plan = toPlanIdSafe(base.plan);
   if (base.status === "CANCELED") {
-    return { plan: "starter", status: "CANCELED", expired: true };
+    return { plan: "free", status: "CANCELED", expired: true };
   }
   if (
     base.cancelAtPeriodEnd &&
     base.currentPeriodEnd &&
     base.currentPeriodEnd.getTime() <= nowMs
   ) {
-    return { plan: "starter", status: "EXPIRED", expired: true };
+    return { plan: "free", status: "EXPIRED", expired: true };
   }
   if (base.status === "PAST_DUE") {
     return { plan, status: "PAST_DUE", expired: false };
@@ -238,13 +248,13 @@ export function resolveEffectiveFromRows(input: {
 
   if (!input.subscription) {
     return {
-      plan: "starter",
+      plan: "free",
       status: "ACTIVE",
       bypass: false,
       source: "default",
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
-      entitlements: getPlan("starter").entitlements,
+      entitlements: getPlan("free").entitlements,
     };
   }
   const resolved = applyPeriodRules(
