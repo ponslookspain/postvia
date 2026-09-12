@@ -32,6 +32,38 @@ function forbidden() {
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
+export type ProbeAccount = {
+  id: string;
+  platform: string;
+  username: string;
+};
+
+/**
+ * Exact id match against the caller's own accounts — the same source
+ * /api/accounts reads (findMany by userId). No normalization beyond the
+ * trim/quote strip at the boundary: a near-miss must NOT match.
+ */
+export function findOwnedTikTokAccount(
+  accounts: readonly ProbeAccount[],
+  accountId: string
+): ProbeAccount | null {
+  const found = accounts.find((entry) => entry.id === accountId);
+  if (!found || found.platform !== "TIKTOK") return null;
+  return found;
+}
+
+/**
+ * First differing index of two strings, -1 when equal. Pinpoints typos
+ * that head/tail/length echoes cannot see.
+ */
+export function firstDiffIndex(a: string, b: string): number {
+  const shared = Math.min(a.length, b.length);
+  for (let index = 0; index < shared; index += 1) {
+    if (a[index] !== b[index]) return index;
+  }
+  return a.length === b.length ? -1 : shared;
+}
+
 export async function POST(request: NextRequest) {
   const user = await getApiUser();
   if (!user || !isAdminEmail(user.email)) return forbidden();
@@ -73,58 +105,43 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Two-step lookup: distinguish "id does not exist", "foreign row" and
-  // "own row of another platform" instead of one opaque miss. Ownership
-  // stays strict — foreign rows get the same generic 404 as missing ones.
-  const row = await prisma.socialAccount.findUnique({
-    where: { id: accountId },
-    select: { id: true, userId: true, platform: true },
-  });
-  // Same data /api/accounts already shows this admin; echoing it (plus a
-  // fragment of their own input) pinpoints typos, wrong entries and
-  // cross-login mismatches without leaking anything beyond their accounts.
+  // Lookup exactly the way /api/accounts does: one findMany by userId,
+  // then an exact in-JS match. No separate PK query that could disagree.
   const own = await prisma.socialAccount.findMany({
     where: { userId: user.id },
     select: { id: true, platform: true, username: true },
   });
-  const yourAccounts = own.map((entry) => ({
+  const yourAccounts: ProbeAccount[] = own.map((entry) => ({
     id: entry.id,
     platform: entry.platform,
     username: entry.username,
   }));
-  const received = {
-    length: accountId.length,
-    head: accountId.slice(0, 4),
-    tail: accountId.slice(-4),
-  };
-  if (!row || row.userId !== user.id) {
+  const match = findOwnedTikTokAccount(yourAccounts, accountId);
+  if (!match) {
+    const rank = (diffAt: number) =>
+      diffAt === -1 ? Number.MAX_SAFE_INTEGER : diffAt;
+    const closest = yourAccounts
+      .map((entry) => ({
+        id: entry.id,
+        platform: entry.platform,
+        diffAt: firstDiffIndex(accountId, entry.id),
+      }))
+      .sort((a, b) => rank(b.diffAt) - rank(a.diffAt))[0];
     return NextResponse.json(
       {
         ok: false,
         stage: "account",
         error:
-          "TikTok account not found. Use an account id from yourAccounts " +
-          "(same login you used for /api/accounts).",
-        received,
-        yourAccounts,
-      },
-      { status: 404 }
-    );
-  }
-  if (row.platform !== "TIKTOK") {
-    return NextResponse.json(
-      {
-        ok: false,
-        stage: "account",
-        error: `Account ${accountId} is ${row.platform}, not TIKTOK. Use a TikTok account id from yourAccounts.`,
-        received,
+          "TikTok account not found. Use the exact account id from yourAccounts.",
+        received: accountId,
+        closest: closest ?? null,
         yourAccounts,
       },
       { status: 404 }
     );
   }
   const account = await prisma.socialAccount.findFirst({
-    where: { id: accountId, userId: user.id },
+    where: { id: match.id, userId: user.id },
     select: { id: true, accessToken: true, refreshToken: true, expiresAt: true },
   });
   if (!account) {
@@ -133,7 +150,7 @@ export async function POST(request: NextRequest) {
         ok: false,
         stage: "account",
         error: "TikTok account not found. Use an account id from yourAccounts.",
-        received,
+        received: accountId,
         yourAccounts,
       },
       { status: 404 }
