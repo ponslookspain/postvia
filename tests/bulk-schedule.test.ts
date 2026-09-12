@@ -193,6 +193,19 @@ describe("validateBulkVideoForAccounts", () => {
     assert.equal(errors.length, 1);
   });
 
+  test("mov passes TikTok but is rejected for Threads", () => {
+    assert.deepEqual(
+      validateBulkVideoForAccounts("video/quicktime", [tiktok]),
+      []
+    );
+    const errors = validateBulkVideoForAccounts("video/quicktime", [
+      threads,
+      tiktok,
+    ]);
+    assert.equal(errors.length, 1);
+    assert.ok(/quicktime/i.test(errors[0] ?? ""));
+  });
+
   test("identical problems are deduped across accounts", () => {
     const errors = validateBulkVideoForAccounts("video/webm", [threads, threads]);
     assert.equal(errors.length, 1);

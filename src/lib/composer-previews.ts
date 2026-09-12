@@ -35,6 +35,15 @@ function textLimit(platform: Platform): number {
 }
 
 /**
+ * Character count in Unicode code points (not UTF-16 units), matching the
+ * server contract (`Array.from().length` in validateTargetOverrides).
+ * Emoji and other astral characters count once on both sides.
+ */
+export function countCharacters(text: string): number {
+  return Array.from(text).length;
+}
+
+/**
  * The single source of truth for the composer preview model:
  * one preview per selected account, global text by default, and a
  * per-account override that only affects that account's preview.
@@ -69,7 +78,7 @@ export function buildComposerPreviews(
       text,
       customized: override !== undefined,
       maxLength,
-      overLimit: text.length > maxLength,
+      overLimit: countCharacters(text) > maxLength,
       fieldKeys: caps.fields.map((field) => field.key),
     };
   });

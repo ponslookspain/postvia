@@ -10,7 +10,7 @@ export const MEDIA_LIMITS: {
   },
   VIDEO: {
     maxBytes: 100 * 1024 * 1024,
-    mimeTypes: ["video/mp4", "video/webm"],
+    mimeTypes: ["video/mp4", "video/webm", "video/quicktime"],
   },
 };
 
@@ -40,7 +40,7 @@ export function validateMediaInput(
     return {
       ok: false,
       error:
-        "Unsupported file type. Use a JPG, PNG, WebP or GIF image, or an MP4 or WebM video.",
+        "Unsupported file type. Use a JPG, PNG, WebP or GIF image, or an MP4, WebM or MOV video.",
     };
   }
   if (!Number.isFinite(size) || size <= 0) {

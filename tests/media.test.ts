@@ -48,6 +48,22 @@ describe("validateMediaInput", () => {
     assert.deepEqual(result, { ok: true, kind: "VIDEO" });
   });
 
+  test("accepts a QuickTime MOV video under the limit", () => {
+    assert.equal(detectMediaKind("video/quicktime"), "VIDEO");
+    const result = validateMediaInput("video/quicktime", 50 * 1024 * 1024);
+    assert.deepEqual(result, { ok: true, kind: "VIDEO" });
+  });
+
+  test("rejects a QuickTime video over 100 MB with video wording", () => {
+    const result = validateMediaInput(
+      "video/quicktime",
+      100 * 1024 * 1024 + 1
+    );
+    assert.ok(!result.ok);
+    assert.match(result.error, /100 MB/);
+    assert.match(result.error, /videos/);
+  });
+
   test("rejects a video over 100 MB", () => {
     const result = validateMediaInput("video/webm", 100 * 1024 * 1024 + 1);
     assert.ok(!result.ok);

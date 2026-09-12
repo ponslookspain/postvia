@@ -192,4 +192,21 @@ describe("target media compatibility", () => {
       { ok: true }
     );
   });
+
+  test("TikTok accepts MOV while Threads rejects it", () => {
+    assert.deepEqual(
+      validateTargetMedia(getPlatformCapabilities("TIKTOK"), [
+        { type: "VIDEO", mimeType: "video/quicktime" },
+      ]),
+      { ok: true }
+    );
+    const threads = validateTargetMedia(getPlatformCapabilities("THREADS"), [
+      { type: "VIDEO", mimeType: "video/quicktime" },
+    ]);
+    assert.equal(threads.ok, false);
+    assert.match(
+      threads.ok === false ? threads.error : "",
+      /does not support video\/quicktime/i
+    );
+  });
 });

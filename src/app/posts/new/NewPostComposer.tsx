@@ -7,47 +7,47 @@ import {
   CircleCheckIcon,
   ExternalLinkIcon,
   FileTextIcon,
-  ImagePlusIcon,
+  HourglassIcon,
   OctagonXIcon,
   PencilIcon,
   RotateCcwIcon,
-  SaveIcon,
-  SendIcon,
-  TriangleAlertIcon,
   UsersIcon,
-  XIcon,
 } from "lucide-react";
 import { threadsPostUrl, isFutureIso } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
 import { parsePlanParam } from "@/lib/plans";
-import { validateMediaInput } from "@/lib/media";
 import {
   buildComposerPreviews,
   buildComposerMediaErrors,
+  countCharacters,
 } from "@/lib/composer-previews";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UpgradeCta } from "@/components/billing/BillingWidgets";
+import {
+  pollPostSettled,
+  type PollProgress,
+  type SettledPost,
+} from "@/lib/publish-poll";
+import {
+  canSubmitComposer,
+  continueEditingFromSaved,
+  getFailedPublishActions,
+  mapWithConcurrencyLimit,
+  MEDIA_UPLOAD_CONCURRENCY,
+  planMediaAdd,
+  resolveScheduleClick,
+  runScheduleFlow,
+  selectMediaForUpload,
+  type ScheduleFlowDenial,
+} from "@/lib/composer-media";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Empty,
   EmptyContent,
@@ -58,82 +58,29 @@ import {
 } from "@/components/ui/empty";
 import {
   Field,
-  FieldContent,
   FieldDescription,
   FieldError,
-  FieldGroup,
   FieldLabel,
-  FieldLegend,
-  FieldSet,
 } from "@/components/ui/field";
-import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { AccountList } from "./_components/AccountList";
+import { MediaGrid } from "./_components/MediaGrid";
+import { PreviewCard } from "./_components/PreviewCard";
+import { PublishCard } from "./_components/PublishCard";
+import { ScheduleDialog } from "./_components/ScheduleDialog";
+import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
 
 import type { Platform } from "@prisma/client";
-
-type PublishResult = {
-  ok: boolean;
-  platform?: Platform;
-  externalPostId?: string;
-  username?: string;
-  error?: string;
-};
-
-type DraftMedia = {
-  key: string;
-  file: File;
-  previewUrl: string;
-  kind: "IMAGE" | "VIDEO";
-  name: string;
-  size: number;
-  status: "pending" | "uploading" | "done" | "error";
-  progress: number;
-  error?: string;
-};
-
-type ConnectedAccount = {
-  id: string;
-  platform: Platform;
-  username: string;
-  implemented: boolean;
-};
-
-type TargetOverrideState = Record<
-  string,
-  { text?: string; title?: string; settings?: Record<string, unknown> }
->;
-
-type TiktokCreatorInfo = {
-  username: string;
-  nickname: string;
-  privacyLevelOptions: string[];
-  commentDisabled: boolean;
-  duetDisabled: boolean;
-  stitchDisabled: boolean;
-  maxVideoPostDurationSec: number;
-};
+import type {
+  ConnectedAccount,
+  DraftMedia,
+  PublishResult,
+  TargetOverrideState,
+} from "./_components/types";
 
 const MAX_MEDIA = 4;
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 let mediaKeyCounter = 0;
 
@@ -148,37 +95,6 @@ type PrepareResponse = {
 
 const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
 const MEDIA_REGISTER_POLL_MS = 500;
-
-const PUBLISH_POLL_MS = 2000;
-const PUBLISH_POLL_TIMEOUT_MS = 330_000;
-
-type SettledPost = {
-  status: string;
-  errorMessage?: string | null;
-  targets: {
-    status: string;
-    platform: Platform;
-    externalPostId: string | null;
-    errorMessage?: string | null;
-    socialAccount?: { username: string } | null;
-  }[];
-};
-
-async function waitForPostSettled(postId: string): Promise<SettledPost | null> {
-  const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, PUBLISH_POLL_MS));
-    try {
-      const res = await fetch(`/api/posts/${postId}`);
-      if (!res.ok) continue;
-      const post = (await res.json()) as SettledPost;
-      if (post.status !== "PUBLISHING") return post;
-    } catch {
-      // transient network hiccup: keep polling until the deadline
-    }
-  }
-  return null;
-}
 
 async function waitForMediaRegistration(
   postId: string,
@@ -278,6 +194,19 @@ function toLocalInputValue(date: Date): string {
   )}`;
 }
 
+function parseScheduleDenial(data: {
+  code?: unknown;
+  reason?: unknown;
+  upgradeTo?: unknown;
+} | null): ScheduleFlowDenial | null {
+  if (!data || data.code !== "UPGRADE_REQUIRED") return null;
+  return {
+    reason:
+      typeof data.reason === "string" ? data.reason : "Plan limit reached.",
+    upgradeTo: parsePlanParam(data.upgradeTo),
+  };
+}
+
 export default function NewPostComposer({
   userName,
   accounts,
@@ -288,7 +217,6 @@ export default function NewPostComposer({
   quota: { postsLeft: number | null; upgradeTo: PlanId | null };
 }) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [media, setMedia] = useState<DraftMedia[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(() =>
@@ -298,13 +226,15 @@ export default function NewPostComposer({
   );
   const [targetOverrides, setTargetOverrides] = useState<TargetOverrideState>({});
   const [customizingIds, setCustomizingIds] = useState<string[]>([]);
-  const [creatorInfos, setCreatorInfos] = useState<
-    Record<string, TiktokCreatorInfo | null>
-  >({});
-  const requestedCreatorInfo = useRef<Set<string>>(new Set());
   const [mediaUploadNote, setMediaUploadNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [publishProgress, setPublishProgress] = useState<PollProgress | null>(
+    null
+  );
+  // Post id the user stopped waiting for: publishing continues server-side.
+  const [publishWatchId, setPublishWatchId] = useState<string | null>(null);
+  const publishAbortRef = useRef<AbortController | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -312,6 +242,7 @@ export default function NewPostComposer({
     null
   );
   const [scheduleMode, setScheduleMode] = useState(false);
+  const [xScheduleHint, setXScheduleHint] = useState(false);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -327,7 +258,7 @@ export default function NewPostComposer({
     selectedAccountIds.includes(account.id)
   );
   const platform: Platform = selectedAccounts[0]?.platform ?? "THREADS";
-  const charCount = text.length;
+  const charCount = countCharacters(text);
   const previews = buildComposerPreviews(
     selectedAccounts,
     text,
@@ -346,48 +277,42 @@ export default function NewPostComposer({
     media.map((item) => ({ type: item.kind, mimeType: item.file.type }))
   );
   const hasMediaError = mediaErrors.length > 0;
-  const canSave =
-    text.trim().length > 0 &&
-    !hasOverLimit &&
-    !hasMediaError &&
-    selectedAccountIds.length > 0 &&
-    !saving;
-  const canPublish =
-    text.trim().length > 0 &&
-    !hasOverLimit &&
-    !hasMediaError &&
-    selectedAccountIds.length > 0 &&
-    !publishing &&
-    !saving;
+  // Quota is known upfront from props: an exhausted plan disables every
+  // submit path before any request, with the reason shown in the Publish
+  // card. The server 403 stays as defense-in-depth.
+  const canSave = canSubmitComposer({
+    textPresent: text.trim().length > 0,
+    overLimit: hasOverLimit,
+    mediaError: hasMediaError,
+    hasSelection: selectedAccountIds.length > 0,
+    busy: saving,
+    quotaBlocked,
+  });
+  const canPublish = canSubmitComposer({
+    textPresent: text.trim().length > 0,
+    overLimit: hasOverLimit,
+    mediaError: hasMediaError,
+    hasSelection: selectedAccountIds.length > 0,
+    busy: publishing || saving,
+    quotaBlocked,
+  });
   const schedulingForX = selectedAccounts.some((account) => account.platform === "X");
+  const { creatorInfos, creatorInfoErrors, retryCreatorInfo, resetForAccount } =
+    useTikTokCreatorInfo(selectedAccounts);
 
+  // Unmount stops client polling only; the server keeps publishing.
   useEffect(() => {
-    for (const account of selectedAccounts) {
-      if (account.platform !== "TIKTOK") continue;
-      if (requestedCreatorInfo.current.has(account.id)) continue;
-      requestedCreatorInfo.current.add(account.id);
-      fetch(
-        `/api/social/tiktok/creator-info?accountId=${encodeURIComponent(account.id)}`
-      )
-        .then((response) =>
-          response.ok
-            ? (response.json() as Promise<TiktokCreatorInfo | null>)
-            : null
-        )
-        .then((info) =>
-          setCreatorInfos((current) => ({ ...current, [account.id]: info }))
-        )
-        .catch(() =>
-          setCreatorInfos((current) => ({ ...current, [account.id]: null }))
-        );
-    }
-  }, [selectedAccounts]);
+    return () => {
+      publishAbortRef.current?.abort();
+    };
+  }, []);
 
   function buildPostBody(nextScheduledAt?: string) {
     return {
       text: text.trim(),
       platform,
       hasMedia: media.length > 0,
+      mediaCount: media.length,
       accountIds: selectedAccountIds,
       targets: selectedAccountIds.map((accountId) => {
         const account = accounts.find((item) => item.id === accountId);
@@ -451,9 +376,18 @@ export default function NewPostComposer({
     setSelectedAccountIds((current) =>
       checked ? [...current, accountId] : current.filter((id) => id !== accountId)
     );
+    // Any selection change dismisses the X-scheduling hint.
+    setXScheduleHint(false);
     if (!checked) {
       clearTargetOverride(accountId);
       setCustomizingIds((current) => current.filter((id) => id !== accountId));
+      // Drop cached TikTok options so reselecting refetches fresh ones.
+      if (
+        accounts.find((account) => account.id === accountId)?.platform ===
+        "TIKTOK"
+      ) {
+        resetForAccount(accountId);
+      }
     }
   }
 
@@ -475,36 +409,58 @@ export default function NewPostComposer({
   }
 
   function addFiles(files: File[]) {
-    const pending: DraftMedia[] = [];
-    for (const file of files) {
-      const validation = validateMediaInput(file.type, file.size);
-      if (!validation.ok) {
-        toast.add({
-          title: "File not added",
-          description: validation.error,
-          type: "error",
-        });
-        continue;
-      }
-      pending.push({
-        key: nextMediaKey(),
-        file,
-        previewUrl: URL.createObjectURL(file),
-        kind: validation.kind,
-        name: file.name,
-        size: file.size,
-        status: "pending",
-        progress: 0,
+    // Decide everything before any side effect: no object URLs and no
+    // selection change happen unless files are actually added.
+    const plan = planMediaAdd({
+      files,
+      existingCount: media.length,
+      maxMedia: MAX_MEDIA,
+      selectedAccountIds,
+      accounts,
+    });
+    for (const item of plan.rejected) {
+      toast.add({
+        title: "File not added",
+        description: `${item.name}: ${item.error}`,
+        type: "error",
       });
     }
-    if (pending.length === 0) return;
-    setSelectedAccountIds((current) =>
-      current.filter(
-        (id) => accounts.find((account) => account.id === id)?.platform !== "X"
-      )
-    );
+    if (plan.limitExceeded) {
+      toast.add({
+        title: "Too many files",
+        description: `You can attach up to ${MAX_MEDIA} files per post.`,
+        type: "warning",
+      });
+      return;
+    }
+    if (plan.accepted.length === 0) return;
+    if (plan.deselectAccountIds.length > 0) {
+      const deselect = new Set(plan.deselectAccountIds);
+      setSelectedAccountIds((current) =>
+        current.filter((id) => !deselect.has(id))
+      );
+      toast.add({
+        title: "X deselected",
+        description:
+          "X can't publish media, so it was removed from the selected accounts.",
+        type: "warning",
+      });
+    }
+    const pending: DraftMedia[] = plan.accepted.map((entry) => ({
+      key: nextMediaKey(),
+      file: entry.file as File,
+      previewUrl: URL.createObjectURL(entry.file as File),
+      kind: entry.kind,
+      name: entry.file.name,
+      size: entry.file.size,
+      status: "pending",
+      progress: 0,
+    }));
     setMedia((prev) => {
+      // Backstop for a same-tick double submit: never exceed the limit,
+      // and revoke the just-created URLs when rejecting.
       if (prev.length + pending.length > MAX_MEDIA) {
+        for (const item of pending) URL.revokeObjectURL(item.previewUrl);
         toast.add({
           title: "Too many files",
           description: `You can attach up to ${MAX_MEDIA} files per post.`,
@@ -524,9 +480,11 @@ export default function NewPostComposer({
     });
   }
 
-  async function uploadMediaForPost(postId: string): Promise<string[]> {
-    const items = media;
-    const errors: string[] = [];
+  async function uploadMediaForPost(
+    postId: string,
+    onlyKeys?: readonly string[]
+  ): Promise<string[]> {
+    const items = selectMediaForUpload(media, postId, onlyKeys);
     for (const item of items) {
       setMedia((prev) =>
         prev.map((m) =>
@@ -535,28 +493,47 @@ export default function NewPostComposer({
             : m
         )
       );
-      const error = await uploadFileToPost(
-        postId,
-        item.file,
-        (percent) =>
+    }
+    const outcomes = await mapWithConcurrencyLimit(
+      items,
+      MEDIA_UPLOAD_CONCURRENCY,
+      async (item) => {
+        const error = await uploadFileToPost(
+          postId,
+          item.file,
+          (percent) =>
+            setMedia((prev) =>
+              prev.map((m) =>
+                m.key === item.key ? { ...m, progress: percent } : m
+              )
+            )
+        );
+        if (error) {
           setMedia((prev) =>
-            prev.map((m) => (m.key === item.key ? { ...m, progress: percent } : m))
-          )
-      );
-      if (error) {
-        errors.push(`${item.name}: ${error}`);
+            prev.map((m) =>
+              m.key === item.key ? { ...m, status: "error", error } : m
+            )
+          );
+          return `${item.name}: ${error}`;
+        }
         setMedia((prev) =>
           prev.map((m) =>
-            m.key === item.key ? { ...m, status: "error", error } : m
+            m.key === item.key
+              ? { ...m, status: "done", registeredPostId: postId }
+              : m
           )
         );
-      } else {
-        setMedia((prev) =>
-          prev.map((m) => (m.key === item.key ? { ...m, status: "done" } : m))
-        );
+        return null;
       }
-    }
-    return errors;
+    );
+    return outcomes.filter((entry): entry is string => entry !== null);
+  }
+
+  async function retryFailedMedia(key: string) {
+    // Retry needs a draft to upload to: every failed item implies a
+    // previous attempt, which always stored its post id.
+    if (!savedId) return;
+    await uploadMediaForPost(savedId, [key]);
   }
 
   async function readDenial(
@@ -633,46 +610,91 @@ export default function NewPostComposer({
 
     setScheduling(true);
     try {
-      const res = await fetch("/api/posts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPostBody(scheduledIso)),
+      // Safe order: create a DRAFT first, upload + register media, and only
+      // then apply the schedule via PATCH. A post must never sit in
+      // SCHEDULED with unregistered or failed media.
+      const result = await runScheduleFlow({
+        scheduledIso,
+        hasMedia: media.length > 0,
+        createDraft: async () => {
+          const res = await fetch("/api/posts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(buildPostBody()),
+          });
+          const data = (await res.json().catch(() => null)) as {
+            id?: unknown;
+            error?: unknown;
+            code?: unknown;
+            reason?: unknown;
+            upgradeTo?: unknown;
+          } | null;
+          if (!res.ok) {
+            const denial =
+              res.status === 403 ? parseScheduleDenial(data) : null;
+            if (denial) return { ok: false as const, denial };
+            return {
+              ok: false as const,
+              error:
+                typeof data?.error === "string"
+                  ? data.error
+                  : "Failed to schedule post.",
+            };
+          }
+          if (typeof data?.id !== "string") {
+            return {
+              ok: false as const,
+              error: "Failed to schedule post.",
+            };
+          }
+          return { ok: true as const, id: data.id };
+        },
+        uploadMedia: (postId) => uploadMediaForPost(postId),
+        applySchedule: async (postId, iso) => {
+          const res = await fetch(`/api/posts/${postId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scheduledAt: iso }),
+          });
+          const data = (await res.json().catch(() => null)) as {
+            error?: unknown;
+            code?: unknown;
+            reason?: unknown;
+            upgradeTo?: unknown;
+          } | null;
+          if (!res.ok) {
+            const denial =
+              res.status === 403 ? parseScheduleDenial(data) : null;
+            if (denial) return { ok: false as const, denial };
+            return {
+              ok: false as const,
+              error:
+                typeof data?.error === "string"
+                  ? data.error
+                  : "Failed to schedule post.",
+            };
+          }
+          return { ok: true as const };
+        },
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        const denial =
-          res.status === 403 && data?.code === "UPGRADE_REQUIRED"
-            ? {
-                reason:
-                  typeof data.reason === "string"
-                    ? data.reason
-                    : "Plan limit reached.",
-                upgradeTo: parsePlanParam(data.upgradeTo),
-              }
-            : null;
-        if (denial) {
-          setQuotaError(denial);
-          setScheduleMode(false);
-          return;
-        }
-        setScheduleError(data.error || "Failed to schedule post.");
+      if (result.outcome === "denied") {
+        setQuotaError(result.denial);
+        setScheduleMode(false);
         return;
       }
-
-      if (media.length > 0) {
-        const errors = await uploadMediaForPost(data.id);
-        if (errors.length > 0) {
-          setScheduleError(
-            `Failed to upload media: ${errors[0]}. The post was not scheduled. You can retry from the saved draft.`
-          );
-          setSavedId(data.id);
-          return;
-        }
+      if (result.outcome === "failed-before-create") {
+        setScheduleError(result.error);
+        return;
       }
-
-      setSavedId(data.id);
+      if (result.outcome === "failed-as-draft") {
+        setScheduleError(
+          `${result.error} The post was saved as a draft, not scheduled. Adjust the media and confirm again.`
+        );
+        setSavedId(result.postId);
+        return;
+      }
+      setSavedId(result.postId);
       setScheduledAt(scheduledIso);
       setScheduleMode(false);
     } catch {
@@ -686,7 +708,11 @@ export default function NewPostComposer({
     if (!canPublish) return;
     setPublishing(true);
     setPublishResult(null);
+    setPublishWatchId(null);
+    setPublishProgress(null);
     setQuotaError(null);
+    const aborter = new AbortController();
+    publishAbortRef.current = aborter;
 
     try {
       const createRes = await fetch("/api/posts", {
@@ -736,15 +762,34 @@ export default function NewPostComposer({
 
       // 202: publishing continues server-side (waitUntil); poll the real
       // target statuses from the database instead of assuming success.
-      const settled = await waitForPostSettled(postData.id);
-      if (!settled) {
+      // Cancel only stops this client polling — the server keeps going.
+      const poll = await pollPostSettled({
+        postId: postData.id,
+        signal: aborter.signal,
+        fetchPost: async (postId) => {
+          const res = await fetch(`/api/posts/${postId}`);
+          if (!res.ok) return null;
+          return (await res.json()) as SettledPost;
+        },
+        onProgress: (progress) => setPublishProgress(progress),
+      });
+      if (poll.outcome === "aborted") {
+        setSavedId(postData.id);
+        setPublishWatchId(postData.id);
+        return;
+      }
+      if (poll.outcome === "timeout") {
         setPublishResult({
           ok: false,
           platform,
           error:
             "Still publishing on some platforms. Open the post to watch progress.",
         });
-      } else if (settled.status === "PUBLISHED") {
+        setSavedId(postData.id);
+        return;
+      }
+      const settled = poll.post;
+      if (settled.status === "PUBLISHED") {
         const done = (settled.targets ?? []).find(
           (t: { status: string }) => t.status === "PUBLISHED"
         );
@@ -781,13 +826,57 @@ export default function NewPostComposer({
         error: "Network error. Please try again.",
       });
     } finally {
+      publishAbortRef.current = null;
       setPublishing(false);
     }
+  }
+
+  if (publishWatchId) {
+    const watchId = publishWatchId;
+    return (
+      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
+        <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HourglassIcon />
+            </EmptyMedia>
+            <EmptyTitle>Still publishing</EmptyTitle>
+            <EmptyDescription>
+              Publishing continues on the server. Open the post to watch
+              progress.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPublishWatchId(null)}
+              >
+                Back to editor
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => router.push(`/posts/${watchId}`)}
+              >
+                View post
+              </Button>
+            </div>
+          </EmptyContent>
+        </Empty>
+      </div>
+    );
   }
 
   if (publishResult) {
     const resultPlatform = publishResult.platform ?? "X";
     const isThreads = resultPlatform === "THREADS";
+    // Draft recovery: a failed publish with a saved draft must keep both
+    // "Try again" and the link to the draft.
+    const openDraftId = getFailedPublishActions(savedId).includes("open-draft")
+      ? savedId
+      : null;
     return (
       <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
         <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
@@ -853,18 +942,19 @@ export default function NewPostComposer({
                       variant="outline"
                       size="sm"
                       onClick={() => {
+                        // Keep savedId: the draft is the recovery path, and
+                        // the "View post" action below must survive.
                         setPublishResult(null);
-                        setSavedId(null);
                       }}
                     >
                       <RotateCcwIcon data-icon="inline-start" />
                       Try again
                     </Button>
                   )}
-                  {savedId && (
+                  {openDraftId && (
                     <Button
                       size="sm"
-                      onClick={() => router.push(`/posts/${savedId}`)}
+                      onClick={() => router.push(`/posts/${openDraftId}`)}
                     >
                       View post
                     </Button>
@@ -948,15 +1038,14 @@ export default function NewPostComposer({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      setSaved(false);
-                      setSavedId(null);
-                      setText("");
-                      clearMedia();
-                    }}
+                    onClick={() =>
+                      // Back to editing with the draft content intact:
+                      // text and media state are deliberately untouched.
+                      continueEditingFromSaved({ setSaved, setSavedId })
+                    }
                   >
                     <PencilIcon data-icon="inline-start" />
-                    Edit post
+                    Continue editing
                   </Button>
                   <Button
                     size="sm"
@@ -992,7 +1081,8 @@ export default function NewPostComposer({
                   Post content
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Used by every selected platform unless customized
+                  Used by every selected platform unless customized — except
+                  TikTok, which posts its own title instead
                 </p>
               </div>
               <Badge variant={hasOverLimit ? "destructive" : "secondary"}>
@@ -1032,217 +1122,26 @@ export default function NewPostComposer({
             </div>
           </section>
 
-          <section aria-labelledby="composer-targets">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 id="composer-targets" className="text-lg font-medium">
-                  Publish to
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Select at least one connected account
-                </p>
-              </div>
-              <Badge variant="secondary">
-                {selectedAccountIds.length} selected
-              </Badge>
-            </div>
-            <div className="flex flex-col gap-3">
-              {accounts.length === 0 ? (
-                <Empty>
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <UsersIcon />
-                    </EmptyMedia>
-                    <EmptyTitle>No connected accounts</EmptyTitle>
-                    <EmptyDescription>
-                      Connect a social account before creating a post.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : (
-                <FieldSet>
-                  <FieldLegend variant="label" className="sr-only">
-                    Publish to
-                  </FieldLegend>
-                  <FieldGroup className="gap-2">
-                    {accounts.map((account) => {
-                      const selected = selectedAccountIds.includes(account.id);
-                      const blockedByMedia =
-                        media.length > 0 && account.platform === "X";
-                      const disabled =
-                        !account.implemented || blockedByMedia;
-                      const overrideEntry = targetOverrides[account.id];
-                      const customized = Boolean(
-                        overrideEntry &&
-                          (overrideEntry.text ||
-                            overrideEntry.title ||
-                            (overrideEntry.settings &&
-                              Object.keys(overrideEntry.settings).length > 0))
-                      );
-                      return (
-                        <Field
-                          key={account.id}
-                          orientation="horizontal"
-                          data-disabled={disabled || undefined}
-                        >
-                          <Checkbox
-                            id={`account-${account.id}`}
-                            checked={selected}
-                            disabled={
-                              disabled || saving || publishing || scheduling
-                            }
-                            onCheckedChange={(checked) =>
-                              toggleAccountSelection(
-                                account.id,
-                                checked === true
-                              )
-                            }
-                          />
-                          <FieldContent>
-                            <FieldLabel htmlFor={`account-${account.id}`}>
-                              {account.platform} @{account.username}
-                            </FieldLabel>
-                            {!account.implemented && (
-                              <FieldDescription>Coming soon</FieldDescription>
-                            )}
-                            {account.implemented && blockedByMedia && (
-                              <FieldDescription>
-                                X media publishing is not available
-                              </FieldDescription>
-                            )}
-                          </FieldContent>
-                          {selected && customized && (
-                            <Badge variant="secondary">Customized</Badge>
-                          )}
-                          {!account.implemented && (
-                            <Badge variant="outline">Soon</Badge>
-                          )}
-                        </Field>
-                      );
-                    })}
-                  </FieldGroup>
-                </FieldSet>
-              )}
-              {accounts.length > 0 && selectedAccountIds.length === 0 && (
-                <FieldError>Select at least one connected account.</FieldError>
-              )}
-              {mediaErrors.map((message) => (
-                <Alert key={message} variant="destructive">
-                  <TriangleAlertIcon />
-                  <AlertTitle>Media not supported</AlertTitle>
-                  <AlertDescription>{message}</AlertDescription>
-                </Alert>
-              ))}
-            </div>
-          </section>
+          <AccountList
+            accounts={accounts}
+            selectedAccountIds={selectedAccountIds}
+            targetOverrides={targetOverrides}
+            mediaAttached={media.length > 0}
+            disabled={saving || publishing || scheduling}
+            mediaErrors={mediaErrors}
+            onToggle={toggleAccountSelection}
+          />
 
-          <section aria-labelledby="composer-media">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 id="composer-media" className="text-lg font-medium">
-                  Media
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  JPG, PNG, WebP or GIF images up to 10 MB; MP4 or WebM
-                  videos up to 100 MB.
-                </p>
-              </div>
-              <Badge variant="secondary">
-                {media.length}/{MAX_MEDIA}
-              </Badge>
-            </div>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-start gap-3">
-                {media.map((item) => (
-                  <div key={item.key} className="flex flex-col gap-1.5">
-                    <div className="relative size-28 overflow-hidden rounded-md border bg-muted">
-                      {item.kind === "IMAGE" ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={item.previewUrl}
-                          alt={item.name}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <video
-                          src={item.previewUrl}
-                          className="size-full object-cover"
-                          muted
-                        />
-                      )}
-                      {item.status === "uploading" && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-foreground/60 p-2">
-                          <span className="text-xs font-medium text-white tabular-nums">
-                            {item.progress}%
-                          </span>
-                          <Progress
-                            value={item.progress}
-                            aria-label={`Uploading ${item.name}`}
-                            className="w-full"
-                          />
-                        </div>
-                      )}
-                      {item.status === "error" && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-destructive/40">
-                          <Badge variant="destructive">Failed</Badge>
-                        </div>
-                      )}
-                      {item.status !== "uploading" && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="icon-sm"
-                          onClick={() => removeMedia(item.key)}
-                          aria-label={`Remove ${item.name}`}
-                          className="absolute top-1.5 right-1.5 size-6 rounded-full"
-                        >
-                          <XIcon />
-                        </Button>
-                      )}
-                    </div>
-                    <p className="w-28 truncate text-xs text-muted-foreground">
-                      {item.name} · {formatFileSize(item.size)}
-                    </p>
-                    {item.status === "error" && item.error && (
-                      <p className="w-28 text-xs text-destructive">
-                        {item.error}
-                      </p>
-                    )}
-                  </div>
-                ))}
-                {media.length < MAX_MEDIA && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={saving || publishing || scheduling}
-                    className="h-28 w-28 flex-col border-dashed"
-                  >
-                    <ImagePlusIcon data-icon="inline-start" />
-                    Add media
-                  </Button>
-                )}
-              </div>
-              {mediaUploadNote && (
-                <Alert>
-                  <TriangleAlertIcon />
-                  <AlertTitle>Media upload</AlertTitle>
-                  <AlertDescription>{mediaUploadNote}</AlertDescription>
-                </Alert>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,.jpg,.jpeg,.png,.webp,.gif,.mp4,.m4v,.webm"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files) addFiles(Array.from(e.target.files));
-                  e.target.value = "";
-                }}
-              />
-            </div>
-          </section>
+          <MediaGrid
+            media={media}
+            maxMedia={MAX_MEDIA}
+            disabled={saving || publishing || scheduling}
+            mediaUploadNote={mediaUploadNote}
+            canRetry={savedId !== null}
+            onAddFiles={addFiles}
+            onRemove={removeMedia}
+            onRetry={(key) => void retryFailedMedia(key)}
+          />
         </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
@@ -1271,482 +1170,119 @@ export default function NewPostComposer({
               ) : (
                 <ScrollArea className={previews.length > 3 ? "h-120" : undefined}>
                   <div className="flex flex-col gap-4">
-                    {previews.map((preview) => {
-                      const isCustomizing = customizingIds.includes(
-                        preview.accountId
-                      );
-                      return (
-                        <div
-                          key={preview.accountId}
-                          className="flex flex-col gap-3 rounded-lg border p-4"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Avatar>
-                              <AvatarFallback aria-label={preview.label}>
-                                <span className="flex size-4 items-center justify-center [&_svg]:size-4">
-                                  <PlatformIcon platform={preview.platform} />
-                                </span>
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold">
-                                {userName}
-                              </p>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {preview.label} · @{preview.username}
-                              </p>
-                            </div>
-                            {preview.customized && (
-                              <Badge variant="secondary">Custom</Badge>
-                            )}
-                          </div>
-                          <Separator />
-                          {isCustomizing ? (
-                            <FieldGroup className="gap-3">
-                              <Field
-                                data-invalid={preview.overLimit || undefined}
-                              >
-                                <FieldLabel
-                                  htmlFor={`custom-${preview.accountId}`}
-                                >
-                                  {preview.platform === "TIKTOK"
-                                    ? "Title / caption for TikTok"
-                                    : `Text for ${preview.label}`}
-                                </FieldLabel>
-                                <Textarea
-                                  id={`custom-${preview.accountId}`}
-                                  value={
-                                    (preview.platform === "TIKTOK"
-                                      ? targetOverrides[preview.accountId]
-                                          ?.title
-                                      : targetOverrides[preview.accountId]
-                                          ?.text) ?? preview.text
-                                  }
-                                  rows={4}
-                                  placeholder={
-                                    preview.platform === "TIKTOK"
-                                      ? "Title / caption for TikTok"
-                                      : `Text for ${preview.label}`
-                                  }
-                                  aria-invalid={preview.overLimit || undefined}
-                                  onChange={(event) => {
-                                    const value = event.target.value;
-                                    updateOverride(
-                                      preview.accountId,
-                                      preview.platform === "TIKTOK"
-                                        ? { title: value }
-                                        : { text: value }
-                                    );
-                                  }}
-                                />
-                                <FieldDescription>
-                                  {preview.text.length} / {preview.maxLength}
-                                </FieldDescription>
-                                {preview.overLimit && (
-                                  <FieldError>
-                                    Exceeds the {preview.maxLength} character
-                                    limit for {preview.label}
-                                  </FieldError>
-                                )}
-                              </Field>
-                              {preview.platform === "TIKTOK" && (
-                                <div className="flex flex-col gap-3">
-                                  {(() => {
-                                    const info =
-                                      creatorInfos[preview.accountId];
-                                    const settings =
-                                      targetOverrides[preview.accountId]
-                                        ?.settings ?? {};
-                                    const privacyOptions =
-                                      info &&
-                                      info.privacyLevelOptions.length > 0
-                                        ? info.privacyLevelOptions
-                                        : ["SELF_ONLY"];
-                                    const currentPrivacy =
-                                      typeof settings.privacy_level ===
-                                      "string"
-                                        ? settings.privacy_level
-                                        : privacyOptions[0];
-                                    const setSetting = (
-                                      patch: Record<string, unknown>
-                                    ) =>
-                                      updateOverride(preview.accountId, {
-                                        settings: { ...settings, ...patch },
-                                      });
-                                    const allowToggle = (
-                                      key:
-                                        | "disable_comment"
-                                        | "disable_duet"
-                                        | "disable_stitch",
-                                      creatorDisabled: boolean | undefined,
-                                      label: string
-                                    ) => (
-                                      <Field
-                                        orientation="horizontal"
-                                        key={key}
-                                        data-disabled={
-                                          creatorDisabled || undefined
-                                        }
-                                      >
-                                        <Switch
-                                          id={`${preview.accountId}-${key}`}
-                                          checked={
-                                            settings[key] !== true &&
-                                            !creatorDisabled
-                                          }
-                                          disabled={Boolean(creatorDisabled)}
-                                          onCheckedChange={(checked) =>
-                                            setSetting({
-                                              [key]: !checked,
-                                            })
-                                          }
-                                        />
-                                        <FieldContent>
-                                          <FieldLabel
-                                            htmlFor={`${preview.accountId}-${key}`}
-                                          >
-                                            {label}
-                                          </FieldLabel>
-                                          {creatorDisabled && (
-                                            <FieldDescription>
-                                              Off in account privacy settings
-                                            </FieldDescription>
-                                          )}
-                                        </FieldContent>
-                                      </Field>
-                                    );
-                                    if (info === undefined) {
-                                      return (
-                                        <div className="flex flex-col gap-2">
-                                          <Skeleton className="h-8 w-full" />
-                                          <Skeleton className="h-4 w-2/3" />
-                                        </div>
-                                      );
-                                    }
-                                    return (
-                                      <>
-                                        {info ? (
-                                          <>
-                                            <Field>
-                                              <FieldLabel
-                                                htmlFor={`${preview.accountId}-privacy`}
-                                              >
-                                                Privacy
-                                              </FieldLabel>
-                                              <Select
-                                                value={currentPrivacy}
-                                                onValueChange={(
-                                                  value: unknown
-                                                ) =>
-                                                  setSetting({
-                                                    privacy_level:
-                                                      String(value),
-                                                  })
-                                                }
-                                              >
-                                                <SelectTrigger
-                                                  id={`${preview.accountId}-privacy`}
-                                                  className="w-full"
-                                                >
-                                                  <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                  <SelectGroup>
-                                                    {privacyOptions.map(
-                                                      (option) => (
-                                                        <SelectItem
-                                                          key={option}
-                                                          value={option}
-                                                        >
-                                                          {option
-                                                            .replaceAll(
-                                                              "_",
-                                                              " "
-                                                            )
-                                                            .toLowerCase()
-                                                            .replace(/^./, (c) =>
-                                                              c.toUpperCase()
-                                                            )}
-                                                        </SelectItem>
-                                                      )
-                                                    )}
-                                                  </SelectGroup>
-                                                </SelectContent>
-                                              </Select>
-                                            </Field>
-                                            {allowToggle(
-                                              "disable_comment",
-                                              info.commentDisabled,
-                                              "Allow comments"
-                                            )}
-                                            {allowToggle(
-                                              "disable_duet",
-                                              info.duetDisabled,
-                                              "Allow Duet"
-                                            )}
-                                            {allowToggle(
-                                              "disable_stitch",
-                                              info.stitchDisabled,
-                                              "Allow Stitch"
-                                            )}
-                                            <Field>
-                                              <FieldLabel
-                                                htmlFor={`${preview.accountId}-cover`}
-                                              >
-                                                Cover timestamp (ms, optional)
-                                              </FieldLabel>
-                                              <input
-                                                id={`${preview.accountId}-cover`}
-                                                type="number"
-                                                min={0}
-                                                step={1000}
-                                                value={
-                                                  typeof settings.video_cover_timestamp_ms ===
-                                                  "number"
-                                                    ? String(
-                                                        settings.video_cover_timestamp_ms
-                                                      )
-                                                    : ""
-                                                }
-                                                onChange={(event) => {
-                                                  const raw =
-                                                    event.target.value;
-                                                  setSetting({
-                                                    video_cover_timestamp_ms:
-                                                      raw === ""
-                                                        ? undefined
-                                                        : Math.max(
-                                                            0,
-                                                            Math.floor(
-                                                              Number(raw) || 0
-                                                            )
-                                                          ),
-                                                  });
-                                                }}
-                                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                                              />
-                                            </Field>
-                                            {info.maxVideoPostDurationSec >
-                                              0 && (
-                                              <FieldDescription>
-                                                Max video length for this
-                                                account:{" "}
-                                                {
-                                                  info.maxVideoPostDurationSec
-                                                }
-                                                s
-                                              </FieldDescription>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <Alert>
-                                            <TriangleAlertIcon />
-                                            <AlertTitle>
-                                              TikTok options unavailable
-                                            </AlertTitle>
-                                            <AlertDescription>
-                                              TikTok posting options unavailable
-                                              (default: private post). Retry or
-                                              reconnect TikTok.
-                                            </AlertDescription>
-                                          </Alert>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                              )}
-                              <div className="flex items-center justify-end gap-2">
-                                {targetOverrides[preview.accountId] && (
-                                  <Button
-                                    type="button"
-                                    variant="link"
-                                    size="sm"
-                                    onClick={() =>
-                                      clearTargetOverride(preview.accountId)
-                                    }
-                                  >
-                                    Use global
-                                  </Button>
-                                )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    setCustomizingIds((current) =>
-                                      current.filter(
-                                        (id) => id !== preview.accountId
-                                      )
-                                    )
-                                  }
-                                >
-                                  Done
-                                </Button>
-                              </div>
-                            </FieldGroup>
-                          ) : (
-                            <div className="flex flex-col gap-2">
-                              {media.length > 0 && (
-                                <div className="flex gap-1.5">
-                                  {media.slice(0, 4).map((item) =>
-                                    item.kind === "IMAGE" ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        key={item.key}
-                                        src={item.previewUrl}
-                                        alt={item.name}
-                                        className="size-10 rounded border object-cover"
-                                      />
-                                    ) : (
-                                      <video
-                                        key={item.key}
-                                        src={item.previewUrl}
-                                        muted
-                                        className="size-10 rounded border object-cover"
-                                      />
-                                    )
-                                  )}
-                                </div>
-                              )}
-                              <p className="text-sm break-words whitespace-pre-wrap">
-                                {preview.text || (
-                                  <span className="text-muted-foreground">
-                                    Your post will appear here...
-                                  </span>
-                                )}
-                              </p>
-                              <div className="flex items-center justify-between gap-2">
-                                <FieldDescription>
-                                  {preview.text.length} / {preview.maxLength}
-                                </FieldDescription>
-                                {preview.customized && (
-                                  <Badge variant="secondary">custom text</Badge>
-                                )}
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={saving || publishing || scheduling}
-                                  onClick={() =>
-                                    setCustomizingIds((current) => [
-                                      ...current,
-                                      preview.accountId,
-                                    ])
-                                  }
-                                >
-                                  <PencilIcon data-icon="inline-start" />
-                                  {preview.customized
-                                    ? `Edit for ${preview.label}`
-                                    : "Customize"}
-                                </Button>
-                              </div>
-                              {preview.overLimit && (
-                                <FieldError>
-                                  Exceeds the {preview.maxLength} character
-                                  limit for {preview.label}. Click Customize to
-                                  shorten it just for this platform.
-                                </FieldError>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {previews.map((preview) => (
+                      <PreviewCard
+                        key={preview.accountId}
+                        preview={preview}
+                        userName={userName}
+                        media={media}
+                        customText={
+                          preview.platform === "TIKTOK"
+                            ? targetOverrides[preview.accountId]?.title
+                            : targetOverrides[preview.accountId]?.text
+                        }
+                        hasOverride={Boolean(
+                          targetOverrides[preview.accountId]
+                        )}
+                        overrideSettings={
+                          targetOverrides[preview.accountId]?.settings ?? {}
+                        }
+                        isCustomizing={customizingIds.includes(
+                          preview.accountId
+                        )}
+                        creatorInfo={creatorInfos[preview.accountId]}
+                        creatorInfoError={
+                          creatorInfoErrors[preview.accountId]
+                        }
+                        showTikTokTitleHint={
+                          preview.platform === "TIKTOK" &&
+                          !targetOverrides[preview.accountId]?.title
+                        }
+                        disabled={saving || publishing || scheduling}
+                        onCustomTextChange={(value) =>
+                          updateOverride(
+                            preview.accountId,
+                            preview.platform === "TIKTOK"
+                              ? { title: value }
+                              : { text: value }
+                          )
+                        }
+                        onSettings={(patch) =>
+                          updateOverride(preview.accountId, {
+                            settings: patch,
+                          })
+                        }
+                        onRetryCreatorInfo={() =>
+                          retryCreatorInfo(preview.accountId)
+                        }
+                        onOpenAccounts={() => router.push("/accounts")}
+                        onUseGlobal={() =>
+                          clearTargetOverride(preview.accountId)
+                        }
+                        onDone={() =>
+                          setCustomizingIds((current) =>
+                            current.filter((id) => id !== preview.accountId)
+                          )
+                        }
+                        onCustomize={() =>
+                          setCustomizingIds((current) => [
+                            ...current,
+                            preview.accountId,
+                          ])
+                        }
+                      />
+                    ))}
                   </div>
                 </ScrollArea>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Publish</CardTitle>
-              <CardDescription>
-                Save a draft, schedule it, or publish right away.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              {(quotaBlocked || quotaError) && (
-                <Alert>
-                  <AlertTitle>Monthly post limit reached</AlertTitle>
-                  <AlertDescription>
-                    <UpgradeCta
-                      reason={
-                        quotaError?.reason ??
-                        "This plan includes a fixed number of posts per month."
-                      }
-                      upgradeTo={quotaError?.upgradeTo ?? quota.upgradeTo}
-                    />
-                  </AlertDescription>
-                </Alert>
-              )}
-              {schedulingForX && scheduleMode && (
-                <Alert variant="destructive">
-                  <TriangleAlertIcon />
-                  <AlertTitle>Scheduling unavailable</AlertTitle>
-                  <AlertDescription>
-                    Scheduling for X is not available yet. Choose Threads to
-                    schedule a post.
-                  </AlertDescription>
-                </Alert>
-              )}
-              {schedulingForX && !scheduleMode && (
-                <FieldDescription>
-                  Scheduling is available for Threads. Publish to X is
-                  available now.
-                </FieldDescription>
-              )}
-              <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
-                <Button
-                  variant="outline"
-                  onClick={handleSaveDraft}
-                  disabled={!canSave}
-                  className="flex-1"
-                >
-                  {saving && <Spinner data-icon="inline-start" />}
-                  <SaveIcon data-icon="inline-start" />
-                  {saving ? "Saving..." : "Save draft"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (schedulingForX) return;
-                    setScheduleMode(true);
-                    setScheduleError(null);
-                  }}
-                  disabled={schedulingForX || scheduling}
-                  title={
-                    schedulingForX
-                      ? "Scheduling for X is not available yet. Use Threads."
-                      : "Schedule this post"
-                  }
-                  className="flex-1"
-                >
-                  <CalendarClockIcon data-icon="inline-start" />
-                  {scheduling ? "Scheduling..." : "Schedule"}
-                </Button>
-                <Button
-                  onClick={handlePublish}
-                  disabled={!canPublish}
-                  className="flex-1"
-                >
-                  {publishing && <Spinner data-icon="inline-start" />}
-                  {!publishing && <SendIcon data-icon="inline-start" />}
-                  {publishing ? "Publishing..." : "Publish now"}
-                </Button>
-              </div>
-            </CardContent>
-            <CardFooter className="text-xs text-muted-foreground">
-              Publishing uploads media first, then publishes to every selected
-              platform.
-            </CardFooter>
-          </Card>
+          <PublishCard
+            quotaBlocked={quotaBlocked}
+            quotaError={quotaError}
+            quotaUpgradeTo={quota.upgradeTo}
+            schedulingForX={schedulingForX}
+            scheduleMode={scheduleMode}
+            xScheduleHint={xScheduleHint}
+            publishing={publishing}
+            publishProgress={publishProgress}
+            canSave={canSave}
+            canPublish={canPublish}
+            saving={saving}
+            scheduling={scheduling}
+            onSaveDraft={handleSaveDraft}
+            onScheduleClick={() => {
+              // X-only never opens the dialog and never no-ops: it
+              // shows the inline explanation above instead.
+              if (
+                resolveScheduleClick(schedulingForX) === "show-x-hint"
+              ) {
+                setXScheduleHint(true);
+                return;
+              }
+              setScheduleMode(true);
+              setScheduleError(null);
+            }}
+            onPublish={handlePublish}
+            onAbort={() => publishAbortRef.current?.abort()}
+            onDismissXHint={() => setXScheduleHint(false)}
+          />
         </div>
       </div>
 
-      <Dialog
+      <ScheduleDialog
         open={scheduleMode && !schedulingForX}
+        scheduleDate={scheduleDate}
+        scheduleTime={scheduleTime}
+        minDate={toLocalInputValue(new Date())}
+        scheduledIso={scheduledIso}
+        scheduleError={scheduleError}
+        savedId={savedId}
+        scheduling={scheduling}
+        canSave={canSave}
+        onDateChange={setScheduleDate}
+        onTimeChange={setScheduleTime}
         onOpenChange={(open) => {
           if (!open) {
             setScheduleMode(false);
@@ -1755,81 +1291,13 @@ export default function NewPostComposer({
             setScheduleMode(true);
           }
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Schedule post</DialogTitle>
-            <DialogDescription>
-              One scheduled time for the whole post — it applies to all
-              selected platforms, which publish together.
-            </DialogDescription>
-          </DialogHeader>
-          <FieldGroup>
-            <div className="grid grid-cols-2 gap-4">
-              <Field>
-                <FieldLabel htmlFor="schedule-date">Date</FieldLabel>
-                <input
-                  id="schedule-date"
-                  type="date"
-                  value={scheduleDate}
-                  min={toLocalInputValue(new Date())}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="schedule-time">Time</FieldLabel>
-                <input
-                  id="schedule-time"
-                  type="time"
-                  value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                />
-              </Field>
-            </div>
-            {scheduledIso && (
-              <FieldDescription>
-                Will be published on{" "}
-                {new Date(scheduledIso).toLocaleString("en-GB", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}{" "}
-                — this schedule applies to all selected platforms.
-              </FieldDescription>
-            )}
-            {scheduleError && (
-              <Alert variant="destructive">
-                <TriangleAlertIcon />
-                <AlertTitle>Cannot schedule</AlertTitle>
-                <AlertDescription>{scheduleError}</AlertDescription>
-              </Alert>
-            )}
-          </FieldGroup>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setScheduleMode(false);
-                setScheduleError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSchedule}
-              disabled={!canSave || scheduling}
-            >
-              {scheduling && <Spinner data-icon="inline-start" />}
-              <CalendarClockIcon data-icon="inline-start" />
-              {scheduling ? "Scheduling..." : "Confirm schedule"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onCancel={() => {
+          setScheduleMode(false);
+          setScheduleError(null);
+        }}
+        onConfirm={handleSchedule}
+        onOpenDraft={(postId) => router.push(`/posts/${postId}`)}
+      />
     </div>
   );
 }

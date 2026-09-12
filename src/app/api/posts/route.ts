@@ -9,6 +9,7 @@ import {
   getUsage,
 } from "@/lib/entitlements";
 import {
+  validateCreatePostContent,
   validateTargetAccountSelection,
   validateTargetOverrides,
 } from "@/lib/platforms/overrides";
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
       accountIds,
       targets: requestedTargets,
       hasMedia = false,
+      mediaCount: rawMediaCount,
     } = await request.json();
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
@@ -123,6 +125,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: selected.error }, { status: 400 });
     }
     const selectedAccounts = selected.accounts;
+
+    // Defense-in-depth: re-check global text length and declared media
+    // count server-side instead of trusting client validation alone.
+    const mediaCount =
+      typeof rawMediaCount === "number" ? rawMediaCount : null;
+    const content = validateCreatePostContent({
+      text: text.trim(),
+      mediaCount,
+      platforms: selectedAccounts.map((account) => account.platform),
+    });
+    if (!content.ok) {
+      return NextResponse.json({ error: content.error }, { status: 400 });
+    }
 
     if (selectedAccounts.some((account) => account.platform === "X") && scheduledAt) {
       return NextResponse.json(

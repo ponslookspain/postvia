@@ -625,7 +625,7 @@ export function BulkScheduler({
                 Videos
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                MP4 or WebM, up to {batchCap} per batch. Each file is
+                MP4, WebM or MOV, up to {batchCap} per batch. Each file is
                 uploaded separately with its own progress.
               </p>
             </div>
@@ -727,7 +727,7 @@ export function BulkScheduler({
             <input
               ref={fileInputRef}
               type="file"
-              accept="video/mp4,video/webm,.mp4,.m4v,.webm"
+              accept="video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov"
               multiple
               className="hidden"
               onChange={(e) => {

@@ -2,6 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildComposerPreviews,
+  countCharacters,
   type PreviewAccount,
   type PreviewOverride,
 } from "../src/lib/composer-previews";
@@ -151,5 +152,49 @@ describe("capability-driven preview metadata", () => {
     const tiktok = buildComposerPreviews([TIKTOK], GLOBAL, [])[0];
     assert.ok(tiktok.fieldKeys.includes("title"));
     assert.ok(tiktok.fieldKeys.includes("privacy_level"));
+  });
+});
+
+describe("tiktok title contract", () => {  test("tiktok preview shows global text until its own title is set", () => {
+    // Known gap, documented here: publishing uses only the TikTok title
+    // override, while the preview falls back to global text. The composer
+    // copy and the empty-title hint warn about exactly this.
+    const previews = buildComposerPreviews([TIKTOK], GLOBAL, []);
+    assert.equal(previews[0].text, GLOBAL);
+    assert.equal(previews[0].customized, false);
+    assert.equal(previews[0].maxLength, 2200);
+  });
+
+  test("tiktok title override replaces the preview text", () => {
+    const previews = buildComposerPreviews([TIKTOK], GLOBAL, [
+      overrideFor("acc-tiktok", "Мой заголовок"),
+    ]);
+    assert.equal(previews[0].text, "Мой заголовок");
+    assert.equal(previews[0].customized, true);
+  });
+
+  test("empty tiktok title counts as no override", () => {
+    const previews = buildComposerPreviews([TIKTOK], GLOBAL, [
+      overrideFor("acc-tiktok", ""),
+    ]);
+    assert.equal(previews[0].text, GLOBAL);
+    assert.equal(previews[0].customized, false);
+  });
+});
+
+describe("countCharacters", () => {
+  test("counts unicode code points like the server contract", () => {
+    assert.equal(countCharacters("hello"), 5);
+    assert.equal(countCharacters("🚀"), 1);
+    assert.equal(countCharacters("🚀".repeat(279)), 279);
+    assert.equal(countCharacters("Новый ролик уже вышел 🚀"), 23);
+  });
+
+  test("emoji-heavy text gates overLimit by code points", () => {
+    // 279 emoji: 558 UTF-16 units but 279 code points — fits X 280.
+    const fits = buildComposerPreviews([X], "🚀".repeat(279), []);
+    assert.equal(fits[0].overLimit, false);
+    const over = buildComposerPreviews([X], "🚀".repeat(281), []);
+    assert.equal(over[0].overLimit, true);
   });
 });

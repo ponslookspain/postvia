@@ -196,3 +196,43 @@ if (!caps.implemented) {
     }
   return { ok: true };
 }
+
+/**
+ * Defense-in-depth for POST /api/posts: the client gates text length and
+ * media count, but the server re-checks global text against every selected
+ * platform's text limit and the declared media count against maxItems.
+ * `mediaCount` may be absent on legacy callers — then only the text check
+ * runs and media rules stay with the publish flow.
+ */
+export function validateCreatePostContent(input: {
+  text: string;
+  mediaCount: number | null;
+  platforms: readonly Platform[];
+}): { ok: true } | { ok: false; error: string } {
+  for (const platform of input.platforms) {
+    const caps = getPlatformCapabilities(platform);
+    const limit = caps.fields.find((field) => field.type === "text")?.maxLength;
+    if (limit !== undefined && Array.from(input.text).length > limit) {
+      return {
+        ok: false,
+        error: `Text exceeds the ${limit} character limit for ${caps.label}`,
+      };
+    }
+  }
+  if (
+    input.mediaCount !== null &&
+    Number.isInteger(input.mediaCount) &&
+    input.mediaCount >= 0
+  ) {
+    for (const platform of input.platforms) {
+      const caps = getPlatformCapabilities(platform);
+      if (input.mediaCount > caps.media.maxItems) {
+        return {
+          ok: false,
+          error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
+        };
+      }
+    }
+  }
+  return { ok: true };
+}

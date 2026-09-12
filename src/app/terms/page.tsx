@@ -251,7 +251,7 @@ export default function TermsPage() {
       <LegalSection heading="12. Media Uploads">
         <p>
           Postvia accepts images (JPG, PNG, WebP, GIF up to 10&nbsp;MB) and
-          videos (MP4, WebM up to 100&nbsp;MB), with a maximum of 4 media
+          videos (MP4, WebM, MOV up to 100&nbsp;MB), with a maximum of 4 media
           files per post. Media is stored in private object storage and is
           only served to you (authenticated) and to a platform at the moment
           of publishing through short-lived, single-file links.
