@@ -434,6 +434,31 @@ export type TiktokDirectPostOutcome =
   | { state: "processing"; publishId: string }
   | { state: "invalid"; error: string };
 
+/**
+ * QuickTime container sniffing: a valid .mov starts with a 32-bit box size
+ * followed by the "ftyp" box type. Returns the major brand (e.g. "qt  ") or
+ * null. Pure byte check — no MIME trust involved.
+ */
+export function sniffQuickTimeBrand(
+  bytes: Uint8Array
+): { brand: string } | null {
+  if (bytes.length < 12) return null;
+  if (
+    bytes[4] !== 0x66 ||
+    bytes[5] !== 0x74 ||
+    bytes[6] !== 0x79 ||
+    bytes[7] !== 0x70
+  ) {
+    return null;
+  }
+  const brandChars = [bytes[8], bytes[9], bytes[10], bytes[11]];
+  if (brandChars.some((code) => code === undefined)) return null;
+  const brand = String.fromCharCode(
+    ...(brandChars as [number, number, number, number])
+  );
+  if (!/^[\x20-\x7e]{4}$/.test(brand)) return null;
+  return { brand };
+}
 export type TiktokDirectPostDeps = {
   readChunk: (range: ByteRange) => Promise<ArrayBuffer>;
   onPublishId: (publishId: string) => Promise<void>;
