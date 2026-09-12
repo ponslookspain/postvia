@@ -13,7 +13,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "reset:data:check": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/reset-data.ts --check",
     "reset:data": "node --import tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/reset-data.ts",
-    "test": "node --import tsx --test tests/threads.publish.test.ts tests/media.test.ts tests/threads.media.test.ts tests/media-client.test.ts tests/media-optimize.test.ts tests/media-cleanup.test.ts tests/scheduling.test.ts tests/schedule.test.ts tests/platform-capabilities.test.ts tests/multi-target.test.ts tests/composer-previews.test.ts tests/tiktok.test.ts tests/instagram.test.ts tests/auth-ux.test.ts"
+    "test": "node --import tsx --test tests/threads.publish.test.ts tests/media.test.ts tests/threads.media.test.ts tests/media-client.test.ts tests/media-optimize.test.ts tests/media-cleanup.test.ts tests/scheduling.test.ts tests/schedule.test.ts tests/platform-capabilities.test.ts tests/multi-target.test.ts tests/composer-previews.test.ts tests/calendar.test.ts tests/bulk-schedule.test.ts tests/tiktok.test.ts tests/instagram.test.ts tests/auth-ux.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

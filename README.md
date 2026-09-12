@@ -32,11 +32,17 @@ composer changes.
   empty state for new users
 - `/posts` — post list with `?status=` filter (All / Draft / Scheduled /
   Publishing / Published / Partially published / Failed)
+- `/calendar` — visual content calendar (month grid, per-day posts with
+  status/platform/media preview, drag & drop rescheduling via the posts
+  API, unscheduled drafts panel, viewer-timezone bucketing)
 - `/posts/new` — multi-target composer: global text with per-account
   overrides, per-platform character limits and live previews, media attach
   (images + video), TikTok posting options (privacy, duet/stitch/comments,
   cover timestamp from creator-info), save draft / schedule (Dialog) /
   publish now
+- `/posts/bulk` — bulk video scheduling: several videos, start date/time
+  with timezone and interval → one ordinary scheduled post per video,
+  then redirect to the calendar
 - `/posts/[id]` — post detail: edit text, media management, per-target
   statuses with retry, reschedule (Dialog), publish, delete (Dialog confirm)
 - `/accounts` — connect / reconnect / disconnect social profiles, token-expiry

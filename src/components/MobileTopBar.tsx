@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  CalendarIcon,
   FileTextIcon,
   LayoutGridIcon,
   PlusIcon,
@@ -22,6 +23,7 @@ import {
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutGridIcon },
   { href: "/posts", label: "Posts", icon: FileTextIcon },
+  { href: "/calendar", label: "Calendar", icon: CalendarIcon },
   { href: "/posts/new", label: "Create", icon: PlusIcon },
   { href: "/accounts", label: "Accounts", icon: UsersIcon },
   { href: "/settings", label: "Settings", icon: SettingsIcon },

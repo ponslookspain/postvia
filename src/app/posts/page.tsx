@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileTextIcon, PlusIcon } from "lucide-react";
+import { ClapperboardIcon, FileTextIcon, PlusIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
@@ -53,10 +53,20 @@ export default async function PostsPage({
           title="Posts"
           description="Every draft, scheduled run and publication"
           actions={
-            <Button nativeButton={false} render={<Link href="/posts/new" />}>
-              <PlusIcon data-icon="inline-start" />
-              Create post
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link href="/posts/bulk" />}
+              >
+                <ClapperboardIcon data-icon="inline-start" />
+                Bulk video
+              </Button>
+              <Button nativeButton={false} render={<Link href="/posts/new" />}>
+                <PlusIcon data-icon="inline-start" />
+                Create post
+              </Button>
+            </div>
           }
         />
 
