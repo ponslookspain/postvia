@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TriangleAlertIcon } from "lucide-react";
-import { getPlan, PLANS, type Plan, type PlanId } from "@/lib/plans";
+import { getPlan, PLANS, type PlanId } from "@/lib/plans";
 import { isStripeRedirectUrl } from "@/lib/stripe-redirect";
 import { PlanBadge, UsageBar } from "@/components/billing/BillingWidgets";
 
@@ -40,16 +40,19 @@ function formatPeriodEnd(iso: string | null): string | null {
   });
 }
 
+type PaidPlanId = Extract<PlanId, "growth" | "scale">;
+
+function isPaidPlanId(plan: PlanId): plan is PaidPlanId {
+  return plan === "growth" || plan === "scale";
+}
+
 export function BillingSection({
   initial,
   canChangePlan = false,
-  checkoutEnabled = false,
 }: {
   initial: BillingView;
   /** True only for admins: direct plan changes are an admin testing tool. */
   canChangePlan?: boolean;
-  /** True when Stripe Checkout/Portal is configured for ordinary users. */
-  checkoutEnabled?: boolean;
 }) {
   const router = useRouter();
   const [changing, setChanging] = useState<PlanId | null>(null);
@@ -89,7 +92,7 @@ export function BillingSection({
     }
   }
 
-  async function startCheckout(plan: Extract<PlanId, "growth" | "scale">) {
+  async function startCheckout(plan: PaidPlanId) {
     setRedirecting(plan);
     setError(null);
     try {
@@ -254,15 +257,18 @@ export function BillingSection({
               })}
             </div>
           </div>
-        ) : checkoutEnabled ? (
+        ) : (
           <div>
             <p className="mb-2 text-sm font-medium">Plans</p>
             <div className="flex flex-col gap-2">
-              {PLANS.filter(
-                (plan): plan is Plan & { id: "growth" | "scale" } =>
-                  plan.id !== "free"
-              ).map((plan) => {
+              {PLANS.map((plan) => {
                 const current = plan.id === initial.plan;
+                // Paid plans are bought through Stripe Checkout, but only
+                // from Free: plan changes on an active subscription go
+                // through Manage subscription (Customer Portal) instead of
+                // stacking a second checkout. Free itself needs no action.
+                const paidId = isPaidPlanId(plan.id) ? plan.id : null;
+                const subscribable = paidId !== null && initial.plan === "free";
                 return (
                   <div
                     key={plan.id}
@@ -277,14 +283,18 @@ export function BillingSection({
                         ${plan.price} / {plan.period}
                       </p>
                     </div>
-                    {!current && (
+                    {subscribable && paidId !== null && (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={redirecting !== null}
-                        onClick={() => void startCheckout(plan.id)}
+                        onClick={() => void startCheckout(paidId)}
                       >
-                        {redirecting === plan.id ? "Redirecting…" : "Upgrade"}
+                        {redirecting === paidId
+                          ? "Redirecting…"
+                          : paidId === "scale"
+                            ? "Subscribe"
+                            : "Upgrade"}
                       </Button>
                     )}
                   </div>
@@ -292,11 +302,6 @@ export function BillingSection({
               })}
             </div>
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Plan changes are currently managed by the Postvia team. Contact
-            support to change your plan.
-          </p>
         )}
         {!canChangePlan &&
           initial.plan !== "free" &&
