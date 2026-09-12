@@ -127,7 +127,8 @@ export function PublishCard({
             Scheduling is available for Threads. Publish to X is available now.
           </FieldDescription>
         )}
-        <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+        {/* Desktop action row; on mobile the fixed bottom bar owns these actions. */}
+        <div className="hidden flex-col gap-2 sm:flex-row lg:flex lg:flex-col xl:flex-row">
           <Button
             variant="outline"
             onClick={onSaveDraft}
