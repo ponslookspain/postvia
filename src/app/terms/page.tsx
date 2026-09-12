@@ -10,15 +10,18 @@ export default function TermsPage() {
   return (
     <LegalPageShell
       title="Terms of Service"
-      effectiveDate="September 11, 2026"
+      effectiveDate="September 12, 2026"
       currentPage="terms"
       intro="These Terms of Service govern your use of Postvia, a web-based social media management tool that lets you compose posts with text and media, preview them per platform, schedule them, and publish them to the social accounts you connect. By creating an account or using the service, you agree to these terms."
     >
-      <LegalSection heading="1. Acceptance of Terms">
+      <LegalSection heading="1. Acceptance">
         <p>
-          By creating an account, accessing, or using Postvia, you agree to
-          be bound by these Terms of Service. If you do not agree, do not
-          use Postvia.
+          By creating an account, accessing, or using Postvia (the
+          &ldquo;Service&rdquo;), you agree to be bound by these Terms of
+          Service (the &ldquo;Terms&rdquo;). If you do not agree, do not use
+          Postvia. If you accept these Terms on behalf of an organization,
+          you represent that you have the authority to bind that
+          organization.
         </p>
       </LegalSection>
 
@@ -26,7 +29,7 @@ export default function TermsPage() {
         <p>
           You must be at least 16 years of age and capable of forming a
           binding legal agreement to use Postvia. If you are using the
-          service on behalf of an organization, you represent that you have
+          Service on behalf of an organization, you represent that you have
           the authority to bind that organization to these Terms.
         </p>
       </LegalSection>
@@ -34,14 +37,27 @@ export default function TermsPage() {
       <LegalSection heading="3. Account Registration and Security">
         <p>
           You create an account with your name, email address, and a
-          password (minimum 8 characters). You are responsible for keeping
-          your credentials confidential and for all activity that occurs
-          under your account. Please notify us promptly if you become aware
-          of any unauthorized use of your account.
+          password (minimum 8, maximum 128 characters), or by signing in
+          with your Google account. Email verification is required before
+          you can use the Service: after signup you receive a verification
+          email with a link that expires after 60 minutes, and you can
+          request a new one from the verification page.
+        </p>
+        <p>
+          You are responsible for keeping your credentials confidential and
+          for all activity that occurs under your account. Please notify us
+          promptly at{" "}
+          <a
+            href="mailto:hello@postvia.online"
+            className="underline hover:text-foreground"
+          >
+            hello@postvia.online
+          </a>{" "}
+          if you become aware of any unauthorized use of your account.
         </p>
       </LegalSection>
 
-      <LegalSection heading="4. What Postvia Is">
+      <LegalSection heading="4. Description of Postvia">
         <p>
           Postvia is a web-based social media management tool. It provides:
         </p>
@@ -51,59 +67,107 @@ export default function TermsPage() {
           </li>
           <li>Per-platform previews and platform-specific customization</li>
           <li>Post scheduling with date, time, and timezone selection</li>
+          <li>Immediate publishing on demand</li>
           <li>
             Publishing to connected social platforms through their official
             APIs
           </li>
-          <li>
-            Draft management and publication status tracking
-          </li>
+          <li>Draft management and publication status tracking</li>
+          <li>A content calendar and bulk video scheduling, subject to plan limits</li>
+          <li>Retry and rescheduling of failed posts</li>
         </ul>
         <p>
           Postvia is not affiliated with, endorsed by, or sponsored by Meta,
-          Instagram, TikTok, Threads, X Corp., or any other social platform.
+          Instagram, TikTok, Threads, X Corp., Google, or any other platform
+          or company.
         </p>
       </LegalSection>
 
-      <LegalSection heading="5. Connecting Your Social Accounts">
+      <LegalSection heading="5. Social Account Connections">
         <p>
           Publishing requires connecting a social account through the
-          official OAuth flow of the target platform. When you connect an
-          account, the platform grants Postvia access tokens with the
-          permissions you approve &mdash; such as reading your basic profile
-          and publishing on your behalf. Currently supported platforms and
-          their requested permissions include:
+          official OAuth flow of the target platform. The platforms Postvia
+          currently supports are Instagram, Threads, TikTok, and X. No other
+          social platform is currently integrated, regardless of any general
+          wording elsewhere in the product.
         </p>
         <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             <span className="font-medium">Instagram</span> &mdash; via
-            Instagram Login; permissions: instagram_business_basic,
-            instagram_business_content_publish
-          </li>
-          <li>
-            <span className="font-medium">TikTok</span> &mdash; via TikTok
-            Login Kit; Content Posting API for direct video publishing
+            Instagram Login (OAuth); permissions:{" "}
+            <code>instagram_business_basic</code> and{" "}
+            <code>instagram_business_content_publish</code>. Publishing
+            requires an Instagram Business or Creator account.
           </li>
           <li>
             <span className="font-medium">Threads</span> &mdash; via OAuth;
-            text, image, and video publishing
+            permissions: <code>threads_basic</code> and{" "}
+            <code>threads_content_publish</code>; text, image, and video
+            publishing.
           </li>
           <li>
-            <span className="font-medium">X</span> &mdash; via OAuth; text
-            publishing (the current X API integration may be subject to
-            availability and credit limitations)
+            <span className="font-medium">TikTok</span> &mdash; via TikTok
+            Login Kit; permissions: <code>user.info.basic</code> and{" "}
+            <code>video.publish</code>; video publishing through the TikTok
+            Content Posting API (see section 12).
+          </li>
+          <li>
+            <span className="font-medium">X</span> &mdash; via OAuth 2.0;
+            permissions: <code>tweet.read</code>, <code>users.read</code>,{" "}
+            <code>tweet.write</code>, and <code>offline.access</code>; text
+            publishing only. The X integration may be subject to
+            availability and API credit limitations outside our control.
           </li>
         </ul>
         <p>
-          You can disconnect any connected account at any time from the
-          Accounts page, which deletes the stored credentials from Postvia.
-          You are responsible for the social accounts you connect and for
-          complying with each platform&rsquo;s terms, policies, and community
-          guidelines.
+          The number of accounts you may connect per platform is subject to
+          your plan (see section 20). You can disconnect any connected
+          account at any time from the Accounts page. You are responsible
+          for the social accounts you connect and for complying with each
+          platform&rsquo;s terms, policies, and community guidelines.
         </p>
       </LegalSection>
 
-      <LegalSection heading="6. Authorization to Publish">
+      <LegalSection heading="6. OAuth Authorization">
+        <p>
+          Connecting a social account redirects you to that platform, where
+          you review and approve the permissions listed in section 5. Only
+          the permissions you approve are granted. Postvia never sees your
+          platform password: authentication happens entirely on the
+          platform&rsquo;s own pages, and the platform returns OAuth
+          credentials that Postvia stores and uses as described in sections
+          7 and 8.
+        </p>
+        <p>
+          Signing in with Google works the same way: Google authenticates
+          you and shares your basic profile (name, email address, and
+          profile image) so Postvia can create or link your account. If a
+          Google account uses an email address that already has a
+          password-based Postvia account, the two are linked.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="7. Access Tokens and Refresh Tokens">
+        <p>
+          The OAuth credentials that platforms issue to Postvia &mdash;
+          access tokens and, where the platform provides them, refresh
+          tokens &mdash; are stored server-side in our database and are
+          never displayed in the app or exposed to your browser. They are
+          used solely to maintain your connected integrations and to carry
+          out publishing and status checks you request.
+        </p>
+        <p>
+          Access tokens expire. Where a platform supports refreshing,
+          Postvia refreshes the token automatically; where it does not, or
+          when a token is revoked or becomes invalid, publishing to that
+          account fails and you need to reconnect the account. Disconnecting
+          an account deletes its stored credentials from Postvia and, where
+          the platform offers a revocation API, Postvia asks the platform to
+          revoke access on a best-effort basis.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="8. Authorization to Publish">
         <p>
           By connecting a social account and requesting publication, you
           authorize Postvia to send your content to that platform&rsquo;s
@@ -118,41 +182,109 @@ export default function TermsPage() {
             Scheduling content for future publication as you have requested
           </li>
           <li>
-            Monitoring publication status and handling retries where
-            appropriate
+            Checking publication status, handling retries, and storing the
+            platform&rsquo;s post or job identifiers for your publication
+            history
           </li>
         </ul>
+        <p>
+          Postvia publishes only to the accounts you connected and only the
+          content you submit. It does not read your platform feeds, messages,
+          or analytics, and it does not post anything you did not request.
+        </p>
       </LegalSection>
 
-      <LegalSection heading="7. Your Content">
+      <LegalSection heading="9. Immediate Publishing">
         <p>
-          You keep all rights to the text, images, videos, and other content
-          you submit to Postvia. By using the service, you grant Postvia
-          only the limited license necessary to:
+          You can publish a post immediately from the composer or a post
+          page. Immediate publishing sends your content to each selected
+          platform&rsquo;s API right away, subject to availability, rate
+          limits, valid credentials, and content rules. If publication to a
+          platform fails, the post is marked as failed for that platform and
+          you can retry it.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="10. Scheduled Publishing">
+        <p>
+          You can save posts as drafts or schedule a post for a chosen date,
+          time, and timezone. A scheduled time applies to the whole post and
+          all platforms selected for it. Scheduled posts are picked up by
+          background scheduling checks and published when due.
+        </p>
+        <p>
+          Scheduling does not guarantee publication at the exact selected
+          time: a scheduled post may be published slightly after the time
+          you selected, and platform outages, API failures, expired tokens,
+          or content restrictions may prevent or delay publication.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="11. Retry, Partial Failure, and Platform Rejection">
+        <p>
+          Publishing to several platforms at once can succeed on some and
+          fail on others. Postvia tracks each platform separately, so a post
+          may end up partially published, with per-platform status and error
+          messages shown on the post page. Failed platform deliveries can be
+          retried or rescheduled from the post page.
+        </p>
+        <p>
+          Platforms may reject content for their own reasons &mdash; for
+          example unsupported formats, length limits, duplicate content,
+          rate limits, or policy violations. Rejection happens on the
+          platform&rsquo;s side; Postvia reports the platform&rsquo;s error
+          but cannot override the platform&rsquo;s decision.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="12. TikTok Direct Post">
+        <p>
+          TikTok publishing uses TikTok Login Kit and the TikTok Content
+          Posting API in Direct Post mode, within the{" "}
+          <code>video.publish</code> permission you approved. TikTok accepts
+          video only: a TikTok delivery requires exactly one video and a
+          title of up to 2,200 characters.
+        </p>
+        <p>
+          The available privacy settings (for example public, friends-only,
+          or self-only) depend on your TikTok account and are read from
+          TikTok at publish time; you choose among the options TikTok
+          reports for your account. Videos are uploaded in chunks and
+          TikTok processes them asynchronously, so TikTok deliveries may
+          take longer to finalize. Postvia keeps TikTok&rsquo;s publish
+          identifier to track that processing and to resume safely without
+          publishing twice.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="13. Platform-Specific Limitations">
+        <p>
+          Each connected platform enforces its own limits, which may change
+          at any time. Current examples include:
         </p>
         <ul className="flex list-disc flex-col gap-1 pl-6">
+          <li>Text limits: X 280 characters, Threads 500 characters</li>
+          <li>Caption/title limits: Instagram 2,200 characters, TikTok title 2,200 characters</li>
           <li>
-            Store, host, process, display, and transmit your content to
-            provide and operate the service
+            Media rules: Instagram accepts JPEG images and MP4 video only;
+            X publishing is text-only and media attached to an X delivery
+            blocks it; Threads accepts a single image or a single MP4 video
+            per delivery
           </li>
+          <li>Daily publishing rate limits and duplicate-content rules</li>
           <li>
-            Deliver your content to the platforms you select, when you
-            request publication
-          </li>
-          <li>
-            Process, validate, optimize, compress, resize, convert, store,
-            retrieve, and deliver your content as reasonably necessary to
-            provide and improve the Service
+            Account-type restrictions, such as Instagram&rsquo;s Business or
+            Creator account requirement
           </li>
         </ul>
         <p>
-          You confirm that you own or have all necessary rights, permissions,
-          and authorizations for any content you submit and publish through
-          Postvia.
+          The composer shows what each selected platform accepts. It is your
+          responsibility to respect the current limits and rules of each
+          platform you use.
         </p>
       </LegalSection>
 
-      <LegalSection heading="8. Your Responsibility for Content">
+      <LegalSection heading="14. User Responsibility for Content">
         <p>
           Postvia is a tool for managing and publishing your content; it is
           not a content moderator. You are solely responsible for:
@@ -166,60 +298,58 @@ export default function TermsPage() {
             and community guidelines of each connected social platform
           </li>
           <li>
-            Obtaining any necessary rights, consents, or permissions for
-            content you publish (including rights to images of people, music,
-            trademarks, and any third-party intellectual property)
-          </li>
-          <li>
             Understanding and respecting the rules, restrictions, and
             limitations of each platform you use
           </li>
         </ul>
       </LegalSection>
 
-      <LegalSection heading="9. Creating, Scheduling, and Publishing Posts">
+      <LegalSection heading="15. Copyright, Music, Trademarks, and Third-Party Rights">
         <p>
-          You can save posts as drafts, schedule a post for a chosen date and
-          time, or publish immediately. A scheduled time applies to the whole
-          post and all platforms selected for it. Publishing works by sending
-          your post content to the connected platforms&rsquo; official APIs.
+          You confirm that you own or have all necessary rights, permissions,
+          and authorizations for any content you submit and publish through
+          Postvia. This includes rights to images of identifiable people,
+          music and audio, trademarks and brand names, and any other
+          third-party intellectual property in your posts.
         </p>
         <p>
-          Scheduling depends on background scheduling checks and platform API
-          availability, so a scheduled post may be published slightly after
-          the time you selected. Scheduling does not guarantee publication;
-          platform outages, API failures, token expiry, or content
-          restrictions may prevent or delay publication.
-        </p>
-        <p>
-          Publishing may fail &mdash; for example, when a platform API is
-          unavailable, your access token expires, or a platform rejects the
-          content. Failed posts can be retried from the post page.
+          Do not upload or publish content you do not have the right to use.
+          Postvia does not clear rights on your behalf, and platforms may
+          remove or mute content that infringes third-party rights.
         </p>
       </LegalSection>
 
-      <LegalSection heading="10. Platform-Specific Limits and Restrictions">
+      <LegalSection heading="16. Platform Policies">
         <p>
-          Each connected platform has its own rules, limits, and
-          restrictions, which may change at any time. Examples include:
-        </p>
-        <ul className="flex list-disc flex-col gap-1 pl-6">
-          <li>Character and caption length limits</li>
-          <li>Supported media types and file sizes</li>
-          <li>Daily publishing rate limits</li>
-          <li>
-            Content policies, community guidelines, and prohibited content
-            rules
-          </li>
-          <li>Geographic or account-type restrictions</li>
-        </ul>
-        <p>
-          It is your responsibility to understand and comply with the current
-          limits and rules of each platform you use.
+          Every connected platform applies its own terms of service,
+          content policies, and community guidelines to content published
+          through its API &mdash; including rules on spam, misleading
+          content, regulated goods, and sensitive topics. You agree to comply
+          with the policies of each platform you publish to. A platform may
+          reject, restrict, or remove your content, or suspend your platform
+          account, without notice to Postvia.
         </p>
       </LegalSection>
 
-      <LegalSection heading="11. Third-Party Platform Dependency">
+      <LegalSection heading="17. Media Uploads and Processing">
+        <p>
+          Postvia accepts images (JPEG, PNG, WebP, GIF up to 10&nbsp;MB) and
+          videos (MP4, WebM, MOV up to 100&nbsp;MB), with a maximum of 4
+          media files per post. To prepare uploads for publishing, Postvia
+          validates file type and size and converts still images to a
+          canonical JPEG form where appropriate (animated GIFs are kept
+          as-is).
+        </p>
+        <p>
+          Media is stored in private object storage. Files are served only
+          to you while authenticated, and to a platform at the moment of
+          publishing through short-lived, single-file links &mdash; never
+          through public URLs. Uploaded files that are never attached to a
+          post are removed automatically.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="18. Third-Party Platform Dependency">
         <p>
           Postvia depends on third-party social platform APIs and
           infrastructure. By using Postvia, you acknowledge and agree that:
@@ -248,38 +378,65 @@ export default function TermsPage() {
         </ul>
       </LegalSection>
 
-      <LegalSection heading="12. Media Uploads">
+      <LegalSection heading="19. Service Providers">
         <p>
-          Postvia accepts images (JPG, PNG, WebP, GIF up to 10&nbsp;MB) and
-          videos (MP4, WebM, MOV up to 100&nbsp;MB), with a maximum of 4 media
-          files per post. Media is stored in private object storage and is
-          only served to you (authenticated) and to a platform at the moment
-          of publishing through short-lived, single-file links.
+          Postvia is operated on the following infrastructure and services,
+          which process data only as necessary to provide their function:
         </p>
+        <ul className="flex list-disc flex-col gap-1 pl-6">
+          <li>
+            <span className="font-medium">Vercel</span> &mdash; application
+            hosting, serverless functions, background jobs, and scheduled
+            publishing checks
+          </li>
+          <li>
+            <span className="font-medium">Vercel Blob</span> &mdash; private
+            object storage for your uploaded images and videos
+          </li>
+          <li>
+            <span className="font-medium">Neon (PostgreSQL)</span> &mdash;
+            database for accounts, sessions, posts, media records, and
+            social-account credentials
+          </li>
+          <li>
+            <span className="font-medium">Resend</span> &mdash; transactional
+            email delivery for account verification
+          </li>
+          <li>
+            <span className="font-medium">Sentry</span> &mdash; error
+            monitoring and diagnostics, with personal data scrubbed before
+            events leave our servers
+          </li>
+        </ul>
         <p>
-          Supported media types differ per platform; the composer shows what
-          each platform accepts. For example, Instagram currently accepts
-          only JPEG images and MP4 video, while Threads accepts additional
-          image formats. X media publishing is not currently available.
+          Authentication runs on our own infrastructure using the
+          open-source Better Auth library; no third-party authentication
+          vendor is involved. The social platforms themselves (Instagram and
+          Threads by Meta, TikTok, X, and Google for sign-in) act
+          independently under their own terms when you use their services.
         </p>
       </LegalSection>
 
-      <LegalSection heading="13. Service Availability and Changes">
+      <LegalSection heading="20. Subscriptions and Plans">
         <p>
-          The service is provided &ldquo;as is&rdquo; and &ldquo;as
-          available&rdquo;, without any uptime guarantee or service-level
-          commitment. Features may be added or removed, and the service may
-          be modified, suspended, or discontinued at any time. We may change
-          infrastructure, providers, or technical architecture as needed.
+          Postvia offers Free, Growth, and Scale plans that differ by usage
+          limits &mdash; currently the number of posts you can create per
+          calendar month (Free: 15, Growth: 300, Scale: unlimited), the
+          number of connected accounts per platform (Free: 1, Growth: 5,
+          Scale: unlimited), and access to bulk video scheduling (Growth and
+          Scale, up to 10 videos per batch). New accounts start on the Free
+          plan.
         </p>
         <p>
-          The service is currently offered free of charge. If paid plans or
-          features are introduced, they will be described and billed only
-          after you consent.
+          Postvia does not currently collect payment details or process
+          charges: selecting a plan only adjusts your usage limits, and no
+          payment is taken. If paid billing is introduced in the future, it
+          will be described separately and will apply only with your
+          consent.
         </p>
       </LegalSection>
 
-      <LegalSection heading="14. Prohibited Conduct">
+      <LegalSection heading="21. Prohibited Conduct">
         <p>You agree not to:</p>
         <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
@@ -311,40 +468,64 @@ export default function TermsPage() {
         </ul>
       </LegalSection>
 
-      <LegalSection heading="15. Intellectual Property">
+      <LegalSection heading="22. Intellectual Property">
         <p>
-          Postvia (including its interface, code, branding, and
+          You keep all rights to the text, images, videos, and other content
+          you submit to Postvia. By using the Service, you grant Postvia
+          only the limited license necessary to store, host, process,
+          display, and transmit your content in order to operate the Service
+          and deliver your content to the platforms you select when you
+          request publication.
+        </p>
+        <p>
+          Postvia itself (including its interface, code, branding, and
           documentation) is owned by its developer. These Terms do not grant
-          you any rights to use the Postvia name, logo, trademarks, or
+          you any rights to use the Postvia name, logo, trademarks, or other
           intellectual property.
         </p>
       </LegalSection>
 
-      <LegalSection heading="16. Suspension and Termination">
+      <LegalSection heading="23. Suspension and Termination">
         <p>
-          We may suspend or terminate accounts that violate these Terms, abuse
-          the service, or put the service or its users at risk. You may stop
-          using the service and delete your account at any time. Sections of
-          these Terms that by their nature should survive termination
-          (including disclaimers, limitation of liability, governing law, and
-          indemnification) survive termination.
+          We may suspend or terminate accounts that violate these Terms,
+          abuse the service, or put the service or its users at risk. You may
+          stop using the service and delete your account at any time.
+          Sections of these Terms that by their nature should survive
+          termination (including disclaimers, limitation of liability,
+          governing law, and indemnification) survive termination.
         </p>
       </LegalSection>
 
-      <LegalSection heading="17. Account Deletion">
+      <LegalSection heading="24. Account Deletion">
         <p>
-          You can delete your account at any time from Settings. Account
-          deletion permanently removes your account, sessions, stored posts,
-          media files, and saved social account tokens. Where supported,
-          Postvia will attempt to revoke your social platform OAuth tokens
-          during deletion. Publishing posts that were already scheduled
-          stops. Content already published to third-party platforms stays
-          there until you remove it on that platform. You may also revoke
-          Postvia&rsquo;s access directly on each connected platform.
+          You can delete your account at any time from Settings, after
+          confirming the deletion. Account deletion permanently removes your
+          user record, sessions, sign-in connections, preferences, posts and
+          drafts, media records and stored files, and connected social
+          accounts with their stored OAuth credentials.
+        </p>
+        <p>
+          During deletion, Postvia asks connected platforms to revoke access
+          where their API offers revocation. Deleting your posts stops any
+          of their still-scheduled publications. For details on content
+          already published elsewhere, see section 25.
         </p>
       </LegalSection>
 
-      <LegalSection heading="18. Disclaimers">
+      <LegalSection heading="25. Already-Published Third-Party Content">
+        <p>
+          Content that was already published to Instagram, Threads, TikTok,
+          X, or any other platform lives on that platform under that
+          platform&rsquo;s control. Deleting your Postvia account,
+          disconnecting an account, or deleting a post in Postvia does not
+          remove already-published content from third-party platforms. To
+          remove it, delete it on the platform itself. You can also revoke
+          Postvia&rsquo;s access at any time directly in each
+          platform&rsquo;s own account or app settings.
+        </p>
+      </LegalSection>
+
+      <LegalSection heading="26. Disclaimers">
         <p>
           To the fullest extent permitted by law, the service is provided
           &ldquo;as is&rdquo; and &ldquo;as available&rdquo; without
@@ -357,7 +538,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="19. Limitation of Liability">
+      <LegalSection heading="27. Limitation of Liability">
         <p>
           To the fullest extent permitted by law, Postvia and its developer
           shall not be liable for any indirect, incidental, special,
@@ -370,7 +551,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="20. Indemnification">
+      <LegalSection heading="28. Indemnification">
         <p>
           To the extent permitted by applicable law, you agree to indemnify
           and hold harmless Postvia and its developer from and against any
@@ -381,7 +562,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="21. Governing Law and Jurisdiction">
+      <LegalSection heading="29. Governing Law">
         <p>
           These Terms are governed by and construed in accordance with the
           laws of the applicable jurisdiction, without regard to its
@@ -392,7 +573,7 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="22. Changes to These Terms">
+      <LegalSection heading="30. Changes">
         <p>
           We may update these Terms. When we do, we will revise the
           &ldquo;Effective date&rdquo; at the top of this page. Material
@@ -401,10 +582,16 @@ export default function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="23. Contact">
+      <LegalSection heading="31. Contact">
         <p>
-          Questions about these Terms can be sent through the project&rsquo;s
-          GitHub repository: github.com/ponslookspain/postvia
+          Questions about these Terms:{" "}
+          <a
+            href="mailto:hello@postvia.online"
+            className="underline hover:text-foreground"
+          >
+            hello@postvia.online
+          </a>
+          .
         </p>
       </LegalSection>
     </LegalPageShell>
