@@ -142,6 +142,42 @@ export function hasUnsavedChanges(text: string, mediaCount: number): boolean {
   return text.trim().length > 0 || mediaCount > 0;
 }
 
+/**
+ * Default composer selection: implemented Threads accounts. Single source
+ * for the initial state and the unsaved-changes baseline.
+ */
+export function defaultSelectedAccountIds(
+  accounts: readonly { id: string; implemented: boolean; platform: string }[]
+): string[] {
+  return accounts
+    .filter(
+      (account) => account.implemented && account.platform === "THREADS"
+    )
+    .map((account) => account.id);
+}
+
+/**
+ * Full dirty check for the unsaved-changes guard: text/media plus account
+ * selection drift from the initial selection plus any platform overrides.
+ * Order-insensitive on account ids.
+ */
+export function isComposerDirty(input: {
+  text: string;
+  mediaCount: number;
+  selectedAccountIds: readonly string[];
+  initialAccountIds: readonly string[];
+  hasOverrides: boolean;
+}): boolean {
+  if (hasUnsavedChanges(input.text, input.mediaCount)) return true;
+  if (input.hasOverrides) return true;
+  if (input.selectedAccountIds.length !== input.initialAccountIds.length) {
+    return true;
+  }
+  const current = [...input.selectedAccountIds].sort();
+  const initial = [...input.initialAccountIds].sort();
+  return current.some((id, index) => id !== initial[index]);
+}
+
 /** Upload parallelism: faster batches without hammering the webhook. */
 export const MEDIA_UPLOAD_CONCURRENCY = 2;
 

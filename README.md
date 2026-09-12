@@ -36,10 +36,15 @@ composer changes.
   status/platform/media preview, drag & drop rescheduling via the posts
   API, unscheduled drafts panel, viewer-timezone bucketing)
 - `/posts/new` — multi-target composer: global text with per-account
-  overrides, per-platform character limits and live previews, media attach
-  (images + video), TikTok posting options (privacy, duet/stitch/comments,
+  overrides (TikTok uses its own title, never the global text), platform
+  switcher with a single platform-aware preview (X/Threads/Instagram/TikTok
+  mock posts), structured per-platform validation with stable issue codes,
+  per-platform character limits and remaining counters, media attach
+  (images + MP4/WebM/MOV video, per-file retry, concurrent uploads),
+  TikTok posting options (privacy, duet/stitch/comments,
   cover timestamp from creator-info), save draft / schedule (Dialog) /
-  publish now
+  publish now with live progress and cancel, dirty-form guard, mobile
+  bottom action bar
 - `/posts/bulk` — bulk video scheduling: several videos, start date/time
   with timezone and interval → one ordinary scheduled post per video,
   then redirect to the calendar
@@ -142,7 +147,7 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (300 tests)
+npm test           # node --test suite (402 tests)
 ```
 
 ## Deploy

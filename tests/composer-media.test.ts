@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   canSubmitComposer,
   continueEditingFromSaved,
+  defaultSelectedAccountIds,
   getFailedPublishActions,
   hasUnsavedChanges,
+  isComposerDirty,
   isTikTokReconnectNeeded,
   mapWithConcurrencyLimit,
   MEDIA_UPLOAD_CONCURRENCY,
@@ -286,5 +288,66 @@ describe("hasUnsavedChanges", () => {
     assert.equal(hasUnsavedChanges("hello", 0), true);
     assert.equal(hasUnsavedChanges("", 2), true);
     assert.equal(hasUnsavedChanges("hello", 1), true);
+  });
+});
+
+describe("isComposerDirty", () => {  const clean = {
+    text: "",
+    mediaCount: 0,
+    selectedAccountIds: ["t1"],
+    initialAccountIds: ["t1"],
+    hasOverrides: false,
+  };
+
+  test("pristine composer is clean", () => {
+    assert.equal(isComposerDirty(clean), false);
+  });
+
+  test("text, media or overrides make it dirty", () => {
+    assert.equal(isComposerDirty({ ...clean, text: "hi" }), true);
+    assert.equal(isComposerDirty({ ...clean, mediaCount: 1 }), true);
+    assert.equal(isComposerDirty({ ...clean, hasOverrides: true }), true);
+  });
+
+  test("account selection drift is order-insensitive", () => {
+    assert.equal(
+      isComposerDirty({
+        ...clean,
+        selectedAccountIds: ["t1", "x1"],
+      }),
+      true
+    );
+    assert.equal(
+      isComposerDirty({
+        ...clean,
+        selectedAccountIds: [],
+        initialAccountIds: [],
+      }),
+      false
+    );
+  });
+
+  test("deselect-and-reselect counts as clean", () => {
+    assert.equal(
+      isComposerDirty({
+        ...clean,
+        selectedAccountIds: ["t1"],
+        initialAccountIds: ["t1"],
+      }),
+      false
+    );
+  });
+});
+
+describe("defaultSelectedAccountIds", () => {
+  test("selects implemented Threads accounts only", () => {
+    assert.deepEqual(
+      defaultSelectedAccountIds([
+        { id: "t1", implemented: true, platform: "THREADS" },
+        { id: "t2", implemented: false, platform: "THREADS" },
+        { id: "x1", implemented: true, platform: "X" },
+      ]),
+      ["t1"]
+    );
   });
 });

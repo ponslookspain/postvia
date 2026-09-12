@@ -1,9 +1,13 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildComposerPreviewModel,
   buildComposerPreviews,
+  classifyMediaIssue,
   countCharacters,
+  hasBlockingFileIssues,
   remainingCharacters,
+  resolvePreviewTarget,
   type PreviewAccount,
   type PreviewOverride,
 } from "../src/lib/composer-previews";
@@ -205,5 +209,355 @@ describe("remainingCharacters", () => {
     assert.equal(remainingCharacters("hello", 280), 275);
     assert.equal(remainingCharacters("🚀".repeat(279), 280), 1);
     assert.equal(remainingCharacters("a".repeat(300), 280), 0);
+  });
+});
+
+describe("composer preview model", () => {
+  test("text platforms use global text with global source", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+    });
+    assert.equal(threads?.text, GLOBAL);
+    assert.equal(threads?.source, "global");
+    assert.equal(threads?.customized, false);
+    assert.equal(threads?.contentKey, "text");
+    assert.equal(threads?.contentLabel, "Text");
+    assert.equal(threads?.characterCount, countCharacters(GLOBAL));
+    assert.equal(threads?.validation.valid, true);
+    assert.deepEqual(threads?.validation.errors, []);
+  });
+
+  test("override replaces only that target", () => {
+    const [threads, x] = buildComposerPreviewModel({
+      accounts: [THREADS, X],
+      globalText: GLOBAL,
+      overrides: [overrideFor("acc-threads", "custom")],
+    });
+    assert.equal(threads?.text, "custom");
+    assert.equal(threads?.source, "override");
+    assert.equal(threads?.customized, true);
+    assert.equal(x?.text, GLOBAL);
+    assert.equal(x?.source, "global");
+  });
+
+  test("tiktok without title never shows global text as title", () => {
+    const [tiktok] = buildComposerPreviewModel({
+      accounts: [TIKTOK],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [{ type: "VIDEO", mimeType: "video/mp4" }],
+    });
+    assert.equal(tiktok?.text, "");
+    assert.equal(tiktok?.source, "global");
+    assert.equal(tiktok?.customized, false);
+    assert.equal(tiktok?.contentKey, "title");
+    assert.equal(tiktok?.validation.valid, false);
+    assert.deepEqual(
+      tiktok?.validation.errors.map((issue) => issue.code),
+      ["tiktok-title-missing"]
+    );
+  });
+
+  test("tiktok title override becomes the effective content", () => {
+    const [tiktok] = buildComposerPreviewModel({
+      accounts: [TIKTOK],
+      globalText: GLOBAL,
+      overrides: [overrideFor("acc-tiktok", "Мой заголовок")],
+      media: [{ type: "VIDEO", mimeType: "video/mp4" }],
+    });
+    assert.equal(tiktok?.text, "Мой заголовок");
+    assert.equal(tiktok?.source, "override");
+    assert.equal(tiktok?.customized, true);
+    assert.equal(tiktok?.validation.valid, true);
+  });
+
+  test("instagram caption stays distinguishable from threads text", () => {
+    const [threads, instagram] = buildComposerPreviewModel({
+      accounts: [
+        THREADS,
+        { id: "acc-ig", platform: "INSTAGRAM", username: "brand" },
+      ],
+      globalText: GLOBAL,
+      overrides: [],
+    });
+    assert.equal(threads?.contentKey, "text");
+    assert.equal(threads?.contentLabel, "Text");
+    assert.equal(instagram?.contentKey, "text");
+    assert.equal(instagram?.contentLabel, "Caption");
+    assert.equal(instagram?.maxLength, 2200);
+  });
+
+  test("over-limit text is a structured error", () => {
+    const [x] = buildComposerPreviewModel({
+      accounts: [X],
+      globalText: "a".repeat(300),
+      overrides: [],
+    });
+    assert.equal(x?.overLimit, true);
+    assert.equal(x?.validation.valid, false);
+    assert.deepEqual(
+      x?.validation.errors.map((issue) => issue.code),
+      ["text-over-limit"]
+    );
+    assert.ok(x !== undefined && x.validation.errors[0]?.message.includes("280"));
+  });
+
+  test("empty text is a warning, not an error", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: "",
+      overrides: [],
+    });
+    assert.equal(threads?.validation.valid, true);
+    assert.deepEqual(
+      threads?.validation.warnings.map((issue) => issue.code),
+      ["content-empty"]
+    );
+  });
+
+  test("media count overflow maps to a stable code per account", () => {
+    const [threads, tiktok] = buildComposerPreviewModel({
+      accounts: [THREADS, TIKTOK],
+      globalText: GLOBAL,
+      overrides: [overrideFor("acc-tiktok", "title")],
+      media: [
+        { type: "VIDEO", mimeType: "video/mp4" },
+        { type: "VIDEO", mimeType: "video/mp4" },
+      ],
+    });
+    assert.equal(threads?.mediaState, "error");
+    assert.deepEqual(
+      threads?.validation.errors.map((issue) => issue.code),
+      ["media-too-many"]
+    );
+    assert.equal(tiktok?.mediaState, "error");
+    assert.equal(tiktok?.validation.valid, false);
+  });
+
+  test("unsupported mime maps to a stable code", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [{ type: "VIDEO", mimeType: "video/avi" }],
+    });
+    assert.equal(threads?.mediaState, "error");
+    assert.deepEqual(
+      threads?.validation.errors.map((issue) => issue.code),
+      ["media-mime-unsupported"]
+    );
+  });
+
+  test("oversized file with known size maps per file", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [
+        { type: "VIDEO", mimeType: "video/mp4", size: 200 * 1024 * 1024 },
+      ],
+    });
+    assert.deepEqual(
+      threads?.media[0]?.issues.map((issue) => issue.code),
+      ["media-too-large"]
+    );
+    assert.equal(threads?.validation.valid, true);
+  });
+
+  test("override settings travel on the model", () => {
+    const [tiktok] = buildComposerPreviewModel({
+      accounts: [TIKTOK],
+      globalText: GLOBAL,
+      overrides: [overrideFor("acc-tiktok", "title")],
+      overrideSettings: {
+        "acc-tiktok": { privacy_level: "SELF_ONLY" },
+      },
+    });
+    assert.equal(tiktok?.hasSettingsOverride, true);
+    assert.deepEqual(tiktok?.settings, { privacy_level: "SELF_ONLY" });
+  });
+
+  test("reset override returns the target to global", () => {
+    const withOverride = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [overrideFor("acc-threads", "custom")],
+    })[0];
+    assert.equal(withOverride?.text, "custom");
+    assert.equal(withOverride?.inheritsGlobal, false);
+    const reset = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+    })[0];
+    assert.equal(reset?.text, GLOBAL);
+    assert.equal(reset?.source, "global");
+    assert.equal(reset?.customized, false);
+    assert.equal(reset?.inheritsGlobal, true);
+  });
+
+  test("override on one account never leaks into another", () => {
+    const secondThreads = {
+      id: "acc-threads-2",
+      platform: "THREADS",
+      username: "other",
+    } as const;
+    const [first, second] = buildComposerPreviewModel({
+      accounts: [THREADS, secondThreads],
+      globalText: GLOBAL,
+      overrides: [overrideFor("acc-threads", "custom")],
+    });
+    assert.equal(first?.text, "custom");
+    assert.equal(first?.source, "override");
+    assert.equal(second?.text, GLOBAL);
+    assert.equal(second?.source, "global");
+    assert.equal(second?.customized, false);
+    assert.equal(second?.inheritsGlobal, true);
+  });
+
+  test("settings-only override keeps inheriting global content", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      overrideSettings: {
+        "acc-threads": { privacy_level: "SELF_ONLY" },
+      },
+    });
+    assert.equal(threads?.text, GLOBAL);
+    assert.equal(threads?.customized, false);
+    assert.equal(threads?.hasSettingsOverride, true);
+    assert.equal(threads?.inheritsGlobal, true);
+  });
+
+  test("tiktok without title inherits nothing", () => {
+    const [tiktok] = buildComposerPreviewModel({
+      accounts: [TIKTOK],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [{ type: "VIDEO", mimeType: "video/mp4" }],
+    });
+    assert.equal(tiktok?.inheritsGlobal, false);
+  });
+});
+
+describe("classifyMediaIssue", () => {
+  test("maps known validator messages to stable codes", () => {
+    assert.equal(
+      classifyMediaIssue("Threads supports at most 1 media item"),
+      "media-too-many"
+    );
+    assert.equal(
+      classifyMediaIssue("TikTok requires exactly one media item"),
+      "media-required"
+    );
+    assert.equal(
+      classifyMediaIssue("File exceeds the 100 MB limit for videos"),
+      "media-too-large"
+    );
+    assert.equal(
+      classifyMediaIssue("Something completely unexpected"),
+      "media-invalid"
+    );
+  });
+});
+
+describe("resolvePreviewTarget", () => {
+  const pick = (platform: string, accountId: string) => ({
+    platform: platform as "X" | "THREADS" | "INSTAGRAM" | "TIKTOK",
+    accountId,
+  });
+
+  test("empty selection resolves to null", () => {
+    assert.equal(resolvePreviewTarget([], "X"), null);
+    assert.equal(resolvePreviewTarget([], null), null);
+  });
+
+  test("preferred platform wins when still selected", () => {
+    assert.deepEqual(
+      resolvePreviewTarget(
+        [pick("THREADS", "t1"), pick("X", "x1")],
+        "X"
+      ),
+      { platform: "X", accountId: "x1" }
+    );
+  });
+
+  test("disappeared platform falls back to first in switcher order", () => {
+    assert.deepEqual(
+      resolvePreviewTarget(
+        [pick("TIKTOK", "k1"), pick("THREADS", "t1")],
+        "INSTAGRAM"
+      ),
+      { platform: "THREADS", accountId: "t1" }
+    );
+  });
+
+  test("null preference resolves to first in switcher order", () => {
+    assert.deepEqual(
+      resolvePreviewTarget([pick("TIKTOK", "k1"), pick("X", "x1")], null),
+      { platform: "X", accountId: "x1" }
+    );
+  });
+
+  test("multi-account platform resolves to its first selected account", () => {
+    assert.deepEqual(
+      resolvePreviewTarget(
+        [pick("THREADS", "t1"), pick("THREADS", "t2")],
+        "THREADS"
+      ),
+      { platform: "THREADS", accountId: "t1" }
+    );
+  });
+});
+
+describe("rich media validation", () => {
+  test("per-file layer reports size only, never mime", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [{ type: "VIDEO", mimeType: "video/avi", size: 1024 }],
+    });
+    // MIME is the platform layer's job (see media-mime-unsupported above).
+    assert.deepEqual(threads?.media[0]?.issues ?? null, []);
+  });
+
+  test("no size means no per-file issues", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [{ type: "VIDEO", mimeType: "video/mp4" }],
+    });
+    assert.deepEqual(threads?.media[0]?.issues ?? null, []);
+    assert.equal(hasBlockingFileIssues([threads]), false);
+  });
+
+  test("oversized file blocks submit paths", () => {
+    const models = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [
+        { type: "VIDEO", mimeType: "video/mp4", size: 200 * 1024 * 1024 },
+      ],
+    });
+    assert.equal(hasBlockingFileIssues(models), true);
+    assert.equal(hasBlockingFileIssues([]), false);
+  });
+
+  test("TikTok MOV stays valid (empirically verified regression)", () => {
+    const [tiktok] = buildComposerPreviewModel({
+      accounts: [TIKTOK],
+      globalText: GLOBAL,
+      overrides: [overrideFor("acc-tiktok", "title")],
+      media: [{ type: "VIDEO", mimeType: "video/quicktime", size: 1024 }],
+    });
+    assert.equal(tiktok?.mediaState, "ok");
+    assert.deepEqual(tiktok?.media[0]?.issues ?? null, []);
+    assert.equal(tiktok?.validation.valid, true);
   });
 });

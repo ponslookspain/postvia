@@ -1,7 +1,6 @@
 "use client";
 
 import { PencilIcon } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,25 +10,25 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { PlatformIcon } from "@/components/PlatformIcon";
 import {
   countCharacters,
   remainingCharacters,
+  type ComposerPreviewModel,
 } from "@/lib/composer-previews";
-import type { ComposerPreview } from "@/lib/composer-previews";
 import { TiktokTargetSettings } from "./TiktokTargetSettings";
+import { PlatformPost } from "./preview/PlatformPost";
+import { PreviewValidation } from "./PreviewValidation";
 import type { DraftMedia, TiktokCreatorInfo } from "./types";
 
 /**
- * Stage H5: one platform preview card moved 1:1 from NewPostComposer
- * (header, customize editor incl. TikTok settings, read view with
- * counters, TikTok title hint and over-limit error).
- * Stage I: counters expose remaining characters to screen readers.
+ * Stage 2B: single platform preview card. Receives a ready-made
+ * ComposerPreviewModel and only presents it: the platform mock, the
+ * structured validation, the counter row and the unchanged customize
+ * editor. No validation, content or account logic lives here.
  */
 export function PreviewCard({
-  preview,
+  model,
   userName,
   media,
   customText,
@@ -48,7 +47,7 @@ export function PreviewCard({
   onDone,
   onCustomize,
 }: {
-  preview: ComposerPreview;
+  model: ComposerPreviewModel;
   userName: string;
   media: DraftMedia[];
   customText: string | undefined;
@@ -68,67 +67,63 @@ export function PreviewCard({
   onCustomize: () => void;
 }) {
   const remainingLabel =
-    remainingCharacters(preview.text, preview.maxLength) +
+    remainingCharacters(model.text, model.maxLength) +
     " characters remaining of " +
-    preview.maxLength +
+    model.maxLength +
     " for " +
-    preview.label;
+    model.label;
   return (
     <div
-      key={preview.accountId}
+      key={model.accountId}
       className="flex flex-col gap-3 rounded-lg border p-4"
     >
-      <div className="flex items-center gap-3">
-        <Avatar>
-          <AvatarFallback aria-label={preview.label}>
-            <span className="flex size-4 items-center justify-center [&_svg]:size-4">
-              <PlatformIcon platform={preview.platform} />
+      {(model.customized || model.hasSettingsOverride || model.inheritsGlobal) && (
+        <div className="flex items-center justify-end gap-2">
+          {model.customized && <Badge variant="secondary">Custom</Badge>}
+          {model.hasSettingsOverride && (
+            <Badge variant="outline">Settings</Badge>
+          )}
+          {model.inheritsGlobal && (
+            <span className="text-xs text-muted-foreground">
+              Using global content
             </span>
-          </AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{userName}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {preview.label} · @{preview.username}
-          </p>
+          )}
         </div>
-        {preview.customized && <Badge variant="secondary">Custom</Badge>}
-      </div>
-      <Separator />
+      )}
       {isCustomizing ? (
         <FieldGroup className="gap-3">
-          <Field data-invalid={preview.overLimit || undefined}>
-            <FieldLabel htmlFor={`custom-${preview.accountId}`}>
-              {preview.platform === "TIKTOK"
+          <Field data-invalid={model.overLimit || undefined}>
+            <FieldLabel htmlFor={`custom-${model.accountId}`}>
+              {model.platform === "TIKTOK"
                 ? "Title / caption for TikTok"
-                : `Text for ${preview.label}`}
+                : `Text for ${model.label}`}
             </FieldLabel>
             <Textarea
-              id={`custom-${preview.accountId}`}
-              value={customText ?? preview.text}
+              id={`custom-${model.accountId}`}
+              value={customText ?? model.text}
               rows={4}
               placeholder={
-                preview.platform === "TIKTOK"
+                model.platform === "TIKTOK"
                   ? "Title / caption for TikTok"
-                  : `Text for ${preview.label}`
+                  : `Text for ${model.label}`
               }
-              aria-invalid={preview.overLimit || undefined}
+              aria-invalid={model.overLimit || undefined}
               onChange={(event) => onCustomTextChange(event.target.value)}
             />
             <FieldDescription aria-label={remainingLabel}>
-              {countCharacters(preview.text)} / {preview.maxLength}
+              {countCharacters(model.text)} / {model.maxLength}
             </FieldDescription>
-            {preview.overLimit && (
+            {model.overLimit && (
               <FieldError>
-                Exceeds the {preview.maxLength} character limit for{" "}
-                {preview.label}
+                Exceeds the {model.maxLength} character limit for{" "}
+                {model.label}
               </FieldError>
             )}
           </Field>
-          {preview.platform === "TIKTOK" && (
+          {model.platform === "TIKTOK" && (
             <div className="flex flex-col gap-3">
               <TiktokTargetSettings
-                accountId={preview.accountId}
+                accountId={model.accountId}
                 creatorInfo={creatorInfo}
                 creatorInfoError={creatorInfoError}
                 settings={overrideSettings}
@@ -156,41 +151,13 @@ export function PreviewCard({
         </FieldGroup>
       ) : (
         <div className="flex flex-col gap-2">
-          {media.length > 0 && (
-            <div className="flex gap-1.5">
-              {media.slice(0, 4).map((item) =>
-                item.kind === "IMAGE" ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={item.key}
-                    src={item.previewUrl}
-                    alt={item.name}
-                    className="size-10 rounded border object-cover"
-                  />
-                ) : (
-                  <video
-                    key={item.key}
-                    src={item.previewUrl}
-                    muted
-                    aria-label={"Video preview of " + item.name}
-                    className="size-10 rounded border object-cover"
-                  />
-                )
-              )}
-            </div>
-          )}
-          <p className="text-sm break-words whitespace-pre-wrap">
-            {preview.text || (
-              <span className="text-muted-foreground">
-                Your post will appear here...
-              </span>
-            )}
-          </p>
+          <PlatformPost model={model} userName={userName} media={media} />
+          <PreviewValidation validation={model.validation} />
           <div className="flex items-center justify-between gap-2">
             <FieldDescription aria-label={remainingLabel}>
-              {countCharacters(preview.text)} / {preview.maxLength}
+              {countCharacters(model.text)} / {model.maxLength}
             </FieldDescription>
-            {preview.customized && (
+            {model.customized && (
               <Badge variant="secondary">custom text</Badge>
             )}
             <Button
@@ -201,7 +168,7 @@ export function PreviewCard({
               onClick={onCustomize}
             >
               <PencilIcon data-icon="inline-start" />
-              {preview.customized ? `Edit for ${preview.label}` : "Customize"}
+              {model.customized ? `Edit for ${model.label}` : "Customize"}
             </Button>
           </div>
           {showTikTokTitleHint && (
@@ -209,13 +176,6 @@ export function PreviewCard({
               TikTok ignores the text above and posts its own title — use
               Customize to set it.
             </FieldDescription>
-          )}
-          {preview.overLimit && (
-            <FieldError>
-              Exceeds the {preview.maxLength} character limit for{" "}
-              {preview.label}. Click Customize to shorten it just for this
-              platform.
-            </FieldError>
           )}
         </div>
       )}

@@ -17,9 +17,13 @@ import { threadsPostUrl, isFutureIso } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
 import { parsePlanParam } from "@/lib/plans";
 import {
+  buildComposerPreviewModel,
   buildComposerPreviews,
   buildComposerMediaErrors,
   countCharacters,
+  hasBlockingFileIssues,
+  PREVIEW_PLATFORM_ORDER,
+  resolvePreviewTarget,
 } from "@/lib/composer-previews";
 import {
   pollPostSettled,
@@ -29,8 +33,9 @@ import {
 import {
   canSubmitComposer,
   continueEditingFromSaved,
+  defaultSelectedAccountIds,
   getFailedPublishActions,
-  hasUnsavedChanges,
+  isComposerDirty,
   mapWithConcurrencyLimit,
   MEDIA_UPLOAD_CONCURRENCY,
   planMediaAdd,
@@ -63,12 +68,12 @@ import {
   FieldError,
   FieldLabel,
 } from "@/components/ui/field";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { AccountList } from "./_components/AccountList";
 import { MediaGrid } from "./_components/MediaGrid";
 import { PreviewCard } from "./_components/PreviewCard";
+import { PlatformSwitcher } from "./_components/PlatformSwitcher";
 import { PublishCard } from "./_components/PublishCard";
 import { MobileComposerBar } from "./_components/MobileComposerBar";
 import { ScheduleDialog } from "./_components/ScheduleDialog";
@@ -222,9 +227,7 @@ export default function NewPostComposer({
   const [text, setText] = useState("");
   const [media, setMedia] = useState<DraftMedia[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(() =>
-    accounts
-      .filter((account) => account.implemented && account.platform === "THREADS")
-      .map((account) => account.id)
+    defaultSelectedAccountIds(accounts)
   );
   const [targetOverrides, setTargetOverrides] = useState<TargetOverrideState>({});
   const [customizingIds, setCustomizingIds] = useState<string[]>([]);
@@ -245,6 +248,9 @@ export default function NewPostComposer({
   );
   const [scheduleMode, setScheduleMode] = useState(false);
   const [xScheduleHint, setXScheduleHint] = useState(false);
+  const [previewPlatform, setPreviewPlatform] = useState<Platform | null>(
+    null
+  );
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -279,13 +285,81 @@ export default function NewPostComposer({
     media.map((item) => ({ type: item.kind, mimeType: item.file.type }))
   );
   const hasMediaError = mediaErrors.length > 0;
+  // Stage 2B: single-preview presentation model. Derived from the same
+  // composer state as the gating pipeline above — no second store.
+  // The gating pipeline (hasOverLimit/canSave/canPublish) intentionally
+  // keeps its existing semantics.
+  const previewModels = buildComposerPreviewModel({
+    accounts: selectedAccounts,
+    globalText: text,
+    overrides: selectedAccountIds.map((accountId) => {
+      const account = accounts.find((item) => item.id === accountId);
+      const override = targetOverrides[accountId];
+      return {
+        accountId,
+        text: account?.platform === "TIKTOK" ? override?.title : override?.text,
+      };
+    }),
+    overrideSettings: Object.fromEntries(
+      selectedAccountIds.map((accountId) => [
+        accountId,
+        targetOverrides[accountId]?.settings ?? {},
+      ])
+    ),
+    media: media.map((item) => ({
+      type: item.kind,
+      mimeType: item.file.type,
+      name: item.name,
+      size: item.size,
+    })),
+  });
+  const previewTarget = resolvePreviewTarget(
+    selectedAccounts.map((account) => ({
+      platform: account.platform,
+      accountId: account.id,
+    })),
+    previewPlatform
+  );
+  const activePreviewModel =
+    previewModels.find(
+      (model) => model.accountId === previewTarget?.accountId
+    ) ?? null;
+  const previewTabs = (() => {
+    const byPlatform = new Map<
+      Platform,
+      { platform: Platform; label: string; hint: string }
+    >();
+    for (const account of selectedAccounts) {
+      const siblings = selectedAccounts.filter(
+        (item) => item.platform === account.platform
+      );
+      byPlatform.set(account.platform, {
+        platform: account.platform,
+        label:
+          previewModels.find((model) => model.platform === account.platform)
+            ?.label ?? account.platform,
+        hint:
+          siblings.length > 1
+            ? `${siblings.length} accounts`
+            : `@${siblings[0]?.username ?? account.username}`,
+      });
+    }
+    return [...byPlatform.values()].sort(
+      (a, b) =>
+        PREVIEW_PLATFORM_ORDER.indexOf(a.platform) -
+        PREVIEW_PLATFORM_ORDER.indexOf(b.platform)
+    );
+  })();
   // Quota is known upfront from props: an exhausted plan disables every
   // submit path before any request, with the reason shown in the Publish
   // card. The server 403 stays as defense-in-depth.
+  // Per-file media issues (today: oversized files only) block submit too —
+  // an unregistered oversized file can never publish.
+  const hasBlockingFileIssue = hasBlockingFileIssues(previewModels);
   const canSave = canSubmitComposer({
     textPresent: text.trim().length > 0,
     overLimit: hasOverLimit,
-    mediaError: hasMediaError,
+    mediaError: hasMediaError || hasBlockingFileIssue,
     hasSelection: selectedAccountIds.length > 0,
     busy: saving,
     quotaBlocked,
@@ -293,7 +367,7 @@ export default function NewPostComposer({
   const canPublish = canSubmitComposer({
     textPresent: text.trim().length > 0,
     overLimit: hasOverLimit,
-    mediaError: hasMediaError,
+    mediaError: hasMediaError || hasBlockingFileIssue,
     hasSelection: selectedAccountIds.length > 0,
     busy: publishing || saving,
     quotaBlocked,
@@ -314,7 +388,13 @@ export default function NewPostComposer({
   // terminal screens (saved/published/scheduled) hold server state.
   const isEditing =
     !publishWatchId && !publishResult && !(saved && savedId);
-  const isDirty = hasUnsavedChanges(text, media.length);
+  const isDirty = isComposerDirty({
+    text,
+    mediaCount: media.length,
+    selectedAccountIds,
+    initialAccountIds: defaultSelectedAccountIds(accounts),
+    hasOverrides: Object.keys(targetOverrides).length > 0,
+  });
   useEffect(() => {
     if (!isEditing || !isDirty) return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1187,7 +1267,7 @@ export default function NewPostComposer({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {previews.length === 0 ? (
+              {previews.length === 0 || !activePreviewModel || !previewTarget ? (
                 <Empty>
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -1200,72 +1280,78 @@ export default function NewPostComposer({
                   </EmptyHeader>
                 </Empty>
               ) : (
-                <ScrollArea className={previews.length > 3 ? "lg:h-120" : undefined}>
-                  <div className="flex flex-col gap-4">
-                    {previews.map((preview) => (
-                      <PreviewCard
-                        key={preview.accountId}
-                        preview={preview}
-                        userName={userName}
-                        media={media}
-                        customText={
-                          preview.platform === "TIKTOK"
-                            ? targetOverrides[preview.accountId]?.title
-                            : targetOverrides[preview.accountId]?.text
-                        }
-                        hasOverride={Boolean(
-                          targetOverrides[preview.accountId]
-                        )}
-                        overrideSettings={
-                          targetOverrides[preview.accountId]?.settings ?? {}
-                        }
-                        isCustomizing={customizingIds.includes(
-                          preview.accountId
-                        )}
-                        creatorInfo={creatorInfos[preview.accountId]}
-                        creatorInfoError={
-                          creatorInfoErrors[preview.accountId]
-                        }
-                        showTikTokTitleHint={
-                          preview.platform === "TIKTOK" &&
-                          !targetOverrides[preview.accountId]?.title
-                        }
-                        disabled={saving || publishing || scheduling}
-                        onCustomTextChange={(value) =>
-                          updateOverride(
-                            preview.accountId,
-                            preview.platform === "TIKTOK"
-                              ? { title: value }
-                              : { text: value }
-                          )
-                        }
-                        onSettings={(patch) =>
-                          updateOverride(preview.accountId, {
-                            settings: patch,
-                          })
-                        }
-                        onRetryCreatorInfo={() =>
-                          retryCreatorInfo(preview.accountId)
-                        }
-                        onOpenAccounts={() => router.push("/accounts")}
-                        onUseGlobal={() =>
-                          clearTargetOverride(preview.accountId)
-                        }
-                        onDone={() =>
-                          setCustomizingIds((current) =>
-                            current.filter((id) => id !== preview.accountId)
-                          )
-                        }
-                        onCustomize={() =>
-                          setCustomizingIds((current) => [
-                            ...current,
-                            preview.accountId,
-                          ])
-                        }
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
+                <div className="flex flex-col gap-4">
+                  <PlatformSwitcher
+                    tabs={previewTabs}
+                    active={previewTarget.platform}
+                    onSelect={setPreviewPlatform}
+                  />
+                  <PreviewCard
+                    key={activePreviewModel.accountId}
+                    model={activePreviewModel}
+                    userName={userName}
+                    media={media}
+                    customText={
+                      activePreviewModel.platform === "TIKTOK"
+                        ? targetOverrides[activePreviewModel.accountId]?.title
+                        : targetOverrides[activePreviewModel.accountId]?.text
+                    }
+                    hasOverride={Boolean(
+                      targetOverrides[activePreviewModel.accountId]
+                    )}
+                    overrideSettings={
+                      targetOverrides[activePreviewModel.accountId]?.settings ??
+                      {}
+                    }
+                    isCustomizing={customizingIds.includes(
+                      activePreviewModel.accountId
+                    )}
+                    creatorInfo={
+                      creatorInfos[activePreviewModel.accountId]
+                    }
+                    creatorInfoError={
+                      creatorInfoErrors[activePreviewModel.accountId]
+                    }
+                    showTikTokTitleHint={
+                      activePreviewModel.platform === "TIKTOK" &&
+                      !targetOverrides[activePreviewModel.accountId]?.title
+                    }
+                    disabled={saving || publishing || scheduling}
+                    onCustomTextChange={(value) =>
+                      updateOverride(
+                        activePreviewModel.accountId,
+                        activePreviewModel.platform === "TIKTOK"
+                          ? { title: value }
+                          : { text: value }
+                      )
+                    }
+                    onSettings={(patch) =>
+                      updateOverride(activePreviewModel.accountId, {
+                        settings: patch,
+                      })
+                    }
+                    onRetryCreatorInfo={() =>
+                      retryCreatorInfo(activePreviewModel.accountId)
+                    }
+                    onOpenAccounts={() => router.push("/accounts")}
+                    onUseGlobal={() =>
+                      clearTargetOverride(activePreviewModel.accountId)
+                    }
+                    onDone={() =>
+                      setCustomizingIds((current) =>
+                        current.filter(
+                          (id) => id !== activePreviewModel.accountId
+                        )
+                      )
+                    }
+                    onCustomize={() =>
+                      setCustomizingIds((current) => [
+                        ...current,
+                        activePreviewModel.accountId,
+                      ])
+                    }
+                  />
+                </div>
               )}
             </CardContent>
           </Card>
