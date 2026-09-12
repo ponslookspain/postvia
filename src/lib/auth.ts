@@ -15,6 +15,7 @@ export const auth = betterAuth({
   trustedOrigins: [
     "http://localhost:3000",
     "https://postvia.online",
+    "https://www.postvia.online",
     "https://*.vercel.app",
   ],
   emailAndPassword: {

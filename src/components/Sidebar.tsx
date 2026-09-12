@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 import { cn } from "cn";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "@/components/ui/toast";
 import { isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,23 @@ export function Sidebar({
   const initial = userName.trim().charAt(0).toUpperCase() || "U";
 
   async function handleSignOut() {
-    await authClient.signOut();
+    try {
+      const result = await authClient.signOut();
+      if (result?.error) {
+        throw new Error(
+          typeof result.error.message === "string"
+            ? result.error.message
+            : "Sign out failed"
+        );
+      }
+    } catch {
+      toast.add({
+        title: "Could not sign out",
+        description: "Your session is still active. Please try again.",
+        type: "error",
+      });
+      return;
+    }
     router.push("/login");
     router.refresh();
   }
