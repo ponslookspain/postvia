@@ -15,7 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { TriangleAlertIcon } from "lucide-react";
-import { getPlan, PLANS, type PlanId } from "@/lib/plans";
+import { getPlan, PLANS, type Plan, type PlanId } from "@/lib/plans";
+import { isStripeRedirectUrl } from "@/lib/stripe-redirect";
 import { PlanBadge, UsageBar } from "@/components/billing/BillingWidgets";
 
 export type BillingView = {
@@ -39,11 +40,24 @@ function formatPeriodEnd(iso: string | null): string | null {
   });
 }
 
-export function BillingSection({ initial }: { initial: BillingView }) {
+export function BillingSection({
+  initial,
+  canChangePlan = false,
+  checkoutEnabled = false,
+}: {
+  initial: BillingView;
+  /** True only for admins: direct plan changes are an admin testing tool. */
+  canChangePlan?: boolean;
+  /** True when Stripe Checkout/Portal is configured for ordinary users. */
+  checkoutEnabled?: boolean;
+}) {
   const router = useRouter();
   const [changing, setChanging] = useState<PlanId | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [redirecting, setRedirecting] = useState<
+    "growth" | "scale" | "portal" | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   async function changePlan(plan: PlanId) {
@@ -72,6 +86,56 @@ export function BillingSection({ initial }: { initial: BillingView }) {
       setError("Network error. Please try again.");
     } finally {
       setChanging(null);
+    }
+  }
+
+  async function startCheckout(plan: Extract<PlanId, "growth" | "scale">) {
+    setRedirecting(plan);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+      const data = await res.json().catch(() => null);
+      const url = data?.url;
+      if (!res.ok || !isStripeRedirectUrl(url)) {
+        setError(
+          typeof data?.error === "string"
+            ? data.error
+            : "Failed to start checkout"
+        );
+        return;
+      }
+      window.location.assign(url);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setRedirecting(null);
+    }
+  }
+
+  async function openPortal() {
+    setRedirecting("portal");
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      const url = data?.url;
+      if (!res.ok || !isStripeRedirectUrl(url)) {
+        setError(
+          typeof data?.error === "string"
+            ? data.error
+            : "Failed to open billing management"
+        );
+        return;
+      }
+      window.location.assign(url);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setRedirecting(null);
     }
   }
 
@@ -122,7 +186,7 @@ export function BillingSection({ initial }: { initial: BillingView }) {
           <Alert>
             <AlertTitle>Canceling on {periodEnd}</AlertTitle>
             <AlertDescription>
-              Full access until then; afterwards the Starter plan applies.
+              Full access until then; afterwards the Free plan applies.
             </AlertDescription>
           </Alert>
         )}
@@ -131,7 +195,7 @@ export function BillingSection({ initial }: { initial: BillingView }) {
             <TriangleAlertIcon />
             <AlertTitle>Payment past due</AlertTitle>
             <AlertDescription>
-              Update payment to keep your plan. Test mode: switch plans freely.
+              Update payment in billing management to keep your plan.
             </AlertDescription>
           </Alert>
         )}
@@ -152,41 +216,106 @@ export function BillingSection({ initial }: { initial: BillingView }) {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        <div>
-          <p className="mb-2 text-sm font-medium">Change plan</p>
-          <div className="flex flex-col gap-2">
-            {PLANS.map((plan) => {
-              const current = plan.id === initial.plan;
-              return (
-                <div
-                  key={plan.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-2 text-sm font-medium">
-                      {plan.name}
-                      {current && <Badge variant="secondary">Current</Badge>}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      ${plan.price} / {plan.period}
-                    </p>
+        {canChangePlan ? (
+          <div>
+            <p className="mb-2 text-sm font-medium">Change plan</p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Admin testing only — ordinary users check out through Stripe.
+            </p>
+            <div className="flex flex-col gap-2">
+              {PLANS.map((plan) => {
+                const current = plan.id === initial.plan;
+                return (
+                  <div
+                    key={plan.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-medium">
+                        {plan.name}
+                        {current && <Badge variant="secondary">Current</Badge>}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        ${plan.price} / {plan.period}
+                      </p>
+                    </div>
+                    {!current && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={changing !== null}
+                        onClick={() => void changePlan(plan.id)}
+                      >
+                        {changing === plan.id ? "Switching…" : "Switch"}
+                      </Button>
+                    )}
                   </div>
-                  {!current && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={changing !== null}
-                      onClick={() => void changePlan(plan.id)}
-                    >
-                      {changing === plan.id ? "Switching…" : "Switch"}
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-        {initial.plan !== "free" &&
+        ) : checkoutEnabled ? (
+          <div>
+            <p className="mb-2 text-sm font-medium">Plans</p>
+            <div className="flex flex-col gap-2">
+              {PLANS.filter(
+                (plan): plan is Plan & { id: "growth" | "scale" } =>
+                  plan.id !== "free"
+              ).map((plan) => {
+                const current = plan.id === initial.plan;
+                return (
+                  <div
+                    key={plan.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-2 text-sm font-medium">
+                        {plan.name}
+                        {current && <Badge variant="secondary">Current</Badge>}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        ${plan.price} / {plan.period}
+                      </p>
+                    </div>
+                    {!current && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={redirecting !== null}
+                        onClick={() => void startCheckout(plan.id)}
+                      >
+                        {redirecting === plan.id ? "Redirecting…" : "Upgrade"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Plan changes are currently managed by the Postvia team. Contact
+            support to change your plan.
+          </p>
+        )}
+        {!canChangePlan &&
+          initial.plan !== "free" &&
+          initial.status !== "CANCELED" &&
+          initial.status !== "EXPIRED" && (
+            <div>
+              <Button
+                variant="outline"
+                disabled={redirecting !== null}
+                onClick={() => void openPortal()}
+              >
+                {redirecting === "portal"
+                  ? "Opening…"
+                  : "Manage subscription"}
+              </Button>
+            </div>
+          )}
+        {canChangePlan &&
+          initial.plan !== "free" &&
           initial.status !== "CANCELED" &&
           initial.status !== "EXPIRED" && (
           <div>
@@ -209,7 +338,7 @@ export function BillingSection({ initial }: { initial: BillingView }) {
             <DialogTitle>Cancel subscription?</DialogTitle>
             <DialogDescription>
               Access continues until the end of the current period. Afterwards
-              the Starter plan applies. Nothing is deleted.
+              the Free plan applies. Nothing is deleted.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -98,9 +98,13 @@ composer changes.
   OAuth callbacks (per-platform account quota, reconnects exempt), retry +
   reschedule PATCH, calendar page, bulk (plan cap + quota pre-check, with
   per-post server backstop). UI only reflects denials.
-- Test-mode billing API: `POST /api/billing/change` (any of the three
-  plans, ACTIVE, +30d), `POST /api/billing/cancel` (paid only,
-  cancel-at-period-end; Free afterwards). No Stripe, no charges.
+- Test-mode billing API: `POST /api/billing/change` and
+  `POST /api/billing/cancel` are admin-only testing tools (403 for ordinary
+  users). Real plan changes go through Stripe: `POST /api/billing/checkout`
+  (Growth/Scale Checkout), `POST /api/billing/portal` (Customer Portal for
+  plan changes and cancellation), and `POST /api/billing/webhook` (verified
+  Stripe events are the only writer of paid `Subscription` state, idempotent
+  via `StripeEvent`). No Stripe, no charges without `STRIPE_SECRET_KEY`.
 - Plan management lives on `/billing` (current plan, usage, change,
   cancel); Settings stays account-only. Dashboard shows a compact
   `Plan · usage` line linking to `/billing`.

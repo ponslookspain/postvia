@@ -116,6 +116,20 @@ model BillingTestOverride {
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/**
+ * Stripe webhook idempotency ledger. Every verified event id is claimed
+ * before processing; a duplicate delivery (Stripe retries, concurrent
+ * workers) hits the unique eventId and is acknowledged without re-applying.
+ * Rows are never read for billing state — Subscription stays the single
+ * source of truth.
+ */
+model StripeEvent {
+  id        String   @id @default(cuid())
+  eventId   String   @unique
+  type      String
+  createdAt DateTime @default(now())
+}
+
 model Session {
   id        String   @id
   token     String   @unique

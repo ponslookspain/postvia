@@ -9,6 +9,7 @@ import {
   isAdminEmail,
 } from "@/lib/entitlements";
 import { getPlan } from "@/lib/plans";
+import { isStripeConfigured } from "@/lib/stripe";
 import type { BillingView } from "@/components/billing/BillingSection";
 import { BillingSection } from "@/components/billing/BillingSection";
 import { AdminBillingPanel } from "@/components/billing/AdminBillingPanel";
@@ -52,6 +53,8 @@ export default async function BillingPage() {
     totalAccounts: usage.totalAccounts,
   };
 
+  const isAdmin = isAdminEmail(user.email);
+
   return (
     <AppShell user={user}>
       <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
@@ -60,8 +63,12 @@ export default async function BillingPage() {
           description="Your plan, usage and subscription status"
         />
         <div className="flex flex-col gap-10">
-          <BillingSection initial={billing} />
-          {isAdminEmail(user.email) && <AdminBillingPanel />}
+          <BillingSection
+            initial={billing}
+            canChangePlan={isAdmin}
+            checkoutEnabled={isStripeConfigured()}
+          />
+          {isAdmin && <AdminBillingPanel />}
         </div>
       </div>
     </AppShell>
