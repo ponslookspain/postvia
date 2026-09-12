@@ -3,6 +3,7 @@ import { ThreadsProvider } from "@/lib/social/threads";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { assertCanConnectAccount } from "@/lib/entitlements";
+import { reportError } from "@/lib/diagnostics";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -95,6 +96,12 @@ export async function GET(request: NextRequest) {
     response.cookies.delete("threads_oauth_state");
     return response;
   } catch (err) {
+    // Presence flags only: the code/state values themselves are secrets.
+    reportError("oauth", "threads callback failed", err, {
+      provider: "THREADS",
+      hasCode: Boolean(code),
+      hasState: Boolean(state),
+    });
     const message =
       err instanceof Error ? err.message : "callback_failed";
     return NextResponse.redirect(

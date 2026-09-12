@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { isKnownPlanId, toDbPlan } from "@/lib/entitlements";
+import { reportError } from "@/lib/diagnostics";
 
 const PERIOD_MS = 30 * 86_400_000;
 
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest) {
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     });
-  } catch {
+  } catch (error) {
+    reportError("billing", "plan change failed", error);
     return NextResponse.json(
       { error: "Failed to change plan" },
       { status: 500 }

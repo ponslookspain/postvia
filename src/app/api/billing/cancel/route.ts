@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { reportError } from "@/lib/diagnostics";
 
 /**
  * Test-mode cancellation. Never deletes the subscription and never cuts
@@ -40,7 +41,8 @@ export async function POST() {
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     });
-  } catch {
+  } catch (error) {
+    reportError("billing", "subscription cancel failed", error);
     return NextResponse.json(
       { error: "Failed to cancel subscription" },
       { status: 500 }

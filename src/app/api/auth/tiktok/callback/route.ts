@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { assertCanConnectAccount } from "@/lib/entitlements";
+import { reportError } from "@/lib/diagnostics";
 import {
   exchangeTiktokCode,
   fetchTiktokUserInfo,
@@ -105,8 +106,14 @@ export async function GET(request: NextRequest) {
     const redirect = response("/accounts?connected=true");
     redirect.cookies.delete("tiktok_oauth_state");
     return redirect;
-  } catch {
-    // Never surface raw TikTok/token errors to the query string.
+  } catch (error) {
+    // Presence flags only: the code/state values themselves are secrets.
+    // Raw TikTok/token errors never reach the query string.
+    reportError("oauth", "tiktok callback failed", error, {
+      provider: "TIKTOK",
+      hasCode: Boolean(code),
+      hasState: Boolean(state),
+    });
     return response("/accounts?error=tiktok_callback_failed");
   }
 }

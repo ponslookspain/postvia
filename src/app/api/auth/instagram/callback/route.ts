@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assertCanConnectAccount } from "@/lib/entitlements";
+import { reportError } from "@/lib/diagnostics";
 import {
   exchangeInstagramCode,
   fetchInstagramProfile,
@@ -116,8 +117,14 @@ export async function GET(request: NextRequest) {
     return clearState(
       NextResponse.redirect(new URL("/accounts?connected=instagram", request.url))
     );
-  } catch {
+  } catch (error) {
+    // Presence flags only: the code/state values themselves are secrets.
     // Generic failure: never surface raw token/API internals to the URL.
+    reportError("oauth", "instagram callback failed", error, {
+      provider: "INSTAGRAM",
+      hasCode: Boolean(code),
+      hasState: Boolean(state),
+    });
     return clearState(
       NextResponse.redirect(new URL("/accounts?error=instagram_callback_failed", request.url))
     );

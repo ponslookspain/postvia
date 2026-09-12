@@ -12,7 +12,7 @@ import {
   registerCompletedUpload,
   validateReservedPathname,
 } from "@/lib/media-upload";
-import { logErrorDiagnostic } from "@/lib/diagnostics";
+import { reportError } from "@/lib/diagnostics";
 
 /**
  * The upload-completed webhook may canonicalize a still image
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    logErrorDiagnostic("media", "upload handler failed", error, {
+    reportError("media", "upload handler failed", error, {
       stage: body?.type ?? "unknown",
     });
     return NextResponse.json(

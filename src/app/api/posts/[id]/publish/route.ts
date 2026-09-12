@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { publishPostTargets } from "@/lib/publish";
-import { logErrorDiagnostic } from "@/lib/diagnostics";
+import { reportError } from "@/lib/diagnostics";
 
 // Threads/TikTok video publishing can keep processing for minutes; the
 // work continues in the background (waitUntil) within this 300s window.
@@ -67,11 +68,18 @@ export async function POST(
     // and finalize semantics all stay inside publishPostTargets — the
     // background continuation only removes the client from the critical path.
     waitUntil(
-      publishPostTargets(id).catch((error) => {
-        logErrorDiagnostic("publish", "background publish failed", error, {
-          postId: id,
-        });
-      })
+      (async () => {
+        try {
+          await publishPostTargets(id);
+        } catch (error) {
+          reportError("publish", "background publish failed", error, {
+            postId: id,
+          });
+          // The response is already sent; flush so the event is not lost
+          // when the function freezes.
+          await Sentry.flush(2000);
+        }
+      })()
     );
 
     return NextResponse.json(

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
+import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { publishPostTargets } from "@/lib/publish";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { STALE_PUBLISHING_MS } from "@/lib/scheduling";
-import { logErrorDiagnostic } from "@/lib/diagnostics";
+import { reportError } from "@/lib/diagnostics";
 
 // Retrying a video target can again take minutes; same background pattern
 // as the publish route. Claims and resume semantics stay in publishPostTargets.
@@ -113,11 +114,18 @@ export async function POST(
     }
 
     waitUntil(
-      publishPostTargets(id, target.id).catch((error) => {
-        logErrorDiagnostic("publish", "background retry failed", error, {
-          postId: id,
-        });
-      })
+      (async () => {
+        try {
+          await publishPostTargets(id, target.id);
+        } catch (error) {
+          reportError("publish", "background retry failed", error, {
+            postId: id,
+          });
+          // The response is already sent; flush so the event is not lost
+          // when the function freezes.
+          await Sentry.flush(2000);
+        }
+      })()
     );
 
     return NextResponse.json(

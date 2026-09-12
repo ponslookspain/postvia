@@ -3,6 +3,7 @@ import { XProvider } from "@/lib/social/x";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { assertCanConnectAccount } from "@/lib/entitlements";
+import { reportError } from "@/lib/diagnostics";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -94,6 +95,12 @@ export async function GET(request: NextRequest) {
     response.cookies.delete("x_oauth_verifier");
     return response;
   } catch (err) {
+    // Presence flags only: the code/state values themselves are secrets.
+    reportError("oauth", "x callback failed", err, {
+      provider: "X",
+      hasCode: Boolean(code),
+      hasState: Boolean(state),
+    });
     const message =
       err instanceof Error ? err.message : "callback_failed";
     return NextResponse.redirect(

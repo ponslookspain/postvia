@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { executePublish, resumeJobTarget } from "@/lib/publish";
 import { deleteBlobs, listMediaBlobs } from "@/lib/blob";
 import { sweepOrphanBlobs } from "@/lib/media-cleanup";
+import { reportError } from "@/lib/diagnostics";
 import {
   isCronAuthorized,
   runScheduledPublishTick,
@@ -44,6 +45,7 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
     }
     return NextResponse.json({ ok: true, ...stats, orphans });
   } catch (error) {
+    reportError("cron", "publish tick failed", error);
     const message = error instanceof Error ? error.message : "Cron run failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
