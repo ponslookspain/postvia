@@ -46,7 +46,7 @@ export default function PrivacyPage() {
           X) through its official OAuth flow, we store the following to
           maintain the integration and perform actions you request:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             Platform name, your platform account ID, and your public
             username or handle
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
           We store the content you create and submit through Postvia,
           including:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>Post text and captions</li>
           <li>Draft posts</li>
           <li>Images and videos you upload</li>
@@ -98,7 +98,7 @@ export default function PrivacyPage() {
 
       <LegalSection heading="3. How We Use Your Information">
         <p>We use the information described above to:</p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>Authenticate you and manage your session</li>
           <li>Provide and operate the Postvia service</li>
           <li>Connect, maintain, and manage your social account integrations</li>
@@ -135,7 +135,7 @@ export default function PrivacyPage() {
           European data-protection law applies, we process personal data on
           the following legal bases:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             <span className="font-medium">Contract:</span> authentication,
             providing the service, connecting social accounts, publishing
@@ -231,7 +231,7 @@ export default function PrivacyPage() {
           necessary to provide its respective service, under its own terms
           and our agreements with them:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             <span className="font-medium">Vercel</span> &mdash; web hosting,
             serverless functions, background jobs, and scheduled publishing
@@ -259,7 +259,7 @@ export default function PrivacyPage() {
       </LegalSection>
 
       <LegalSection heading="7. Data Storage and Retention">
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             Your data is retained for as long as needed to provide the
             service to you.
@@ -291,7 +291,7 @@ export default function PrivacyPage() {
           <span className="font-medium">Settings &rarr; Delete account</span>.
           Account deletion permanently removes:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>Your Postvia account and user record</li>
           <li>Sessions and authentication data</li>
           <li>Posts, drafts, and post-related data</li>
@@ -336,7 +336,7 @@ export default function PrivacyPage() {
           Where applicable law provides them (including GDPR/EEA), you have
           the right to:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>Access the personal data we hold about you</li>
           <li>Rectify inaccurate or incomplete data</li>
           <li>Request erasure of your data</li>
@@ -378,7 +378,7 @@ export default function PrivacyPage() {
           We use reasonable technical and organizational measures to protect
           your data, including:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>HTTPS encryption for data in transit</li>
           <li>Passwords stored only as cryptographic hashes</li>
           <li>

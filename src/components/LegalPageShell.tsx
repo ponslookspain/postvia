@@ -30,7 +30,7 @@ export default function LegalPageShell({
           {intro && <p className="mt-6 text-sm leading-6">{intro}</p>}
         </header>
 
-        <div className="space-y-8 text-sm leading-6">{children}</div>
+        <div className="flex flex-col gap-8 text-sm leading-6">{children}</div>
 
         <footer className="mt-14 border-t border-border pt-6 text-xs text-muted-foreground">
           <p className="mb-2">
@@ -84,7 +84,7 @@ export function LegalSection({
   return (
     <section>
       <h2 className="mb-3 text-lg font-semibold">{heading}</h2>
-      <div className="space-y-3 text-sm leading-6">{children}</div>
+      <div className="flex flex-col gap-3 text-sm leading-6">{children}</div>
     </section>
   );
 }

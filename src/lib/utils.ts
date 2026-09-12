@@ -1,3 +1,5 @@
+export { cn } from "cn";
+
 export const X_POST_CHAR_LIMIT = 280;
 export const THREADS_POST_CHAR_LIMIT = 500;
 

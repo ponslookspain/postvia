@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Postvia
 
-## Getting Started
+Publish to social media in one place. Postvia lets you write once, preview per
+platform, and publish (or schedule) to every connected social profile.
 
-First, run the development server:
+## Stack
+
+- **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
+- **Styling:** Tailwind CSS v4, shadcn/ui (`base-nova` style, Neutral base color)
+  on Base UI primitives, Lucide icons, Geist Sans / Geist Mono via `next/font`
+- **Database:** PostgreSQL via Prisma 6
+- **Auth:** Better Auth — email/password, Google OAuth, email verification
+  (Resend)
+- **Media:** Vercel Blob (private store, presigned uploads, webhook
+  registration)
+- **Scheduling:** Vercel Cron (`/api/cron/publish-scheduled`)
+
+## Social platforms
+
+Implemented and connectable via OAuth: **Threads, X, TikTok, Instagram**.
+`Facebook`, `LinkedIn`, `YouTube`, `Pinterest` exist in the Prisma enum but
+are not implemented yet. Platform behavior is capability-driven
+(`src/lib/platforms/capabilities.ts`), so adding a platform does not require
+composer changes.
+
+## App structure
+
+- `/dashboard` — publishing overview: Needs attention (failed / partially
+  published / publishing), Up next (upcoming scheduled), stats with
+  publishing/failed counters and per-platform breakdown, accounts strip,
+  recent posts with search (`?q=`) and status filter (`?status=`), onboarding
+  empty state for new users
+- `/posts` — post list with `?status=` filter (All / Draft / Scheduled /
+  Publishing / Published / Partially published / Failed)
+- `/posts/new` — multi-target composer: global text with per-account
+  overrides, per-platform character limits and live previews, media attach
+  (images + video), TikTok posting options (privacy, duet/stitch/comments,
+  cover timestamp from creator-info), save draft / schedule (Dialog) /
+  publish now
+- `/posts/[id]` — post detail: edit text, media management, per-target
+  statuses with retry, reschedule (Dialog), publish, delete (Dialog confirm)
+- `/accounts` — connect / reconnect / disconnect social profiles, token-expiry
+  badges, disconnect confirmation Dialog
+- `/settings` — profile name, sign-in methods, password, notification
+  preferences, danger-zone account deletion (Dialog + confirmation phrase)
+- `/login`, `/signup`, `/verify-email` — auth flows with verification resend
+- `/terms`, `/privacy` — legal pages
+- `/api/*` — posts CRUD + publish/retry, media prepare/upload/status,
+  settings, per-platform OAuth connect/callback + account management, TikTok
+  creator-info, scheduled-publish cron
+
+## Publishing model
+
+- `Post` lifecycle: `DRAFT → SCHEDULED → PUBLISHING → PUBLISHED`, plus
+  `PARTIALLY_PUBLISHED` and `FAILED`. Per-account `PostTarget` rows track
+  `PENDING / PUBLISHING / PUBLISHED / FAILED` with error messages.
+- Publish endpoints respond `202` while work continues server-side; clients
+  poll until the post settles instead of assuming success.
+- Media uploads go through `/api/media/prepare` (authorized pathname) →
+  presigned Blob upload → server-side webhook registration, with client
+  polling for registration before publishing.
+
+## Design system
+
+- Nova neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
+  only, dark mode via `.dark` overrides, no hardcoded palette values.
+- Shared components (`src/components`): `PageHeader`, `StatusBadge`,
+  `AuthShell`, `MobileTopBar`, plus shadcn/ui primitives in
+  `src/components/ui` (Base UI only — no Radix).
+- Conventions: `FieldGroup` + `Field` forms with `data-invalid` /
+  `aria-invalid`, `Card` sections with full header composition, `Alert` for
+  callouts, `Empty` for empty states, Base UI `toast` (not `alert()`), `Gap`
+  spacing (no `space-*`), `size-*` for square elements, `cn()` for
+  conditionals, Lucide icons with `data-icon` inside buttons.
+- Responsive: `max-w-5xl/3xl/6xl` containers with `p-4 md:p-8`, sidebar on
+  desktop + top bar navigation on mobile.
+
+## Getting started
 
 ```bash
+npm install
+# configure .env (DATABASE_URL_POSTGRES_PRISMA_URL, auth + OAuth + Resend + Blob keys)
+npx prisma db push
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev        # start dev server
+npm run build      # prisma generate + next build
+npm run start      # start production server
+npm run lint       # eslint
+npm run typecheck  # tsc --noEmit
+npm test           # node --test suite (219 tests)
+```
 
-## Learn More
+## Deploy
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Connected Vercel project `postvia` (see `.vercel/project.json`). Pushing to
+`main` deploys via the linked project; `vercel --prod` deploys the working
+tree explicitly. Scheduled publishing runs on the cron defined in
+`vercel.json`.

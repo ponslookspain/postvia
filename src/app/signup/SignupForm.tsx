@@ -3,8 +3,29 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { MailCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { GoogleButton } from "@/components/GoogleButton";
+import { AuthShell } from "@/components/AuthShell";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
 
 export function SignupForm() {
   const router = useRouter();
@@ -65,127 +86,120 @@ export function SignupForm() {
 
   if (checkEmail) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="w-full max-w-sm text-center">
-          <div className="mb-6 text-4xl">✉️</div>
-          <h1 className="text-2xl font-semibold mb-2">Check your email</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            We sent a verification link to{" "}
-            <span className="font-medium text-foreground">{email}</span>.
-            Please verify your email to continue.
-          </p>
-          <div className="space-y-3">
-            {resendSuccess ? (
-              <p className="text-sm text-muted-foreground">
-                Verification email sent. Check your inbox.
-              </p>
-            ) : (
-              <button
+      <AuthShell
+        title="Check your email"
+        description={`We sent a verification link to ${email}. Please verify your email to continue.`}
+      >
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MailCheckIcon />
+            </EmptyMedia>
+            <EmptyTitle>Verification link sent</EmptyTitle>
+            <EmptyDescription>
+              {resendSuccess
+                ? "Verification email sent. Check your inbox."
+                : "Didn't get it? Ask for another one."}
+            </EmptyDescription>
+          </EmptyHeader>
+          {!resendSuccess && (
+            <EmptyContent>
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => void handleResend()}
                 disabled={resending}
-                className="text-sm font-medium text-primary hover:underline disabled:opacity-40"
               >
+                {resending && <Spinner data-icon="inline-start" />}
                 {resending ? "Sending..." : "Resend verification email"}
-              </button>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Verified already?{" "}
-              <Link href="/login" className="hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </div>
-      </div>
+              </Button>
+            </EmptyContent>
+          )}
+        </Empty>
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Verified already?{" "}
+          <Link href="/login" className="hover:underline">
+            Sign in
+          </Link>
+        </p>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8">
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-semibold mb-2">Create your account</h1>
-        <p className="text-sm text-muted-foreground mb-8">
-          Publish to social media in one place
-        </p>
-
+    <AuthShell
+      title="Create your account"
+      description="Publish to social media in one place"
+    >
+      <div className="flex flex-col gap-4">
         {error && (
-          <div className="mb-4 p-3 rounded-md border border-destructive/30 bg-red-50 text-sm text-destructive">
-            {error}
-          </div>
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>Sign-up failed</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-1">
-              Name
-            </label>
-            <input
-              id="name"
-              type="text"
-              required
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={8}
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              At least 8 characters
-            </p>
-          </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
-          >
-            {submitting ? "Creating account..." : "Sign up"}
-          </button>
+        <form onSubmit={(e) => void handleSubmit(e)}>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="name">Name</FieldLabel>
+              <Input
+                id="name"
+                type="text"
+                required
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
+              <Input
+                id="password"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <FieldDescription>At least 8 characters</FieldDescription>
+            </Field>
+            <Button type="submit" disabled={submitting} className="w-full">
+              {submitting && <Spinner data-icon="inline-start" />}
+              {submitting ? "Creating account..." : "Sign up"}
+            </Button>
+          </FieldGroup>
         </form>
 
-        <div className="my-6 flex items-center gap-3">
-          <div className="flex-1 h-px bg-border" />
+        <div className="flex items-center gap-3">
+          <Separator className="flex-1" />
           <span className="text-xs text-muted-foreground">or</span>
-          <div className="flex-1 h-px bg-border" />
+          <Separator className="flex-1" />
         </div>
 
         <GoogleButton />
 
-        <p className="mt-6 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href="/login" className="font-medium hover:underline">
             Sign in
           </Link>
         </p>
-        <p className="mt-4 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           By signing up you agree to the{" "}
           <Link href="/terms" className="hover:underline">
             Terms of Service
@@ -196,6 +210,6 @@ export function SignupForm() {
           </Link>
         </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }

@@ -45,7 +45,7 @@ export default function TermsPage() {
         <p>
           Postvia is a web-based social media management tool. It provides:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             A composer for creating posts with text, images, and videos
           </li>
@@ -74,7 +74,7 @@ export default function TermsPage() {
           and publishing on your behalf. Currently supported platforms and
           their requested permissions include:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             <span className="font-medium">Instagram</span> &mdash; via
             Instagram Login; permissions: instagram_business_basic,
@@ -109,7 +109,7 @@ export default function TermsPage() {
           authorize Postvia to send your content to that platform&rsquo;s
           official API on your behalf. This authorization is limited to:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             Creating and submitting content you have composed and requested
             to publish
@@ -130,7 +130,7 @@ export default function TermsPage() {
           you submit to Postvia. By using the service, you grant Postvia
           only the limited license necessary to:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             Store, host, process, display, and transmit your content to
             provide and operate the service
@@ -157,7 +157,7 @@ export default function TermsPage() {
           Postvia is a tool for managing and publishing your content; it is
           not a content moderator. You are solely responsible for:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             All content you create, schedule, and publish through Postvia
           </li>
@@ -203,7 +203,7 @@ export default function TermsPage() {
           Each connected platform has its own rules, limits, and
           restrictions, which may change at any time. Examples include:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>Character and caption length limits</li>
           <li>Supported media types and file sizes</li>
           <li>Daily publishing rate limits</li>
@@ -224,7 +224,7 @@ export default function TermsPage() {
           Postvia depends on third-party social platform APIs and
           infrastructure. By using Postvia, you acknowledge and agree that:
         </p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             Postvia cannot guarantee that any connected platform will accept,
             publish, or continue to host your content
@@ -281,7 +281,7 @@ export default function TermsPage() {
 
       <LegalSection heading="14. Prohibited Conduct">
         <p>You agree not to:</p>
-        <ul className="list-disc space-y-1 pl-6">
+        <ul className="flex list-disc flex-col gap-1 pl-6">
           <li>
             Use Postvia to publish content that is unlawful, infringing,
             hateful, harassing, defamatory, or otherwise violates a

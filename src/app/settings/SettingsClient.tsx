@@ -1,99 +1,56 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AtSignIcon, KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 
 const CONFIRMATION_PHRASE = "delete";
 
 type Message = { type: "success" | "error"; text: string } | null;
 
-function Section({
-  title,
-  description,
-  children,
-  danger = false,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-  danger?: boolean;
-}) {
+function FormAlert({ message }: { message: NonNullable<Message> }) {
   return (
-    <section
-      className={`border rounded-lg p-6 ${
-        danger ? "border-destructive/40 bg-red-50/40" : "border-border"
-      }`}
-    >
-      <h2
-        className={`text-sm font-semibold ${
-          danger ? "text-destructive" : "text-foreground"
-        }`}
-      >
-        {title}
-      </h2>
-      {description && (
-        <p className="text-sm text-muted-foreground mt-1">{description}</p>
-      )}
-      <div className="mt-4">{children}</div>
-    </section>
+    <Alert variant={message.type === "error" ? "destructive" : "default"}>
+      {message.type === "error" && <TriangleAlertIcon />}
+      <AlertTitle>
+        {message.type === "error" ? "Something went wrong" : "Saved"}
+      </AlertTitle>
+      <AlertDescription>{message.text}</AlertDescription>
+    </Alert>
   );
 }
 
-function Alert({ message }: { message: NonNullable<Message> }) {
-  const isError = message.type === "error";
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={`p-3 rounded-md border text-sm ${
-        isError
-          ? "border-destructive/30 bg-red-50 text-destructive"
-          : "border-border bg-muted/50 text-foreground"
-      }`}
-    >
-      {message.text}
-    </div>
-  );
-}
-
-function Switch({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled: boolean;
-  label: string;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-40 disabled:cursor-not-allowed ${
-        checked ? "bg-primary" : "bg-muted-foreground/30"
-      }`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? "translate-x-6" : "translate-x-1"
-        }`}
-      />
-    </button>
-  );
-}
-
-const inputClassName =
-  "w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring";
-
-function GoogleIcon({ className = "" }: { className?: string }) {
+function GoogleGlyph({ className = "" }: { className?: string }) {
   return (
     <svg className={className} width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
       <path
@@ -158,9 +115,6 @@ export function SettingsClient({
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteMessage, setDeleteMessage] = useState<Message>(null);
-  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const confirmInputRef = useRef<HTMLInputElement>(null);
 
   const canConfirmDelete =
     !deleting && confirmText === CONFIRMATION_PHRASE;
@@ -331,54 +285,11 @@ export function SettingsClient({
     }
   }
 
-  const closeDeleteModal = useCallback(() => {
+  function closeDeleteModal() {
     setDeleteModalOpen(false);
     setConfirmText("");
     setDeleteMessage(null);
-    deleteTriggerRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    if (!isDeleteModalOpen) return;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        closeDeleteModal();
-        return;
-      }
-      if (e.key !== "Tab" || !dialogRef.current) return;
-      const focusables = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-      if (e.shiftKey) {
-        if (active === first || !dialogRef.current.contains(active)) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !dialogRef.current.contains(active)) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused?.focus();
-    };
-  }, [isDeleteModalOpen, closeDeleteModal]);
+  }
 
   async function handleConfirmDelete() {
     if (!canConfirmDelete) return;
@@ -416,336 +327,301 @@ export function SettingsClient({
   }
 
   return (
-    <div className="p-8 max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+    <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Manage your profile, security and preferences
         </p>
       </div>
 
-      <Section title="Profile" description="Update the name shown in your account">
-        <div className="space-y-4 max-w-sm">
-          <div>
-            <label
-              htmlFor="settings-name"
-              className="block text-sm font-medium mb-1"
+      <FieldGroup className="gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile</CardTitle>
+            <CardDescription>
+              Update the name shown in your account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="settings-name">Name</FieldLabel>
+                <Input
+                  id="settings-name"
+                  type="text"
+                  autoComplete="name"
+                  value={name}
+                  maxLength={50}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Field>
+              <Field data-disabled>
+                <FieldLabel htmlFor="settings-email">Email</FieldLabel>
+                <Input
+                  id="settings-email"
+                  type="email"
+                  value={email}
+                  readOnly
+                  disabled
+                />
+                <FieldDescription>
+                  {emailVerified
+                    ? "Verified"
+                    : "Email change is currently not supported"}
+                </FieldDescription>
+              </Field>
+              {nameMessage && <FormAlert message={nameMessage} />}
+              <div>
+                <Button onClick={() => void handleSaveName()} disabled={savingName}>
+                  {savingName && <Spinner data-icon="inline-start" />}
+                  {savingName ? "Saving..." : "Save changes"}
+                </Button>
+              </div>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Sign-in methods</CardTitle>
+            <CardDescription>How you can sign in to your account</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-sm">
+                <AtSignIcon className="size-4 shrink-0" aria-hidden="true" />
+                Email and password
+              </span>
+              <Badge variant={hasPassword ? "secondary" : "outline"}>
+                {hasPassword ? "Connected" : "Not set"}
+              </Badge>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-sm">
+                <GoogleGlyph className="size-4 shrink-0" /> Google
+              </span>
+              <Badge variant={hasGoogle ? "secondary" : "outline"}>
+                {hasGoogle ? "Connected" : "Not connected"}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Security</CardTitle>
+            <CardDescription>
+              {hasPassword
+                ? "Change your account password"
+                : "Set a password so you can sign in with email and password"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (hasPassword) void handleChangePassword();
+                else void handleSetPassword();
+              }}
             >
-              Name
-            </label>
-            <input
-              id="settings-name"
-              type="text"
-              autoComplete="name"
-              value={name}
-              maxLength={50}
-              onChange={(e) => setName(e.target.value)}
-              className={inputClassName}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="settings-email"
-              className="block text-sm font-medium mb-1"
-            >
-              Email
-            </label>
-            <input
-              id="settings-email"
-              type="email"
-              value={email}
-              readOnly
-              disabled
-              className={`${inputClassName} opacity-60 cursor-not-allowed`}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              {emailVerified
-                ? "Verified"
-                : "Email change is currently not supported"}
+              <FieldGroup>
+                {hasPassword && (
+                  <Field data-invalid={Boolean(passwordErrors.current) || undefined}>
+                    <FieldLabel htmlFor="settings-current-password">
+                      Current password
+                    </FieldLabel>
+                    <Input
+                      id="settings-current-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password.current}
+                      onChange={(e) =>
+                        setPassword((p) => ({ ...p, current: e.target.value }))
+                      }
+                      aria-invalid={Boolean(passwordErrors.current) || undefined}
+                    />
+                    {passwordErrors.current && (
+                      <FieldError>{passwordErrors.current}</FieldError>
+                    )}
+                  </Field>
+                )}
+                <Field data-invalid={Boolean(passwordErrors.next) || undefined}>
+                  <FieldLabel htmlFor="settings-new-password">
+                    New password
+                  </FieldLabel>
+                  <Input
+                    id="settings-new-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password.next}
+                    onChange={(e) =>
+                      setPassword((p) => ({ ...p, next: e.target.value }))
+                    }
+                    aria-invalid={Boolean(passwordErrors.next) || undefined}
+                  />
+                  {passwordErrors.next ? (
+                    <FieldError>{passwordErrors.next}</FieldError>
+                  ) : (
+                    <FieldDescription>
+                      Must be at least 8 characters long.
+                    </FieldDescription>
+                  )}
+                </Field>
+                <Field data-invalid={Boolean(passwordErrors.confirm) || undefined}>
+                  <FieldLabel htmlFor="settings-confirm-password">
+                    Confirm new password
+                  </FieldLabel>
+                  <Input
+                    id="settings-confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password.confirm}
+                    onChange={(e) =>
+                      setPassword((p) => ({ ...p, confirm: e.target.value }))
+                    }
+                    aria-invalid={Boolean(passwordErrors.confirm) || undefined}
+                  />
+                  {passwordErrors.confirm && (
+                    <FieldError>{passwordErrors.confirm}</FieldError>
+                  )}
+                </Field>
+                {passwordMessage && <FormAlert message={passwordMessage} />}
+                <div>
+                  <Button type="submit" disabled={savingPassword}>
+                    {savingPassword && <Spinner data-icon="inline-start" />}
+                    <KeyRoundIcon data-icon="inline-start" />
+                    {savingPassword
+                      ? "Saving..."
+                      : hasPassword
+                        ? "Change password"
+                        : "Set password"}
+                  </Button>
+                </div>
+              </FieldGroup>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Preferences</CardTitle>
+            <CardDescription>
+              Choose how you want to hear from us
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              {prefsMessage && <FormAlert message={prefsMessage} />}
+              <Field orientation="horizontal">
+                <FieldDescription className="flex-1">
+                  <span className="block text-sm font-medium text-foreground">
+                    Email notifications
+                  </span>
+                  Receive updates about your posts
+                </FieldDescription>
+                <Switch
+                  id="prefs-email"
+                  aria-label="Email notifications"
+                  checked={prefs.emailNotifications}
+                  disabled={savingPref === "emailNotifications"}
+                  onCheckedChange={() =>
+                    void handleTogglePref("emailNotifications")
+                  }
+                />
+              </Field>
+              <Separator />
+              <Field orientation="horizontal">
+                <FieldDescription className="flex-1">
+                  <span className="block text-sm font-medium text-foreground">
+                    Product updates
+                  </span>
+                  News about new features and improvements
+                </FieldDescription>
+                <Switch
+                  id="prefs-product"
+                  aria-label="Product updates"
+                  checked={prefs.productUpdates}
+                  disabled={savingPref === "productUpdates"}
+                  onCheckedChange={() =>
+                    void handleTogglePref("productUpdates")
+                  }
+                />
+              </Field>
+            </FieldGroup>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger zone</CardTitle>
+            <CardDescription>
+              Permanently delete your account and all associated data
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Once you delete your account there is no going back. All your
+              posts, connected social accounts, sessions and account data will
+              be permanently removed.
             </p>
-          </div>
-          {nameMessage && (
-            <Alert message={nameMessage} />
-          )}
-          <button
-            onClick={handleSaveName}
-            disabled={savingName}
-            className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {savingName ? "Saving..." : "Save changes"}
-          </button>
-        </div>
-      </Section>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              Delete account
+            </Button>
+          </CardContent>
+        </Card>
+      </FieldGroup>
 
-      <Section
-        title="Sign-in methods"
-        description="How you can sign in to your account"
+      <Dialog
+        open={isDeleteModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeDeleteModal();
+          else setDeleteModalOpen(true);
+        }}
       >
-        <ul className="max-w-sm divide-y divide-border border-y border-border text-sm">
-          <li className="flex items-center justify-between py-3">
-            <span className="flex items-center gap-2">
-              <span aria-hidden="true">✉️</span> Email and password
-            </span>
-            <span
-              className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                hasPassword
-                  ? "bg-green-100 text-green-700"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {hasPassword ? "Connected" : "Not set"}
-            </span>
-          </li>
-          <li className="flex items-center justify-between py-3">
-            <span className="flex items-center gap-2">
-              <GoogleIcon className="h-4 w-4" /> Google
-            </span>
-            <span
-              className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                hasGoogle
-                  ? "bg-green-100 text-green-700"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {hasGoogle ? "Connected" : "Not connected"}
-            </span>
-          </li>
-        </ul>
-      </Section>
-
-      <Section
-        title="Security"
-        description={
-          hasPassword
-            ? "Change your account password"
-            : "Set a password so you can sign in with email and password"
-        }
-      >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (hasPassword) void handleChangePassword();
-            else void handleSetPassword();
-          }}
-          className="space-y-4 max-w-sm"
-        >
-          {hasPassword && (
-            <div>
-              <label
-                htmlFor="settings-current-password"
-                className="block text-sm font-medium mb-1"
-              >
-                Current password
-              </label>
-              <input
-                id="settings-current-password"
-                type="password"
-                autoComplete="current-password"
-                value={password.current}
-                onChange={(e) =>
-                  setPassword((p) => ({ ...p, current: e.target.value }))
-                }
-                aria-invalid={Boolean(passwordErrors.current)}
-                className={inputClassName}
-              />
-              {passwordErrors.current && (
-                <p className="text-xs text-destructive mt-1">
-                  {passwordErrors.current}
-                </p>
-              )}
-            </div>
-          )}
-          <div>
-            <label
-              htmlFor="settings-new-password"
-              className="block text-sm font-medium mb-1"
-            >
-              New password
-            </label>
-            <input
-              id="settings-new-password"
-              type="password"
-              autoComplete="new-password"
-              value={password.next}
-              onChange={(e) =>
-                setPassword((p) => ({ ...p, next: e.target.value }))
-              }
-              aria-invalid={Boolean(passwordErrors.next)}
-              className={inputClassName}
-            />
-            {passwordErrors.next && (
-              <p className="text-xs text-destructive mt-1">
-                {passwordErrors.next}
-              </p>
-            )}
-          </div>
-          <div>
-            <label
-              htmlFor="settings-confirm-password"
-              className="block text-sm font-medium mb-1"
-            >
-              Confirm new password
-            </label>
-            <input
-              id="settings-confirm-password"
-              type="password"
-              autoComplete="new-password"
-              value={password.confirm}
-              onChange={(e) =>
-                setPassword((p) => ({ ...p, confirm: e.target.value }))
-              }
-              aria-invalid={Boolean(passwordErrors.confirm)}
-              className={inputClassName}
-            />
-            {passwordErrors.confirm && (
-              <p className="text-xs text-destructive mt-1">
-                {passwordErrors.confirm}
-              </p>
-            )}
-          </div>
-          {passwordMessage && <Alert message={passwordMessage} />}
-          <button
-            type="submit"
-            disabled={savingPassword}
-            className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {savingPassword
-              ? "Saving..."
-              : hasPassword
-                ? "Change password"
-                : "Set password"}
-          </button>
-        </form>
-      </Section>
-
-      <Section title="Preferences" description="Choose how you want to hear from us">
-        <div className="space-y-4 max-w-sm">
-          {prefsMessage && <Alert message={prefsMessage} />}
-          <div className="flex items-center justify-between">
-            <div className="pr-4">
-              <p className="text-sm font-medium">Email notifications</p>
-              <p className="text-sm text-muted-foreground">
-                Receive updates about your posts
-              </p>
-            </div>
-            <Switch
-              checked={prefs.emailNotifications}
-              disabled={savingPref === "emailNotifications"}
-              label="Email notifications"
-              onChange={() =>
-                void handleTogglePref("emailNotifications")
-              }
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="pr-4">
-              <p className="text-sm font-medium">Product updates</p>
-              <p className="text-sm text-muted-foreground">
-                News about new features and improvements
-              </p>
-            </div>
-            <Switch
-              checked={prefs.productUpdates}
-              disabled={savingPref === "productUpdates"}
-              label="Product updates"
-              onChange={() => void handleTogglePref("productUpdates")}
-            />
-          </div>
-        </div>
-      </Section>
-
-      <Section
-        title="Danger Zone"
-        description="Permanently delete your account and all associated data"
-        danger
-      >
-        <div className="max-w-sm">
-          <p className="text-sm text-destructive/90 mb-4">
-            Once you delete your account there is no going back. All your
-            posts, connected social accounts, sessions and account data will
-            be permanently removed.
-          </p>
-          <button
-            ref={deleteTriggerRef}
-            onClick={() => setDeleteModalOpen(true)}
-            className="px-4 py-2 text-sm font-medium text-destructive border border-destructive/40 rounded-md hover:bg-red-50 transition-colors"
-          >
-            Delete account
-          </button>
-        </div>
-      </Section>
-
-      {isDeleteModalOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeDeleteModal();
-          }}
-        >
-          <div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-account-title"
-            aria-describedby="delete-account-description"
-            className="w-full max-w-md bg-background border border-border rounded-lg p-6 shadow-lg"
-          >
-            <h2
-              id="delete-account-title"
-              className="text-lg font-semibold text-destructive"
-            >
-              Delete your account?
-            </h2>
-            <p
-              id="delete-account-description"
-              className="text-sm text-muted-foreground mt-2"
-            >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete your account?</DialogTitle>
+            <DialogDescription>
               This action is permanent and cannot be undone. All your posts,
               connected social accounts, sessions and account data will be
               deleted.
-            </p>
-            <div className="mt-4">
-              <label
-                htmlFor="delete-confirmation-input"
-                className="block text-sm font-medium mb-1"
-              >
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="delete-confirmation-input">
                 Type {CONFIRMATION_PHRASE} to confirm
-              </label>
-              <input
+              </FieldLabel>
+              <Input
                 id="delete-confirmation-input"
-                ref={confirmInputRef}
-                autoFocus
                 type="text"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
                 autoComplete="off"
-                className={inputClassName}
               />
-            </div>
-            {deleteMessage && (
-              <div className="mt-3">
-                <Alert message={deleteMessage} />
-              </div>
-            )}
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={closeDeleteModal}
-                disabled={deleting}
-                className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void handleConfirmDelete()}
-                disabled={!canConfirmDelete}
-                className="px-4 py-2 text-sm font-medium text-white bg-destructive rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {deleting ? "Deleting..." : "Delete account"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </Field>
+            {deleteMessage && <FormAlert message={deleteMessage} />}
+          </FieldGroup>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDeleteModal} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleConfirmDelete()}
+              disabled={!canConfirmDelete}
+            >
+              {deleting && <Spinner data-icon="inline-start" />}
+              {deleting ? "Deleting..." : "Delete account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

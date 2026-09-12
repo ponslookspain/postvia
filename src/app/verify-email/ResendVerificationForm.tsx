@@ -2,6 +2,15 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export function ResendVerificationForm() {
   const searchParams = useSearchParams();
@@ -34,37 +43,43 @@ export function ResendVerificationForm() {
   }
 
   return (
-    <div className="mt-6 border border-border rounded-lg p-4">
-      <h2 className="text-sm font-semibold mb-2">Resend verification email</h2>
-      {success ? (
-        <p className="text-sm text-muted-foreground">
-          Verification email sent. Check your inbox.
-        </p>
-      ) : (
-        <>
+    <div className="rounded-lg border border-border p-4">
+      <FieldGroup>
+        <Field data-invalid={Boolean(error) || undefined}>
+          <FieldLabel htmlFor="resend-email">
+            Resend verification email
+          </FieldLabel>
           <div className="flex gap-2">
-            <input
+            <Input
+              id="resend-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
-              className="flex-1 px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-invalid={Boolean(error) || undefined}
             />
-            <button
+            <Button
               type="button"
               onClick={() => void handleResend()}
               disabled={loading || !email}
-              className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
+              className="shrink-0"
             >
+              {loading && <Spinner data-icon="inline-start" />}
               {loading ? "Sending..." : "Send"}
-            </button>
+            </Button>
           </div>
-          {error && (
-            <p className="mt-2 text-sm text-destructive">{error}</p>
+          {error ? (
+            <FieldError>{error}</FieldError>
+          ) : (
+            success && (
+              <p className="text-sm text-muted-foreground">
+                Verification email sent. Check your inbox.
+              </p>
+            )
           )}
-        </>
-      )}
+        </Field>
+      </FieldGroup>
     </div>
   );
 }

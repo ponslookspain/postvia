@@ -2,6 +2,7 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PencilIcon, SendIcon, TriangleAlertIcon } from "lucide-react";
 import {
   X_POST_CHAR_LIMIT,
   THREADS_POST_CHAR_LIMIT,
@@ -13,6 +14,36 @@ import {
   localDateInputValue,
   localTimeInputValue,
 } from "@/lib/schedule";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "@/components/ui/toast";
 
 interface Post {
   id: string;
@@ -101,6 +132,7 @@ export default function PostDetailPage({
   const [text, setText] = useState(initialPost.text);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
@@ -134,22 +166,30 @@ export default function PostDetailPage({
       setPost((prev) => ({ ...prev, text: data.text }));
       setEditing(false);
     } catch {
-      alert("Failed to save changes.");
+      toast.add({
+        title: "Failed to save changes",
+        description: "Please try again.",
+        type: "error",
+      });
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this post?")) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/posts/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       router.push("/posts");
     } catch {
-      alert("Failed to delete post.");
+      toast.add({
+        title: "Failed to delete post",
+        description: "Please try again.",
+        type: "error",
+      });
       setDeleting(false);
+      setDeleteOpen(false);
     }
   }
 
@@ -176,7 +216,11 @@ export default function PostDetailPage({
         media: prev.media.filter((m) => m.id !== mediaId),
       }));
     } catch {
-      alert("Failed to delete media.");
+      toast.add({
+        title: "Failed to delete media",
+        description: "Please try again.",
+        type: "error",
+      });
     } finally {
       setDeletingMediaId(null);
     }
@@ -246,15 +290,6 @@ export default function PostDetailPage({
     await sendScheduledAt(null);
   }
 
-  const statusColors: Record<string, string> = {
-    DRAFT: "bg-muted text-muted-foreground",
-    SCHEDULED: "bg-amber-50 text-amber-700",
-    PUBLISHING: "bg-blue-50 text-blue-700",
-    PUBLISHED: "bg-green-50 text-green-700",
-    PARTIALLY_PUBLISHED: "bg-amber-50 text-amber-700",
-    FAILED: "bg-red-50 text-red-700",
-  };
-
   function targetPostUrl(targetItem: Post["targets"][number]): string | null {
     if (!targetItem.externalPostId) return null;
     const handle = targetItem.socialAccount?.username;
@@ -271,391 +306,451 @@ export default function PostDetailPage({
   }
 
   return (
-    <div className="p-8 max-w-3xl">
-      <h1 className="text-2xl font-semibold mb-8">Post</h1>
+    <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
+      <PageHeader
+        title="Post"
+        description={`Created ${new Date(post.createdAt).toLocaleDateString(
+          "en-GB",
+          { day: "numeric", month: "short", year: "numeric" }
+        )}`}
+        actions={<StatusBadge status={post.status} />}
+      />
 
-      <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium mb-2">Text</label>
-          {editing ? (
-            <>
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={5}
-                className="w-full border border-border rounded-lg p-4 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
-              />
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-muted-foreground">
-                  Platform: {formatPlatformName(platform)}
-                </span>
-                <span
-                  className={`text-xs font-mono ${
-                    isOverLimit
-                      ? "text-red-600 font-medium"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {charCount} / {charLimit}
-                </span>
-              </div>
-              {isOverLimit && (
-                <p className="text-xs text-red-600 mt-1">
-                  Post exceeds the {charLimit} character limit
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="border border-border rounded-lg p-4">
-              <p className="text-sm whitespace-pre-wrap break-words">
+      <FieldGroup className="gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Text</CardTitle>
+            {!editing && (
+              <CardDescription>
+                Platform: {formatPlatformName(platform)}
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent>
+            {editing ? (
+              <FieldGroup>
+                <Field data-invalid={isOverLimit || undefined}>
+                  <FieldLabel htmlFor="post-text" className="sr-only">
+                    Post text
+                  </FieldLabel>
+                  <Textarea
+                    id="post-text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    rows={5}
+                    aria-invalid={isOverLimit || undefined}
+                  />
+                  <div className="flex items-center justify-between gap-2">
+                    <FieldDescription>
+                      Platform: {formatPlatformName(platform)}
+                    </FieldDescription>
+                    <Badge
+                      variant={isOverLimit ? "destructive" : "secondary"}
+                    >
+                      {charCount} / {charLimit}
+                    </Badge>
+                  </div>
+                  {isOverLimit && (
+                    <FieldError>
+                      Post exceeds the {charLimit} character limit
+                    </FieldError>
+                  )}
+                </Field>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button onClick={() => void handleSave()} disabled={!canSave}>
+                    {saving && <Spinner data-icon="inline-start" />}
+                    {saving ? "Saving..." : "Save changes"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditing(false);
+                      setText(post.text);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </FieldGroup>
+            ) : (
+              <p className="text-sm break-words whitespace-pre-wrap">
                 {post.text}
               </p>
-            </div>
-          )}
-        </div>
+            )}
+          </CardContent>
+        </Card>
 
         {post.media.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium mb-2">Media</label>
-            <div className="flex flex-wrap gap-3">
-              {post.media.map((item) => (
-                <div key={item.id} className="relative w-40 h-40">
-                  <div className="w-40 h-40 rounded-md border border-border overflow-hidden bg-muted">
-                    {item.type === "IMAGE" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`/api/media/${item.id}`}
-                        alt={item.filename}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={`/api/media/${item.id}`}
-                        className="w-full h-full object-cover"
-                        muted
-                        playsInline
-                        preload="metadata"
-                      />
-                    )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Media</CardTitle>
+              <CardDescription>
+                {post.media.length}{" "}
+                {post.media.length === 1 ? "file" : "files"} attached
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-start gap-3">
+                {post.media.map((item) => (
+                  <div key={item.id} className="flex flex-col gap-1.5">
+                    <div className="relative size-40 overflow-hidden rounded-md border border-border bg-muted">
+                      {item.type === "IMAGE" ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/media/${item.id}`}
+                          alt={item.filename}
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={`/api/media/${item.id}`}
+                          className="size-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon-sm"
+                        onClick={() => void handleDeleteMedia(item.id)}
+                        disabled={deletingMediaId === item.id}
+                        aria-label={`Remove ${item.filename}`}
+                        className="absolute top-1.5 right-1.5 size-6 rounded-full"
+                      >
+                        {deletingMediaId === item.id ? (
+                          <Spinner data-icon="inline-start" />
+                        ) : (
+                          <span aria-hidden="true" className="text-sm leading-none">
+                            ×
+                          </span>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="w-40 truncate text-xs text-muted-foreground">
+                      {item.filename}
+                    </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteMedia(item.id)}
-                    disabled={deletingMediaId === item.id}
-                    aria-label={`Remove ${item.filename}`}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground text-primary-foreground flex items-center justify-center hover:opacity-80 transition-opacity disabled:opacity-40"
-                  >
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                  <p className="text-xs text-muted-foreground mt-1 w-40 truncate">
-                    {item.filename}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Platform</label>
-            <p className="text-sm">{formatPlatformName(platform)}</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Status</label>
-            <span
-              className={`inline-block text-xs font-medium px-2.5 py-0.5 rounded-full ${
-                statusColors[post.status] ?? ""
-              }`}
-            >
-              {post.status.charAt(0) + post.status.slice(1).toLowerCase()}
-            </span>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Created</label>
-            <p className="text-sm">
-              {new Date(post.createdAt).toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </p>
-          </div>
-          {post.scheduledAt && (
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Scheduled for
-              </label>
-              <p className="text-sm text-amber-700">
-                {new Date(post.scheduledAt).toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZoneName: "short",
-                })}
-              </p>
-            </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium mb-1">Published</label>
-            <p className="text-sm text-muted-foreground">
-              {post.publishedAt
-                ? new Date(post.publishedAt).toLocaleDateString("en-GB", {
+        <Card>
+          <CardHeader>
+            <CardTitle>Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-4">
+              <div>
+                <dt className="mb-1 text-sm font-medium">Platform</dt>
+                <dd className="text-sm">{formatPlatformName(platform)}</dd>
+              </div>
+              <div>
+                <dt className="mb-1 text-sm font-medium">Status</dt>
+                <dd>
+                  <StatusBadge status={post.status} />
+                </dd>
+              </div>
+              <div>
+                <dt className="mb-1 text-sm font-medium">Created</dt>
+                <dd className="text-sm">
+                  {new Date(post.createdAt).toLocaleDateString("en-GB", {
                     day: "numeric",
                     month: "short",
                     year: "numeric",
                     hour: "2-digit",
                     minute: "2-digit",
-                  })
-                : "—"}
-            </p>
-          </div>
-          {externalPostId && (
-            <div className="col-span-2">
-              <label className="block text-sm font-medium mb-1">
-                External ID
-              </label>
-              <p className="text-sm text-muted-foreground font-mono">
-                {externalPostId}
-              </p>
-            </div>
-          )}
-        </div>
+                  })}
+                </dd>
+              </div>
+              {post.scheduledAt && (
+                <div>
+                  <dt className="mb-1 text-sm font-medium">Scheduled for</dt>
+                  <dd className="text-sm">
+                    {new Date(post.scheduledAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZoneName: "short",
+                    })}
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt className="mb-1 text-sm font-medium">Published</dt>
+                <dd className="text-sm text-muted-foreground">
+                  {post.publishedAt
+                    ? new Date(post.publishedAt).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : "—"}
+                </dd>
+              </div>
+              {externalPostId && (
+                <div className="col-span-2">
+                  <dt className="mb-1 text-sm font-medium">External ID</dt>
+                  <dd className="text-sm text-muted-foreground font-mono">
+                    {externalPostId}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </CardContent>
+        </Card>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">Publishing targets</label>
-          <div className="space-y-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Publishing targets</CardTitle>
+            <CardDescription>
+              One row per connected account this post goes to
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
             {post.targets.map((targetItem) => (
               <div
                 key={targetItem.id}
-                className="flex items-center justify-between border border-border rounded-md px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
               >
-                <div>
-                  <p className="text-sm font-medium">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
                     {formatPlatformName(targetItem.platform)}
                     {targetItem.socialAccount?.username
                       ? ` @${targetItem.socialAccount.username}`
                       : ""}
                   </p>
                   {targetItem.errorMessage && (
-                    <p className="text-xs text-red-600">{targetItem.errorMessage}</p>
+                    <p className="text-xs text-destructive">
+                      {targetItem.errorMessage}
+                    </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {targetItem.status === "PUBLISHED" && targetPostUrl(targetItem) && (
-                    <a
-                      href={targetPostUrl(targetItem)!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs underline hover:text-foreground text-muted-foreground"
-                    >
-                      View
-                    </a>
-                  )}
-                  <span className="text-xs text-muted-foreground">
+                <div className="flex shrink-0 items-center gap-2">
+                  {targetItem.status === "PUBLISHED" &&
+                    targetPostUrl(targetItem) && (
+                      <a
+                        href={targetPostUrl(targetItem)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-muted-foreground underline hover:text-foreground"
+                      >
+                        View
+                      </a>
+                    )}
+                  <Badge variant="secondary">
                     {targetItem.status.toLowerCase()}
-                  </span>
+                  </Badge>
                   {targetItem.status === "FAILED" && (
-                    <button
-                      onClick={() => handleRetry(targetItem.id)}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleRetry(targetItem.id)}
                       disabled={retrying}
-                      className="px-3 py-1 text-xs border border-border rounded-md hover:bg-muted disabled:opacity-40"
                     >
+                      {retrying && <Spinner data-icon="inline-start" />}
                       Retry
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {rescheduleOpen &&
-          (post.status === "DRAFT" || post.status === "SCHEDULED") &&
-          platform === "THREADS" && (
-            <div className="border border-border rounded-lg p-5">
-              <label className="block text-sm font-medium mb-3">
-                {post.status === "SCHEDULED"
-                  ? "Change scheduled time"
-                  : "Schedule this post"}
-              </label>
-              <div className="flex items-start gap-4">
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={rescheduleDate}
-                    min={localDateInputValue(new Date())}
-                    onChange={(e) => setRescheduleDate(e.target.value)}
-                    className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
-                    Time
-                  </label>
-                  <input
-                    type="time"
-                    value={rescheduleTime}
-                    onChange={(e) => setRescheduleTime(e.target.value)}
-                    className="border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30"
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Times are interpreted in your local timezone (
-                {Intl.DateTimeFormat().resolvedOptions().timeZone}).
-              </p>
-              {rescheduleError && (
-                <p className="text-xs text-red-600 mt-3">{rescheduleError}</p>
-              )}
-              <div className="flex items-center gap-3 mt-4">
-                <button
-                  onClick={handleRescheduleSave}
-                  disabled={rescheduling || !rescheduleDate || !rescheduleTime}
-                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {rescheduling ? "Saving..." : "Save time"}
-                </button>
-                {post.status === "SCHEDULED" && (
-                  <button
-                    onClick={handleUnschedule}
-                    disabled={rescheduling}
-                    className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
-                  >
-                    Remove schedule
-                  </button>
-                )}
-                <button
-                  onClick={() => setRescheduleOpen(false)}
-                  disabled={rescheduling}
-                  className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+          </CardContent>
+        </Card>
 
         {post.status === "FAILED" && post.errorMessage && (
-          <div className="p-4 rounded-lg border border-red-200 bg-red-50">
-            <p className="text-sm font-medium text-red-700 mb-1">
-              Publication failed
-            </p>
-            <p className="text-sm text-red-600">{post.errorMessage}</p>
-          </div>
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>Publication failed</AlertTitle>
+            <AlertDescription>{post.errorMessage}</AlertDescription>
+          </Alert>
         )}
 
-        <div className="flex items-center gap-3 pt-2">
-          {editing ? (
-            <>
-              <button
-                onClick={handleSave}
-                disabled={!canSave}
-                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+        {!editing && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {post.status === "DRAFT" && (
+              <>
+                <Button variant="outline" onClick={() => setEditing(true)}>
+                  <PencilIcon data-icon="inline-start" />
+                  Edit
+                </Button>
+                <Button
+                  onClick={() => void handlePublish()}
+                  disabled={publishing}
+                >
+                  {publishing && <Spinner data-icon="inline-start" />}
+                  {!publishing && <SendIcon data-icon="inline-start" />}
+                  {publishing ? "Publishing..." : "Publish now"}
+                </Button>
+              </>
+            )}
+
+            {post.status === "PUBLISHED" && externalPostId && (
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={
+                  <a
+                    href={
+                      platform === "THREADS"
+                        ? threadsPostUrl(post.username ?? "", externalPostId)
+                        : `https://x.com/i/status/${externalPostId}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  />
+                }
               >
-                {saving ? "Saving..." : "Save changes"}
-              </button>
-              <button
-                onClick={() => {
-                  setEditing(false);
-                  setText(post.text);
-                }}
-                className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
+                View on {platform === "THREADS" ? "Threads" : "X"}
+              </Button>
+            )}
+
+            {post.status === "FAILED" && (
+              <Button
+                onClick={() => void handleRetry()}
+                disabled={retrying}
               >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              {post.status === "DRAFT" && (
-                <>
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={handlePublish}
-                    disabled={publishing}
-                    className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
-                  >
-                    {publishing ? "Publishing..." : "Publish now"}
-                  </button>
-                </>
-              )}
+                {retrying && <Spinner data-icon="inline-start" />}
+                {retrying ? "Retrying..." : "Retry"}
+              </Button>
+            )}
 
-              {post.status === "PUBLISHED" && externalPostId && (
-                <a
-                  href={
-                    platform === "THREADS"
-                      ? threadsPostUrl(post.username ?? "", externalPostId)
-                      : `https://x.com/i/status/${externalPostId}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
+            {(post.status === "DRAFT" || post.status === "SCHEDULED") &&
+              platform === "THREADS" && (
+                <Button
+                  variant="outline"
+                  onClick={openReschedule}
+                  disabled={rescheduling || publishing}
                 >
-                  View on {platform === "THREADS" ? "Threads" : "X"}
-                </a>
+                  {post.status === "SCHEDULED" ? "Reschedule" : "Schedule"}
+                </Button>
               )}
 
-              {post.status === "FAILED" && (
-                <button
-                  onClick={() => handleRetry()}
-                  disabled={retrying}
-                  className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-40"
-                >
-                  {retrying ? "Retrying..." : "Retry"}
-                </button>
-              )}
+            {(post.status === "DRAFT" ||
+              post.status === "SCHEDULED" ||
+              post.status === "FAILED") && (
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteOpen(true)}
+                disabled={deleting}
+              >
+                {deleting && <Spinner data-icon="inline-start" />}
+                {deleting ? "Deleting..." : "Delete"}
+              </Button>
+            )}
+          </div>
+        )}
+      </FieldGroup>
 
-              {(post.status === "DRAFT" ||
-                post.status === "SCHEDULED") &&
-                platform === "THREADS" && (
-                  <button
-                    onClick={openReschedule}
-                    disabled={rescheduling || publishing}
-                    className="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors disabled:opacity-40"
-                  >
-                    {post.status === "SCHEDULED" ? "Reschedule" : "Schedule"}
-                  </button>
-                )}
+      <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {post.status === "SCHEDULED"
+                ? "Change scheduled time"
+                : "Schedule this post"}
+            </DialogTitle>
+            <DialogDescription>
+              Times are interpreted in your local timezone (
+              {Intl.DateTimeFormat().resolvedOptions().timeZone}).
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <div className="grid grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel htmlFor="reschedule-date">Date</FieldLabel>
+                <input
+                  id="reschedule-date"
+                  type="date"
+                  value={rescheduleDate}
+                  min={localDateInputValue(new Date())}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="reschedule-time">Time</FieldLabel>
+                <input
+                  id="reschedule-time"
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              </Field>
+            </div>
+            {rescheduleError && (
+              <Alert variant="destructive">
+                <TriangleAlertIcon />
+                <AlertTitle>Cannot save time</AlertTitle>
+                <AlertDescription>{rescheduleError}</AlertDescription>
+              </Alert>
+            )}
+          </FieldGroup>
+          <DialogFooter>
+            {post.status === "SCHEDULED" && (
+              <Button
+                variant="outline"
+                onClick={() => void handleUnschedule()}
+                disabled={rescheduling}
+                className="mr-auto"
+              >
+                Remove schedule
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setRescheduleOpen(false)}
+              disabled={rescheduling}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleRescheduleSave()}
+              disabled={rescheduling || !rescheduleDate || !rescheduleTime}
+            >
+              {rescheduling && <Spinner data-icon="inline-start" />}
+              {rescheduling ? "Saving..." : "Save time"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-              {(post.status === "DRAFT" ||
-                post.status === "SCHEDULED" ||
-                post.status === "FAILED") && (
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="px-4 py-2 text-sm text-destructive border border-destructive/30 rounded-md hover:bg-red-50 transition-colors disabled:opacity-40"
-                >
-                  {deleting ? "Deleting..." : "Delete"}
-                </button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this post?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The post and its media will be
+              permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {deleting && <Spinner data-icon="inline-start" />}
+              {deleting ? "Deleting..." : "Delete post"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,26 +1,136 @@
 import Link from "next/link";
+import {
+  FileTextIcon,
+  PlusIcon,
+  TriangleAlertIcon,
+  UsersIcon,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { formatPlatformName } from "@/lib/utils";
 import { AppShell } from "@/components/AppShell";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  DashboardPostFilter,
+  statusLabel,
+} from "@/app/dashboard/DashboardPostFilter";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const user = await requireUser();
+const FILTERABLE_STATUSES = [
+  "DRAFT",
+  "SCHEDULED",
+  "PUBLISHING",
+  "PUBLISHED",
+  "PARTIALLY_PUBLISHED",
+  "FAILED",
+];
 
-  // One groupBy replaces the four per-status count queries; total is the
-  // sum of the same groups. Recent posts run in parallel with it.
-  const [statusGroups, recentPosts] = await Promise.all([
+function formatTargets(
+  targets: { platform: string; socialAccount?: { username: string } | null }[]
+): string {
+  if (targets.length === 0) return "No targets";
+  return targets
+    .map((target) => {
+      const name = formatPlatformName(target.platform);
+      return target.socialAccount?.username
+        ? `${name} @${target.socialAccount.username}`
+        : name;
+    })
+    .join(" · ");
+}
+
+function formatDateTime(value: Date): string {
+  return value.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const user = await requireUser();
+  const params = await searchParams;
+  const rawQ = typeof params.q === "string" ? params.q.trim() : "";
+  const rawStatus = typeof params.status === "string" ? params.status : "all";
+  const q = rawQ.slice(0, 100);
+  const statusFilter = FILTERABLE_STATUSES.includes(rawStatus)
+    ? rawStatus
+    : "all";
+
+  // One groupBy replaces the per-status count queries; total is the sum of
+  // the same groups. All independent reads run in parallel.
+  const [
+    statusGroups,
+    recentPosts,
+    attentionPosts,
+    upcomingPosts,
+    accounts,
+    platformGroups,
+  ] = await Promise.all([
     prisma.post.groupBy({
       by: ["status"],
       where: { userId: user.id },
       _count: { _all: true },
     }),
     prisma.post.findMany({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        ...(statusFilter !== "all" ? { status: statusFilter as never } : {}),
+        ...(q ? { text: { contains: q, mode: "insensitive" } } : {}),
+      },
       take: 5,
       orderBy: { createdAt: "desc" },
-      include: { targets: true },
+      include: {
+        targets: { include: { socialAccount: { select: { username: true } } } },
+      },
+    }),
+    prisma.post.findMany({
+      where: {
+        userId: user.id,
+        status: { in: ["FAILED", "PARTIALLY_PUBLISHED", "PUBLISHING"] },
+      },
+      take: 5,
+      orderBy: { updatedAt: "desc" },
+      include: {
+        targets: { include: { socialAccount: { select: { username: true } } } },
+      },
+    }),
+    prisma.post.findMany({
+      where: { userId: user.id, status: "SCHEDULED" },
+      take: 3,
+      orderBy: { scheduledAt: "asc" },
+      include: {
+        targets: { include: { socialAccount: { select: { username: true } } } },
+      },
+    }),
+    prisma.socialAccount.findMany({
+      where: { userId: user.id },
+      select: { platform: true, username: true, expiresAt: true },
+      orderBy: [{ platform: "asc" }, { username: "asc" }],
+    }),
+    prisma.postTarget.groupBy({
+      by: ["platform"],
+      where: { post: { userId: user.id } },
+      _count: { _all: true },
     }),
   ]);
 
@@ -34,6 +144,21 @@ export default async function DashboardPage() {
   const drafts = countsByStatus.DRAFT ?? 0;
   const scheduled = countsByStatus.SCHEDULED ?? 0;
   const published = countsByStatus.PUBLISHED ?? 0;
+  const publishing = countsByStatus.PUBLISHING ?? 0;
+  const failed = countsByStatus.FAILED ?? 0;
+
+  const now = new Date();
+  const expiredAccounts = accounts.filter(
+    (account) =>
+      account.expiresAt && new Date(account.expiresAt).getTime() <= now.getTime()
+  );
+
+  const platformCounts = platformGroups
+    .map((group) => ({
+      platform: group.platform,
+      count: group._count._all,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   const stats = [
     { label: "Posts", value: totalPosts },
@@ -42,92 +167,327 @@ export default async function DashboardPage() {
     { label: "Published", value: published },
   ];
 
+  const isOnboarding = totalPosts === 0 && accounts.length === 0;
+  const isFiltered = q !== "" || statusFilter !== "all";
+
   return (
     <AppShell user={user}>
-      <div className="p-8 max-w-5xl">
-      <h1 className="text-2xl font-semibold mb-8">Dashboard</h1>
+      <div className="mx-auto w-full max-w-5xl p-4 md:p-8">
+        <PageHeader
+          title="Dashboard"
+          description="An overview of your publishing activity"
+          actions={
+            <Button nativeButton={false} render={<Link href="/posts/new" />}>
+              <PlusIcon data-icon="inline-start" />
+              Create post
+            </Button>
+          }
+        />
 
-      <div className="grid grid-cols-4 gap-4 mb-10">
-        {stats.map((stat) => (
-          <div
-            key={stat.label}
-            className="border border-border rounded-lg p-5"
-          >
-            <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-            <p className="text-3xl font-semibold">{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">Recent posts</h2>
-          <Link
-            href="/posts/new"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Create post
-          </Link>
-        </div>
-
-        {recentPosts.length === 0 ? (
-          <div className="border border-border rounded-lg p-8 text-center">
-            <p className="text-muted-foreground text-sm mb-3">
-              No posts yet
-            </p>
-            <Link
-              href="/posts/new"
-              className="text-sm font-medium hover:underline"
-            >
-              Create your first post
-            </Link>
-          </div>
+        {isOnboarding ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UsersIcon />
+              </EmptyMedia>
+              <EmptyTitle>Start publishing in two steps</EmptyTitle>
+              <EmptyDescription>
+                Connect a social profile first, then create your first post.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  size="sm"
+                  nativeButton={false}
+                  render={<Link href="/accounts" />}
+                >
+                  Connect account
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href="/posts/new" />}
+                >
+                  <PlusIcon data-icon="inline-start" />
+                  Create post
+                </Button>
+              </div>
+            </EmptyContent>
+          </Empty>
         ) : (
-          <div className="border border-border rounded-lg divide-y divide-border">
-            {recentPosts.map((post) => (
-              <Link
-                key={post.id}
-                href={`/posts/${post.id}`}
-                className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-1 min-w-0 mr-4">
-                  <p className="text-sm truncate">{post.text}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {post.targets[0]?.platform ?? "X"} ·{" "}
-                    {post.createdAt.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+          <div className="flex flex-col gap-10">
+            {attentionPosts.length > 0 && (
+              <section aria-labelledby="attention-heading">
+                <Alert variant="destructive" className="mb-4">
+                  <TriangleAlertIcon />
+                  <AlertTitle>Needs attention</AlertTitle>
+                  <AlertDescription>
+                    {attentionPosts.length}{" "}
+                    {attentionPosts.length === 1 ? "post" : "posts"} failed,
+                    partially published or still publishing.
+                  </AlertDescription>
+                </Alert>
+                <ul className="rounded-lg border border-destructive/30 divide-y divide-border">
+                  {attentionPosts.map((post) => (
+                    <li key={post.id} className="min-w-0">
+                      <Link
+                        href={`/posts/${post.id}`}
+                        className="flex items-center justify-between gap-4 p-4 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm">{post.text}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {formatTargets(post.targets)}
+                          </p>
+                          {(post.errorMessage ||
+                            post.targets.some((t) => t.errorMessage)) && (
+                            <p className="mt-1 truncate text-xs text-destructive">
+                              {post.errorMessage ??
+                                post.targets.find((t) => t.errorMessage)
+                                  ?.errorMessage}
+                            </p>
+                          )}
+                        </div>
+                        <StatusBadge status={post.status} />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {upcomingPosts.length > 0 && (
+              <section aria-labelledby="up-next-heading">
+                <div className="mb-4 flex items-center justify-between gap-4">
+                  <h2 id="up-next-heading" className="text-lg font-medium">
+                    Up next
+                  </h2>
+                  <Link
+                    href="/posts?status=SCHEDULED"
+                    className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    View all scheduled
+                  </Link>
+                </div>
+                <ul className="rounded-lg border border-border divide-y divide-border">
+                  {upcomingPosts.map((post) => (
+                    <li key={post.id} className="min-w-0">
+                      <Link
+                        href={`/posts/${post.id}`}
+                        className="flex items-center justify-between gap-4 p-4 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm">{post.text}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {formatTargets(post.targets)} ·{" "}
+                            {post.scheduledAt
+                              ? formatDateTime(post.scheduledAt)
+                              : "Scheduled"}
+                          </p>
+                        </div>
+                        <StatusBadge status={post.status} />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section aria-label="Publishing stats">
+              <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {stats.map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="rounded-lg border border-border p-5"
+                  >
+                    <dt className="mb-1 text-sm text-muted-foreground">
+                      {stat.label}
+                    </dt>
+                    <dd className="text-3xl font-semibold tracking-tight tabular-nums">
+                      {stat.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {(publishing > 0 || failed > 0) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {publishing > 0 && (
+                    <Badge variant="secondary">
+                      Publishing · {publishing}
+                    </Badge>
+                  )}
+                  {failed > 0 && (
+                    <Badge variant="destructive">Failed · {failed}</Badge>
+                  )}
+                </div>
+              )}
+              {platformCounts.length > 1 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {platformCounts.map((entry) => (
+                    <Badge key={entry.platform} variant="outline">
+                      {formatPlatformName(entry.platform)} · {entry.count}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section aria-labelledby="accounts-heading">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 id="accounts-heading" className="text-lg font-medium">
+                  Accounts
+                </h2>
+                <Link
+                  href="/accounts"
+                  className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  Manage
+                </Link>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                    {accounts.length === 0
+                      ? "No accounts connected"
+                      : `${accounts.length} connected`}
+                    {expiredAccounts.length > 0 && (
+                      <Badge variant="destructive">
+                        {expiredAccounts.length} expired
+                      </Badge>
+                    )}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {accounts.length === 0
+                      ? "Connect a profile to start publishing"
+                      : accounts.map((a) => `@${a.username}`).join(" · ")}
                   </p>
                 </div>
-                <StatusBadge status={post.status} />
-              </Link>
-            ))}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href="/accounts" />}
+                  className="shrink-0"
+                >
+                  {expiredAccounts.length > 0
+                    ? "Reconnect"
+                    : accounts.length === 0
+                      ? "Connect account"
+                      : "Manage"}
+                </Button>
+              </div>
+            </section>
+
+            <section aria-labelledby="recent-posts-heading">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 id="recent-posts-heading" className="text-lg font-medium">
+                  Recent posts
+                </h2>
+                <Link
+                  href="/posts"
+                  className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  View all
+                </Link>
+              </div>
+              <DashboardPostFilter q={q} status={statusFilter} />
+
+              {recentPosts.length === 0 ? (
+                isFiltered ? (
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <FileTextIcon />
+                      </EmptyMedia>
+                      <EmptyTitle>No matching posts</EmptyTitle>
+                      <EmptyDescription>
+                        {q
+                          ? `Nothing matches “${q}”${statusFilter !== "all" ? ` with status ${statusLabel(statusFilter).toLowerCase()}` : ""}.`
+                          : `No ${statusLabel(statusFilter).toLowerCase()} posts yet.`}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        nativeButton={false}
+                        render={<Link href="/dashboard" />}
+                      >
+                        Clear filters
+                      </Button>
+                    </EmptyContent>
+                  </Empty>
+                ) : (
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <FileTextIcon />
+                      </EmptyMedia>
+                      <EmptyTitle>No posts yet</EmptyTitle>
+                      <EmptyDescription>
+                        Create your first post to get started.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      <Button
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link href="/posts/new" />}
+                      >
+                        <PlusIcon data-icon="inline-start" />
+                        Create post
+                      </Button>
+                    </EmptyContent>
+                  </Empty>
+                )
+              ) : (
+                <ul className="rounded-lg border border-border divide-y divide-border">
+                  {recentPosts.map((post) => (
+                    <li key={post.id} className="min-w-0">
+                      <Link
+                        href={`/posts/${post.id}`}
+                        className="flex items-center justify-between gap-4 p-4 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm">{post.text}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {formatTargets(post.targets)} ·{" "}
+                            {post.status === "PUBLISHED" && post.publishedAt ? (
+                              <>
+                                Published{" "}
+                                {post.publishedAt.toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </>
+                            ) : post.status === "SCHEDULED" &&
+                              post.scheduledAt ? (
+                              <>
+                                Scheduled{" "}
+                                {formatDateTime(post.scheduledAt)}
+                              </>
+                            ) : (
+                              post.createdAt.toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            )}
+                          </p>
+                        </div>
+                        <StatusBadge status={post.status} />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
         )}
       </div>
-      </div>
     </AppShell>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    DRAFT: "bg-muted text-muted-foreground",
-    SCHEDULED: "bg-amber-50 text-amber-700 border-amber-200",
-    PUBLISHING: "bg-blue-50 text-blue-700 border-blue-200",
-    PUBLISHED: "bg-green-50 text-green-700 border-green-200",
-    FAILED: "bg-red-50 text-red-700 border-red-200",
-  };
-
-  return (
-    <span
-      className={`text-xs font-medium px-2.5 py-0.5 rounded-full border border-transparent ${
-        colors[status] ?? colors.DRAFT
-      }`}
-    >
-      {status.charAt(0) + status.slice(1).toLowerCase()}
-    </span>
   );
 }

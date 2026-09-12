@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { CircleCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { ResendVerificationForm } from "./ResendVerificationForm";
+import { AuthShell } from "@/components/AuthShell";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -22,42 +26,45 @@ export default async function VerifyEmailPage({
   const errorTitle = errorMessages[error ?? ""] ?? null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8">
-      <div className="w-full max-w-sm text-center">
+    <AuthShell
+      title={errorTitle ? "Verification failed" : "Email verified"}
+      description={
+        errorTitle
+          ? errorTitle
+          : "Your email address has been successfully verified."
+      }
+    >
+      <div className="flex flex-col gap-4">
         {errorTitle ? (
           <>
-            <div className="mb-6 text-4xl">⚠️</div>
-            <h1 className="text-2xl font-semibold mb-2">
-              Verification failed
-            </h1>
-            <p className="text-sm text-muted-foreground mb-6">{errorTitle}</p>
+            <Alert variant="destructive">
+              <TriangleAlertIcon />
+              <AlertTitle>Verification failed</AlertTitle>
+              <AlertDescription>
+                Request a new verification link below.
+              </AlertDescription>
+            </Alert>
             <ResendVerificationForm />
           </>
         ) : (
           <>
-            <div className="mb-6 text-4xl">✅</div>
-            <h1 className="text-2xl font-semibold mb-2">Email verified</h1>
-            <p className="text-sm text-muted-foreground mb-6">
-              Your email address has been successfully verified.
-            </p>
-            {user ? (
-              <Link
-                href="/dashboard"
-                className="inline-block bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
-              >
-                Go to dashboard
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="inline-block bg-primary text-primary-foreground text-sm font-medium px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
-              >
-                Sign in
-              </Link>
-            )}
+            <Alert>
+              <CircleCheckIcon />
+              <AlertTitle>Verified</AlertTitle>
+              <AlertDescription>
+                You can now continue to your account.
+              </AlertDescription>
+            </Alert>
+            <Button
+              nativeButton={false}
+              render={<Link href={user ? "/dashboard" : "/login"} />}
+              className="w-full"
+            >
+              {user ? "Go to dashboard" : "Sign in"}
+            </Button>
           </>
         )}
       </div>
-    </div>
+    </AuthShell>
   );
 }
