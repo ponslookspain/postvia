@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  const accountId = rawAccountId.trim();
+  const accountId = rawAccountId.trim().replace(/^["']+|["']+$/g, "");
   if (!accountId) {
     return NextResponse.json(
       { error: "Expected multipart fields: file (.mov) and accountId" },
@@ -73,31 +73,68 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const account = await prisma.socialAccount.findFirst({
-    where: { id: accountId, userId: user.id, platform: "TIKTOK" },
-    select: { id: true, accessToken: true, refreshToken: true, expiresAt: true },
+  // Two-step lookup: distinguish "id does not exist", "foreign row" and
+  // "own row of another platform" instead of one opaque miss. Ownership
+  // stays strict — foreign rows get the same generic 404 as missing ones.
+  const row = await prisma.socialAccount.findUnique({
+    where: { id: accountId },
+    select: { id: true, userId: true, platform: true },
   });
-  if (!account) {
-    // Same data /api/accounts already shows this admin; listing it here
-    // pinpoints a wrong-platform or foreign id without leaking anything
-    // beyond the caller's own accounts. Gate and ownership stay strict.
-    const own = await prisma.socialAccount.findMany({
-      where: { userId: user.id },
-      select: { id: true, platform: true, username: true },
-    });
-    const sameId = own.find((entry) => entry.id === accountId);
+  // Same data /api/accounts already shows this admin; echoing it (plus a
+  // fragment of their own input) pinpoints typos, wrong entries and
+  // cross-login mismatches without leaking anything beyond their accounts.
+  const own = await prisma.socialAccount.findMany({
+    where: { userId: user.id },
+    select: { id: true, platform: true, username: true },
+  });
+  const yourAccounts = own.map((entry) => ({
+    id: entry.id,
+    platform: entry.platform,
+    username: entry.username,
+  }));
+  const received = {
+    length: accountId.length,
+    head: accountId.slice(0, 4),
+    tail: accountId.slice(-4),
+  };
+  if (!row || row.userId !== user.id) {
     return NextResponse.json(
       {
         ok: false,
         stage: "account",
-        error: sameId
-          ? `Account ${accountId} is ${sameId.platform}, not TIKTOK. Use a TikTok account id from yourAccounts.`
-          : "TikTok account not found. Use an account id from yourAccounts.",
-        yourAccounts: own.map((entry) => ({
-          id: entry.id,
-          platform: entry.platform,
-          username: entry.username,
-        })),
+        error:
+          "TikTok account not found. Use an account id from yourAccounts " +
+          "(same login you used for /api/accounts).",
+        received,
+        yourAccounts,
+      },
+      { status: 404 }
+    );
+  }
+  if (row.platform !== "TIKTOK") {
+    return NextResponse.json(
+      {
+        ok: false,
+        stage: "account",
+        error: `Account ${accountId} is ${row.platform}, not TIKTOK. Use a TikTok account id from yourAccounts.`,
+        received,
+        yourAccounts,
+      },
+      { status: 404 }
+    );
+  }
+  const account = await prisma.socialAccount.findFirst({
+    where: { id: accountId, userId: user.id },
+    select: { id: true, accessToken: true, refreshToken: true, expiresAt: true },
+  });
+  if (!account) {
+    return NextResponse.json(
+      {
+        ok: false,
+        stage: "account",
+        error: "TikTok account not found. Use an account id from yourAccounts.",
+        received,
+        yourAccounts,
       },
       { status: 404 }
     );
