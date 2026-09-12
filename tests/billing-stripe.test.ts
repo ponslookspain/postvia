@@ -1,6 +1,7 @@
 import { afterEach, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  getStripeKeyMode,
   getStripePrices,
   isStripeConfigured,
   mapSubscriptionStatus,
@@ -8,6 +9,7 @@ import {
   processInvoiceSnapshot,
   processSubscriptionSnapshot,
   processWebhookEvent,
+  resolveStripeConfig,
   snapshotInvoice,
   snapshotSubscription,
   STRIPE_PRICE_GROWTH_DEFAULT,
@@ -78,6 +80,114 @@ describe("stripe price config", () => {
     assert.equal(isStripeConfigured(), false);
     process.env.STRIPE_SECRET_KEY = "sk_test_123";
     assert.equal(isStripeConfigured(), true);
+  });
+});
+
+describe("stripe live/test separation", () => {
+  test("key mode follows the secret prefix", () => {
+    assert.equal(getStripeKeyMode("sk_live_abc"), "live");
+    assert.equal(getStripeKeyMode("rk_live_abc"), "live");
+    assert.equal(getStripeKeyMode("sk_test_abc"), "test");
+    assert.equal(getStripeKeyMode("rk_test_abc"), "test");
+    assert.equal(getStripeKeyMode("pk_test_abc"), "unknown");
+    assert.equal(getStripeKeyMode(""), "unknown");
+    assert.equal(getStripeKeyMode(null), "unknown");
+    assert.equal(getStripeKeyMode(undefined), "unknown");
+  });
+  test("unconfigured env resolves to nothing", () => {
+    const config = resolveStripeConfig({
+      STRIPE_SECRET_KEY: undefined,
+      STRIPE_PRICE_GROWTH: undefined,
+      STRIPE_PRICE_SCALE: undefined,
+    });
+    assert.deepEqual(config, {
+      configured: false,
+      mode: null,
+      prices: null,
+    });
+  });
+  test("live key keeps the live price defaults", () => {
+    const config = resolveStripeConfig({
+      STRIPE_SECRET_KEY: "sk_live_abc",
+      STRIPE_PRICE_GROWTH: undefined,
+      STRIPE_PRICE_SCALE: undefined,
+    });
+    assert.deepEqual(config, {
+      configured: true,
+      mode: "live",
+      prices: { growth: GROWTH_PRICE, scale: SCALE_PRICE },
+    });
+  });
+  test("test key without explicit prices refuses the live defaults", () => {
+    const config = resolveStripeConfig({
+      STRIPE_SECRET_KEY: "sk_test_abc",
+      STRIPE_PRICE_GROWTH: undefined,
+      STRIPE_PRICE_SCALE: undefined,
+    });
+    assert.deepEqual(config, {
+      configured: true,
+      mode: "test",
+      prices: null,
+    });
+  });
+  test("explicit prices always win, in either mode", () => {
+    const testPrices = { growth: "price_test_growth", scale: "price_test_scale" };
+    assert.deepEqual(
+      resolveStripeConfig({
+        STRIPE_SECRET_KEY: "sk_test_abc",
+        STRIPE_PRICE_GROWTH: testPrices.growth,
+        STRIPE_PRICE_SCALE: testPrices.scale,
+      }),
+      { configured: true, mode: "test", prices: testPrices }
+    );
+    const livePrices = { growth: "price_live_growth", scale: "price_live_scale" };
+    assert.deepEqual(
+      resolveStripeConfig({
+        STRIPE_SECRET_KEY: "sk_live_abc",
+        STRIPE_PRICE_GROWTH: livePrices.growth,
+        STRIPE_PRICE_SCALE: livePrices.scale,
+      }),
+      { configured: true, mode: "live", prices: livePrices }
+    );
+  });
+  test("test payloads map through test prices, live payloads do not", () => {
+    const testPrices = { growth: "price_test_growth", scale: "price_test_scale" };
+    assert.equal(priceIdToPlanId("price_test_growth", testPrices), "growth");
+    assert.equal(priceIdToPlanId("price_test_scale", testPrices), "scale");
+    assert.equal(priceIdToPlanId(GROWTH_PRICE, testPrices), null);
+    assert.equal(priceIdToPlanId("price_test_growth", {
+      growth: GROWTH_PRICE,
+      scale: SCALE_PRICE,
+    }), null);
+  });
+  test("checkout without resolved prices stops before any Stripe call", async () => {
+    const calls = { customers: 0, links: 0, sessions: 0 };
+    const deps: CheckoutDeps = {
+      configured: true,
+      prices: null,
+      findSubscription: async () => null,
+      linkCustomer: async () => {
+        calls.links += 1;
+      },
+      createCustomer: async () => {
+        calls.customers += 1;
+        return { id: "cus_x" };
+      },
+      createSession: async () => {
+        calls.sessions += 1;
+        return { url: "https://checkout.stripe.com/c/pay_x" };
+      },
+    };
+    const res = await handleCheckout({
+      user: user(),
+      plan: "growth",
+      origin: "https://preview-postvia.vercel.app",
+      deps,
+    });
+    assert.equal(res.status, 503);
+    const body = (await res.json()) as { error?: unknown };
+    assert.match(String(body.error), /STRIPE_PRICE_GROWTH/);
+    assert.deepEqual(calls, { customers: 0, links: 0, sessions: 0 });
   });
 });
 

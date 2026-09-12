@@ -12,6 +12,9 @@ export { isStripeRedirectUrl } from "@/lib/stripe-redirect";
  *   Stripe webhook writes paid state; Checkout/Portal never write plans.
  * - BillingTestOverride is admin-only test state and is never consulted
  *   here — a webhook event can never become, or derive from, an override.
+ * - Live/Test separation is enforced by environment-scoped config
+ *   (resolveStripeConfig): a test key never falls back to the live price
+ *   defaults, and webhook secrets are verified per environment.
  * - Nothing here logs secrets, emails, amounts, or card data: callers log
  *   only event ids/types, internal user ids, plan ids and statuses.
  */
@@ -21,7 +24,7 @@ export const STRIPE_PRICE_SCALE_DEFAULT = "price_1UEyqeRKEM3xporCZv7dEUEc";
 
 export type StripePrices = { growth: string; scale: string };
 
-/** Price ids are operator config (env) with safe production defaults. */
+/** Price ids are operator config (env) with safe production defaults. Prefer resolveStripeConfig, which refuses live defaults under a test key. */
 export function getStripePrices(
   env: Record<string, string | undefined> = process.env
 ): StripePrices {
@@ -46,6 +49,62 @@ export function isStripeConfigured(
   env: Record<string, string | undefined> = process.env
 ): boolean {
   return Boolean(env.STRIPE_SECRET_KEY?.trim());
+}
+
+export type StripeKeyMode = "live" | "test" | "unknown";
+
+/**
+ * Detects the Stripe account mode from the secret-key prefix
+ * (sk_live_/rk_live_ vs sk_test_/rk_test_). Heuristic only: it selects
+ * configuration, never authorization — every request is still verified by
+ * Stripe itself (API calls, webhook signatures).
+ */
+export function getStripeKeyMode(
+  secret: string | null | undefined
+): StripeKeyMode {
+  const key = secret?.trim() ?? "";
+  if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) return "live";
+  if (key.startsWith("sk_test_") || key.startsWith("rk_test_")) return "test";
+  return "unknown";
+}
+
+export type ResolvedStripeConfig = {
+  configured: boolean;
+  /** Null when unconfigured. */
+  mode: StripeKeyMode | null;
+  /**
+   * Null when billing cannot start checkouts: unconfigured, or a test key
+   * without explicit test price ids. Test mode never inherits the live
+   * price defaults, so Preview can never charge or reference live prices.
+   */
+  prices: StripePrices | null;
+};
+
+/**
+ * Resolves billing configuration for the current environment. Vercel scopes
+ * STRIPE_* vars per environment (Production = live key/secrets/prices,
+ * Preview = test key/secrets/prices), and this resolver reads only the
+ * current process env — environments can never mix clients, subscriptions,
+ * webhook secrets or price ids through code.
+ */
+export function resolveStripeConfig(
+  env: Record<string, string | undefined> = process.env
+): ResolvedStripeConfig {
+  const secret = env.STRIPE_SECRET_KEY?.trim();
+  if (!secret) return { configured: false, mode: null, prices: null };
+  const mode = getStripeKeyMode(secret);
+  const growth = env.STRIPE_PRICE_GROWTH?.trim() || null;
+  const scale = env.STRIPE_PRICE_SCALE?.trim() || null;
+  if (growth && scale) return { configured: true, mode, prices: { growth, scale } };
+  if (mode === "test") return { configured: true, mode, prices: null };
+  return {
+    configured: true,
+    mode,
+    prices: {
+      growth: growth || STRIPE_PRICE_GROWTH_DEFAULT,
+      scale: scale || STRIPE_PRICE_SCALE_DEFAULT,
+    },
+  };
 }
 
 let cachedClient: Stripe | null = null;

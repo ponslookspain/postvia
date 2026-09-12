@@ -3,9 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getApiUser, type AuthUser } from "@/lib/auth";
 import {
   getStripeClient,
-  getStripePrices,
-  isStripeConfigured,
   isStripeRedirectUrl,
+  resolveStripeConfig,
   type StripePrices,
 } from "@/lib/stripe";
 import { toPlanId, type DbPlan } from "@/lib/entitlements";
@@ -14,7 +13,8 @@ import { reportError } from "@/lib/diagnostics";
 
 export type CheckoutDeps = {
   configured: boolean;
-  prices: StripePrices;
+  /** Null when the environment cannot start checkouts (test key, no prices). */
+  prices: StripePrices | null;
   findSubscription: (userId: string) => Promise<{
     plan: PlanId;
     status: string;
@@ -36,9 +36,11 @@ export type CheckoutDeps = {
   }) => Promise<{ url: string | null }>;
 };
 
+const billingConfig = resolveStripeConfig();
+
 const liveDeps: CheckoutDeps = {
-  configured: isStripeConfigured(),
-  prices: getStripePrices(),
+  configured: billingConfig.configured,
+  prices: billingConfig.prices,
   findSubscription: async (userId) => {
     const row = await prisma.subscription.findUnique({
       where: { userId },
@@ -125,6 +127,16 @@ export async function handleCheckout(input: {
       { status: 503 }
     );
   }
+  const prices = input.deps.prices;
+  if (!prices) {
+    return NextResponse.json(
+      {
+        error:
+          "Billing test configuration is incomplete. Set STRIPE_PRICE_GROWTH and STRIPE_PRICE_SCALE.",
+      },
+      { status: 503 }
+    );
+  }
   if (!isHttpOrigin(input.origin)) {
     return NextResponse.json({ error: "Invalid origin" }, { status: 400 });
   }
@@ -162,10 +174,7 @@ export async function handleCheckout(input: {
   }
   const session = await input.deps.createSession({
     customerId,
-    priceId:
-      input.plan === "growth"
-        ? input.deps.prices.growth
-        : input.deps.prices.scale,
+    priceId: input.plan === "growth" ? prices.growth : prices.scale,
     userId: input.user.id,
     successUrl: `${input.origin}/billing?checkout=success`,
     cancelUrl: `${input.origin}/billing?checkout=cancelled`,

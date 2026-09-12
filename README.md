@@ -105,6 +105,9 @@ composer changes.
   plan changes and cancellation), and `POST /api/billing/webhook` (verified
   Stripe events are the only writer of paid `Subscription` state, idempotent
   via `StripeEvent`). No Stripe, no charges without `STRIPE_SECRET_KEY`.
+  Preview deployments use `sk_test_*` keys with separate test webhook
+  secrets and test price ids (Vercel Preview env); a test key without
+  explicit test prices refuses checkout instead of touching live prices.
 - Plan management lives on `/billing` (current plan, usage, change,
   cancel); Settings stays account-only. Dashboard shows a compact
   `Plan · usage` line linking to `/billing`.
