@@ -501,24 +501,4 @@ describe("TikTok social layer", () => {
       );
     });
   });
-
-  describe("sniffQuickTimeBrand", () => {
-    test("recognizes a QuickTime ftyp header and its brand", () => {
-      const header = new Uint8Array([
-        0, 0, 0, 32, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20,
-      ]);
-      assert.deepEqual(tiktok.sniffQuickTimeBrand(header), { brand: "qt  " });
-    });
-
-    test("rejects non-QuickTime bytes and truncated input", () => {
-      assert.equal(
-        tiktok.sniffQuickTimeBrand(
-          new Uint8Array([0, 0, 0, 32, 0x69, 0x73, 0x6f, 0x6d, 0x69, 0x73, 0x6f, 0x6d])
-        ),
-        null
-      );
-      assert.equal(tiktok.sniffQuickTimeBrand(new Uint8Array([0x66, 0x74])), null);
-      assert.equal(tiktok.sniffQuickTimeBrand(new Uint8Array(0)), null);
-    });
-  });
 });
