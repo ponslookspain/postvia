@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   CalendarClockIcon,
+  CheckIcon,
   CircleCheckIcon,
   ClapperboardIcon,
   OctagonXIcon,
@@ -14,6 +15,7 @@ import {
   UploadIcon,
   XIcon,
 } from "lucide-react";
+import { cn } from "cn";
 import { validateMediaInput } from "@/lib/media";
 import {
   BULK_INTERVAL_PRESETS,
@@ -32,14 +34,6 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Empty,
@@ -496,6 +490,14 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
   }
 
   const allDone = items.length > 0 && doneCount === items.length;
+  const reviewReady =
+    items.length > 0 &&
+    schedule.length > 0 &&
+    configValidation.ok &&
+    fileProblems.size === 0 &&
+    text.trim().length > 0;
+  const currentStep = running ? 4 : items.length === 0 ? 1 : reviewReady ? 3 : 2;
+  const steps = ["Upload", "Configure", "Review", "Schedule"];
 
   if (accounts.length === 0) {
     return (
@@ -530,21 +532,64 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
         </p>
       </div>
 
-      <FieldGroup className="gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Videos</CardTitle>
-            <CardDescription>
-              MP4 or WebM, up to {BULK_MAX_VIDEOS} per batch. Each file is
-              uploaded separately with its own progress.
-            </CardDescription>
-            <CardAction>
-              <Badge variant="secondary">
-                {items.length}/{BULK_MAX_VIDEOS}
-              </Badge>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+      <ol
+        aria-label="Batch progress"
+        className="mb-10 flex items-center gap-2"
+      >
+        {steps.map((label, index) => {
+          const stepNumber = index + 1;
+          const done = stepNumber < currentStep;
+          const current = stepNumber === currentStep;
+          return (
+            <li
+              key={label}
+              aria-current={current ? "step" : undefined}
+              className="flex min-w-0 flex-1 items-center gap-2 last:flex-none"
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium tabular-nums transition-colors",
+                  done && "bg-primary text-primary-foreground",
+                  current && "border border-primary text-foreground",
+                  !done && !current && "border border-border text-muted-foreground"
+                )}
+              >
+                {done ? <CheckIcon className="size-3.5" /> : stepNumber}
+              </span>
+              <span
+                className={cn(
+                  "truncate text-xs",
+                  current || done ? "font-medium text-foreground" : "text-muted-foreground"
+                )}
+              >
+                {label}
+              </span>
+              {stepNumber < steps.length && (
+                <span aria-hidden="true" className="mx-1 h-px flex-1 bg-border" />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="flex flex-col gap-10">
+        <section aria-labelledby="bulk-videos">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 id="bulk-videos" className="text-lg font-medium">
+                Videos
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                MP4 or WebM, up to {BULK_MAX_VIDEOS} per batch. Each file is
+                uploaded separately with its own progress.
+              </p>
+            </div>
+            <Badge variant="secondary">
+              {items.length}/{BULK_MAX_VIDEOS}
+            </Badge>
+          </div>
+          <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-start gap-3">
               {items.map((item) => (
                 <div key={item.key} className="flex w-36 flex-col gap-1.5">
@@ -646,17 +691,17 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
                 e.target.value = "";
               }}
             />
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Content</CardTitle>
-            <CardDescription>
-              The same text is used for every post in the batch.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <section aria-labelledby="bulk-content">
+          <h2 id="bulk-content" className="text-lg font-medium">
+            Content
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            The same text is used for every post in the batch.
+          </p>
+          <div>
             <Field>
               <FieldLabel htmlFor="bulk-text">Post text</FieldLabel>
               <Textarea
@@ -667,17 +712,17 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
                 rows={3}
               />
             </Field>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Publish to</CardTitle>
-            <CardDescription>
-              Only connected accounts that support video are listed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <section aria-labelledby="bulk-targets">
+          <h2 id="bulk-targets" className="text-lg font-medium">
+            Publish to
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            Only connected accounts that support video are listed.
+          </p>
+          <div>
             <FieldSet>
               <FieldLegend variant="label" className="sr-only">
                 Publish to
@@ -714,18 +759,18 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
                 })}
               </FieldGroup>
             </FieldSet>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Schedule</CardTitle>
-            <CardDescription>
-              First post goes out at the start time, the rest follow spaced
-              by the interval. All times shown in the selected timezone.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <section aria-labelledby="bulk-schedule">
+          <h2 id="bulk-schedule" className="text-lg font-medium">
+            Schedule
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            First post goes out at the start time, the rest follow spaced
+            by the interval. All times shown in the selected timezone.
+          </p>
+          <div>
             <FieldGroup>
               <div className="grid grid-cols-2 gap-4">
                 <Field>
@@ -818,21 +863,21 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
                 </Alert>
               )}
             </FieldGroup>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         {items.length > 0 && schedule.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Review</CardTitle>
-              <CardDescription>
-                One ordinary scheduled post per video. Each stays editable,
-                retryable and deletable on its own.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
+          <section aria-labelledby="bulk-review">
+            <h2 id="bulk-review" className="text-lg font-medium">
+              Review
+            </h2>
+            <p className="mt-1 mb-4 text-sm text-muted-foreground">
+              One ordinary scheduled post per video. Each stays editable,
+              retryable and deletable on its own.
+            </p>
+            <ul className="flex flex-col gap-2">
               {items.map((item, index) => (
-                <div
+                <li
                   key={item.key}
                   className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
                 >
@@ -860,10 +905,10 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
                       <Trash2Icon />
                     </Button>
                   )}
-                </div>
+                </li>
               ))}
-            </CardContent>
-          </Card>
+            </ul>
+          </section>
         )}
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -895,7 +940,7 @@ export function BulkScheduler({ accounts }: { accounts: BulkAccountRef[] }) {
             </AlertDescription>
           </Alert>
         )}
-      </FieldGroup>
+      </div>
 
       {running && activeCount > 0 && (
         <div className="mt-4">

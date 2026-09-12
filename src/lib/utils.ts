@@ -38,3 +38,33 @@ export function formatStatusLabel(status: string): string {
   if (status === "all") return "All statuses";
   return status.charAt(0) + status.slice(1).toLowerCase().replaceAll("_", " ");
 }
+
+/** Primary date line for a post: published, scheduled, or created. */
+export function formatPostDate(post: {
+  status: string;
+  publishedAt: Date | null;
+  scheduledAt: Date | null;
+  createdAt: Date;
+}): string {
+  if (post.status === "PUBLISHED" && post.publishedAt) {
+    return `Published ${post.publishedAt.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })}`;
+  }
+  if (post.status === "SCHEDULED" && post.scheduledAt) {
+    return `Scheduled ${post.scheduledAt.toLocaleString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  }
+  return post.createdAt.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}

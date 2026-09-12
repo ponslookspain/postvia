@@ -2,7 +2,7 @@
 
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PencilIcon, SendIcon, TriangleAlertIcon } from "lucide-react";
+import { PencilIcon, SendIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import {
   X_POST_CHAR_LIMIT,
   THREADS_POST_CHAR_LIMIT,
@@ -15,17 +15,11 @@ import {
   localTimeInputValue,
 } from "@/lib/schedule";
 import { PageHeader } from "@/components/PageHeader";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +35,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
@@ -118,6 +113,120 @@ async function startBackgroundAction(
   }
 }
 
+function MediaHero({
+  media,
+  selectedId,
+  onSelect,
+  deletingMediaId,
+  onRemove,
+}: {
+  media: Post["media"];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  deletingMediaId: string | null;
+  onRemove: (id: string) => void;
+}) {
+  const selected = media.find((item) => item.id === selectedId) ?? media[0];
+  if (!selected) return null;
+  return (
+    <div>
+      <div
+        key={selected.id}
+        className="overflow-hidden rounded-xl bg-muted animate-[post-in_.35s_ease_both] motion-reduce:animate-none"
+      >
+        {selected.type === "IMAGE" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/media/${selected.id}`}
+            alt={selected.filename}
+            className="max-h-[480px] w-full object-contain"
+          />
+        ) : (
+          <video
+            src={`/api/media/${selected.id}`}
+            className="max-h-[480px] w-full object-contain"
+            controls
+            playsInline
+            preload="metadata"
+          />
+        )}
+      </div>
+      {media.length > 1 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {media.map((item) => {
+            const active = item.id === selected.id;
+            return (
+              <div key={item.id} className="relative">
+                <button
+                  type="button"
+                  onClick={() => onSelect(item.id)}
+                  aria-label={`Show ${item.filename}`}
+                  aria-pressed={active}
+                  className={`block size-16 overflow-hidden rounded-lg bg-muted outline-none transition-all hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring/50 ${
+                    active ? "ring-2 ring-primary" : "opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  {item.type === "IMAGE" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/media/${item.id}`}
+                      alt=""
+                      loading="lazy"
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={`/api/media/${item.id}`}
+                      className="size-full object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                  )}
+                </button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="icon-sm"
+                  onClick={() => onRemove(item.id)}
+                  disabled={deletingMediaId === item.id}
+                  aria-label={`Remove ${item.filename}`}
+                  className="absolute -top-1.5 -right-1.5 size-6 rounded-full shadow-sm"
+                >
+                  {deletingMediaId === item.id ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <XIcon />
+                  )}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {media.length === 1 && (
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="truncate text-xs text-muted-foreground">
+            {selected.filename}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onRemove(selected.id)}
+            disabled={deletingMediaId === selected.id}
+          >
+            {deletingMediaId === selected.id && (
+              <Spinner data-icon="inline-start" />
+            )}
+            Remove media
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PostDetailPage({
   params,
   post: initialPost,
@@ -141,6 +250,7 @@ export default function PostDetailPage({
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
   const [rescheduling, setRescheduling] = useState(false);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
 
   const target = post.targets[0];
   const platform = target?.platform ?? "X";
@@ -290,8 +400,7 @@ export default function PostDetailPage({
     await sendScheduledAt(null);
   }
 
-  function targetPostUrl(targetItem: Post["targets"][number]): string | null {
-    if (!targetItem.externalPostId) return null;
+  function targetPostUrl(targetItem: Post["targets"][number]): string | null {    if (!targetItem.externalPostId) return null;
     const handle = targetItem.socialAccount?.username;
     if (targetItem.platform === "THREADS") {
       return threadsPostUrl(handle ?? post.username ?? "", targetItem.externalPostId);
@@ -306,7 +415,7 @@ export default function PostDetailPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
+    <div className="mx-auto w-full max-w-5xl p-4 md:p-8">
       <PageHeader
         title="Post"
         description={`Created ${new Date(post.createdAt).toLocaleDateString(
@@ -316,174 +425,111 @@ export default function PostDetailPage({
         actions={<StatusBadge status={post.status} />}
       />
 
-      <FieldGroup className="gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Text</CardTitle>
-            {!editing && (
-              <CardDescription>
-                Platform: {formatPlatformName(platform)}
-              </CardDescription>
-            )}
-          </CardHeader>
-          <CardContent>
-            {editing ? (
-              <FieldGroup>
-                <Field data-invalid={isOverLimit || undefined}>
-                  <FieldLabel htmlFor="post-text" className="sr-only">
-                    Post text
-                  </FieldLabel>
-                  <Textarea
-                    id="post-text"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    rows={5}
-                    aria-invalid={isOverLimit || undefined}
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    <FieldDescription>
-                      Platform: {formatPlatformName(platform)}
-                    </FieldDescription>
-                    <Badge
-                      variant={isOverLimit ? "destructive" : "secondary"}
-                    >
-                      {charCount} / {charLimit}
-                    </Badge>
-                  </div>
-                  {isOverLimit && (
-                    <FieldError>
-                      Post exceeds the {charLimit} character limit
-                    </FieldError>
-                  )}
-                </Field>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button onClick={() => void handleSave()} disabled={!canSave}>
-                    {saving && <Spinner data-icon="inline-start" />}
-                    {saving ? "Saving..." : "Save changes"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setEditing(false);
-                      setText(post.text);
-                    }}
+      {post.status === "FAILED" && post.errorMessage && (
+        <Alert variant="destructive" className="mb-6">
+          <TriangleAlertIcon />
+          <AlertTitle>Publication failed</AlertTitle>
+          <AlertDescription>{post.errorMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 animate-[post-in_.45s_ease_both] motion-reduce:animate-none">
+          {editing ? (
+            <FieldGroup>
+              <Field data-invalid={isOverLimit || undefined}>
+                <FieldLabel htmlFor="post-text" className="sr-only">
+                  Post text
+                </FieldLabel>
+                <Textarea
+                  id="post-text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  rows={5}
+                  aria-invalid={isOverLimit || undefined}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <FieldDescription>
+                    Platform: {formatPlatformName(platform)}
+                  </FieldDescription>
+                  <Badge
+                    variant={isOverLimit ? "destructive" : "secondary"}
                   >
-                    Cancel
-                  </Button>
+                    {charCount} / {charLimit}
+                  </Badge>
                 </div>
-              </FieldGroup>
-            ) : (
-              <p className="text-sm break-words whitespace-pre-wrap">
+                {isOverLimit && (
+                  <FieldError>
+                    Post exceeds the {charLimit} character limit
+                  </FieldError>
+                )}
+              </Field>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button onClick={() => void handleSave()} disabled={!canSave}>
+                  {saving && <Spinner data-icon="inline-start" />}
+                  {saving ? "Saving..." : "Save changes"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(false);
+                    setText(post.text);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </FieldGroup>
+          ) : (
+            <>
+              {post.media.length > 0 && (
+                <MediaHero
+                  media={post.media}
+                  selectedId={selectedMediaId}
+                  onSelect={setSelectedMediaId}
+                  deletingMediaId={deletingMediaId}
+                  onRemove={(mediaId) => void handleDeleteMedia(mediaId)}
+                />
+              )}
+              <p className="mt-5 text-lg leading-relaxed break-words whitespace-pre-wrap">
                 {post.text}
               </p>
-            )}
-          </CardContent>
-        </Card>
+              {post.status === "DRAFT" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditing(true)}
+                  className="mt-3"
+                >
+                  <PencilIcon data-icon="inline-start" />
+                  Edit caption
+                </Button>
+              )}
+            </>
+          )}
+        </div>
 
-        {post.media.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Media</CardTitle>
-              <CardDescription>
-                {post.media.length}{" "}
-                {post.media.length === 1 ? "file" : "files"} attached
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap items-start gap-3">
-                {post.media.map((item) => (
-                  <div key={item.id} className="flex flex-col gap-1.5">
-                    <div className="relative size-40 overflow-hidden rounded-md border border-border bg-muted">
-                      {item.type === "IMAGE" ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/media/${item.id}`}
-                          alt={item.filename}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <video
-                          src={`/api/media/${item.id}`}
-                          className="size-full object-cover"
-                          muted
-                          playsInline
-                          preload="metadata"
-                        />
-                      )}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon-sm"
-                        onClick={() => void handleDeleteMedia(item.id)}
-                        disabled={deletingMediaId === item.id}
-                        aria-label={`Remove ${item.filename}`}
-                        className="absolute top-1.5 right-1.5 size-6 rounded-full"
-                      >
-                        {deletingMediaId === item.id ? (
-                          <Spinner data-icon="inline-start" />
-                        ) : (
-                          <span aria-hidden="true" className="text-sm leading-none">
-                            ×
-                          </span>
-                        )}
-                      </Button>
-                    </div>
-                    <p className="w-40 truncate text-xs text-muted-foreground">
-                      {item.filename}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-4">
-              <div>
-                <dt className="mb-1 text-sm font-medium">Platform</dt>
-                <dd className="text-sm">{formatPlatformName(platform)}</dd>
-              </div>
-              <div>
-                <dt className="mb-1 text-sm font-medium">Status</dt>
-                <dd>
-                  <StatusBadge status={post.status} />
-                </dd>
-              </div>
-              <div>
-                <dt className="mb-1 text-sm font-medium">Created</dt>
-                <dd className="text-sm">
-                  {new Date(post.createdAt).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </dd>
-              </div>
+        <aside className="flex min-w-0 flex-col gap-6 animate-[post-in_.45s_ease_both] motion-reduce:animate-none" style={{ animationDelay: "80ms" }}>
+          <section aria-label="Publication status">
+            <StatusBadge status={post.status} />
+            <dl className="mt-3 flex flex-col gap-2 text-sm">
               {post.scheduledAt && (
-                <div>
-                  <dt className="mb-1 text-sm font-medium">Scheduled for</dt>
-                  <dd className="text-sm">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Scheduled</dt>
+                  <dd className="text-right">
                     {new Date(post.scheduledAt).toLocaleDateString("en-GB", {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
-                      timeZoneName: "short",
                     })}
                   </dd>
                 </div>
               )}
-              <div>
-                <dt className="mb-1 text-sm font-medium">Published</dt>
-                <dd className="text-sm text-muted-foreground">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted-foreground">Published</dt>
+                <dd className="text-right text-muted-foreground">
                   {post.publishedAt
                     ? new Date(post.publishedAt).toLocaleDateString("en-GB", {
                         day: "numeric",
@@ -495,159 +541,159 @@ export default function PostDetailPage({
                     : "—"}
                 </dd>
               </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-muted-foreground">Created</dt>
+                <dd className="text-right text-muted-foreground">
+                  {new Date(post.createdAt).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </dd>
+              </div>
               {externalPostId && (
-                <div className="col-span-2">
-                  <dt className="mb-1 text-sm font-medium">External ID</dt>
-                  <dd className="text-sm text-muted-foreground font-mono">
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">External ID</dt>
+                  <dd className="truncate text-right font-mono text-xs text-muted-foreground">
                     {externalPostId}
                   </dd>
                 </div>
               )}
             </dl>
-          </CardContent>
-        </Card>
+          </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Publishing targets</CardTitle>
-            <CardDescription>
-              One row per connected account this post goes to
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {post.targets.map((targetItem) => (
-              <div
-                key={targetItem.id}
-                className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">
-                    {formatPlatformName(targetItem.platform)}
-                    {targetItem.socialAccount?.username
-                      ? ` @${targetItem.socialAccount.username}`
-                      : ""}
-                  </p>
-                  {targetItem.errorMessage && (
-                    <p className="text-xs text-destructive">
-                      {targetItem.errorMessage}
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {targetItem.status === "PUBLISHED" &&
-                    targetPostUrl(targetItem) && (
+          <section aria-label="Publishing targets">
+            <Separator className="mb-4" />
+            <ul className="flex flex-col gap-1">
+              {post.targets.map((targetItem) => (
+                <li
+                  key={targetItem.id}
+                  className="flex items-center justify-between gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/50"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex size-5 shrink-0 items-center justify-center [&_svg]:size-5">
+                      <PlatformIcon platform={targetItem.platform} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        {formatPlatformName(targetItem.platform)}
+                        {targetItem.socialAccount?.username
+                          ? ` @${targetItem.socialAccount.username}`
+                          : ""}
+                      </p>
+                      {targetItem.errorMessage && (
+                        <p className="truncate text-xs text-destructive">
+                          {targetItem.errorMessage}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {targetItem.status === "PUBLISHED" &&
+                      targetPostUrl(targetItem) && (
+                        <a
+                          href={targetPostUrl(targetItem)!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-sm text-xs text-muted-foreground underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                        >
+                          View
+                        </a>
+                      )}
+                    <Badge variant="secondary">
+                      {targetItem.status.toLowerCase()}
+                    </Badge>
+                    {targetItem.status === "FAILED" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void handleRetry(targetItem.id)}
+                        disabled={retrying}
+                      >
+                        {retrying && <Spinner data-icon="inline-start" />}
+                        Retry
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          {!editing && (
+            <section aria-label="Post actions">
+              <Separator className="mb-4" />
+              <div className="flex flex-col gap-2">
+                {post.status === "DRAFT" && (
+                  <Button
+                    onClick={() => void handlePublish()}
+                    disabled={publishing}
+                  >
+                    {publishing && <Spinner data-icon="inline-start" />}
+                    {!publishing && <SendIcon data-icon="inline-start" />}
+                    {publishing ? "Publishing..." : "Publish now"}
+                  </Button>
+                )}
+
+                {post.status === "PUBLISHED" && externalPostId && (
+                  <Button
+                    variant="outline"
+                    nativeButton={false}
+                    render={
                       <a
-                        href={targetPostUrl(targetItem)!}
+                        href={
+                          platform === "THREADS"
+                            ? threadsPostUrl(post.username ?? "", externalPostId)
+                            : `https://x.com/i/status/${externalPostId}`
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-muted-foreground underline hover:text-foreground"
-                      >
-                        View
-                      </a>
-                    )}
-                  <Badge variant="secondary">
-                    {targetItem.status.toLowerCase()}
-                  </Badge>
-                  {targetItem.status === "FAILED" && (
+                      />
+                    }
+                  >
+                    View on {platform === "THREADS" ? "Threads" : "X"}
+                  </Button>
+                )}
+
+                {post.status === "FAILED" && (
+                  <Button
+                    onClick={() => void handleRetry()}
+                    disabled={retrying}
+                  >
+                    {retrying && <Spinner data-icon="inline-start" />}
+                    {retrying ? "Retrying..." : "Retry"}
+                  </Button>
+                )}
+
+                {(post.status === "DRAFT" ||
+                  post.status === "SCHEDULED") &&
+                  platform === "THREADS" && (
                     <Button
                       variant="outline"
-                      size="sm"
-                      onClick={() => void handleRetry(targetItem.id)}
-                      disabled={retrying}
+                      onClick={openReschedule}
+                      disabled={rescheduling || publishing}
                     >
-                      {retrying && <Spinner data-icon="inline-start" />}
-                      Retry
+                      {post.status === "SCHEDULED" ? "Reschedule" : "Schedule"}
                     </Button>
                   )}
-                </div>
+
+                {(post.status === "DRAFT" ||
+                  post.status === "SCHEDULED" ||
+                  post.status === "FAILED") && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => setDeleteOpen(true)}
+                    disabled={deleting}
+                  >
+                    {deleting && <Spinner data-icon="inline-start" />}
+                    {deleting ? "Deleting..." : "Delete"}
+                  </Button>
+                )}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {post.status === "FAILED" && post.errorMessage && (
-          <Alert variant="destructive">
-            <TriangleAlertIcon />
-            <AlertTitle>Publication failed</AlertTitle>
-            <AlertDescription>{post.errorMessage}</AlertDescription>
-          </Alert>
-        )}
-
-        {!editing && (
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {post.status === "DRAFT" && (
-              <>
-                <Button variant="outline" onClick={() => setEditing(true)}>
-                  <PencilIcon data-icon="inline-start" />
-                  Edit
-                </Button>
-                <Button
-                  onClick={() => void handlePublish()}
-                  disabled={publishing}
-                >
-                  {publishing && <Spinner data-icon="inline-start" />}
-                  {!publishing && <SendIcon data-icon="inline-start" />}
-                  {publishing ? "Publishing..." : "Publish now"}
-                </Button>
-              </>
-            )}
-
-            {post.status === "PUBLISHED" && externalPostId && (
-              <Button
-                variant="outline"
-                nativeButton={false}
-                render={
-                  <a
-                    href={
-                      platform === "THREADS"
-                        ? threadsPostUrl(post.username ?? "", externalPostId)
-                        : `https://x.com/i/status/${externalPostId}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
-                }
-              >
-                View on {platform === "THREADS" ? "Threads" : "X"}
-              </Button>
-            )}
-
-            {post.status === "FAILED" && (
-              <Button
-                onClick={() => void handleRetry()}
-                disabled={retrying}
-              >
-                {retrying && <Spinner data-icon="inline-start" />}
-                {retrying ? "Retrying..." : "Retry"}
-              </Button>
-            )}
-
-            {(post.status === "DRAFT" || post.status === "SCHEDULED") &&
-              platform === "THREADS" && (
-                <Button
-                  variant="outline"
-                  onClick={openReschedule}
-                  disabled={rescheduling || publishing}
-                >
-                  {post.status === "SCHEDULED" ? "Reschedule" : "Schedule"}
-                </Button>
-              )}
-
-            {(post.status === "DRAFT" ||
-              post.status === "SCHEDULED" ||
-              post.status === "FAILED") && (
-              <Button
-                variant="destructive"
-                onClick={() => setDeleteOpen(true)}
-                disabled={deleting}
-              >
-                {deleting && <Spinner data-icon="inline-start" />}
-                {deleting ? "Deleting..." : "Delete"}
-              </Button>
-            )}
-          </div>
-        )}
-      </FieldGroup>
+            </section>
+          )}
+        </aside>
+      </div>
 
       <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
         <DialogContent>

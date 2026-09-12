@@ -1,17 +1,10 @@
 import Link from "next/link";
-import {
-  FileTextIcon,
-  PlusIcon,
-  TriangleAlertIcon,
-  UsersIcon,
-} from "lucide-react";
+import { FileTextIcon, PlusIcon, UsersIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
-import { StatusBadge } from "@/components/StatusBadge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,9 +15,8 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import {
-  DashboardPostFilter,
-} from "@/app/dashboard/DashboardPostFilter";
+import { DashboardPostFilter } from "@/app/dashboard/DashboardPostFilter";
+import { PostRow } from "@/app/dashboard/PostRow";
 
 export const dynamic = "force-dynamic";
 
@@ -37,29 +29,10 @@ const FILTERABLE_STATUSES = [
   "FAILED",
 ];
 
-function formatTargets(
-  targets: { platform: string; socialAccount?: { username: string } | null }[]
-): string {
-  if (targets.length === 0) return "No targets";
-  return targets
-    .map((target) => {
-      const name = formatPlatformName(target.platform);
-      return target.socialAccount?.username
-        ? `${name} @${target.socialAccount.username}`
-        : name;
-    })
-    .join(" · ");
-}
-
-function formatDateTime(value: Date): string {
-  return value.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const postFeedInclude = {
+  targets: { include: { socialAccount: { select: { username: true } } } },
+  media: { take: 1 as const, select: { id: true, type: true } },
+};
 
 export default async function DashboardPage({
   searchParams,
@@ -98,9 +71,7 @@ export default async function DashboardPage({
       },
       take: 5,
       orderBy: { createdAt: "desc" },
-      include: {
-        targets: { include: { socialAccount: { select: { username: true } } } },
-      },
+      include: postFeedInclude,
     }),
     prisma.post.findMany({
       where: {
@@ -109,17 +80,13 @@ export default async function DashboardPage({
       },
       take: 5,
       orderBy: { updatedAt: "desc" },
-      include: {
-        targets: { include: { socialAccount: { select: { username: true } } } },
-      },
+      include: postFeedInclude,
     }),
     prisma.post.findMany({
       where: { userId: user.id, status: "SCHEDULED" },
       take: 3,
       orderBy: { scheduledAt: "asc" },
-      include: {
-        targets: { include: { socialAccount: { select: { username: true } } } },
-      },
+      include: postFeedInclude,
     }),
     prisma.socialAccount.findMany({
       where: { userId: user.id },
@@ -219,39 +186,25 @@ export default async function DashboardPage({
           <div className="flex flex-col gap-10">
             {attentionPosts.length > 0 && (
               <section aria-labelledby="attention-heading">
-                <Alert variant="destructive" className="mb-4">
-                  <TriangleAlertIcon />
-                  <AlertTitle>Needs attention</AlertTitle>
-                  <AlertDescription>
-                    {attentionPosts.length}{" "}
-                    {attentionPosts.length === 1 ? "post" : "posts"} failed,
-                    partially published or still publishing.
-                  </AlertDescription>
-                </Alert>
-                <ul className="rounded-lg border border-destructive/30 divide-y divide-border">
-                  {attentionPosts.map((post) => (
-                    <li key={post.id} className="min-w-0">
-                      <Link
-                        href={`/posts/${post.id}`}
-                        className="flex items-center justify-between gap-4 p-4 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm">{post.text}</p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {formatTargets(post.targets)}
-                          </p>
-                          {(post.errorMessage ||
-                            post.targets.some((t) => t.errorMessage)) && (
-                            <p className="mt-1 truncate text-xs text-destructive">
-                              {post.errorMessage ??
-                                post.targets.find((t) => t.errorMessage)
-                                  ?.errorMessage}
-                            </p>
-                          )}
-                        </div>
-                        <StatusBadge status={post.status} />
-                      </Link>
-                    </li>
+                <div className="mb-2 flex items-center gap-2.5">
+                  <h2 id="attention-heading" className="text-lg font-medium">
+                    Needs attention
+                  </h2>
+                  <Badge variant="destructive" aria-label={`${attentionPosts.length} posts need attention`}>
+                    {attentionPosts.length}
+                  </Badge>
+                </div>
+                <ul className="divide-y divide-border border-t border-border">
+                  {attentionPosts.map((post, index) => (
+                    <PostRow
+                      key={post.id}
+                      post={post}
+                      index={index}
+                      error={
+                        post.errorMessage ??
+                        post.targets.find((t) => t.errorMessage)?.errorMessage
+                      }
+                    />
                   ))}
                 </ul>
               </section>
@@ -259,7 +212,7 @@ export default async function DashboardPage({
 
             {upcomingPosts.length > 0 && (
               <section aria-labelledby="up-next-heading">
-                <div className="mb-4 flex items-center justify-between gap-4">
+                <div className="mb-2 flex items-center justify-between gap-4">
                   <h2 id="up-next-heading" className="text-lg font-medium">
                     Up next
                   </h2>
@@ -270,114 +223,13 @@ export default async function DashboardPage({
                     View all scheduled
                   </Link>
                 </div>
-                <ul className="rounded-lg border border-border divide-y divide-border">
-                  {upcomingPosts.map((post) => (
-                    <li key={post.id} className="min-w-0">
-                      <Link
-                        href={`/posts/${post.id}`}
-                        className="flex items-center justify-between gap-4 p-4 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm">{post.text}</p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {formatTargets(post.targets)} ·{" "}
-                            {post.scheduledAt
-                              ? formatDateTime(post.scheduledAt)
-                              : "Scheduled"}
-                          </p>
-                        </div>
-                        <StatusBadge status={post.status} />
-                      </Link>
-                    </li>
+                <ul className="divide-y divide-border border-t border-border">
+                  {upcomingPosts.map((post, index) => (
+                    <PostRow key={post.id} post={post} index={index} large />
                   ))}
                 </ul>
               </section>
             )}
-
-            <section aria-label="Publishing stats">
-              <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {stats.map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="rounded-lg border border-border p-5"
-                  >
-                    <dt className="mb-1 text-sm text-muted-foreground">
-                      {stat.label}
-                    </dt>
-                    <dd className="text-3xl font-semibold tracking-tight tabular-nums">
-                      {stat.value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-              {(publishing > 0 || failed > 0) && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {publishing > 0 && (
-                    <Badge variant="secondary">
-                      Publishing · {publishing}
-                    </Badge>
-                  )}
-                  {failed > 0 && (
-                    <Badge variant="destructive">Failed · {failed}</Badge>
-                  )}
-                </div>
-              )}
-              {platformCounts.length > 1 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {platformCounts.map((entry) => (
-                    <Badge key={entry.platform} variant="outline">
-                      {formatPlatformName(entry.platform)} · {entry.count}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section aria-labelledby="accounts-heading">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <h2 id="accounts-heading" className="text-lg font-medium">
-                  Accounts
-                </h2>
-                <Link
-                  href="/accounts"
-                  className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                >
-                  Manage
-                </Link>
-              </div>
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
-                <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                    {accounts.length === 0
-                      ? "No accounts connected"
-                      : `${accounts.length} connected`}
-                    {expiredAccounts.length > 0 && (
-                      <Badge variant="destructive">
-                        {expiredAccounts.length} expired
-                      </Badge>
-                    )}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {accounts.length === 0
-                      ? "Connect a profile to start publishing"
-                      : accounts.map((a) => `@${a.username}`).join(" · ")}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/accounts" />}
-                  className="shrink-0"
-                >
-                  {expiredAccounts.length > 0
-                    ? "Reconnect"
-                    : accounts.length === 0
-                      ? "Connect account"
-                      : "Manage"}
-                </Button>
-              </div>
-            </section>
 
             <section aria-labelledby="recent-posts-heading">
               <div className="mb-4 flex items-center justify-between gap-4">
@@ -442,47 +294,95 @@ export default async function DashboardPage({
                   </Empty>
                 )
               ) : (
-                <ul className="rounded-lg border border-border divide-y divide-border">
-                  {recentPosts.map((post) => (
-                    <li key={post.id} className="min-w-0">
-                      <Link
-                        href={`/posts/${post.id}`}
-                        className="flex items-center justify-between gap-4 p-4 outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm">{post.text}</p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {formatTargets(post.targets)} ·{" "}
-                            {post.status === "PUBLISHED" && post.publishedAt ? (
-                              <>
-                                Published{" "}
-                                {post.publishedAt.toLocaleDateString("en-GB", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
-                              </>
-                            ) : post.status === "SCHEDULED" &&
-                              post.scheduledAt ? (
-                              <>
-                                Scheduled{" "}
-                                {formatDateTime(post.scheduledAt)}
-                              </>
-                            ) : (
-                              post.createdAt.toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            )}
-                          </p>
-                        </div>
-                        <StatusBadge status={post.status} />
-                      </Link>
-                    </li>
+                <ul className="divide-y divide-border border-t border-border">
+                  {recentPosts.map((post, index) => (
+                    <PostRow key={post.id} post={post} index={index} />
                   ))}
                 </ul>
               )}
+            </section>
+
+            <section aria-labelledby="accounts-heading">
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <h2 id="accounts-heading" className="text-lg font-medium">
+                  Accounts
+                </h2>
+                <Link
+                  href="/accounts"
+                  className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  Manage
+                </Link>
+              </div>
+              <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                    {accounts.length === 0
+                      ? "No accounts connected"
+                      : `${accounts.length} connected`}
+                    {expiredAccounts.length > 0 && (
+                      <Badge variant="destructive">
+                        {expiredAccounts.length} expired
+                      </Badge>
+                    )}
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {accounts.length === 0
+                      ? "Connect a profile to start publishing"
+                      : accounts.map((a) => `@${a.username}`).join(" · ")}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link href="/accounts" />}
+                  className="shrink-0"
+                >
+                  {expiredAccounts.length > 0
+                    ? "Reconnect"
+                    : accounts.length === 0
+                      ? "Connect account"
+                      : "Manage"}
+                </Button>
+              </div>
+            </section>
+
+            <section
+              aria-label="Publishing stats"
+              className="border-t border-border pt-5"
+            >
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                {stats.map((stat) => (
+                  <p key={stat.label} className="text-sm">
+                    <span className="font-semibold tabular-nums">
+                      {stat.value}
+                    </span>{" "}
+                    <span className="text-muted-foreground">{stat.label.toLowerCase()}</span>
+                  </p>
+                ))}
+                {(publishing > 0 || failed > 0) && (
+                  <span className="flex flex-wrap gap-2">
+                    {publishing > 0 && (
+                      <Badge variant="secondary">
+                        Publishing · {publishing}
+                      </Badge>
+                    )}
+                    {failed > 0 && (
+                      <Badge variant="destructive">Failed · {failed}</Badge>
+                    )}
+                  </span>
+                )}
+                {platformCounts.length > 1 && (
+                  <span className="flex flex-wrap gap-2">
+                    {platformCounts.map((entry) => (
+                      <Badge key={entry.platform} variant="outline">
+                        {formatPlatformName(entry.platform)} · {entry.count}
+                      </Badge>
+                    ))}
+                  </span>
+                )}
+              </div>
             </section>
           </div>
         )}

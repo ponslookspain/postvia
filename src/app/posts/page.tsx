@@ -1,12 +1,17 @@
 import Link from "next/link";
-import { ClapperboardIcon, FileTextIcon, PlusIcon } from "lucide-react";
+import {
+  ChevronRightIcon,
+  ClapperboardIcon,
+  FileTextIcon,
+  PlusIcon,
+} from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
+import { formatPostDate, formatStatusLabel } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -72,7 +77,7 @@ export default async function PostsPage({
 
         <nav
           aria-label="Filter posts by status"
-          className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2"
+          className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-2"
         >
           <Link
             href="/posts"
@@ -103,7 +108,7 @@ export default async function PostsPage({
 
         {posts.length === 0 ? (
           statusFilter !== "all" ? (
-            <Empty>
+            <Empty className="mt-6">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
                   <FileTextIcon />
@@ -121,106 +126,111 @@ export default async function PostsPage({
               </EmptyHeader>
             </Empty>
           ) : (
-            <Empty>
+            <Empty className="mt-6">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
                   <FileTextIcon />
                 </EmptyMedia>
                 <EmptyTitle>No posts yet</EmptyTitle>
-              <EmptyDescription>
-                Create your first post to get started.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button
-                size="sm"
-                nativeButton={false}
-                render={<Link href="/posts/new" />}
-              >
-                <PlusIcon data-icon="inline-start" />
-                Create post
-              </Button>
-            </EmptyContent>
-          </Empty>
+                <EmptyDescription>
+                  Create your first post to get started.
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button
+                  size="sm"
+                  nativeButton={false}
+                  render={<Link href="/posts/new" />}
+                >
+                  <PlusIcon data-icon="inline-start" />
+                  Create post
+                </Button>
+              </EmptyContent>
+            </Empty>
           )
         ) : (
-          <div className="rounded-lg border border-border divide-y divide-border">
-            {posts.map((post) => {
-              const target = post.targets[0];
+          <ul className="divide-y divide-border border-t border-border">
+            {posts.map((post, index) => {
               const preview = post.media[0];
               return (
-                <Link
+                <li
                   key={post.id}
-                  href={`/posts/${post.id}`}
-                  className="flex items-center justify-between gap-4 p-4 transition-colors hover:bg-muted/50 md:p-5"
+                  className="animate-[post-in_.45s_ease_both] motion-reduce:animate-none"
+                  style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
                 >
-                  {preview && (
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      {preview.type === "IMAGE" ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/media/${preview.id}`}
-                          alt=""
-                          className="size-10 rounded-md object-cover"
-                        />
-                      ) : (
-                        <Badge variant="secondary">Video</Badge>
-                      )}
-                      {post.media.length > 1 && (
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          +{post.media.length - 1}
+                  <Link
+                    href={`/posts/${post.id}`}
+                    className="group flex items-start gap-4 py-5 outline-none transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 sm:gap-5"
+                  >
+                    {preview ? (
+                      <span className="relative block size-20 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-24">
+                        {preview.type === "IMAGE" ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={`/api/media/${preview.id}`}
+                            alt=""
+                            loading="lazy"
+                            className="size-full object-cover transition-transform duration-300 motion-reduce:transition-none motion-reduce:transform-none group-hover:scale-[1.04]"
+                          />
+                        ) : (
+                          <span className="flex size-full items-center justify-center">
+                            <ClapperboardIcon
+                              className="size-6 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                          </span>
+                        )}
+                        {post.media.length > 1 && (
+                          <span className="absolute right-1 bottom-1 rounded-md bg-foreground/80 px-1.5 py-0.5 text-[11px] font-medium text-primary-foreground tabular-nums">
+                            +{post.media.length - 1}
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="mt-1 hidden size-2 shrink-0 rounded-full bg-border sm:block"
+                      />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] leading-snug break-words text-foreground line-clamp-2">
+                        {post.text}
+                      </span>
+                      <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          {post.targets.map((target) => (
+                            <span
+                              key={target.id}
+                              title={target.platform}
+                              className="flex size-4 items-center justify-center [&_svg]:size-4"
+                            >
+                              <PlatformIcon platform={target.platform} className="size-4" />
+                              <span className="sr-only">{target.platform}</span>
+                            </span>
+                          ))}
                         </span>
-                      )}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="mb-1 truncate text-sm">{post.text}</p>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      <span>{formatPlatformName(target?.platform ?? "X")}</span>
-                      <span aria-hidden="true">·</span>
-                      <StatusBadge status={post.status} />
-                      <span aria-hidden="true">·</span>
-                      {post.status === "PUBLISHED" && post.publishedAt ? (
-                        <span>
-                          Published{" "}
-                          {new Date(post.publishedAt).toLocaleDateString(
-                            "en-GB",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            }
-                          )}
-                        </span>
-                      ) : post.status === "SCHEDULED" && post.scheduledAt ? (
-                        <span>
-                          Scheduled{" "}
-                          {new Date(post.scheduledAt).toLocaleString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
-                      ) : (
-                        <span>
-                          {post.createdAt.toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-sm text-muted-foreground">
-                    {post.status === "FAILED" ? "Retry" : "View"}
-                  </span>
-                </Link>
+                        <StatusBadge status={post.status} />
+                        <span>{formatPostDate(post)}</span>
+                      </span>
+                    </span>
+                    <span
+                      className={`flex shrink-0 items-center gap-1 pt-0.5 text-sm transition-colors ${
+                        post.status === "FAILED"
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground group-hover:text-foreground"
+                      }`}
+                    >
+                      {post.status === "FAILED" ? "Retry" : "View"}
+                      <ChevronRightIcon
+                        className="size-4 transition-transform duration-200 motion-reduce:transition-none motion-reduce:transform-none group-hover:translate-x-0.5"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </Link>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </div>
     </AppShell>

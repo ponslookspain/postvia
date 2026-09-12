@@ -248,104 +248,98 @@ export default function AccountsContent({
         </Alert>
       )}
 
-      <ul className="flex flex-col gap-4">
+      <ul className="grid gap-4 sm:grid-cols-2">
         {SINGLE_PLATFORMS.map((config) => {
           const { account } = byPlatform[config.platform];
           const connected = Boolean(account);
           const expired = isExpired(account);
           return (
             <li key={config.platform} className="min-w-0">
-              <Card>
-                <CardHeader>
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-4">
-                      <Avatar>
-                        <AvatarFallback
-                          aria-label={config.name}
-                          className={
-                            connected
-                              ? "bg-foreground text-primary-foreground"
-                              : undefined
-                          }
-                        >
-                          <span className="flex size-5 items-center justify-center [&_svg]:size-5">
-                            <PlatformIcon platform={config.platform} />
-                          </span>
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <CardTitle>{config.name}</CardTitle>
-                          {connected ? (
-                            expired ? (
-                              <Badge variant="destructive">Expired</Badge>
-                            ) : (
-                              <Badge variant="secondary">Connected</Badge>
-                            )
-                          ) : (
-                            <Badge variant="outline">Not connected</Badge>
-                          )}
-                        </div>
-                        <CardDescription>
-                          {account ? (
-                            <>
-                              @{account.username}
-                              {expired &&
-                                " · Token expired, reconnect to keep publishing"}
-                            </>
-                          ) : (
-                            `Connect to publish to ${config.name}`
-                          )}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {connected ? (
-                        <>
-                          {expired && (
-                            <Button
-                              onClick={() => void handleConnect(config)}
-                              disabled={connecting === config.platform}
-                            >
-                              {connecting === config.platform && (
-                                <Spinner data-icon="inline-start" />
-                              )}
-                              {connecting === config.platform
-                                ? "Connecting..."
-                                : "Reconnect"}
-                            </Button>
-                          )}
+              <Card className="h-full">
+                <CardHeader className="items-center text-center">
+                  <Avatar className="size-12">
+                    <AvatarFallback
+                      aria-label={config.name}
+                      className={
+                        connected
+                          ? "bg-foreground text-primary-foreground"
+                          : undefined
+                      }
+                    >
+                      <span className="flex size-6 items-center justify-center [&_svg]:size-6">
+                        <PlatformIcon platform={config.platform} className="size-6" />
+                      </span>
+                    </AvatarFallback>
+                  </Avatar>
+                  <CardTitle>{config.name}</CardTitle>
+                  {connected ? (
+                    expired ? (
+                      <Badge variant="destructive">Expired</Badge>
+                    ) : (
+                      <Badge variant="secondary">Connected</Badge>
+                    )
+                  ) : (
+                    <Badge variant="outline">Not connected</Badge>
+                  )}
+                  <CardDescription>
+                    {account ? (
+                      <>
+                        @{account.username}
+                        {expired &&
+                          " · Token expired, reconnect to keep publishing"}
+                      </>
+                    ) : (
+                      `Connect to publish to ${config.name}`
+                    )}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col gap-2">
+                    {connected ? (
+                      <>
+                        {expired && (
                           <Button
-                            variant={expired ? "outline" : "destructive"}
-                            onClick={() =>
-                              setPendingDisconnect({ config, account: null })
-                            }
-                            disabled={disconnecting === config.platform}
+                            onClick={() => void handleConnect(config)}
+                            disabled={connecting === config.platform}
                           >
-                            {disconnecting === config.platform && (
+                            {connecting === config.platform && (
                               <Spinner data-icon="inline-start" />
                             )}
-                            {disconnecting === config.platform
-                              ? "Disconnecting..."
-                              : "Disconnect"}
+                            {connecting === config.platform
+                              ? "Connecting..."
+                              : "Reconnect"}
                           </Button>
-                        </>
-                      ) : (
+                        )}
                         <Button
-                          onClick={() => void handleConnect(config)}
-                          disabled={connecting === config.platform}
+                          variant={expired ? "outline" : "destructive"}
+                          onClick={() =>
+                            setPendingDisconnect({ config, account: null })
+                          }
+                          disabled={disconnecting === config.platform}
                         >
-                          {connecting === config.platform && (
+                          {disconnecting === config.platform && (
                             <Spinner data-icon="inline-start" />
                           )}
-                          {connecting === config.platform
-                            ? "Connecting..."
-                            : config.connectLabel}
+                          {disconnecting === config.platform
+                            ? "Disconnecting..."
+                            : "Disconnect"}
                         </Button>
-                      )}
-                    </div>
+                      </>
+                    ) : (
+                      <Button
+                        onClick={() => void handleConnect(config)}
+                        disabled={connecting === config.platform}
+                      >
+                        {connecting === config.platform && (
+                          <Spinner data-icon="inline-start" />
+                        )}
+                        {connecting === config.platform
+                          ? "Connecting..."
+                          : config.connectLabel}
+                      </Button>
+                    )}
                   </div>
-                </CardHeader>
+                </CardContent>
               </Card>
             </li>
           );
@@ -355,58 +349,49 @@ export default function AccountsContent({
           const accounts = multiAccounts[config.platform] ?? [];
           return (
             <li key={config.platform} className="min-w-0">
-              <Card>
-                <CardHeader>
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-4">
-                      <Avatar>
-                        <AvatarFallback
-                          aria-label={config.name}
-                          className={
-                            accounts.length > 0
-                              ? "bg-foreground text-primary-foreground"
-                              : undefined
-                          }
-                        >
-                          <span className="flex size-5 items-center justify-center [&_svg]:size-5">
-                            <PlatformIcon platform={config.platform} />
-                          </span>
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <CardTitle>{config.name}</CardTitle>
-                          {accounts.length > 0 ? (
-                            <Badge variant="secondary">
-                              {accounts.length} connected
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">Not connected</Badge>
-                          )}
-                        </div>
-                        <CardDescription>
-                          {accounts.length === 0
-                            ? `Connect to publish to ${config.name}`
-                            : "Multiple accounts supported"}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={() => void handleConnect(config)}
-                      disabled={connecting === config.platform}
-                      className="shrink-0"
+              <Card className="h-full">
+                <CardHeader className="items-center text-center">
+                  <Avatar className="size-12">
+                    <AvatarFallback
+                      aria-label={config.name}
+                      className={
+                        accounts.length > 0
+                          ? "bg-foreground text-primary-foreground"
+                          : undefined
+                      }
                     >
-                      {connecting === config.platform && (
-                        <Spinner data-icon="inline-start" />
-                      )}
-                      {connecting === config.platform
-                        ? "Connecting..."
-                        : config.connectLabel}
-                    </Button>
-                  </div>
+                      <span className="flex size-6 items-center justify-center [&_svg]:size-6">
+                        <PlatformIcon platform={config.platform} className="size-6" />
+                      </span>
+                    </AvatarFallback>
+                  </Avatar>
+                  <CardTitle>{config.name}</CardTitle>
+                  {accounts.length > 0 ? (
+                    <Badge variant="secondary">
+                      {accounts.length} connected
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Not connected</Badge>
+                  )}
+                  <CardDescription>
+                    {accounts.length === 0
+                      ? `Connect to publish to ${config.name}`
+                      : "Multiple accounts supported"}
+                  </CardDescription>
                 </CardHeader>
-                {accounts.length > 0 && (
-                  <CardContent className="flex flex-col gap-2 pt-0">
+                <CardContent className="flex flex-col gap-3">
+                  <Button
+                    onClick={() => void handleConnect(config)}
+                    disabled={connecting === config.platform}
+                  >
+                    {connecting === config.platform && (
+                      <Spinner data-icon="inline-start" />
+                    )}
+                    {connecting === config.platform
+                      ? "Connecting..."
+                      : config.connectLabel}
+                  </Button>
+                  {accounts.length > 0 && (
                     <ul className="flex flex-col gap-2">
                       {accounts.map((account) => {
                         const expired = isExpired(account);
@@ -459,8 +444,8 @@ export default function AccountsContent({
                         );
                       })}
                     </ul>
+                  )}
                   </CardContent>
-                )}
               </Card>
             </li>
           );

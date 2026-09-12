@@ -14,7 +14,7 @@ export function AuthShell({
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center p-4 md:p-8">
-      <div className={cn("w-full max-w-sm", className)}>
+      <div className={cn("w-full max-w-sm animate-[post-in_.4s_ease_both] motion-reduce:animate-none", className)}>
         <p className="mb-8 text-lg font-semibold tracking-tight">postvia</p>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {description && (

@@ -262,7 +262,7 @@ export function CalendarView({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section aria-label={`Posts in ${title}`}>
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border animate-[post-in_.4s_ease_both] motion-reduce:animate-none">
             {WEEKDAYS.map((day) => (
               <div
                 key={day}

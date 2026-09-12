@@ -30,7 +30,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -739,8 +738,6 @@ export default function NewPostComposer({
     return (
       <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
         <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
-        <Card>
-          <CardContent className="pt-6">
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -822,19 +819,14 @@ export default function NewPostComposer({
                 </div>
               </EmptyContent>
             </Empty>
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
-  if (saved && savedId && scheduledAt) {
-    const scheduledLocal = new Date(scheduledAt);
+  if (saved && savedId && scheduledAt) {    const scheduledLocal = new Date(scheduledAt);
     return (
       <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
         <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
-        <Card>
-          <CardContent className="pt-6">
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -880,8 +872,6 @@ export default function NewPostComposer({
                 </div>
               </EmptyContent>
             </Empty>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -890,8 +880,6 @@ export default function NewPostComposer({
     return (
       <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
         <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
-        <Card>
-          <CardContent className="pt-6">
             <Empty>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -926,8 +914,6 @@ export default function NewPostComposer({
                 </div>
               </EmptyContent>
             </Empty>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -944,21 +930,23 @@ export default function NewPostComposer({
         )}
       </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <FieldGroup className="min-w-0 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Post content</CardTitle>
-              <CardDescription>
-                Used by every selected platform unless customized
-              </CardDescription>
-              <CardAction>
-                <Badge variant={hasOverLimit ? "destructive" : "secondary"}>
-                  {charCount} chars
-                </Badge>
-              </CardAction>
-            </CardHeader>
-            <CardContent>
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="flex min-w-0 flex-col gap-10">
+          <section aria-labelledby="composer-content">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="composer-content" className="text-lg font-medium">
+                  Post content
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Used by every selected platform unless customized
+                </p>
+              </div>
+              <Badge variant={hasOverLimit ? "destructive" : "secondary"}>
+                {charCount} chars
+              </Badge>
+            </div>
+            <div>
               <Field data-invalid={hasOverLimit || undefined}>
                 <FieldLabel htmlFor="composer-text" className="sr-only">
                   Post content
@@ -988,22 +976,24 @@ export default function NewPostComposer({
                   </FieldDescription>
                 )}
               </Field>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Publish to</CardTitle>
-              <CardDescription>
-                Select at least one connected account
-              </CardDescription>
-              <CardAction>
-                <Badge variant="secondary">
-                  {selectedAccountIds.length} selected
-                </Badge>
-              </CardAction>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+          <section aria-labelledby="composer-targets">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="composer-targets" className="text-lg font-medium">
+                  Publish to
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Select at least one connected account
+                </p>
+              </div>
+              <Badge variant="secondary">
+                {selectedAccountIds.length} selected
+              </Badge>
+            </div>
+            <div className="flex flex-col gap-3">
               {accounts.length === 0 ? (
                 <Empty>
                   <EmptyHeader>
@@ -1090,23 +1080,25 @@ export default function NewPostComposer({
                   <AlertDescription>{message}</AlertDescription>
                 </Alert>
               ))}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Media</CardTitle>
-              <CardDescription>
-                JPG, PNG, WebP or GIF images up to 10 MB; MP4 or WebM videos
-                up to 100 MB.
-              </CardDescription>
-              <CardAction>
-                <Badge variant="secondary">
-                  {media.length}/{MAX_MEDIA}
-                </Badge>
-              </CardAction>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+          <section aria-labelledby="composer-media">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 id="composer-media" className="text-lg font-medium">
+                  Media
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  JPG, PNG, WebP or GIF images up to 10 MB; MP4 or WebM
+                  videos up to 100 MB.
+                </p>
+              </div>
+              <Badge variant="secondary">
+                {media.length}/{MAX_MEDIA}
+              </Badge>
+            </div>
+            <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-start gap-3">
                 {media.map((item) => (
                   <div key={item.key} className="flex flex-col gap-1.5">
@@ -1196,9 +1188,9 @@ export default function NewPostComposer({
                   e.target.value = "";
                 }}
               />
-            </CardContent>
-          </Card>
-        </FieldGroup>
+            </div>
+          </section>
+        </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
           <Card>

@@ -8,13 +8,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -335,15 +328,15 @@ export function SettingsClient({
         </p>
       </div>
 
-      <FieldGroup className="gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile</CardTitle>
-            <CardDescription>
-              Update the name shown in your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <div className="flex flex-col gap-10">
+        <section aria-labelledby="settings-profile">
+          <h2 id="settings-profile" className="text-lg font-medium">
+            Profile
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            Update the name shown in your account
+          </p>
+          <div>
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="settings-name">Name</FieldLabel>
@@ -379,15 +372,17 @@ export function SettingsClient({
                 </Button>
               </div>
             </FieldGroup>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Sign-in methods</CardTitle>
-            <CardDescription>How you can sign in to your account</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+        <section aria-labelledby="settings-signin">
+          <h2 id="settings-signin" className="text-lg font-medium">
+            Sign-in methods
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            How you can sign in to your account
+          </p>
+          <div className="flex max-w-md flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-sm">
                 <AtSignIcon className="size-4 shrink-0" aria-hidden="true" />
@@ -406,19 +401,19 @@ export function SettingsClient({
                 {hasGoogle ? "Connected" : "Not connected"}
               </Badge>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Security</CardTitle>
-            <CardDescription>
-              {hasPassword
-                ? "Change your account password"
-                : "Set a password so you can sign in with email and password"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <section aria-labelledby="settings-security">
+          <h2 id="settings-security" className="text-lg font-medium">
+            Security
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            {hasPassword
+              ? "Change your account password"
+              : "Set a password so you can sign in with email and password"}
+          </p>
+          <div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -501,17 +496,17 @@ export function SettingsClient({
                 </div>
               </FieldGroup>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Preferences</CardTitle>
-            <CardDescription>
-              Choose how you want to hear from us
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <section aria-labelledby="settings-preferences">
+          <h2 id="settings-preferences" className="text-lg font-medium">
+            Preferences
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            Choose how you want to hear from us
+          </p>
+          <div>
             <FieldGroup>
               {prefsMessage && <FormAlert message={prefsMessage} />}
               <Field orientation="horizontal">
@@ -550,18 +545,19 @@ export function SettingsClient({
                 />
               </Field>
             </FieldGroup>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
-        <Card className="border-destructive/40">
-          <CardHeader>
-            <CardTitle className="text-destructive">Danger zone</CardTitle>
-            <CardDescription>
-              Permanently delete your account and all associated data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-muted-foreground">
+        <section aria-labelledby="settings-danger">
+          <Separator className="mb-10" />
+          <h2 id="settings-danger" className="text-lg font-medium text-destructive">
+            Danger zone
+          </h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">
+            Permanently delete your account and all associated data
+          </p>
+          <div>
+            <p className="mb-4 max-w-prose text-sm text-muted-foreground">
               Once you delete your account there is no going back. All your
               posts, connected social accounts, sessions and account data will
               be permanently removed.
@@ -572,9 +568,9 @@ export function SettingsClient({
             >
               Delete account
             </Button>
-          </CardContent>
-        </Card>
-      </FieldGroup>
+          </div>
+        </section>
+      </div>
 
       <Dialog
         open={isDeleteModalOpen}
