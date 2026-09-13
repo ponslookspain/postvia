@@ -3,7 +3,8 @@
 Publish to social media in one place. Postvia lets you write once, preview per
 platform, and publish (or schedule) to every connected social profile.
 
-Docs: [`docs/`](docs/) (architecture, database, auth, social integrations,
+Docs: [`docs/`](docs/) (architecture, database, auth, [auth UI](docs/auth-ui.md),
+social integrations,
 posting, billing, [abuse protection](docs/abuse-protection.md), environment,
 deployment, [workflow](docs/workflow.md), security, development). The code
 is the source of truth; docs mirror it.
