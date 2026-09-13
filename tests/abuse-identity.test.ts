@@ -13,6 +13,7 @@ import {
   gateNewSocialLink,
   getAbusePepper,
   getClientIp,
+  getIdentityFreeUsage,
   hashRateKey,
   hashSignal,
   isAbuseDisabled,
@@ -1734,5 +1735,121 @@ describe("seen vs linked touches (cooldown regression)", () => {
       nowMs: base + 25 * 3_600_000,
     });
     assert.equal(allowed.ok, true);
+  });
+});
+
+describe("identity free usage read (display path, strictly read-only)", () => {
+  function readParams(stores: AbuseStores) {
+    return {
+      period: "2026-09",
+      monthStart: MONTH_START,
+      stores,
+    };
+  }
+  async function link(
+    stores: AbuseStores,
+    userId: string,
+    userEmail: string,
+    externalId: string
+  ) {
+    return checkSocialLink({
+      userId,
+      userEmail,
+      platform: "THREADS",
+      externalId,
+      deviceId: null,
+      isPaid: false,
+      enforce: true,
+      pepper: PEPPER,
+      stores,
+    });
+  }
+  test("usage follows claims on one identity", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await link(stores, "u1", "r-a@x.com", "ext-r");
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    for (let index = 0; index < 2; index += 1) {
+      await claimIdentityFree(claimParams(first.identityId, ["u1"], stores));
+    }
+    assert.deepEqual(await getIdentityFreeUsage({
+      userId: "u1",
+      ...readParams(stores),
+    }), { identityId: first.identityId, used: 2 });
+  });
+  test("new user on the same social identity reads the shared usage", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await link(stores, "u1", "s-a@x.com", "ext-shared");
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    for (let index = 0; index < 2; index += 1) {
+      await claimIdentityFree(claimParams(first.identityId, ["u1"], stores));
+    }
+    await recordDisconnect({
+      userId: "u1",
+      platform: "THREADS",
+      externalId: "ext-shared",
+      pepper: PEPPER,
+      stores,
+    });
+    const second = await link(stores, "u2", "s-b@x.com", "ext-shared");
+    assert.equal(second.ok, true);
+    if (!second.ok || !first.ok) return;
+    assert.equal(second.identityId, first.identityId);
+    assert.deepEqual(await getIdentityFreeUsage({
+      userId: "u2",
+      ...readParams(stores),
+    }), { identityId: first.identityId, used: 2 });
+    // And the shared read tracks further claims by either user.
+    await claimIdentityFree(
+      claimParams(first.identityId, ["u1", "u2"], stores)
+    );
+    assert.deepEqual(await getIdentityFreeUsage({
+      userId: "u2",
+      ...readParams(stores),
+    }), { identityId: first.identityId, used: 3 });
+  });
+  test("exhausted identity reads 15", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await link(stores, "u1", "e-a@x.com", "ext-full");
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    for (let index = 0; index < 15; index += 1) {
+      await claimIdentityFree(claimParams(first.identityId, ["u1"], stores));
+    }
+    assert.deepEqual(await getIdentityFreeUsage({
+      userId: "u1",
+      ...readParams(stores),
+    }), { identityId: first.identityId, used: 15 });
+  });
+  test("different identity stays independent; unknown user reads zero", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await link(stores, "u1", "d-a@x.com", "ext-one");
+    assert.equal(first.ok, true);
+    if (!first.ok) return;
+    await claimIdentityFree(claimParams(first.identityId, ["u1"], stores));
+    const other = await link(stores, "u9", "d-b@x.com", "ext-two");
+    assert.equal(other.ok, true);
+    assert.deepEqual(await getIdentityFreeUsage({
+      userId: "u9",
+      ...readParams(stores),
+    }), {
+      identityId: other.ok ? other.identityId : null,
+      used: 0,
+    });
+    assert.deepEqual(await getIdentityFreeUsage({
+      userId: "ghost",
+      ...readParams(stores),
+    }), { identityId: null, used: 0 });
+  });
+  test("read performs no writes", async () => {
+    const { stores, readFreeUsage } = makeAbuseStores();
+    const before = await getIdentityFreeUsage({
+      userId: "nobody",
+      ...readParams(stores),
+    });
+    assert.deepEqual(before, { identityId: null, used: 0 });
+    assert.equal(await stores.findIdentityIdByUser("nobody"), null);
+    assert.equal(readFreeUsage("whatever", "2026-09"), null);
   });
 });

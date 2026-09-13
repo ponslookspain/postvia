@@ -980,6 +980,38 @@ export async function syncIdentityFloor(input: {
   }
 }
 
+/**
+ * Read-only identity-level Free usage for display purposes (progress bars,
+ * remaining counts). Strictly no writes: unlike `resolveAbuseIdentity` it
+ * never creates an identity, links a user, attaches signals, merges or
+ * touches risk — and unlike `syncIdentityFloor` it never initializes or
+ * raises the ledger. Missing link or missing row reads as 0 usage.
+ *
+ * Mirrors the enforcement floor math (`max(stored, SUM(PostUsage))`) so the
+ * displayed number can never understate what `claimIdentityFree` would
+ * observe for the same identity and period.
+ */
+export async function getIdentityFreeUsage(input: {
+  userId: string;
+  period: string;
+  monthStart: Date;
+  stores?: AbuseStores;
+}): Promise<{ identityId: string | null; used: number }> {
+  const stores = input.stores ?? liveAbuseStores;
+  const identityId = await stores.findIdentityIdByUser(input.userId);
+  if (!identityId) return { identityId: null, used: 0 };
+  const [linked, stored] = await Promise.all([
+    stores.findUserIdsByIdentity(identityId),
+    stores.getFreeUsage(identityId, input.period),
+  ]);
+  const floor = await stores.sumPostUsage(
+    linked,
+    input.period,
+    input.monthStart
+  );
+  return { identityId, used: Math.max(stored ?? 0, floor) };
+}
+
 export type FreeClaim = { ok: true } | { ok: false; observed: number };
 
 /**

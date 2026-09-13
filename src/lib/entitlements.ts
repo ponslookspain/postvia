@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getIdentityFreeUsage } from "@/lib/abuse";
 import {
   getPlan,
   PLANS,
@@ -74,6 +75,13 @@ export type Usage = {
   accountsByPlatform: Record<string, number>;
   totalAccounts: number;
   scheduledPosts: number;
+  /**
+   * Identity-level Free usage (AbuseFreeUsage) for the current period.
+   * Null when the user has no abuse identity link (nothing shared yet) —
+   * callers fall back to the per-user `postsThisMonth`. Never computed on
+   * the client; always resolved server-side next to `getUsage`.
+   */
+  identityPostsUsed: number | null;
 };
 
 const DB_TO_PLAN: Record<DbPlan, PlanId> = {
@@ -387,7 +395,7 @@ export async function getUsage(
 ): Promise<Usage> {
   const monthStart = getMonthStart(nowMs);
   const period = getPeriodKey(nowMs);
-  const [postCount, usageRow, accountGroups, scheduledCount] =
+  const [postCount, usageRow, accountGroups, scheduledCount, identity] =
     await Promise.all([
       prisma.post.count({
         where: { userId, createdAt: { gte: monthStart } },
@@ -406,6 +414,12 @@ export async function getUsage(
         _count: { _all: true },
       }),
       prisma.post.count({ where: { userId, status: "SCHEDULED" } }),
+      // Read-only: never creates an identity or touches the ledger.
+      // Failures degrade to per-user display instead of breaking the page.
+      getIdentityFreeUsage({ userId, period, monthStart }).catch(() => ({
+        identityId: null as string | null,
+        used: 0,
+      })),
     ]);
   const accountsByPlatform: Record<string, number> = {};
   for (const group of accountGroups) {
@@ -417,6 +431,7 @@ export async function getUsage(
     accountsByPlatform,
     totalAccounts: Object.values(accountsByPlatform).reduce((a, b) => a + b, 0),
     scheduledPosts: scheduledCount,
+    identityPostsUsed: identity.identityId === null ? null : identity.used,
   };
 }
 
@@ -625,6 +640,28 @@ export function canRetry(eff: EffectiveSubscription): Check {
   return upgradeDenial(eff.plan, "Retry and reschedule are not included in this plan.");
 }
 
+/**
+ * Posts-used number for progress display. Free plans share one
+ * identity-level monthly allowance across all users of an AbuseIdentity
+ * (enforced from AbuseFreeUsage), so Free progress shows the shared
+ * `identityPostsUsed` whenever it is known. Paid plans and the admin
+ * bypass keep the per-user counter. Server-side enforcement always stays
+ * authoritative — this only selects the displayed snapshot.
+ */
+export function getDisplayPostsUsed(
+  eff: EffectiveSubscription,
+  usage: Usage
+): number {
+  if (
+    eff.plan === "free" &&
+    !eff.bypass &&
+    usage.identityPostsUsed !== null
+  ) {
+    return usage.identityPostsUsed;
+  }
+  return usage.postsThisMonth;
+}
+
 export function getRemainingQuota(
   eff: EffectiveSubscription,
   usage: Usage
@@ -632,7 +669,9 @@ export function getRemainingQuota(
   const limit = eff.entitlements.monthlyPosts;
   return {
     postsLeft:
-      eff.bypass || limit === null ? null : Math.max(0, limit - usage.postsThisMonth),
+      eff.bypass || limit === null
+        ? null
+        : Math.max(0, limit - getDisplayPostsUsed(eff, usage)),
     scheduledPosts: usage.scheduledPosts,
     totalAccounts: usage.totalAccounts,
   };

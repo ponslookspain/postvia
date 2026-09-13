@@ -29,7 +29,7 @@ import { CheckIcon } from "lucide-react";
 import { cn } from "cn";
 import { getPlan, PLANS, type Plan, type PlanId } from "@/lib/plans";
 import { isStripeRedirectUrl } from "@/lib/stripe-redirect";
-import { PlanBadge, UsageBar } from "@/components/billing/BillingWidgets";
+import { PlanBadge, UpgradeCta, UsageBar } from "@/components/billing/BillingWidgets";
 
 export type BillingView = {
   plan: PlanId;
@@ -261,6 +261,22 @@ export function BillingSection({
               limit={initial.postsLimit}
               label="Posts this month"
             />
+            {initial.plan === "free" &&
+              initial.postsLimit !== null &&
+              initial.postsUsed >= initial.postsLimit && (
+                <Alert>
+                  <AlertTitle>
+                    You&apos;ve reached your {initial.postsLimit} free posts
+                    this month.
+                  </AlertTitle>
+                  <AlertDescription>
+                    <UpgradeCta
+                      reason="New posts are paused until your allowance resets next month."
+                      upgradeTo="growth"
+                    />
+                  </AlertDescription>
+                </Alert>
+              )}
             <div>
               <Separator />
               <dl className="flex flex-col">

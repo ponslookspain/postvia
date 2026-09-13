@@ -146,6 +146,7 @@ function usage(postsThisMonth: number) {
     accountsByPlatform: {},
     totalAccounts: 0,
     scheduledPosts: 2,
+    identityPostsUsed: null,
   };
 }
 

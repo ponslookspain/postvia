@@ -14,7 +14,7 @@ import { cn } from "cn";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
-import { getEffectivePlan, getRemainingQuota, getUsage } from "@/lib/entitlements";
+import { getDisplayPostsUsed, getEffectivePlan, getRemainingQuota, getUsage } from "@/lib/entitlements";
 import { getPlan } from "@/lib/plans";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
@@ -25,7 +25,7 @@ import {
 import { Section, SectionHeader } from "@/components/Section";
 import { EmptyBlock } from "@/components/StateBlock";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { PlanBadge } from "@/components/billing/BillingWidgets";
+import { PlanBadge, UpgradeCta } from "@/components/billing/BillingWidgets";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -209,18 +209,22 @@ export default async function DashboardPage({
   const quota = getRemainingQuota(effective, usage);
   const plan = getPlan(effective.plan);
   const monthlyLimit = effective.entitlements.monthlyPosts;
+  // Free progress reflects the shared identity-level allowance
+  // (AbuseFreeUsage), not just this user's own posts. Paid plans keep the
+  // per-user counter. Server-side enforcement stays authoritative.
+  const displayPostsUsed = getDisplayPostsUsed(effective, usage);
   const usagePercent =
     monthlyLimit === null
       ? 0
       : Math.min(
           100,
-          Math.round((usage.postsThisMonth / Math.max(1, monthlyLimit)) * 100)
+          Math.round((displayPostsUsed / Math.max(1, monthlyLimit)) * 100)
         );
   const usageHint =
     quota.postsLeft === null
       ? monthlyLimit === null
         ? "No monthly limit on your plan"
-        : `${usage.postsThisMonth} used`
+        : `${displayPostsUsed} used`
       : `${quota.postsLeft} of ${monthlyLimit} left`;
   const periodLabel = usage.monthStart.toLocaleDateString("en-GB", {
     month: "long",
@@ -285,7 +289,7 @@ export default async function DashboardPage({
                 <StatTile
                   icon={LayersIcon}
                   label="Posts this month"
-                  value={usage.postsThisMonth}
+                  value={displayPostsUsed}
                   hint={usageHint}
                 />
                 <StatTile
@@ -338,7 +342,7 @@ export default async function DashboardPage({
                       "Unlimited"
                     ) : (
                       <>
-                        {usage.postsThisMonth}
+                        {displayPostsUsed}
                         <span className="text-base font-normal text-muted-foreground">
                           {" "}
                           of {monthlyLimit} posts
@@ -352,10 +356,21 @@ export default async function DashboardPage({
                   {monthlyLimit !== null && (
                     <Progress
                       value={usagePercent}
-                      aria-label={`Posts used this month: ${usage.postsThisMonth} of ${monthlyLimit}`}
+                      aria-label={`Posts used this month: ${displayPostsUsed} of ${monthlyLimit}`}
                       className="mt-auto pt-3"
                     />
                   )}
+                  {effective.plan === "free" &&
+                    monthlyLimit !== null &&
+                    quota.postsLeft === 0 && (
+                      <div className="mt-3">
+                        <UpgradeCta
+                          reason={`You've reached your ${monthlyLimit} free posts this month.`}
+                          upgradeTo="growth"
+                          compact
+                        />
+                      </div>
+                    )}
                 </CardContent>
               </Card>
 

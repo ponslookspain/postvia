@@ -7,6 +7,7 @@ import {
   canCreatePost,
   canRetry,
   canUseCalendar,
+  getDisplayPostsUsed,
   getRemainingQuota,
   getUpgradeTarget,
   isAdminEmail,
@@ -37,13 +38,18 @@ function eff(
   };
 }
 
-function usage(postsThisMonth = 0, accounts: Record<string, number> = {}) {
+function usage(
+  postsThisMonth = 0,
+  accounts: Record<string, number> = {},
+  identityPostsUsed: number | null = null
+) {
   return {
     postsThisMonth,
     monthStart: new Date("2026-09-01T00:00:00Z"),
     accountsByPlatform: accounts,
     totalAccounts: Object.values(accounts).reduce((a, b) => a + b, 0),
     scheduledPosts: 0,
+    identityPostsUsed,
   };
 }
 
@@ -211,6 +217,34 @@ describe("remaining quota", () => {
     assert.equal(getRemainingQuota(eff("free"), usage(12)).postsLeft, 3);
     assert.equal(getRemainingQuota(eff("free"), usage(15)).postsLeft, 0);
     assert.equal(getRemainingQuota(eff("scale"), usage(500)).postsLeft, null);
+  });
+  test("free remaining follows the shared identity usage when known", () => {
+    // New user B: personal 0, identity already at 2 → 13 left.
+    assert.equal(
+      getRemainingQuota(eff("free"), usage(0, {}, 2)).postsLeft,
+      13
+    );
+    // Exhausted identity → 0 left even with personal usage below limit.
+    assert.equal(
+      getRemainingQuota(eff("free"), usage(1, {}, 15)).postsLeft,
+      0
+    );
+  });
+});
+
+describe("display posts used (identity-level Free progress)", () => {
+  test("free shows identity usage when known, else personal", () => {
+    assert.equal(getDisplayPostsUsed(eff("free"), usage(0, {}, 2)), 2);
+    assert.equal(getDisplayPostsUsed(eff("free"), usage(1, {}, 3)), 3);
+    assert.equal(getDisplayPostsUsed(eff("free"), usage(4)), 4);
+  });
+  test("paid plans and bypass keep the per-user counter", () => {
+    assert.equal(getDisplayPostsUsed(eff("growth"), usage(1, {}, 15)), 1);
+    assert.equal(getDisplayPostsUsed(eff("scale"), usage(7, {}, 15)), 7);
+    assert.equal(
+      getDisplayPostsUsed(eff("free", { bypass: true }), usage(1, {}, 15)),
+      1
+    );
   });
 });
 

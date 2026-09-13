@@ -119,6 +119,11 @@ Google + social tombstones atomically with the user delete.
   (missing pepper, `P2021`) fails closed and loud.
 - Paid/bypass never enter the kernel. Bulk has no bypass: every bulk item
   is one kernel-gated `POST /api/posts`.
+- Display: Free progress bars show the identity-level `AbuseFreeUsage`
+  (`getIdentityFreeUsage`: link lookup + `max(stored, SUM(PostUsage))`,
+  strictly read-only — never resolves, links, merges or writes), via
+  `Usage.identityPostsUsed` and `getDisplayPostsUsed` (Free only; paid
+  keeps the per-user counter). `PostUsage` stays the per-user audit trail.
 
 ## OAuth throttling & IP
 

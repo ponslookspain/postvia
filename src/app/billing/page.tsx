@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import {
+  getDisplayPostsUsed,
   getEffectivePlan,
   getSubscription,
   getUsage,
@@ -87,7 +88,7 @@ export default async function BillingPage({
       ? effective.currentPeriodEnd.toISOString()
       : null,
     cancelAtPeriodEnd: effective.cancelAtPeriodEnd,
-    postsUsed: usage.postsThisMonth,
+    postsUsed: getDisplayPostsUsed(effective, usage),
     postsLimit: effective.entitlements.monthlyPosts,
     totalAccounts: usage.totalAccounts,
     accountsLimit: effective.entitlements.maxTotalAccounts,
