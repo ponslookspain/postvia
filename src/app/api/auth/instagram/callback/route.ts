@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { assertCanConnectAccount } from "@/lib/entitlements";
+import { assertCanConnectAccount, getEffectivePlan } from "@/lib/entitlements";
+import {
+  gateNewSocialLink,
+  isPaidActivePlan,
+} from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
 import {
   exchangeInstagramCode,
@@ -89,6 +93,29 @@ export async function GET(request: NextRequest) {
         data: accountData,
       });
     } else {
+      // Abuse gate for fresh links (reconnects above skip it).
+      const effectiveForAbuse = await getEffectivePlan({
+        userId: user.id,
+        userEmail: user.email,
+      });
+      const abuseGate = await gateNewSocialLink({
+        userId: user.id,
+        userEmail: user.email,
+        platform: "INSTAGRAM",
+        externalId: profile.id,
+        deviceCookieHeader:
+          request.cookies.get("pv_did")?.value ?? null,
+        isPaid:
+          effectiveForAbuse.bypass ||
+          isPaidActivePlan(effectiveForAbuse.plan, effectiveForAbuse.status),
+      });
+      if (!abuseGate.ok) {
+        return clearState(
+          NextResponse.redirect(
+            new URL(`/accounts?error=${abuseGate.errorParam}`, request.url)
+          )
+        );
+      }
       const gate = await assertCanConnectAccount({
         userId: user.id,
         userEmail: user.email,

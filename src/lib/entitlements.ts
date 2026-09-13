@@ -309,37 +309,67 @@ export async function getEffectivePlan(input: {
 
 /**
  * Centralized usage rules.
- * - Month = UTC calendar month containing `now`.
- * - Every Post row created in the month counts (draft/scheduled/
- *   published/failed...). Deleted posts vanish with their rows and stop
- *   counting — no destructive cleanup, ever.
+ * - Month = UTC calendar month containing `now` (period key "YYYY-MM").
+ * - Every successful Post creation consumes one unit of the monthly quota,
+ *   recorded in PostUsage. The counter only grows: deleting a post never
+ *   refills it, so create/delete loops cannot mint quota.
  * - An account counts once per SocialAccount row on that platform.
  */
+export function getPeriodKey(nowMs: number = Date.now()): string {
+  const now = new Date(nowMs);
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  return `${now.getUTCFullYear()}-${month}`;
+}
+
+export function getMonthStart(nowMs: number = Date.now()): Date {
+  const now = new Date(nowMs);
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/**
+ * Resolves the creation count for the month: the persistent counter wins
+ * whenever a row exists (deletions after that point cannot refill quota);
+ * otherwise the live row count is the baseline.
+ */
+export function selectPostCount(
+  counter: number | null,
+  liveCount: number
+): number {
+  return counter ?? liveCount;
+}
+
 export async function getUsage(
   userId: string,
   nowMs: number = Date.now()
 ): Promise<Usage> {
-  const now = new Date(nowMs);
-  const monthStart = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
-  );
-  const [postCount, accountGroups, scheduledCount] = await Promise.all([
-    prisma.post.count({
-      where: { userId, createdAt: { gte: monthStart } },
-    }),
-    prisma.socialAccount.groupBy({
-      by: ["platform"],
-      where: { userId },
-      _count: { _all: true },
-    }),
-    prisma.post.count({ where: { userId, status: "SCHEDULED" } }),
-  ]);
+  const monthStart = getMonthStart(nowMs);
+  const period = getPeriodKey(nowMs);
+  const [postCount, usageRow, accountGroups, scheduledCount] =
+    await Promise.all([
+      prisma.post.count({
+        where: { userId, createdAt: { gte: monthStart } },
+      }),
+      prisma.postUsage
+        .findUnique({
+          where: { userId_period: { userId, period } },
+          select: { count: true },
+        })
+        // Pre-migration databases have no PostUsage table yet: reads stay
+        // available on the live count while writes fail closed.
+        .catch(() => null),
+      prisma.socialAccount.groupBy({
+        by: ["platform"],
+        where: { userId },
+        _count: { _all: true },
+      }),
+      prisma.post.count({ where: { userId, status: "SCHEDULED" } }),
+    ]);
   const accountsByPlatform: Record<string, number> = {};
   for (const group of accountGroups) {
     accountsByPlatform[group.platform] = group._count._all;
   }
   return {
-    postsThisMonth: postCount,
+    postsThisMonth: selectPostCount(usageRow?.count ?? null, postCount),
     monthStart,
     accountsByPlatform,
     totalAccounts: Object.values(accountsByPlatform).reduce((a, b) => a + b, 0),
@@ -360,6 +390,119 @@ export function canCreatePost(
     `Monthly post limit reached (${usage.postsThisMonth}/${limit}).`
   );
 }
+
+/** Quota-ledger access, injected so tests run without a database. */
+export type QuotaClaimStore = {
+  findUsage: (
+    userId: string,
+    period: string
+  ) => Promise<{ id: string; count: number } | null>;
+  /** Creates the row backfilled from the live count; tolerates races. */
+  createUsage: (
+    userId: string,
+    period: string,
+    count: number
+  ) => Promise<{ id: string; count: number }>;
+  /**
+   * Atomically increments only while below the limit. Serialized by the
+   * row lock with the predicate re-evaluated after locking, so concurrent
+   * claims on the last slot grant exactly one winner.
+   */
+  incrementIfBelowLimit: (id: string, limit: number) => Promise<boolean>;
+};
+
+export type QuotaClaim = { ok: true } | { ok: false; observed: number };
+
+/**
+ * Claims one unit of the monthly post quota. Creates the ledger row lazily,
+ * backfilled from the live creation count so usage accrued before the
+ * first claim keeps counting. Never decrements: deletions cannot refill.
+ */
+export async function claimMonthlyQuota(input: {
+  userId: string;
+  period: string;
+  limit: number;
+  liveCount: number;
+  store: QuotaClaimStore;
+}): Promise<QuotaClaim> {
+  let row = await input.store.findUsage(input.userId, input.period);
+  if (!row) {
+    row = await input.store.createUsage(
+      input.userId,
+      input.period,
+      input.liveCount
+    );
+  }
+  const granted = await input.store.incrementIfBelowLimit(row.id, input.limit);
+  if (!granted) {
+    const current = await input.store.findUsage(input.userId, input.period);
+    return { ok: false, observed: current?.count ?? input.limit };
+  }
+  return { ok: true };
+}
+
+/**
+ * Creation path with quota enforcement. Unlimited plans and the admin
+ * bypass skip the ledger entirely. When the claim is denied nothing is
+ * inserted. When the insert throws after a granted claim the unit stays
+ * consumed — fail-closed, never an over-grant.
+ */
+export async function createWithMonthlyQuota<T>(input: {
+  userId: string;
+  limit: number | null;
+  bypass: boolean;
+  nowMs?: number;
+  liveCount: () => Promise<number>;
+  quota: QuotaClaimStore;
+  insert: () => Promise<T>;
+}): Promise<{ ok: true; value: T } | { ok: false; observed: number }> {
+  if (input.bypass || input.limit === null) {
+    return { ok: true, value: await input.insert() };
+  }
+  const claim = await claimMonthlyQuota({
+    userId: input.userId,
+    period: getPeriodKey(input.nowMs ?? Date.now()),
+    limit: input.limit,
+    liveCount: await input.liveCount(),
+    store: input.quota,
+  });
+  if (!claim.ok) return { ok: false, observed: claim.observed };
+  return { ok: true, value: await input.insert() };
+}
+
+/** Prisma-backed quota ledger. */
+export const liveQuotaStore: QuotaClaimStore = {
+  findUsage: async (userId, period) => {
+    const row = await prisma.postUsage.findUnique({
+      where: { userId_period: { userId, period } },
+      select: { id: true, count: true },
+    });
+    return row;
+  },
+  createUsage: async (userId, period, count) => {
+    try {
+      return await prisma.postUsage.create({
+        data: { userId, period, count },
+        select: { id: true, count: true },
+      });
+    } catch {
+      // A concurrent first claim won the unique key: use its row.
+      const row = await prisma.postUsage.findUnique({
+        where: { userId_period: { userId, period } },
+        select: { id: true, count: true },
+      });
+      if (!row) throw new Error("PostUsage row vanished after conflict");
+      return row;
+    }
+  },
+  incrementIfBelowLimit: async (id, limit) => {
+    const updated = await prisma.postUsage.updateMany({
+      where: { id, count: { lt: limit } },
+      data: { count: { increment: 1 } },
+    });
+    return updated.count > 0;
+  },
+};
 
 export function canConnectAccount(
   eff: EffectiveSubscription,
@@ -390,6 +533,43 @@ export function canBulkSchedule(
       `A batch holds at most ${eff.entitlements.maxBulkVideos} videos on this plan.`
     );
   }
+  return { ok: true };
+}
+
+/**
+ * Parses the client-attested bulk batch size on post creation. Absent means
+ * an ordinary (non-bulk) create gated only by the monthly quota. Anything
+ * that is not a positive integer is rejected before any entitlement check.
+ */
+export function parseBulkBatchSize(
+  value: unknown
+): number | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    return "invalid";
+  }
+  return value;
+}
+
+export type BulkBatchGate =
+  | { ok: true }
+  | { ok: false; denial: Denial }
+  | { ok: false; invalid: true };
+
+/**
+ * Server-side bulk gate for POST /api/posts: an attested batch must fit
+ * the plan (Free has no bulk, paid plans cap videos per batch). Undeclared
+ * sequential creates stay bounded by the monthly quota backstop.
+ */
+export function checkBulkBatch(
+  eff: EffectiveSubscription,
+  rawSize: unknown
+): BulkBatchGate {
+  const parsed = parseBulkBatchSize(rawSize);
+  if (parsed === null) return { ok: true };
+  if (parsed === "invalid") return { ok: false, invalid: true };
+  const allowed = canBulkSchedule(eff, parsed);
+  if (!allowed.ok) return { ok: false, denial: allowed };
   return { ok: true };
 }
 

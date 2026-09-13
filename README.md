@@ -87,7 +87,10 @@ composer changes.
   `src/lib/plans.ts` (prices, features, entitlements) — never duplicated.
 - Limits: Free `{1 account/platform, 15 posts/month, no bulk}`,
   Growth `{5/platform, 300/month, 10-video bulk}`, Scale `{unlimited
-  accounts/posts, 10-video bulk}`. Media limits stay global.
+  accounts/posts, 10-video bulk}`. Media limits stay global. Monthly quota
+  counts created posts via an atomic ledger (`PostUsage`) — deleting a post
+  never refills it, and concurrent creates on the last slot grant one
+  winner. Bulk batches attest their size server-side per item.
 - New users start on Free automatically — no plan selection, no checkout.
   Paid landing CTAs route signup → `/billing` for an instant upgrade.
 - Data: `Subscription` row per user (plan, status, period end,

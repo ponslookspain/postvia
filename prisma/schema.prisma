@@ -72,6 +72,8 @@ model User {
   media          Media[]
   subscription   Subscription?
   testOverride   BillingTestOverride?
+  postUsages     PostUsage[]
+  identityLink   AbuseIdentityLink?
 }
 
 model UserPreferences {
@@ -128,6 +130,152 @@ model StripeEvent {
   eventId   String   @unique
   type      String
   createdAt DateTime @default(now())
+}
+
+/**
+ * Monthly post-creation ledger. One row per user per UTC calendar month
+ * (period "YYYY-MM"). The counter only ever grows: deleting a post never
+ * decrements it, so create/delete loops cannot refill the monthly quota.
+ * Rows are created lazily on first claimed creation, backfilled from the
+ * live post count — usage before that moment follows the same rules.
+ */
+model PostUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  period    String
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period])
+  @@index([userId])
+}
+
+enum AbuseRisk {
+  LOW
+  MEDIUM
+  HIGH
+  ABUSE
+}
+
+enum AbuseSignalKind {
+  GOOGLE_SUB
+  EMAIL_HASH
+  SOCIAL_LINK
+  DEVICE_COOKIE
+  IP_HASH
+}
+
+/**
+ * Abuse identity: the unit Free value belongs to. One human may own several
+ * Postvia users (AbuseIdentityLink), but the Free monthly allowance is
+ * consumed once per identity per period — new accounts never mint fresh
+ * Free quota. Paid subscriptions are NEVER pooled here: each Stripe
+ * Subscription stays bound to its own user with its own limits.
+ */
+model AbuseIdentity {
+  id             String              @id @default(cuid())
+  riskLevel      AbuseRisk           @default(LOW)
+  riskReason     String?
+  lastLinkedAt   DateTime?
+  firstSeenAt    DateTime            @default(now())
+  lastSeenAt     DateTime            @updatedAt
+  users          AbuseIdentityLink[]
+  signals        AbuseSignal[]
+  freeUsages     AbuseFreeUsage[]
+}
+
+/**
+ * One Postvia user belongs to at most one abuse identity. The link is
+ * removed by cascade when the user is deleted; the identity, its signals
+ * and its consumed Free value survive (see AbuseTombstone).
+ */
+model AbuseIdentityLink {
+  id         String        @id @default(cuid())
+  identityId String
+  userId     String        @unique
+  createdAt  DateTime      @default(now())
+  identity   AbuseIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([identityId])
+}
+
+/**
+ * Stable identity signals. The global (kind, valueHash) unique key is the
+ * matcher: a signal value can only ever point at one identity, which makes
+ * concurrent resolves serialize through P2002 into a single identity.
+ * Only hashes are stored — never raw emails, subs or external ids.
+ */
+model AbuseSignal {
+  id            String           @id @default(cuid())
+  identityId    String
+  kind          AbuseSignalKind
+  valueHash     String
+  pepperVersion Int              @default(1)
+  createdAt     DateTime         @default(now())
+  identity      AbuseIdentity    @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@unique([kind, valueHash])
+  @@index([identityId])
+}
+
+/**
+ * Survives User/SocialAccount deletion: re-registration with the same
+ * email, Google sub or social account re-resolves the recorded identity
+ * instead of minting fresh Free value. identityId is informational (no FK,
+ * may dangle after merges — resolution falls back to a plain tombstone
+ * hit). Swept after TTL.
+ */
+model AbuseTombstone {
+  id          String           @id @default(cuid())
+  kind        AbuseSignalKind
+  valueHash   String
+  identityId  String?
+  deletedAt   DateTime         @default(now())
+
+  @@unique([kind, valueHash])
+  @@index([identityId])
+  @@index([deletedAt])
+}
+
+/**
+ * Identity-level Free ledger. One row per identity per UTC calendar month
+ * (period "YYYY-MM"); the counter only grows. Created lazily on the first
+ * Free claim, initialized to the max of the linked users' PostUsage so
+ * already-consumed value is never re-granted. Claimed atomically with a
+ * conditional increment — concurrent claims on the last unit grant exactly
+ * one winner. Paid plans never touch this table.
+ */
+model AbuseFreeUsage {
+  id         String        @id @default(cuid())
+  identityId String
+  period     String
+  count      Int           @default(0)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  identity   AbuseIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@unique([identityId, period])
+  @@index([identityId])
+}
+
+/**
+ * Persistent, multi-instance rate-limit ledger (replaces in-memory Maps
+ * for abuse-relevant scopes). Rows are tiny and self-expiring via resetAt.
+ */
+model AbuseRateBucket {
+  id        String   @id @default(cuid())
+  scope     String
+  keyHash   String
+  count     Int      @default(0)
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scope, keyHash])
+  @@index([resetAt])
 }
 
 model Session {

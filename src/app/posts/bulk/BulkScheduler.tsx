@@ -366,7 +366,11 @@ export function BulkScheduler({
     }
   }
 
-  async function processItem(item: BulkItem, scheduledIso: string): Promise<boolean> {
+  async function processItem(
+    item: BulkItem,
+    scheduledIso: string,
+    batchSize: number
+  ): Promise<boolean> {
     // 1. Draft first: an aborted batch leaves harmless drafts, never
     //    half-broken scheduled posts.
     patchItem(item.key, { status: "creating", error: undefined });
@@ -375,9 +379,12 @@ export function BulkScheduler({
       const createRes = await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          buildBulkPostBody({ text, accountIds: selectedAccountIds })
-        ),
+        body: JSON.stringify({
+          ...buildBulkPostBody({ text, accountIds: selectedAccountIds }),
+          // Attests the whole batch size so the server can enforce the
+          // plan's bulk gate per item; the monthly quota backstops the rest.
+          bulkBatchSize: batchSize,
+        }),
       });
       const created = await createRes.json().catch(() => null);
       if (!createRes.ok || typeof created?.id !== "string") {
@@ -486,7 +493,7 @@ export function BulkScheduler({
           patchItem(item.key, { status: "error", error: "Could not compute schedule." });
           continue;
         }
-        if (await processItem(item, iso)) succeeded++;
+        if (await processItem(item, iso, queue.length)) succeeded++;
       }
     } finally {
       runningRef.current = false;

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
-import { assertCanConnectAccount } from "@/lib/entitlements";
+import { assertCanConnectAccount, getEffectivePlan } from "@/lib/entitlements";
+import {
+  gateNewSocialLink,
+  isPaidActivePlan,
+} from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
 
 export async function GET(request: NextRequest) {
@@ -71,6 +75,29 @@ export async function GET(request: NextRequest) {
         data: accountData,
       });
     } else {
+      // Abuse gate for fresh links (reconnects above skip it): one external
+      // account cannot serve two live users, and re-linked value is inherited.
+      const cookieStoreForAbuse = await request.cookies;
+      const effectiveForAbuse = await getEffectivePlan({
+        userId: user.id,
+        userEmail: user.email,
+      });
+      const abuseGate = await gateNewSocialLink({
+        userId: user.id,
+        userEmail: user.email,
+        platform: "THREADS",
+        externalId: threadsUser.externalId,
+        deviceCookieHeader:
+          cookieStoreForAbuse.get("pv_did")?.value ?? null,
+        isPaid:
+          effectiveForAbuse.bypass ||
+          isPaidActivePlan(effectiveForAbuse.plan, effectiveForAbuse.status),
+      });
+      if (!abuseGate.ok) {
+        return NextResponse.redirect(
+          new URL(`/accounts?error=${abuseGate.errorParam}`, request.url)
+        );
+      }
       // New connections consume plan quota; reconnects (above) never do.
       const gate = await assertCanConnectAccount({
         userId: user.id,

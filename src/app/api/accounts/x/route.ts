@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { XProvider } from "@/lib/social/x";
+import { recordDisconnect } from "@/lib/abuse";
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -31,6 +32,15 @@ export async function DELETE(request: NextRequest) {
     } catch {
       // Revocation is best-effort
     }
+
+    // Abuse tombstone + signal release: the freed (platform, externalId)
+    // pair stays remembered with its identity so re-linking by another user
+    // inherits consumed value instead of minting fresh Free quota.
+    await recordDisconnect({
+      userId: user.id,
+      platform: account.platform,
+      externalId: account.externalId,
+    });
 
     await prisma.socialAccount.delete({
       where: { id: account.id },

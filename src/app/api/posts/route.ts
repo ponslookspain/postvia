@@ -5,9 +5,21 @@ import { getApiUser } from "@/lib/auth";
 import { validateScheduledAt } from "@/lib/schedule";
 import {
   canCreatePost,
+  checkBulkBatch,
+  createWithMonthlyQuota,
   getEffectivePlan,
+  getMonthStart,
+  getPeriodKey,
+  getUpgradeTarget,
   getUsage,
+  liveQuotaStore,
 } from "@/lib/entitlements";
+import {
+  enforceFreeIdentityGate,
+  getAbusePepper,
+  isAbuseEnforcementEnabled,
+  liveAbuseStores,
+} from "@/lib/abuse";
 import {
   validateCreatePostContent,
   validateTargetAccountSelection,
@@ -78,7 +90,26 @@ export async function POST(request: NextRequest) {
       targets: requestedTargets,
       hasMedia = false,
       mediaCount: rawMediaCount,
+      bulkBatchSize: rawBulkBatchSize,
     } = await request.json();
+
+    // Server-side bulk gate: an attested batch must fit the plan. Free has
+    // no bulk; paid plans cap videos per batch. Undeclared sequential
+    // creates stay bounded by the monthly quota backstop.
+    const bulkGate = checkBulkBatch(effective, rawBulkBatchSize);
+    if (!bulkGate.ok) {
+      if ("invalid" in bulkGate) {
+        return NextResponse.json(
+          { error: "Invalid bulk batch size" },
+          { status: 400 }
+        );
+      }
+      const denial = bulkGate.denial;
+      return NextResponse.json(
+        { code: denial.code, reason: denial.reason, upgradeTo: denial.upgradeTo },
+        { status: 403 }
+      );
+    }
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
@@ -191,17 +222,91 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const post = await prisma.post.create({
-      data: {
-        userId: user.id,
-        text: text.trim(),
-        status: isScheduled ? "SCHEDULED" : "DRAFT",
-        scheduledAt: scheduledAtDate,
-        publishedAt: null,
-        targets: { create: targets },
-      },
-      include: { targets: true },
+    // Atomic quota claim + insert. The early gate above fast-fails the
+    // common over-limit case; this claim closes the check-then-create race:
+    // concurrent requests on the last slot grant exactly one winner. The
+    // ledger only grows — deleting a post never refills it.
+    //
+    // Identity-level Free enforcement (authoritative for Free): the monthly
+    // allowance belongs to the abuse identity shared by every linked user,
+    // so new accounts cannot mint fresh Free quota. Paid plans and the
+    // admin bypass skip this entirely — each paid subscription keeps its
+    // own per-user limits. Transient identity-store failures degrade to
+    // the PostUsage-only path below (still gated); a missing migration
+    // fails closed and loud.
+    const monthStart = getMonthStart();
+    const enforceAbuse = isAbuseEnforcementEnabled();
+    if (effective.plan === "free" && !effective.bypass) {
+      const freeLimit = effective.entitlements.monthlyPosts;
+      if (freeLimit !== null) {
+        const gate = await enforceFreeIdentityGate({
+          userId: user.id,
+          email: user.email,
+          limit: freeLimit,
+          enforce: enforceAbuse,
+          pepper: getAbusePepper(),
+          period: getPeriodKey(),
+          monthStart,
+          stores: liveAbuseStores,
+        });
+        if (!gate.ok) {
+          return NextResponse.json(
+            {
+              code: "UPGRADE_REQUIRED",
+              reason:
+                gate.code === "RESTRICTED"
+                  ? "This account is restricted. Contact support."
+                  : `Monthly post limit reached (${gate.observed}/${freeLimit}).`,
+              upgradeTo: getUpgradeTarget(effective.plan),
+            },
+            { status: 403 }
+          );
+        }
+      }
+    }
+    const created = await createWithMonthlyQuota({
+      userId: user.id,
+      limit: effective.entitlements.monthlyPosts,
+      bypass: effective.bypass,
+      liveCount: () =>
+        prisma.post.count({
+          where: { userId: user.id, createdAt: { gte: monthStart } },
+        }),
+      quota: liveQuotaStore,
+      insert: () =>
+        prisma.post.create({
+          data: {
+            userId: user.id,
+            text: text.trim(),
+            status: isScheduled ? "SCHEDULED" : "DRAFT",
+            scheduledAt: scheduledAtDate,
+            publishedAt: null,
+            targets: { create: targets },
+          },
+          include: { targets: true },
+        }),
     });
+    if (!created.ok) {
+      const denial = canCreatePost(effective, {
+        ...usage,
+        postsThisMonth: created.observed,
+      });
+      if (!denial.ok) {
+        return NextResponse.json(
+          { code: denial.code, reason: denial.reason, upgradeTo: denial.upgradeTo },
+          { status: 403 }
+        );
+      }
+      return NextResponse.json(
+        {
+          code: "UPGRADE_REQUIRED",
+          reason: "Monthly post limit reached.",
+          upgradeTo: getUpgradeTarget(effective.plan),
+        },
+        { status: 403 }
+      );
+    }
+    const post = created.value;
 
     return NextResponse.json(post, { status: 201 });
   } catch {

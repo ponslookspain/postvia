@@ -168,6 +168,9 @@ export async function DELETE(
       }
     }
 
+    // Quota invariant: deleting a post never touches the PostUsage ledger,
+    // so create/delete loops cannot refill the monthly quota. The deleted
+    // unit stays consumed — fail-closed by design.
     await prisma.post.delete({ where: { id } });
 
     return NextResponse.json({ ok: true });

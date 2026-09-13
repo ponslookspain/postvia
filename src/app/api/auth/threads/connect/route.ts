@@ -1,14 +1,22 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { generateState } from "@/lib/social/pkce";
 import { cookies } from "next/headers";
 import { getApiUser } from "@/lib/auth";
+import { applyDeviceCookie, gateOAuthInit } from "@/lib/abuse";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    if (!(await gateOAuthInit(request))) {
+      return NextResponse.json(
+        { error: "Too many requests. Try again later." },
+        { status: 429 }
+      );
     }
 
     const threadsProvider = new ThreadsProvider();
@@ -25,7 +33,11 @@ export async function GET() {
 
     const authorizeUrl = threadsProvider.getAuthorizeUrl(state);
 
-    return NextResponse.json({ url: authorizeUrl });
+    return applyDeviceCookie(
+      NextResponse.json({ url: authorizeUrl }),
+      request,
+      request.cookies.get("pv_did")?.value ?? null
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to initiate OAuth";
