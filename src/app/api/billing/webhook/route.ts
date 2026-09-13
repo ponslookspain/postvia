@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { liveBillingStores } from "@/lib/billing-live-stores";
 import {
   getStripeClient,
   processWebhookEvent,
   snapshotInvoice,
   snapshotSubscription,
-  type BillingSubscriptionStore,
-  type WebhookEventStore,
   type WebhookOutcome,
   type WebhookPayload,
 } from "@/lib/stripe";
@@ -16,80 +13,14 @@ import { logDiagnostic, reportError } from "@/lib/diagnostics";
 
 export const dynamic = "force-dynamic";
 
-const liveStores: BillingSubscriptionStore & WebhookEventStore = {
-  findUserByStripeSubId: async (stripeSubId) => {
-    const row = await prisma.subscription.findFirst({
-      where: { stripeSubId },
-      select: { userId: true },
-    });
-    return row?.userId ?? null;
-  },
-  findUserByCustomerId: async (customerId) => {
-    const row = await prisma.subscription.findFirst({
-      where: { stripeCustomerId: customerId },
-      select: { userId: true },
-    });
-    return row?.userId ?? null;
-  },
-  upsertSubscription: async (userId, write) => {
-    await prisma.subscription.upsert({
-      where: { userId },
-      create: {
-        userId,
-        plan: write.plan,
-        status: write.status,
-        currentPeriodEnd: write.currentPeriodEnd,
-        cancelAtPeriodEnd: write.cancelAtPeriodEnd,
-        stripeCustomerId: write.stripeCustomerId,
-        stripeSubId: write.stripeSubId,
-      },
-      update: {
-        plan: write.plan,
-        status: write.status,
-        currentPeriodEnd: write.currentPeriodEnd,
-        cancelAtPeriodEnd: write.cancelAtPeriodEnd,
-        stripeCustomerId: write.stripeCustomerId,
-        stripeSubId: write.stripeSubId,
-      },
-    });
-  },
-  setStatusByStripeSubId: async (stripeSubId, status) => {
-    const row = await prisma.subscription.findFirst({
-      where: { stripeSubId },
-      select: { userId: true },
-    });
-    if (!row) return null;
-    await prisma.subscription.update({
-      where: { userId: row.userId },
-      data: { status },
-    });
-    return row.userId;
-  },
-  claimEvent: async (eventId, type) => {
-    try {
-      await prisma.stripeEvent.create({ data: { eventId, type } });
-      return true;
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        return false;
-      }
-      throw error;
-    }
-  },
-  releaseEvent: async (eventId) => {
-    await prisma.stripeEvent.deleteMany({ where: { eventId } });
-  },
-};
+const liveStores = liveBillingStores;
 
 function payloadFor(event: Stripe.Event): WebhookPayload | null {
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
-      const snapshot = snapshotSubscription(event.data.object);
+      const snapshot = snapshotSubscription(event.data.object, event.created);
       if (!snapshot) return null;
       return { kind: "subscription", snapshot };
     }

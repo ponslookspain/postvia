@@ -34,7 +34,7 @@ export async function GET() {
 }
 
 const VALID_MODES = ["BYPASS", "ENFORCEMENT"] as const;
-const VALID_STATUSES = ["ACTIVE", "CANCELED", "PAST_DUE"] as const;
+const VALID_STATUSES = ["ACTIVE", "CANCELED", "PAST_DUE", "UNPAID"] as const;
 
 export async function POST(request: NextRequest) {
   const user = await requireAdmin();
@@ -92,14 +92,14 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       mode: mode as TestMode,
       plan: toDbPlan(plan),
-      subStatus: subStatus as "ACTIVE" | "CANCELED" | "PAST_DUE",
+      subStatus: subStatus as "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID",
       cancelAtPeriodEnd,
       currentPeriodEnd,
     },
     update: {
       mode: mode as TestMode,
       plan: toDbPlan(plan),
-      subStatus: subStatus as "ACTIVE" | "CANCELED" | "PAST_DUE",
+      subStatus: subStatus as "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID",
       cancelAtPeriodEnd,
       currentPeriodEnd,
     },

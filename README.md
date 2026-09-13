@@ -111,8 +111,11 @@ composer changes.
   users). Real plan changes go through Stripe: `POST /api/billing/checkout`
   (Growth/Scale Checkout), `POST /api/billing/portal` (Customer Portal for
   plan changes and cancellation), and `POST /api/billing/webhook` (verified
-  Stripe events are the only writer of paid `Subscription` state, idempotent
-  via `StripeEvent`). No Stripe, no charges without `STRIPE_SECRET_KEY`.
+  Stripe subscription events are the only authoritative writer of paid
+  `Subscription` state — ordered, mismatch- and ownership-guarded,
+  idempotent via `StripeEvent`; invoice events are telemetry only, and
+  `GET /billing?checkout=success` reconciles once through the same guards).
+  No Stripe, no charges without `STRIPE_SECRET_KEY`.
   Preview deployments use `sk_test_*` keys with separate test webhook
   secrets and test price ids (Vercel Preview env); a test key without
   explicit test prices refuses checkout instead of touching live prices.

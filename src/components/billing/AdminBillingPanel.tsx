@@ -45,7 +45,7 @@ export function AdminBillingPanel() {
   const [forbidden, setForbidden] = useState(false);
   const [mode, setMode] = useState<"BYPASS" | "ENFORCEMENT">("ENFORCEMENT");
   const [plan, setPlan] = useState<PlanId>("growth");
-  const [subStatus, setSubStatus] = useState<"ACTIVE" | "CANCELED" | "PAST_DUE">("ACTIVE");
+  const [subStatus, setSubStatus] = useState<"ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID">("ACTIVE");
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [periodEnd, setPeriodEnd] = useState("");
   const [saving, setSaving] = useState(false);
@@ -219,7 +219,7 @@ export function AdminBillingPanel() {
               value={subStatus}
               onValueChange={(value: unknown) =>
                 setSubStatus(
-                  (value as "ACTIVE" | "CANCELED" | "PAST_DUE") ?? "ACTIVE"
+                  (value as "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID") ?? "ACTIVE"
                 )
               }
             >
@@ -231,6 +231,7 @@ export function AdminBillingPanel() {
                   <SelectItem value="ACTIVE">Active</SelectItem>
                   <SelectItem value="CANCELED">Canceled</SelectItem>
                   <SelectItem value="PAST_DUE">Past due</SelectItem>
+                  <SelectItem value="UNPAID">Unpaid</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>

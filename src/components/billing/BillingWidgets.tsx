@@ -16,8 +16,14 @@ export function PlanBadge({
     <span className="flex flex-wrap items-center gap-2">
       <Badge variant="secondary">{getPlan(plan).name}</Badge>
       {status && status !== "ACTIVE" && (
-        <Badge variant={status === "PAST_DUE" ? "destructive" : "outline"}>
-          {status === "CANCELLING" ? "Canceling" : status.charAt(0) + status.slice(1).toLowerCase()}
+        <Badge
+          variant={status === "PAST_DUE" || status === "UNPAID" ? "destructive" : "outline"}
+        >
+          {status === "CANCELLING"
+            ? "Canceling"
+            : status === "UNPAID"
+              ? "Unpaid"
+              : status.charAt(0) + status.slice(1).toLowerCase()}
         </Badge>
       )}
     </span>

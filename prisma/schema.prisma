@@ -44,6 +44,7 @@ enum SubscriptionStatus {
   ACTIVE
   CANCELED
   PAST_DUE
+  UNPAID
 }
 
 enum TestMode {
@@ -95,6 +96,13 @@ model Subscription {
   cancelAtPeriodEnd  Boolean            @default(false)
   stripeCustomerId   String?
   stripeSubId        String?
+  /**
+   * Stripe `event.created` (unix seconds) of the last applied subscription
+   * event. Out-of-order deliveries with an older timestamp are ignored, so
+   * a stale event can never roll back newer plan/status state. Null means
+   * no timestamped event has been applied yet (legacy rows, admin writes).
+   */
+  lastStripeEventCreated Int?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)

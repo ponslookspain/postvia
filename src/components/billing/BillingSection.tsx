@@ -41,6 +41,11 @@ export type BillingView = {
   postsUsed: number;
   postsLimit: number | null;
   totalAccounts: number;
+  /** Checkout started, no authoritative subscription state yet — no paid grant. */
+  checkoutPending: boolean;
+  checkoutResult: "success" | "cancelled" | null;
+  /** A Stripe customer exists: upgrades/fixes go through the portal, not a new checkout. */
+  hasBillingCustomer: boolean;
 };
 
 function formatPeriodEnd(iso: string | null): string | null {
@@ -206,9 +211,13 @@ export function BillingSection({
 
   const periodEnd = formatPeriodEnd(initial.currentPeriodEnd);
   const currentPlan = getPlan(initial.plan);
+  // Anyone with a Stripe customer (including UNPAID on the Free effective
+  // plan) manages payment through the portal; canceled/expired customers
+  // resubscribe via a fresh checkout instead.
   const showPortal =
     !canChangePlan &&
-    initial.plan !== "free" &&
+    initial.hasBillingCustomer &&
+    !initial.checkoutPending &&
     initial.status !== "CANCELED" &&
     initial.status !== "EXPIRED";
   const showCancel =
@@ -278,11 +287,50 @@ export function BillingSection({
                 </AlertDescription>
               </Alert>
             )}
+            {initial.checkoutResult === "cancelled" && (
+              <Alert>
+                <AlertTitle>Checkout cancelled</AlertTitle>
+                <AlertDescription>
+                  No charge was made. You can subscribe any time.
+                </AlertDescription>
+              </Alert>
+            )}
+            {initial.checkoutPending && (
+              <Alert>
+                <AlertTitle>Payment processing</AlertTitle>
+                <AlertDescription>
+                  Your checkout is confirming with the payment provider. Your
+                  plan activates automatically once it is confirmed — no need
+                  to pay again.
+                </AlertDescription>
+              </Alert>
+            )}
             {initial.status === "PAST_DUE" && (
               <Alert variant="destructive">
                 <AlertTitle>Payment past due</AlertTitle>
                 <AlertDescription>
                   Update payment in billing management to keep your plan.
+                </AlertDescription>
+              </Alert>
+            )}
+            {initial.status === "UNPAID" && (
+              <Alert variant="destructive">
+                <AlertTitle>Payment failed</AlertTitle>
+                <AlertDescription>
+                  Paid features are paused while the subscription is unpaid.
+                  Update payment in billing management to restore access — your
+                  posts and accounts are kept.
+                </AlertDescription>
+              </Alert>
+            )}
+            {(initial.status === "CANCELED" || initial.status === "EXPIRED") && (
+              <Alert>
+                <AlertTitle>
+                  {initial.status === "CANCELED" ? "Subscription canceled" : "Subscription expired"}
+                </AlertTitle>
+                <AlertDescription>
+                  The Free plan applies now. Your posts and accounts are kept —
+                  resubscribe any time to unlock paid limits again.
                 </AlertDescription>
               </Alert>
             )}
@@ -339,10 +387,18 @@ export function BillingSection({
             const recommended = plan.id === "growth";
             const paidId = isPaidPlanId(plan.id) ? plan.id : null;
             // Paid plans are bought through Stripe Checkout, but only
-            // from Free: plan changes on an active subscription go
-            // through Manage subscription (Customer Portal) instead of
-            // stacking a second checkout. Free itself needs no action.
-            const subscribable = paidId !== null && initial.plan === "free";
+            // from Free without a live billing stake: plan changes and
+            // payment fixes on an active subscription go through Manage
+            // subscription (Customer Portal) instead of stacking a second
+            // checkout. Canceled/expired customers may resubscribe freely.
+            // Free itself needs no action.
+            const subscribable =
+              paidId !== null &&
+              initial.plan === "free" &&
+              !initial.checkoutPending &&
+              (!initial.hasBillingCustomer ||
+                initial.status === "CANCELED" ||
+                initial.status === "EXPIRED");
             return (
               <Card
                 key={plan.id}

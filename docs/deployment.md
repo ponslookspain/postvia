@@ -27,6 +27,15 @@ The database carries **no `_prisma_migrations` history** (created with
   verify on an isolated database first, then apply the SQL in a controlled
   way (single-command statements; Prisma prepared statements reject
   multi-command strings) during low traffic.
+- Applied production changes (manual psql, **no** `_prisma_migrations`
+  rows written, never `migrate deploy` / `db push` against production):
+  - 2026-09-13 — `20260913000000_billing_guards`: `ALTER TYPE
+    "SubscriptionStatus" ADD VALUE 'UNPAID'` (each statement in its own
+    transaction — Postgres forbids `ADD VALUE` inside a transaction block)
+    and `ALTER TABLE "Subscription" ADD COLUMN "lastStripeEventCreated"
+    INTEGER`. Verified read-only afterwards: enum holds
+    `ACTIVE,CANCELED,PAST_DUE,UNPAID`, the column is `integer NULL`, and
+    `migrate diff` against production prints an empty migration.
 
 Never: `migrate reset`, destructive SQL, touching other databases,
 deleting the Neon project. Production data changes go through app flows

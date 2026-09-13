@@ -4,6 +4,7 @@ import { getApiUser } from "@/lib/auth";
 import { XProvider } from "@/lib/social/x";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { deleteBlobs } from "@/lib/blob";
+import { cancelStripeSubscriptionNow, getStripeClient } from "@/lib/stripe";
 import {
   emailSignal,
   getAbusePepper,
@@ -76,6 +77,65 @@ export async function DELETE(request: NextRequest) {
       where: { userId: user.id },
       select: { pathname: true },
     });
+
+    // Billing durability: a Stripe subscription must never survive its user
+    // as an orphan that keeps billing. Cancel immediately (the paid period
+    // is non-refunded by default; nothing bills afterwards). This gate is
+    // fail-closed: when the subscription cannot be confirmed canceled, the
+    // wipe is blocked with 500 and the user retries — a Stripe outage may
+    // delay deletion but can never orphan billing. Webhooks arriving after
+    // a completed deletion resolve to no user and grant nothing.
+    try {
+      const subscription = await prisma.subscription.findUnique({
+        where: { userId: user.id },
+        select: { status: true, stripeSubId: true },
+      });
+      if (subscription?.stripeSubId && subscription.status !== "CANCELED") {
+        if (!process.env.STRIPE_SECRET_KEY?.trim()) {
+          reportError("billing", "stripe cancel on account delete blocked: no key", undefined, {
+            userId: user.id,
+          });
+          return NextResponse.json(
+            { error: "Billing cancellation is unavailable. Try again later." },
+            { status: 500 }
+          );
+        }
+        const outcome = await cancelStripeSubscriptionNow({
+          stripeSubId: subscription.stripeSubId,
+          cancel: (id) => getStripeClient().subscriptions.cancel(id),
+          getStatus: async (id) => {
+            try {
+              const sub = await getStripeClient().subscriptions.retrieve(id);
+              return sub.status;
+            } catch (error) {
+              // Positively gone (deleted/missing) means no future billing;
+              // anything else is unverifiable and must block the wipe.
+              const statusCode = (error as { statusCode?: unknown })?.statusCode;
+              const code = (error as { code?: unknown })?.code;
+              if (statusCode === 404 || code === "resource_missing") return null;
+              throw error;
+            }
+          },
+        });
+        if (outcome.outcome === "failed") {
+          reportError("billing", "stripe cancel on account delete failed", outcome.error, {
+            userId: user.id,
+          });
+          return NextResponse.json(
+            { error: "Billing cancellation failed. Try again later." },
+            { status: 500 }
+          );
+        }
+      }
+    } catch (error) {
+      reportError("billing", "stripe cancel on account delete failed", error, {
+        userId: user.id,
+      });
+      return NextResponse.json(
+        { error: "Billing cancellation failed. Try again later." },
+        { status: 500 }
+      );
+    }
 
     for (const account of accounts) {
       try {

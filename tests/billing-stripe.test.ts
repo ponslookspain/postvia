@@ -177,6 +177,9 @@ describe("stripe live/test separation", () => {
         calls.sessions += 1;
         return { url: "https://checkout.stripe.com/c/pay_x" };
       },
+      listSubscriptionsByCustomer: async () => [],
+      expireOpenSessions: async () => {},
+      withLock: async (_userId, fn) => fn(),
     };
     const res = await handleCheckout({
       user: user(),
@@ -196,9 +199,9 @@ describe("subscription status mapping", () => {
     assert.equal(mapSubscriptionStatus("active"), "ACTIVE");
     assert.equal(mapSubscriptionStatus("trialing"), "ACTIVE");
   });
-  test("past_due and unpaid flag the plan", () => {
+  test("past_due flags the plan, unpaid revokes paid access distinctly", () => {
     assert.equal(mapSubscriptionStatus("past_due"), "PAST_DUE");
-    assert.equal(mapSubscriptionStatus("unpaid"), "PAST_DUE");
+    assert.equal(mapSubscriptionStatus("unpaid"), "UNPAID");
   });
   test("canceled and incomplete_expired end access", () => {
     assert.equal(mapSubscriptionStatus("canceled"), "CANCELED");
@@ -274,13 +277,18 @@ function makeCheckoutDeps(
         }
       | null;
     sessionUrl?: string;
+    liveSubs?: { id: string; status: string }[];
   } = {}
 ): { deps: CheckoutDeps; calls: CheckoutCalls } {
   const calls: CheckoutCalls = { customers: [], links: [], sessions: [] };
   const deps: CheckoutDeps = {
     configured: true,
     prices: { growth: GROWTH_PRICE, scale: SCALE_PRICE },
-    findSubscription: async () => overrides.subscription ?? null,
+    findSubscription: async () => {
+      const sub = overrides.subscription ?? null;
+      if (!sub) return null;
+      return { ...sub, currentPeriodEnd: null, cancelAtPeriodEnd: false };
+    },
     linkCustomer: async (userId, customerId) => {
       calls.links.push({ userId, customerId });
     },
@@ -292,6 +300,9 @@ function makeCheckoutDeps(
       calls.sessions.push(input);
       return { url: overrides.sessionUrl ?? "https://checkout.stripe.com/c/pay_123" };
     },
+    listSubscriptionsByCustomer: async () => overrides.liveSubs ?? [],
+    expireOpenSessions: async () => {},
+    withLock: async (_userId, fn) => fn(),
   };
   return { deps, calls };
 }
@@ -504,6 +515,7 @@ type SubRow = {
   stripeSubId: string | null;
   currentPeriodEnd: Date | null;
   cancelAtPeriodEnd: boolean;
+  lastStripeEventCreated?: number | null;
 };
 
 function makeStores(initial: SubRow[] = []) {
@@ -523,6 +535,20 @@ function makeStores(initial: SubRow[] = []) {
       }
       return null;
     },
+    getSubscriptionByUserId: async (userId) => {
+      const row = subs.get(userId);
+      if (!row) return null;
+      return {
+        userId: row.userId,
+        plan: row.plan as "FREE" | "GROWTH" | "SCALE",
+        status: row.status as "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID",
+        currentPeriodEnd: row.currentPeriodEnd,
+        cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+        stripeCustomerId: row.stripeCustomerId,
+        stripeSubId: row.stripeSubId,
+        lastStripeEventCreated: row.lastStripeEventCreated ?? null,
+      };
+    },
     upsertSubscription: async (userId, write: SubscriptionWrite) => {
       counters.upserts += 1;
       subs.set(userId, {
@@ -533,18 +559,10 @@ function makeStores(initial: SubRow[] = []) {
         stripeSubId: write.stripeSubId,
         currentPeriodEnd: write.currentPeriodEnd,
         cancelAtPeriodEnd: write.cancelAtPeriodEnd,
+        lastStripeEventCreated: write.lastStripeEventCreated,
       });
     },
-    setStatusByStripeSubId: async (stripeSubId, status) => {
-      for (const row of subs.values()) {
-        if (row.stripeSubId === stripeSubId) {
-          counters.statusWrites += 1;
-          row.status = status;
-          return row.userId;
-        }
-      }
-      return null;
-    },
+    retrieveLiveSnapshot: async () => null,
   };
   const eventStore: WebhookEventStore = {
     claimEvent: async (eventId, type) => {
@@ -575,6 +593,7 @@ function subSnapshot(
     cancelAtPeriodEnd: false,
     currentPeriodEnd: new Date("2026-10-12T00:00:00Z"),
     userId: "user-1",
+    eventCreated: null,
     ...overrides,
   };
 }
@@ -612,6 +631,7 @@ describe("webhook payload snapshots", () => {
       cancelAtPeriodEnd: true,
       currentPeriodEnd: new Date(1791763200 * 1000),
       userId: "user-1",
+      eventCreated: null,
     });
   });
   test("subscription snapshot falls back to the legacy period end", () => {
@@ -674,6 +694,7 @@ describe("webhook subscription events", () => {
       stripeSubId: "sub_test_1",
       currentPeriodEnd: new Date("2026-10-12T00:00:00Z"),
       cancelAtPeriodEnd: false,
+      lastStripeEventCreated: null,
     });
   });
   test("unknown price never grants access and writes nothing", async () => {
@@ -734,8 +755,28 @@ describe("webhook subscription events", () => {
 });
 
 describe("webhook invoice events", () => {
-  test("payment failure flags past due", async () => {
-    const { stores, subs } = makeStores([
+  test("invoice events are telemetry: success writes nothing", async () => {
+    const { stores, subs, counters } = makeStores([
+      {
+        userId: "user-1",
+        plan: "GROWTH",
+        status: "CANCELED",
+        stripeCustomerId: "cus_test_1",
+        stripeSubId: "sub_test_1",
+        currentPeriodEnd: new Date("2026-10-12T00:00:00Z"),
+        cancelAtPeriodEnd: false,
+      },
+    ]);
+    const outcome = await processInvoiceSnapshot(
+      invoiceSnapshot({ succeeded: true }),
+      stores
+    );
+    assert.deepEqual(outcome, { outcome: "ignored", reason: "invoice-telemetry" });
+    assert.equal(subs.get("user-1")?.status, "CANCELED");
+    assert.equal(counters.upserts, 0);
+  });
+  test("invoice events are telemetry: failure writes nothing", async () => {
+    const { stores, subs, counters } = makeStores([
       {
         userId: "user-1",
         plan: "GROWTH",
@@ -750,40 +791,9 @@ describe("webhook invoice events", () => {
       invoiceSnapshot({ succeeded: false }),
       stores
     );
-    assert.deepEqual(outcome, { outcome: "applied", userId: "user-1" });
-    assert.equal(subs.get("user-1")?.status, "PAST_DUE");
-    assert.equal(subs.get("user-1")?.plan, "GROWTH");
-  });
-  test("payment success restores active", async () => {
-    const { stores, subs } = makeStores([
-      {
-        userId: "user-1",
-        plan: "SCALE",
-        status: "PAST_DUE",
-        stripeCustomerId: "cus_test_1",
-        stripeSubId: "sub_test_1",
-        currentPeriodEnd: new Date("2026-10-12T00:00:00Z"),
-        cancelAtPeriodEnd: false,
-      },
-    ]);
-    const outcome = await processInvoiceSnapshot(
-      invoiceSnapshot({ succeeded: true }),
-      stores
-    );
-    assert.deepEqual(outcome, { outcome: "applied", userId: "user-1" });
+    assert.deepEqual(outcome, { outcome: "ignored", reason: "invoice-telemetry" });
     assert.equal(subs.get("user-1")?.status, "ACTIVE");
-  });
-  test("invoice for an unknown subscription writes nothing", async () => {
-    const { stores, counters } = makeStores();
-    const outcome = await processInvoiceSnapshot(
-      invoiceSnapshot({ subscriptionId: "sub_ghost" }),
-      stores
-    );
-    assert.deepEqual(outcome, {
-      outcome: "unresolvable",
-      reason: "unknown-subscription",
-    });
-    assert.equal(counters.statusWrites, 0);
+    assert.equal(counters.upserts, 0);
   });
 });
 

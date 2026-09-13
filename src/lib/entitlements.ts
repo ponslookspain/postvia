@@ -15,7 +15,7 @@ import {
  */
 
 export type DbPlan = "FREE" | "GROWTH" | "SCALE";
-export type DbSubStatus = "ACTIVE" | "CANCELED" | "PAST_DUE";
+export type DbSubStatus = "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID";
 
 export type SubscriptionRow = {
   plan: DbPlan;
@@ -24,6 +24,8 @@ export type SubscriptionRow = {
   cancelAtPeriodEnd: boolean;
   stripeCustomerId: string | null;
   stripeSubId: string | null;
+  /** Present on live rows; absent in test fixtures. Drives pending-checkout aging. */
+  updatedAt?: Date;
 } | null;
 
 export type TestMode = "BYPASS" | "ENFORCEMENT";
@@ -42,6 +44,7 @@ export type EffectiveStatus =
   | "CANCELLING"
   | "CANCELED"
   | "PAST_DUE"
+  | "UNPAID"
   | "EXPIRED";
 
 export type EffectiveSubscription = {
@@ -103,6 +106,34 @@ export function toPlanIdSafe(plan: string): PlanId {
   return "free";
 }
 
+/**
+ * How long a customer-without-subscription row reads as a pending checkout
+ * (Stripe Checkout Sessions expire after 24h; older rows are abandoned and
+ * may start over — stale open sessions are expired server-side on retry).
+ */
+export const CHECKOUT_PENDING_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * True while a FREE row holds a Stripe customer but no authoritative
+ * subscription state yet. Never grants access — the billing page shows a
+ * processing state until the webhook (or reconciliation) lands.
+ */
+export function isCheckoutPending(
+  subscription: SubscriptionRow,
+  nowMs: number = Date.now()
+): boolean {
+  if (
+    !subscription ||
+    subscription.plan !== "FREE" ||
+    !subscription.stripeCustomerId ||
+    subscription.stripeSubId ||
+    !subscription.updatedAt
+  ) {
+    return false;
+  }
+  return nowMs - subscription.updatedAt.getTime() < CHECKOUT_PENDING_MS;
+}
+
 /** Next paid tier, or null when already on top. */
 export function getUpgradeTarget(plan: PlanId): Exclude<PlanId, "scale"> | "scale" | null {
   if (plan === "free") return "growth";
@@ -146,6 +177,7 @@ export async function getSubscription(
     cancelAtPeriodEnd: row.cancelAtPeriodEnd,
     stripeCustomerId: row.stripeCustomerId,
     stripeSubId: row.stripeSubId,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -182,6 +214,17 @@ export function applyPeriodRules(
   const plan = toPlanIdSafe(base.plan);
   if (base.status === "CANCELED") {
     return { plan: "free", status: "CANCELED", expired: true };
+  }
+  // UNPAID keeps no paid entitlements but stays lifecycle-distinct from
+  // CANCELED: recovery (subscription.updated → active) can still reactivate
+  // the same subscription, while CANCELED is terminal for that object.
+  if (base.status === "UNPAID") {
+    return { plan: "free", status: "UNPAID", expired: true };
+  }
+  // Fail closed: a scheduled cancellation without any period end must never
+  // read as an indefinite paid plan.
+  if (base.cancelAtPeriodEnd && !base.currentPeriodEnd) {
+    return { plan: "free", status: "EXPIRED", expired: true };
   }
   if (
     base.cancelAtPeriodEnd &&

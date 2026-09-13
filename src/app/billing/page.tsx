@@ -6,17 +6,29 @@ import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import {
   getEffectivePlan,
+  getSubscription,
   getUsage,
   isAdminEmail,
+  isCheckoutPending,
 } from "@/lib/entitlements";
 import { getPlan } from "@/lib/plans";
+import { liveBillingStores } from "@/lib/billing-live-stores";
+import { isStripeConfigured, reconcileSubscriptionFromStripe } from "@/lib/stripe";
 import type { BillingView } from "@/components/billing/BillingSection";
 import { BillingSection } from "@/components/billing/BillingSection";
 import { AdminBillingPanel } from "@/components/billing/AdminBillingPanel";
 
 export const dynamic = "force-dynamic";
 
-export default async function BillingPage() {
+type BillingSearchParams = {
+  checkout?: string;
+};
+
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<BillingSearchParams>;
+}) {
   const user = await getSessionUser();
   if (!user) {
     return (
@@ -34,10 +46,37 @@ export default async function BillingPage() {
       </div>
     );
   }
-  const [effective, usage] = await Promise.all([
+  const params = await searchParams;
+  const checkoutResult =
+    params?.checkout === "success"
+      ? ("success" as const)
+      : params?.checkout === "cancelled"
+        ? ("cancelled" as const)
+        : null;
+  // On-demand reconciliation (no polling): the user just returned from
+  // Checkout but the webhook may be delayed. Reads the live Stripe object
+  // and applies it through the same guarded writer — never grants from the
+  // `checkout=success` query param itself.
+  if (checkoutResult === "success" && isStripeConfigured()) {
+    try {
+      await reconcileSubscriptionFromStripe({
+        userId: user.id,
+        stores: liveBillingStores,
+      });
+    } catch {
+      // Webhook remains the writer; the page degrades to the pending state.
+    }
+  }
+  const [effective, usage, subscription] = await Promise.all([
     getEffectivePlan({ userId: user.id, userEmail: user.email }),
     getUsage(user.id),
+    getSubscription(user.id),
   ]);
+
+  // A FREE row holding a customer but no subscription means Checkout
+  // started and no authoritative subscription state exists yet. Older rows
+  // read as abandoned checkouts that may safely start over.
+  const checkoutPending = isCheckoutPending(subscription);
 
   const billing: BillingView = {
     plan: effective.plan,
@@ -51,6 +90,9 @@ export default async function BillingPage() {
     postsUsed: usage.postsThisMonth,
     postsLimit: effective.entitlements.monthlyPosts,
     totalAccounts: usage.totalAccounts,
+    checkoutPending,
+    checkoutResult,
+    hasBillingCustomer: !!subscription?.stripeCustomerId,
   };
 
   const isAdmin = isAdminEmail(user.email);
