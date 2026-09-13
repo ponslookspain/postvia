@@ -137,8 +137,14 @@ Change: old address tombstoned + live signal released (a recycled address
 re-resolves flagged `MEDIUM`, never silently clean), new address attached.
 Delete: tombstones in the delete transaction; identity, signals, consumed
 value survive. Own reconnect skips the abuse gate (token update) and needs
-no cooldown; чужой handoff starts fresh unless same-device evidence ties
-the same pair.
+no cooldown; re-linking the same social pair from another user/device
+merges into the surviving identity and inherits its consumed Free quota
+(the pair links only through OAuth on the same external social account,
+so no fresh allowance is minted). Device overlap is logged as supporting
+evidence but never gates this inheritance — and its absence never
+re-grants consumed value. Note: the per-user `PostUsage` counter (and any
+UI derived from it) may still show 0/15 for the new user; enforcement
+authority is the identity-level `AbuseFreeUsage`, which is shared.
 
 ## Paid & admin bypass
 

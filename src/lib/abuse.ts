@@ -1102,9 +1102,11 @@ export async function checkSocialLink(input: {
   } else {
     // No live owner: the pair may still carry consumed value on a
     // tombstoned identity (disconnect removes the signal row, the ledger
-    // stays). Absorb identities with no live users so the value is
-    // inherited; a tombstone whose users are alive is a handoff — the new
-    // link starts fresh and the fact is logged.
+    // stays). That identity is absorbed so the value is inherited: the
+    // pair links only through OAuth on the same external social account,
+    // so a re-link from any user or device continues the same consumed
+    // quota instead of minting a fresh allowance. Expired tombstones are
+    // ignored (they await the sweeper, never block forever).
   // Tombstones for this pair, including our own history (re-linking a
   // pair this identity owned before is exempt from the MEDIUM cooldown —
   // linking consumes no value by itself, posting does). Expired tombstones
@@ -1124,12 +1126,10 @@ export async function checkSocialLink(input: {
     ),
   ];
   const orphans: string[] = [];
-  // Supporting device evidence: the device cookie never merges identities
-  // by itself, but when the requester's device is already owned by a
-  // tombstoned identity with live users, that is same-human evidence for
-  // THIS pair (the requester re-links from the same browser) — inherit
-  // instead of treating it as a handoff to a stranger. Without device
-  // overlap a live-users tombstone stays a handoff (fresh allowance).
+  // Supporting device evidence is logged but never gates inheritance: the
+  // device cookie must not merge strangers by itself, and its absence must
+  // not re-grant consumed value either (a new browser/incognito would
+  // otherwise reset the Free allowance for the same social identity).
   let deviceOwnerIds: Set<string> | null = null;
   for (const tombId of tombIds) {
     const users = await input.stores.findUserIdsByIdentity(tombId);
@@ -1147,14 +1147,17 @@ export async function checkSocialLink(input: {
       }
       sameHuman = deviceOwnerIds.has(tombId);
     }
+    // Tombstone with live users: absorb the surviving identity so
+    // already-consumed Free value is inherited, not re-granted. Risk is
+    // preserved at max by the merge below.
+    orphans.push(tombId);
     if (sameHuman) {
-      orphans.push(tombId);
       logDiagnostic("abuse", "same-device re-link inherits usage", {
         userId: input.userId,
         identityId,
       });
     } else {
-      logDiagnostic("abuse", "social handoff without inheritance", {
+      logDiagnostic("abuse", "tombstoned re-link inherits usage", {
         userId: input.userId,
         identityId,
       });

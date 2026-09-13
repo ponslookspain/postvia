@@ -1219,7 +1219,7 @@ describe("disconnect and re-link flows", () => {
       ...extra,
     });
   }
-  test("disconnect frees the pair; another user starts fresh (handoff)", async () => {
+  test("disconnect then re-link by a new user inherits consumed quota (no fresh allowance)", async () => {
     const { stores } = makeAbuseStores();
     const first = await linkX(stores, "u1", "hand-a@x.com", "ext-hand");
     assert.equal(first.ok, true);
@@ -1237,14 +1237,23 @@ describe("disconnect and re-link flows", () => {
       pepper: PEPPER,
       stores,
     });
+    // New user, new email, no shared device: same social identity, so the
+    // consumed Free value is inherited instead of re-granted.
     const second = await linkX(stores, "u2", "hand-b@x.com", "ext-hand");
     assert.equal(second.ok, true);
-    if (second.ok) {
-      // Handoff to a distinct human: fresh allowance, no inherited value.
-      const claim = await claimIdentityFree(
-        claimParams(second.identityId, ["u2"], stores)
+    if (second.ok && first.ok) {
+      assert.equal(second.identityId, first.identityId);
+      // 7 inherited + 8 more = 15, then denied.
+      for (let index = 0; index < 8; index += 1) {
+        const grant = await claimIdentityFree(
+          claimParams(second.identityId, ["u1", "u2"], stores)
+        );
+        assert.deepEqual(grant, { ok: true });
+      }
+      const exhausted = await claimIdentityFree(
+        claimParams(second.identityId, ["u1", "u2"], stores)
       );
-      assert.deepEqual(claim, { ok: true });
+      assert.deepEqual(exhausted, { ok: false, observed: 15 });
     }
   });
   test("same human (shared device) re-linking inherits consumed value", async () => {
@@ -1321,6 +1330,178 @@ describe("disconnect and re-link flows", () => {
     assert.equal(retry.ok, true);
     if (retry.ok && first.ok) {
       assert.equal(retry.identityId, first.identityId);
+    }
+  });
+  test("exhausted quota stays exhausted for the next user of the same social identity", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await linkX(stores, "u1", "full-a@x.com", "ext-full");
+    assert.equal(first.ok, true);
+    if (first.ok) {
+      for (let index = 0; index < 15; index += 1) {
+        await claimIdentityFree(
+          claimParams(first.identityId, ["u1"], stores)
+        );
+      }
+    }
+    await recordDisconnect({
+      userId: "u1",
+      platform: "X",
+      externalId: "ext-full",
+      pepper: PEPPER,
+      stores,
+    });
+    const second = await linkX(stores, "u2", "full-b@x.com", "ext-full");
+    assert.equal(second.ok, true);
+    if (second.ok && first.ok) {
+      assert.equal(second.identityId, first.identityId);
+      const denied = await claimIdentityFree(
+        claimParams(second.identityId, ["u1", "u2"], stores)
+      );
+      assert.deepEqual(denied, { ok: false, observed: 15 });
+    }
+  });
+  test("reverse order shares the same quota (second linker inherits)", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await linkX(stores, "u2", "rev-b@x.com", "ext-rev");
+    assert.equal(first.ok, true);
+    if (first.ok) {
+      for (let index = 0; index < 5; index += 1) {
+        await claimIdentityFree(
+          claimParams(first.identityId, ["u2"], stores)
+        );
+      }
+    }
+    await recordDisconnect({
+      userId: "u2",
+      platform: "X",
+      externalId: "ext-rev",
+      pepper: PEPPER,
+      stores,
+    });
+    const second = await linkX(stores, "u1", "rev-a@x.com", "ext-rev");
+    assert.equal(second.ok, true);
+    if (second.ok && first.ok) {
+      assert.equal(second.identityId, first.identityId);
+      for (let index = 0; index < 10; index += 1) {
+        const grant = await claimIdentityFree(
+          claimParams(second.identityId, ["u1", "u2"], stores)
+        );
+        assert.deepEqual(grant, { ok: true });
+      }
+      const exhausted = await claimIdentityFree(
+        claimParams(second.identityId, ["u1", "u2"], stores)
+      );
+      assert.deepEqual(exhausted, { ok: false, observed: 15 });
+    }
+  });
+  test("a different social externalId still starts its own allowance", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await linkX(stores, "u1", "dif-a@x.com", "ext-dif-a");
+    assert.equal(first.ok, true);
+    if (first.ok) {
+      for (let index = 0; index < 7; index += 1) {
+        await claimIdentityFree(
+          claimParams(first.identityId, ["u1"], stores)
+        );
+      }
+    }
+    await recordDisconnect({
+      userId: "u1",
+      platform: "X",
+      externalId: "ext-dif-a",
+      pepper: PEPPER,
+      stores,
+    });
+    const second = await linkX(stores, "u2", "dif-b@x.com", "ext-dif-b");
+    assert.equal(second.ok, true);
+    if (second.ok && first.ok) {
+      assert.notEqual(second.identityId, first.identityId);
+      const fresh = await claimIdentityFree(
+        claimParams(second.identityId, ["u2"], stores)
+      );
+      assert.deepEqual(fresh, { ok: true });
+    }
+  });
+  for (const platform of ["THREADS", "X", "INSTAGRAM", "TIKTOK"]) {
+    test(`disconnect + new-user re-link inherits quota on ${platform}`, async () => {
+      const { stores } = makeAbuseStores();
+      const ext = `ext-shared-${platform.toLowerCase()}`;
+      const first = await linkX(stores, "u1", `plat-a-${platform}@x.com`, ext, {
+        platform,
+      });
+      assert.equal(first.ok, true);
+      if (first.ok) {
+        for (let index = 0; index < 7; index += 1) {
+          await claimIdentityFree(
+            claimParams(first.identityId, ["u1"], stores)
+          );
+        }
+      }
+      await recordDisconnect({
+        userId: "u1",
+        platform,
+        externalId: ext,
+        pepper: PEPPER,
+        stores,
+      });
+      const second = await linkX(stores, "u2", `plat-b-${platform}@x.com`, ext, {
+        platform,
+      });
+      assert.equal(second.ok, true);
+      if (second.ok && first.ok) {
+        assert.equal(second.identityId, first.identityId);
+        for (let index = 0; index < 8; index += 1) {
+          const grant = await claimIdentityFree(
+            claimParams(second.identityId, ["u1", "u2"], stores)
+          );
+          assert.deepEqual(grant, { ok: true });
+        }
+        const exhausted = await claimIdentityFree(
+          claimParams(second.identityId, ["u1", "u2"], stores)
+        );
+        assert.deepEqual(exhausted, { ok: false, observed: 15 });
+      }
+    });
+  }
+  test("concurrent re-links after disconnect converge to one shared identity", async () => {
+    const { stores } = makeAbuseStores();
+    const first = await linkX(stores, "u1", "race-a@x.com", "ext-race");
+    assert.equal(first.ok, true);
+    if (first.ok) {
+      for (let index = 0; index < 7; index += 1) {
+        await claimIdentityFree(
+          claimParams(first.identityId, ["u1"], stores)
+        );
+      }
+    }
+    await recordDisconnect({
+      userId: "u1",
+      platform: "X",
+      externalId: "ext-race",
+      pepper: PEPPER,
+      stores,
+    });
+    const [b, c] = await Promise.all([
+      linkX(stores, "u2", "race-b@x.com", "ext-race"),
+      linkX(stores, "u3", "race-c@x.com", "ext-race"),
+    ]);
+    assert.equal(b.ok, true);
+    assert.equal(c.ok, true);
+    if (b.ok && c.ok && first.ok) {
+      // Deterministic convergence: both racers land in the surviving
+      // identity, so the ledger is shared, never doubled.
+      assert.equal(b.identityId, c.identityId);
+      assert.equal(b.identityId, first.identityId);
+      for (let index = 0; index < 8; index += 1) {
+        const grant = await claimIdentityFree(
+          claimParams(b.identityId, ["u1", "u2", "u3"], stores)
+        );
+        assert.deepEqual(grant, { ok: true });
+      }
+      const exhausted = await claimIdentityFree(
+        claimParams(b.identityId, ["u1", "u2", "u3"], stores)
+      );
+      assert.deepEqual(exhausted, { ok: false, observed: 15 });
     }
   });
 });

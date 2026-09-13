@@ -1050,7 +1050,7 @@ describe("adversarial failure classification and rate limits", () => {
         );
         return row ? { id: row.id } : null;
       },
-      countByPlatform: async () => 0,
+      countTotal: async () => 0,
       create: async ({ userId, platform, data: d }) => {
         await tick();
         if (rows.some((r) => r.platform === platform && r.externalId === d.externalId)) {
@@ -1061,9 +1061,9 @@ describe("adversarial failure classification and rate limits", () => {
         rows.push(row);
         return { id: row.id };
       },
-      listIdsByPlatformOldestFirst: async (userId, platform) => {
+      listIdsOldestFirst: async (userId) => {
         await tick();
-        return rows.filter((r) => r.userId === userId && r.platform === platform).map((r) => r.id);
+        return rows.filter((r) => r.userId === userId).map((r) => r.id);
       },
       updateAccount: async () => {},
       deleteOwnById: async () => {},
@@ -1385,5 +1385,114 @@ describe("adversarial misc invariants", () => {
       assert.equal(isAbuseDisabled(), false);
       assert.equal(isAbuseEnforcementEnabled(), false);
     }
+  });
+});
+
+// ---------------------------------------------------------------- quota follows the social identity
+describe("disconnect re-link shares Free quota through the post kernel", () => {
+  function postParams(
+    h: ReturnType<typeof makeHarness>,
+    userId: string,
+    email: string,
+    seq: { next: number }
+  ) {
+    return {
+      userId,
+      email,
+      limit: LIMIT,
+      period: PERIOD,
+      monthStart: MONTH_START,
+      pepper: PEPPER,
+      enforce: true,
+      stores: h.stores,
+      quota: h.quota,
+      liveCount: async () => 0,
+      insert: async () => {
+        seq.next += 1;
+        return `post-${userId}-${seq.next}`;
+      },
+    };
+  }
+  async function link(
+    h: ReturnType<typeof makeHarness>,
+    userId: string,
+    userEmail: string,
+    platform: string,
+    externalId: string
+  ) {
+    return checkSocialLink({
+      userId,
+      userEmail,
+      platform,
+      externalId,
+      deviceId: null,
+      isPaid: false,
+      enforce: true,
+      pepper: PEPPER,
+      stores: h.stores,
+    });
+  }
+  test("exhausted quota denies the next user's real post body (server-side)", async () => {
+    const h = makeHarness();
+    const seq = { next: 0 };
+    const first = await link(h, "u1", "post-a@x.com", "THREADS", "ext-post");
+    assert.equal(first.ok, true);
+    for (let index = 0; index < LIMIT; index += 1) {
+      await h.runTx(() =>
+        runFreePostBody(postParams(h, "u1", "post-a@x.com", seq))
+      );
+    }
+    await recordDisconnect({
+      userId: "u1",
+      platform: "THREADS",
+      externalId: "ext-post",
+      pepper: PEPPER,
+      stores: h.stores,
+    });
+    // New user, new email, new device, same Threads account.
+    const second = await link(h, "u2", "post-b@x.com", "THREADS", "ext-post");
+    assert.equal(second.ok, true);
+    if (second.ok && first.ok) {
+      assert.equal(second.identityId, first.identityId);
+    }
+    // The route maps this throw to 403 UPGRADE_REQUIRED
+    // ("Monthly post limit reached (15/15)").
+    await assert.rejects(
+      () => h.runTx(() => runFreePostBody(postParams(h, "u2", "post-b@x.com", seq))),
+      (error: unknown) =>
+        error instanceof FreePostDeny &&
+        error.code === "LIMIT" &&
+        error.observed === LIMIT
+    );
+  });
+  test("partial quota leaves exactly the remainder for the next user", async () => {
+    const h = makeHarness();
+    const seq = { next: 0 };
+    const first = await link(h, "u1", "part-a@x.com", "X", "ext-part");
+    assert.equal(first.ok, true);
+    for (let index = 0; index < 7; index += 1) {
+      await h.runTx(() =>
+        runFreePostBody(postParams(h, "u1", "part-a@x.com", seq))
+      );
+    }
+    await recordDisconnect({
+      userId: "u1",
+      platform: "X",
+      externalId: "ext-part",
+      pepper: PEPPER,
+      stores: h.stores,
+    });
+    const second = await link(h, "u2", "part-b@x.com", "X", "ext-part");
+    assert.equal(second.ok, true);
+    for (let index = 0; index < 8; index += 1) {
+      await h.runTx(() =>
+        runFreePostBody(postParams(h, "u2", "part-b@x.com", seq))
+      );
+    }
+    assert.equal(h.readFree((second as { identityId: string }).identityId, PERIOD), LIMIT);
+    await assert.rejects(
+      () => h.runTx(() => runFreePostBody(postParams(h, "u2", "part-b@x.com", seq))),
+      (error: unknown) => error instanceof FreePostDeny && error.code === "LIMIT"
+    );
   });
 });
