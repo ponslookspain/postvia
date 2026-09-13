@@ -30,12 +30,10 @@ import {
   zonedTimeToIso,
   type BulkAccountRef,
 } from "@/lib/bulk-schedule";
-import type { PlanId } from "@/lib/plans";
+import { getPlan, type PlanId } from "@/lib/plans";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { EmptyBlock } from "@/components/StateBlock";
-import { UpgradeCta } from "@/components/billing/BillingWidgets";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -541,34 +539,80 @@ export function BulkScheduler({
 
   if (accounts.length === 0) {
     return (
-      <PageContainer size="narrow">
-        <EmptyBlock
-          icon={<ClapperboardIcon />}
-          title="No video accounts connected"
-          description="Connect a profile that supports video to schedule a batch."
-          actions={
-            <Button size="sm" nativeButton={false} render={<Link href="/accounts" />}>
+      <PageContainer size="wide">
+        <PageHeader
+          title="Bulk video scheduling"
+          description="Upload several videos and schedule one post per video, spaced by a fixed interval. Publishing runs on the regular schedule engine."
+        />
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center sm:py-14">
+            <span
+              aria-hidden="true"
+              className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
+            >
+              <ClapperboardIcon className="size-6" />
+            </span>
+            <div className="flex max-w-md flex-col gap-1.5">
+              <h2 className="text-xl font-semibold tracking-tight text-balance">
+                No video accounts connected
+              </h2>
+              <p className="text-sm leading-relaxed text-pretty text-muted-foreground">
+                Connect a profile that supports video to schedule a batch.
+              </p>
+            </div>
+            <Button
+              size="lg"
+              nativeButton={false}
+              render={<Link href="/accounts" />}
+              className="min-h-11 w-full sm:w-auto"
+            >
               Connect account
             </Button>
-          }
-        />
+          </CardContent>
+        </Card>
       </PageContainer>
     );
   }
 
   if (!billing.bulk) {
+    const upgradeName = billing.upgradeTo
+      ? getPlan(billing.upgradeTo).name
+      : null;
     return (
-      <PageContainer size="narrow">
-        <EmptyBlock
-          icon={<ClapperboardIcon />}
-          title="Bulk scheduling needs a bigger plan"
-          actions={
-            <UpgradeCta
-              reason="Bulk video scheduling is not included in your current plan."
-              upgradeTo={billing.upgradeTo}
-            />
-          }
+      <PageContainer size="wide">
+        <PageHeader
+          title="Bulk video scheduling"
+          description="Upload several videos and schedule one post per video, spaced by a fixed interval. Publishing runs on the regular schedule engine."
         />
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center sm:py-14">
+            <span
+              aria-hidden="true"
+              className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground"
+            >
+              <ClapperboardIcon className="size-6" />
+            </span>
+            <div className="flex max-w-md flex-col gap-1.5">
+              <h2 className="text-xl font-semibold tracking-tight text-balance">
+                Bulk scheduling needs a bigger plan
+              </h2>
+              <p className="text-sm leading-relaxed text-pretty text-muted-foreground">
+                Bulk video scheduling is not included in your current plan.
+                {upgradeName
+                  ? ` Upgrade to ${upgradeName} to unlock it.`
+                  : " Manage your plan to unlock it."}
+              </p>
+            </div>
+            <Button
+              size="lg"
+              nativeButton={false}
+              render={<Link href="/billing" />}
+              className="min-h-11 w-full sm:w-auto"
+            >
+              {upgradeName ? `Upgrade to ${upgradeName}` : "Manage plan"}
+            </Button>
+          </CardContent>
+        </Card>
       </PageContainer>
     );
   }
