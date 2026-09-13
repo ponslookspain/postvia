@@ -1,5 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { XProvider, ensureFreshXToken, xErrorMessage } from "@/lib/social/x";
+import {
+  XProvider,
+  createXAttemptMarker,
+  decideXStaleAttempt,
+  ensureFreshXToken,
+  resolveXMediaPolicy,
+  uploadXMedia,
+  xAmbiguousRetryMessage,
+  xErrorMessage,
+  xMediaCategoryForMime,
+} from "@/lib/social/x";
 import {
   ThreadsApiError,
   ThreadsProvider,
@@ -15,7 +25,9 @@ import {
   TiktokApiError,
   ensureFreshTiktokToken,
   fetchTiktokPublishStatus,
+  publishTiktokDirectPhoto,
   publishTiktokDirectVideo,
+  resolveTiktokMediaPolicy,
   tiktokErrorMessage,
   tiktokFailReasonMessage,
   TIKTOK_CAPTION_MAX_LENGTH,
@@ -23,6 +35,7 @@ import {
   TIKTOK_STATUS_FAILED,
   type TiktokPublishSettings,
 } from "@/lib/social/tiktok";
+import { createTiktokMediaUrl } from "@/lib/tiktok-media-bridge";
 import {
   ensureFreshInstagramToken,
   InstagramApiError,
@@ -41,7 +54,7 @@ import {
   validateTargetOverrides,
 } from "@/lib/platforms/overrides";
 import { resolveThreadsMediaPolicy, type MediaKind } from "@/lib/media";
-import { createSignedGetUrl } from "@/lib/blob";
+import { createSignedGetUrl, fetchPrivateBlob } from "@/lib/blob";
 
 export interface PublishOutcome {
   ok: boolean;
@@ -348,8 +361,14 @@ async function executeTargetPublish(
  */
 /**
  * X publishes synchronously (no platform job id): refresh the token first,
- * then post. Expired/revoked tokens map to a reconnect message instead of
- * a raw 401 so the UI can offer Reconnect.
+ * upload media (if any) via the v2 chunked upload, then create the tweet
+ * with the resulting media_ids. Expired/revoked tokens map to a reconnect
+ * message instead of a raw 401 so the UI can offer Reconnect.
+ *
+ * Idempotency note: X offers no idempotency key for tweet creation. If the
+ * tweet is created remotely but the response is lost (crash before the DB
+ * update below), a retry posts again. This matches the pre-existing text
+ * behavior; media does not make it worse.
  */
 async function executeXTarget(
   post: PublishPost,
@@ -357,6 +376,18 @@ async function executeXTarget(
   account: PublishAccount,
   text: string
 ): Promise<PublishOutcome> {
+  const caps = getPlatformCapabilities("X");
+  const mediaValidation = validateTargetMedia(caps, post.media);
+  if (!mediaValidation.ok) {
+    await updateTargetFailure(post.id, target.id, mediaValidation.error);
+    return failedOutcome(target, mediaValidation.error);
+  }
+  const policy = resolveXMediaPolicy(post.media);
+  if (policy.kind === "error") {
+    await updateTargetFailure(post.id, target.id, policy.message, { clearJobId: true });
+    return failedOutcome(target, policy.message);
+  }
+
   let accessToken: string;
   try {
     accessToken = await ensureFreshXToken({
@@ -371,18 +402,84 @@ async function executeXTarget(
     return failedOutcome(target, message);
   }
 
-  const provider = new XProvider();
-  let result: { success: boolean; externalPostId?: string; error?: string };
+  // Upload media first (sequentially, preserving composer order), then
+  // attach all media_ids to a single tweet. Text-only posts skip this.
+  const mediaIds: string[] = [];
+  if (policy.kind !== "text") {
+    const byId = new Map(post.media.map((item) => [item.id, item]));
+    const orderedIds =
+      policy.kind === "photo" ? policy.mediaIds : [policy.mediaId];
+    try {
+      for (const id of orderedIds) {
+        const item = byId.get(id);
+        if (!item) {
+          const error = "X media could not be resolved.";
+          await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+          return failedOutcome(target, error);
+        }
+        const blob = await fetchPrivateBlob(item.pathname);
+        if (!blob?.stream) {
+          const error = "The stored media could not be read for X upload. Retry the post.";
+          await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+          return failedOutcome(target, error);
+        }
+        const bytes = await new Response(blob.stream).arrayBuffer();
+        const uploaded = await uploadXMedia(
+          accessToken,
+          {
+            bytes,
+            mediaType: item.mimeType,
+            mediaCategory: xMediaCategoryForMime(item.mimeType),
+          }
+        );
+        if (uploaded.state === "failed") {
+          // Upload-only failure: no tweet POST was reached, so no tweet
+          // can exist — a plain retryable failure, no ambiguity.
+          await updateTargetFailure(post.id, target.id, uploaded.error, { clearJobId: true });
+          return failedOutcome(target, uploaded.error);
+        }
+        mediaIds.push(uploaded.mediaId);
+      }
+    } catch (error) {
+      // Upload-phase failure happens before any tweet POST: unambiguous.
+      const message = xErrorMessage(error);
+      await updateTargetFailure(post.id, target.id, message, { clearJobId: true });
+      return failedOutcome(target, message);
+    }
+  }
+
+  // Attempt marker BEFORE the tweet POST: a crash or transport failure
+  // past this point has an UNKNOWN outcome (the tweet may exist
+  // remotely), which stale recovery must not blindly republish. Media
+  // uploads above already finished and cannot have created a tweet.
   try {
-    result = await provider.publishPost(accessToken, text);
+    await prisma.postTarget.update({
+      where: { id: target.id },
+      data: { externalJobId: createXAttemptMarker() },
+    });
   } catch (error) {
     const message = xErrorMessage(error);
     await updateTargetFailure(post.id, target.id, message);
     return failedOutcome(target, message);
   }
+
+  const provider = new XProvider();
+  let result: { success: boolean; externalPostId?: string; error?: string };
+  try {
+    result = await provider.publishPostWithMedia(accessToken, text, mediaIds);
+  } catch {
+    // Transport-level failure: the request may already have been applied
+    // remotely. FAILED (cron never auto-retries FAILED) with check-first
+    // guidance — never a blind "try again".
+    const message = xAmbiguousRetryMessage();
+    await updateTargetFailure(post.id, target.id, message, { clearJobId: true });
+    return failedOutcome(target, message);
+  }
   if (!result.success) {
+    // An HTTP error response from X is unambiguous: the tweet was
+    // rejected, so a later retry cannot duplicate it.
     const error = xErrorMessage(new Error(result.error || "Publication failed"));
-    await updateTargetFailure(post.id, target.id, error);
+    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
 
@@ -391,6 +488,7 @@ async function executeXTarget(
     data: {
       status: "PUBLISHED",
       externalPostId: result.externalPostId,
+      externalJobId: null,
       publishedAt: new Date(),
       errorMessage: null,
     },
@@ -510,6 +608,11 @@ function tiktokSettingsFromRaw(settings: Record<string, unknown>): TiktokPublish
       Number.isInteger(settings.video_cover_timestamp_ms)
         ? settings.video_cover_timestamp_ms
         : undefined,
+    photoCoverIndex:
+      typeof settings.photo_cover_index === "number" &&
+      Number.isInteger(settings.photo_cover_index)
+        ? settings.photo_cover_index
+        : undefined,
   };
 }
 
@@ -525,7 +628,6 @@ async function executeTiktokTarget(
     await updateTargetFailure(post.id, target.id, mediaValidation.error);
     return failedOutcome(target, mediaValidation.error);
   }
-  const video = post.media[0];
   // TikTok Direct Post requires its own title: the global post text is
   // never a fallback. A missing title is a validation failure, not a
   // reason to publish the wrong caption.
@@ -541,8 +643,25 @@ async function executeTiktokTarget(
     await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
+  const settings = tiktokSettingsFromRaw(effective.settings);
+  const policy = resolveTiktokMediaPolicy(post.media, settings.photoCoverIndex);
+  if (policy.kind === "error") {
+    await updateTargetFailure(post.id, target.id, policy.message, { clearJobId: true });
+    return failedOutcome(target, policy.message);
+  }
+
+  if (policy.kind === "photo") {
+    return executeTiktokPhotoTarget(post, target, account, {
+      title,
+      settings,
+      mediaIds: policy.mediaIds,
+      coverIndex: policy.coverIndex,
+    });
+  }
+
+  const video = post.media.find((item) => item.id === policy.mediaId);
   if (!video) {
-    const error = "TikTok requires exactly one MP4/WebM video.";
+    const error = "TikTok media could not be resolved.";
     await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
@@ -570,7 +689,7 @@ async function executeTiktokTarget(
     accessToken,
     {
       title,
-      settings: tiktokSettingsFromRaw(effective.settings),
+      settings,
       videoSize: video.size,
       videoContentType: video.mimeType,
       existingPublishId: target.externalJobId,
@@ -627,6 +746,124 @@ async function executeTiktokTarget(
       return {
         ok: false,
         error: "TikTok is still processing this video. Publishing continues automatically — do not reinitialize.",
+        platform: "TIKTOK",
+      };
+    }
+  }
+}
+
+/**
+ * PHOTO branch of the TikTok target: hands TikTok ordered first-party
+ * bridge URLs (`/api/tiktok/media/{mediaId}?expires&sig`) that stream the
+ * PRIVATE blob bytes server-side with no redirect.
+ *
+ * A raw Vercel presigned Blob URL was deliberately NOT used here: its
+ * hostname (`{store}.private.blob.vercel-storage.com`) can never be
+ * covered by TikTok's domain/URL-prefix ownership verification, so
+ * production would always fail with `url_ownership_unverified`. The
+ * bridge lives under Postvia's own verified host/path instead.
+ * (Threads/Instagram keep their Meta-proven signed-URL model — only
+ * TikTok PHOTO needs first-party ownership.)
+ *
+ * URLs are minted fresh on every non-resume attempt so an expired link
+ * can never strand a retry; a resume (existingPublishId) skips URL
+ * generation entirely and only polls status/fetch. Ownership is enforced
+ * because media ids come from this post's own Media rows validated by
+ * `resolveTiktokMediaPolicy` — never from caller-supplied paths — and
+ * each bridge token is HMAC-bound to exactly one media id.
+ */
+async function executeTiktokPhotoTarget(
+  post: PublishPost,
+  target: PublishTarget,
+  account: PublishAccount,
+  input: {
+    title: string;
+    settings: TiktokPublishSettings;
+    mediaIds: string[];
+    coverIndex: number;
+  }
+): Promise<PublishOutcome> {
+  const byId = new Map(post.media.map((item) => [item.id, item]));
+  const ordered = input.mediaIds.map((id) => byId.get(id));
+  if (ordered.some((item) => !item)) {
+    const error = "TikTok media could not be resolved.";
+    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    return failedOutcome(target, error);
+  }
+
+  let accessToken: string;
+  let photoUrls: string[] = [];
+  try {
+    accessToken = await ensureFreshTiktokToken({
+      id: account.id,
+      accessToken: account.accessToken,
+      refreshToken: account.refreshToken,
+      expiresAt: account.expiresAt,
+    });
+    // Resume path: TikTok already has the bytes; polling needs no URLs.
+    // Skipping URL generation also avoids extra Blob token calls against
+    // TikTok's rate limits.
+    if (!target.externalJobId) {
+      photoUrls = [];
+      for (const item of ordered) {
+        if (!item) continue;
+        photoUrls.push(createTiktokMediaUrl({ mediaId: item.id }));
+      }
+    }
+  } catch (error) {
+    const message = tiktokErrorMessage(error);
+    await updateTargetFailure(post.id, target.id, message);
+    return failedOutcome(target, message);
+  }
+
+  const outcome = await publishTiktokDirectPhoto(
+    accessToken,
+    {
+      title: input.title,
+      settings: input.settings,
+      photoUrls,
+      coverIndex: input.coverIndex,
+      existingPublishId: target.externalJobId,
+    },
+    {
+      onPublishId: async (publishId) => {
+        await prisma.postTarget.update({
+          where: { id: target.id },
+          data: { externalJobId: publishId },
+        });
+      },
+    }
+  );
+
+  switch (outcome.state) {
+    case "published": {
+      await prisma.postTarget.update({
+        where: { id: target.id },
+        data: {
+          status: "PUBLISHED",
+          externalPostId: outcome.externalPostId ?? null,
+          publishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      return {
+        ok: true,
+        externalPostId: outcome.externalPostId,
+        username: account.username,
+        platform: "TIKTOK",
+      };
+    }
+    case "invalid":
+    case "failed": {
+      await updateTargetFailure(post.id, target.id, outcome.error, {
+        clearJobId: true,
+      });
+      return failedOutcome(target, outcome.error);
+    }
+    case "processing": {
+      return {
+        ok: false,
+        error: "TikTok is still processing these photos. Publishing continues automatically — do not reinitialize.",
         platform: "TIKTOK",
       };
     }
@@ -961,6 +1198,44 @@ export async function resumeThreadsTarget(
 }
 
 /**
+ * X stale-recovery for crashed attempts (PUBLISHING + `x-req-` marker).
+ * X has no remote job to poll, so this performs NO network calls: fresh
+ * markers stay PUBLISHING ("pending" — blocks both the generic
+ * auto-reset and manual republish), aged-out markers convert to FAILED
+ * with check-first guidance ("failed"). Anything else returns "skip"
+ * for the generic path. A second tweet POST is never issued here.
+ */
+export async function resumeXTarget(
+  targetId: string
+): Promise<"complete" | "failed" | "pending" | "skip"> {
+  const target = await prisma.postTarget.findUnique({
+    where: { id: targetId },
+  });
+  if (!target) return "skip";
+  const decision = decideXStaleAttempt({
+    platform: target.platform,
+    status: target.status,
+    externalJobId: target.externalJobId,
+    updatedAtMs: target.updatedAt.getTime(),
+    nowMs: Date.now(),
+  });
+  if (decision === "skip") return "skip";
+  if (decision === "pending") return "pending";
+  // Unknown outcome, aged out: convert to FAILED with informed-manual-
+  // retry guidance. Conditional on still being PUBLISHING so a
+  // concurrently settled target is never regressed.
+  const claimed = await prisma.postTarget.updateMany({
+    where: { id: targetId, status: "PUBLISHING" },
+    data: {
+      status: "FAILED",
+      externalJobId: null,
+      errorMessage: xAmbiguousRetryMessage(),
+    },
+  });
+  return claimed.count > 0 ? "failed" : "skip";
+}
+
+/**
  * Scheduler dispatch: resolve a stale PUBLISHING target by its own job,
  * routing to the right platform resume. Non-job targets return "skip" so
  * the standard stale-recovery resets them as before.
@@ -977,6 +1252,9 @@ export async function resumeJobTarget(
   }
   if (platform?.platform === "THREADS") {
     return resumeThreadsTarget(targetId);
+  }
+  if (platform?.platform === "X") {
+    return resumeXTarget(targetId);
   }
   return resumeTiktokTarget(targetId);
 }

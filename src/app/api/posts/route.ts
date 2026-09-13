@@ -86,6 +86,9 @@ export async function POST(request: NextRequest) {
       scheduledAt,
       accountIds,
       targets: requestedTargets,
+      // Legacy client flag, superseded by mediaCount below; still accepted
+      // so older composers keep working (unknown fields are ignored).
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       hasMedia = false,
       mediaCount: rawMediaCount,
       bulkBatchSize: rawBulkBatchSize,
@@ -148,12 +151,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const selected = validateTargetAccountSelection(
-      accounts,
-      selectedIds,
-      user.id,
-      Boolean(hasMedia)
-    );
+    const selected = validateTargetAccountSelection(accounts, selectedIds, user.id);
     if (!selected.ok) {
       return NextResponse.json({ error: selected.error }, { status: 400 });
     }

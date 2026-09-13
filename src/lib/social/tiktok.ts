@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { TIKTOK_BRIDGE_URL_TTL_MS } from "@/lib/tiktok-media-bridge";
 import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
 
 const TIKTOK_AUTHORIZE_URL = "https://www.tiktok.com/v2/auth/authorize/";
@@ -394,7 +395,134 @@ export type TiktokPublishSettings = {
   disableDuet?: boolean;
   disableStitch?: boolean;
   videoCoverTimestampMs?: number;
+  photoCoverIndex?: number;
 };
+
+/* ------------------------------ photo policy ------------------------------ */
+
+export const TIKTOK_PHOTO_MAX_COUNT = 35;
+export const TIKTOK_PHOTO_MAX_BYTES = 20 * 1024 * 1024;
+export const TIKTOK_PHOTO_MIME_TYPES = ["image/jpeg", "image/webp"] as const;
+/**
+ * Validity of the first-party bridge URLs handed to TikTok via
+ * PULL_FROM_URL (`/api/tiktok/media/{id}?expires&sig`). Single source of
+ * truth lives in `tiktok-media-bridge.ts`; this alias keeps the policy
+ * module's public surface stable. 90 min comfortably exceeds TikTok's
+ * 1-hour PULL_FROM_URL download timeout (the download starts seconds
+ * after init). A raw Vercel presigned Blob URL is deliberately NOT used:
+ * its `{store}.private.blob.vercel-storage.com` hostname can never be
+ * covered by TikTok's domain/URL-prefix ownership verification.
+ */
+export const TIKTOK_PHOTO_URL_TTL_MS = TIKTOK_BRIDGE_URL_TTL_MS;
+
+export type TiktokMediaPolicyInput = {
+  id: string;
+  type: string;
+  mimeType: string;
+  size: number;
+};
+
+export type TiktokMediaPolicy =
+  | { kind: "video"; mediaId: string }
+  | { kind: "photo"; mediaIds: string[]; coverIndex: number }
+  | { kind: "error"; message: string };
+
+/**
+ * Pure TikTok media router. Keeps TikTok-only restrictions (JPEG/WebP,
+ * 20 MB per photo, 35 photos, no mixing) out of the global
+ * validateMediaInput(), which intentionally stays broader for other
+ * platforms. Order of `media` is the publish order; the cover defaults
+ * to the first image.
+ *
+ * Pixel dimensions are deliberately NOT pre-validated here: this stack
+ * has no image decoder (no sharp/jimp), and neither the video flow nor
+ * Threads/Instagram pre-check dimensions either — they rely on the
+ * platform transcode pipeline. A photo whose pixels exceed TikTok's
+ * 1080p limit surfaces as a terminal TikTok `fail_reason` mapped to a
+ * user-facing message, never as a silent hang. The canonical store
+ * (max 2048px wide) means very wide panoramas are the residual risk
+ * class; narrowing global canonicalization for TikTok alone would
+ * degrade every other platform and is out of scope.
+ */
+export function resolveTiktokMediaPolicy(
+  media: readonly TiktokMediaPolicyInput[],
+  requestedCoverIndex?: number
+): TiktokMediaPolicy {
+  if (media.length === 0) {
+    return {
+      kind: "error",
+      message: "TikTok requires media: one video or up to 4 photos (JPEG/WebP).",
+    };
+  }
+  const hasVideo = media.some((item) => item.type === "VIDEO");
+  const hasImage = media.some((item) => item.type === "IMAGE");
+  if (hasVideo && hasImage) {
+    return {
+      kind: "error",
+      message:
+        "TikTok does not support mixing photos and videos in one post. Publish the video and the photos as separate posts.",
+    };
+  }
+  if (hasVideo) {
+    if (media.length > 1) {
+      return {
+        kind: "error",
+        message: "TikTok supports only one video per post.",
+      };
+    }
+    return { kind: "video", mediaId: media[0].id };
+  }
+  // Photo path: every item must be an image at this point.
+  if (media.some((item) => item.type !== "IMAGE")) {
+    return {
+      kind: "error",
+      message: "TikTok photo posts support images only.",
+    };
+  }
+  if (media.length > TIKTOK_PHOTO_MAX_COUNT) {
+    return {
+      kind: "error",
+      message: `TikTok supports at most ${TIKTOK_PHOTO_MAX_COUNT} photos per post.`,
+    };
+  }
+  for (const item of media) {
+    if (
+      !(TIKTOK_PHOTO_MIME_TYPES as readonly string[]).includes(item.mimeType)
+    ) {
+      const short = item.mimeType.split("/").pop() ?? item.mimeType;
+      return {
+        kind: "error",
+        message: `TikTok photo posts support JPEG and WebP images only (got ${short}). Convert the image to JPG or WebP and retry.`,
+      };
+    }
+    if (!Number.isFinite(item.size) || item.size <= 0) {
+      return {
+        kind: "error",
+        message: "TikTok photo posts require a valid image file.",
+      };
+    }
+    if (item.size > TIKTOK_PHOTO_MAX_BYTES) {
+      return {
+        kind: "error",
+        message:
+          "One of the photos exceeds TikTok's 20 MB per-image limit. Use a smaller file.",
+      };
+    }
+  }
+  const coverIndex =
+    requestedCoverIndex === undefined ? 0 : requestedCoverIndex;
+  if (!Number.isInteger(coverIndex) || coverIndex < 0 || coverIndex >= media.length) {
+    return {
+      kind: "error",
+      message: "TikTok cover index is out of range for the selected photos.",
+    };
+  }
+  return {
+    kind: "photo",
+    mediaIds: media.map((item) => item.id),
+    coverIndex,
+  };
+}
 
 export type TiktokJobStatus = {
   status: string;
@@ -485,11 +613,20 @@ export function tiktokErrorMessage(error: unknown): string {
     case "invalid_token":
       return "TikTok access expired or was revoked. Reconnect your TikTok account.";
     case "url_ownership_unverified":
-      return "TikTok could not verify the media source. Please retry the post.";
+      return "TikTok could not verify the media source: TikTok could not download the media — the media URL domain is not verified for this TikTok app or the link expired. Retry the post; if it persists, verify the app's URL prefix/domain in the TikTok Developer portal.";
+    case "invalid_param":
+      return "TikTok rejected the photo parameters (format, size, or cover). Photos must be JPEG/WebP up to 20 MB each — convert and retry.";
+    case "photo_validation_failed":
+    case "image_validation_failed":
+      return "TikTok rejected one of the photos. Use JPEG or WebP images up to 20 MB each and retry.";
     case "video_size_exceeds_limit":
       return "The video is too large for TikTok. Use a smaller file.";
     case "video_duration_exceeds_limit":
       return "The video is longer than this TikTok account is allowed to post.";
+    case "spam_risk_too_many_hashtags":
+      return "TikTok flagged too many hashtags in the title. Remove some hashtags and retry.";
+    case "spam_risk_duplicate_content":
+      return "TikTok flagged this as duplicate content. Change the title or media and retry.";
     default:
       return error instanceof Error && error.message
         ? error.message
@@ -503,10 +640,10 @@ export function tiktokErrorMessage(error: unknown): string {
  * user-facing dictionary; unknown reasons keep the code for support.
  */
 export function tiktokFailReasonMessage(failReason?: string): string {
-  if (!failReason) return "TikTok rejected the video post. Please review the media and retry.";
+  if (!failReason) return "TikTok rejected the post. Please review the media and retry.";
   const friendly = tiktokErrorMessage({ code: failReason });
   return friendly === "TikTok publishing failed. Please try again."
-    ? `TikTok could not publish the video: ${failReason}`
+    ? `TikTok could not publish the post: ${failReason}`
     : friendly;
 }
 
@@ -554,6 +691,110 @@ export function resolveTiktokPostInfo(input: {
   return { postInfo };
 }
 
+/**
+ * Photo Direct Post info: same title/privacy contract as video, but only
+ * the fields the PHOTO content/init endpoint accepts (title,
+ * privacy_level, disable_comment). Duet/stitch and video cover timestamp
+ * are video-only and must never be sent for PHOTO (invalid_param risk).
+ */
+export function resolveTiktokPhotoPostInfo(input: {
+  title: string;
+  settings: TiktokPublishSettings;
+  creatorInfo: TiktokCreatorInfo;
+}): { postInfo: Record<string, unknown> } | { error: string } {
+  const { settings, creatorInfo } = input;
+  const title = input.title.trim();
+  if (!title) {
+    return { error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback." };
+  }
+  if (Array.from(title).length > TIKTOK_CAPTION_MAX_LENGTH) {
+    return { error: `TikTok title exceeds the ${TIKTOK_CAPTION_MAX_LENGTH} character limit.` };
+  }
+  if (creatorInfo.privacyLevelOptions.length === 0) {
+    return { error: "TikTok did not return privacy options for this account. Reconnect or retry." };
+  }
+  const privacyLevel =
+    settings.privacyLevel ??
+    (creatorInfo.privacyLevelOptions.includes("SELF_ONLY")
+      ? "SELF_ONLY"
+      : creatorInfo.privacyLevelOptions[0]);
+  if (!creatorInfo.privacyLevelOptions.includes(privacyLevel)) {
+    return {
+      error: `This TikTok account cannot use the "${privacyLevel}" privacy setting. Choose another option.`,
+    };
+  }
+  return {
+    postInfo: {
+      title,
+      privacy_level: privacyLevel,
+      disable_comment: settings.disableComment === true || creatorInfo.commentDisabled,
+    },
+  };
+}
+
+export type TiktokPhotoInitPayload = {
+  post_info: Record<string, unknown>;
+  source_info: {
+    source: "PULL_FROM_URL";
+    photo_images: string[];
+    photo_cover_index: number;
+  };
+  post_mode: "DIRECT_POST";
+  media_type: "PHOTO";
+};
+
+/**
+ * Pure builder for the PHOTO content/init body. Keeps the exact API
+ * contract (media_type, post_mode, source, ordered photo_images, cover
+ * index) unit-testable without network.
+ */
+export function buildTiktokPhotoInitPayload(input: {
+  title: string;
+  settings: TiktokPublishSettings;
+  creatorInfo: TiktokCreatorInfo;
+  photoUrls: string[];
+  coverIndex: number;
+}): { payload: TiktokPhotoInitPayload } | { error: string } {
+  if (input.photoUrls.length === 0) {
+    return { error: "TikTok photo posts require at least one photo." };
+  }
+  if (input.photoUrls.length > TIKTOK_PHOTO_MAX_COUNT) {
+    return {
+      error: `TikTok supports at most ${TIKTOK_PHOTO_MAX_COUNT} photos per post.`,
+    };
+  }
+  if (
+    !Number.isInteger(input.coverIndex) ||
+    input.coverIndex < 0 ||
+    input.coverIndex >= input.photoUrls.length
+  ) {
+    return { error: "TikTok cover index is out of range for the selected photos." };
+  }
+  for (const url of input.photoUrls) {
+    if (typeof url !== "string" || url.trim().length === 0) {
+      return { error: "TikTok photo posts require a valid public image URL for every photo." };
+    }
+  }
+  const resolved = resolveTiktokPhotoPostInfo({
+    title: input.title,
+    settings: input.settings,
+    creatorInfo: input.creatorInfo,
+  });
+  if ("error" in resolved) return resolved;
+  return {
+    payload: {
+      post_info: resolved.postInfo,
+      source_info: {
+        source: "PULL_FROM_URL",
+        photo_images: [...input.photoUrls],
+        photo_cover_index: input.coverIndex,
+      },
+      post_mode: "DIRECT_POST",
+      media_type: "PHOTO",
+    },
+  };
+}
+
 export type TiktokDirectPostOutcome =
   | { state: "published"; externalPostId?: string }
   | { state: "failed"; error: string }
@@ -561,6 +802,13 @@ export type TiktokDirectPostOutcome =
   | { state: "invalid"; error: string };
 export type TiktokDirectPostDeps = {
   readChunk: (range: ByteRange) => Promise<ArrayBuffer>;
+  onPublishId: (publishId: string) => Promise<void>;
+  sleep?: (ms: number) => Promise<void>;
+  pollIntervalMs?: number;
+  pollBudgetMs?: number;
+  now?: () => number;
+};
+export type TiktokDirectPhotoDeps = {
   onPublishId: (publishId: string) => Promise<void>;
   sleep?: (ms: number) => Promise<void>;
   pollIntervalMs?: number;
@@ -685,6 +933,80 @@ export async function publishTiktokDirectVideo(
   } catch (error) {
     return { state: "failed", error: tiktokErrorMessage(error) };
   }
+
+  return monitorPublish(accessToken, publishId, sleep, pollIntervalMs, pollBudgetMs, now);
+}
+
+/**
+ * TikTok PHOTO Direct Post via PULL_FROM_URL.
+ * Separate contract from video (content/init, media_type PHOTO) — never
+ * routed through the video FILE_UPLOAD endpoint.
+ * Resume-safe: when publishId is already known we ONLY fetch status —
+ * a second content/init can never happen for the same target.
+ */
+export async function publishTiktokDirectPhoto(
+  accessToken: string,
+  input: {
+    title: string;
+    settings: TiktokPublishSettings;
+    photoUrls: string[];
+    coverIndex: number;
+    existingPublishId?: string | null;
+  },
+  deps: TiktokDirectPhotoDeps
+): Promise<TiktokDirectPostOutcome> {
+  const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+  const pollIntervalMs = deps.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const pollBudgetMs = deps.pollBudgetMs ?? DEFAULT_POLL_BUDGET_MS;
+  const now = deps.now ?? (() => Date.now());
+
+  if (input.existingPublishId) {
+    return monitorPublish(accessToken, input.existingPublishId, sleep, pollIntervalMs, pollBudgetMs, now);
+  }
+
+  if (!input.title || input.title.trim().length === 0) {
+    return {
+      state: "invalid",
+      error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback.",
+    };
+  }
+
+  let creatorInfo: TiktokCreatorInfo;
+  try {
+    creatorInfo = await queryTiktokCreatorInfo(accessToken);
+  } catch (error) {
+    return { state: "failed", error: tiktokErrorMessage(error) };
+  }
+
+  const built = buildTiktokPhotoInitPayload({
+    title: input.title,
+    settings: input.settings,
+    creatorInfo,
+    photoUrls: input.photoUrls,
+    coverIndex: input.coverIndex,
+  });
+  if ("error" in built) {
+    return { state: "invalid", error: built.error };
+  }
+
+  let publishId: string;
+  try {
+    const data = await postJson(
+      `${TIKTOK_API_BASE}/v2/post/publish/content/init/`,
+      accessToken,
+      built.payload as unknown as Record<string, unknown>
+    );
+    publishId = String(data.publish_id ?? "");
+    if (!publishId) {
+      return { state: "failed", error: "TikTok did not return a publish id. Retry the post." };
+    }
+  } catch (error) {
+    return { state: "failed", error: tiktokErrorMessage(error) };
+  }
+
+  // Persist IMMEDIATELY: from here on, every path resumes via
+  // status/fetch instead of re-initializing (duplicate protection).
+  await deps.onPublishId(publishId);
 
   return monitorPublish(accessToken, publishId, sleep, pollIntervalMs, pollBudgetMs, now);
 }

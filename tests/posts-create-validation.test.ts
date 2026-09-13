@@ -96,10 +96,14 @@ describe("validateCreatePostContent", () => {
     );
   });
 
-  test("any media on X is rejected by count", () => {
+  test("up to 4 media on X passes, 5 is rejected by count", () => {
+    assert.deepEqual(
+      validateCreatePostContent({ text: "Hello", mediaCount: 4, platforms: ["X"] }),
+      { ok: true }
+    );
     const result = validateCreatePostContent({
       text: "Hello",
-      mediaCount: 1,
+      mediaCount: 5,
       platforms: ["X"],
     });
     assert.equal(result.ok, false);

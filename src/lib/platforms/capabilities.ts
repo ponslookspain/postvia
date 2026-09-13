@@ -34,6 +34,10 @@ const THREADS: PlatformCapabilities = {
   label: "Threads",
   implemented: true,
   supportsText: true,
+  // Conscious product scope (NOT an API gap): the official Threads API
+  // also supports carousel posts (media_type=CAROUSEL + children, 2+
+  // items). Postvia publishes single-media posts only; multi-file
+  // composer input fails closed with an explicit per-platform error.
   media: {
     image: true,
     video: true,
@@ -50,9 +54,24 @@ const X: PlatformCapabilities = {
   label: "X",
   implemented: true,
   supportsText: true,
-  // The current X provider publishes text only. Media is intentionally
-  // blocked until X media upload is implemented separately.
-  media: { image: false, video: false, maxItems: 0 },
+  // Media via the X API v2 chunked upload (INIT → APPEND → FINALIZE →
+  // STATUS) with the same user-context Bearer token: up to 4 photos,
+  // 1 GIF, or 1 video attached as media_ids on POST /2/tweets.
+  // Operator note: X bills pay-per-use per post (and more for posts
+  // containing URLs); media posts cost the same as text posts.
+  media: {
+    image: true,
+    video: true,
+    maxItems: 4,
+    mimeTypes: [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "video/mp4",
+      "video/quicktime",
+    ],
+  },
   fields: [
     { key: "text", label: "Text", type: "text", maxLength: 280 },
   ],
@@ -62,14 +81,20 @@ const TIKTOK: PlatformCapabilities = {
   platform: "TIKTOK",
   label: "TikTok",
   implemented: true,
-  // TikTok Direct Post requires media: exactly one video in the first scope.
+  // TikTok Direct Post requires media: exactly one video OR 1..4 photos
+  // (Postvia global limit; the TikTok API itself allows up to 35).
   supportsText: false,
   media: {
-    image: false,
+    image: true,
     video: true,
-    maxItems: 1,
-    requiredKind: "VIDEO",
-    mimeTypes: ["video/mp4", "video/webm", "video/quicktime"],
+    maxItems: 4,
+    mimeTypes: [
+      "video/mp4",
+      "video/webm",
+      "video/quicktime",
+      "image/jpeg",
+      "image/webp",
+    ],
   },
   fields: [
     { key: "title", label: "Title", type: "text", maxLength: 2200 },
@@ -96,6 +121,12 @@ const TIKTOK: PlatformCapabilities = {
       type: "number",
       min: 0,
     },
+    {
+      key: "photo_cover_index",
+      label: "Cover photo index",
+      type: "number",
+      min: 0,
+    },
   ],
 };
 
@@ -107,8 +138,12 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     platform: "INSTAGRAM",
     label: "Instagram",
     implemented: true,
-    // Instagram professional accounts require media: single JPEG photo or
-    // single MP4 Reel in the MVP. Text-only posts are not publishable.
+    // Conscious product scope (NOT an API gap): the official Content
+    // Publishing API also supports carousels (CAROUSEL + up to 10
+    // children), stories (STORIES), and alt_text on images. Postvia's MVP
+    // publishes a single JPEG photo or a single MP4 Reel only; anything
+    // else fails closed with an explicit per-platform error.
+    // Text-only posts are not publishable.
     supportsText: false,
     media: {
       image: true,

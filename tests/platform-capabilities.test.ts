@@ -16,22 +16,25 @@ describe("platform capability registry", () => {
     assert.equal(caps.media.video, true);
   });
 
-  test("X is implemented for text but blocks media", () => {
+  test("X is implemented for text + media (v2 upload, up to 4 items)", () => {
     const caps = getPlatformCapabilities("X");
     assert.equal(caps.implemented, true);
     assert.equal(caps.supportsText, true);
-    assert.equal(caps.media.image, false);
-    assert.equal(caps.media.video, false);
+    assert.equal(caps.media.image, true);
+    assert.equal(caps.media.video, true);
+    assert.equal(caps.media.maxItems, 4);
+    assert.ok(caps.fields.some((field) => field.key === "text"));
   });
 
-  test("TikTok is implemented for video-only Direct Post with settings fields", () => {
+  test("TikTok is implemented for video + photo Direct Post with settings fields", () => {
     const caps = getPlatformCapabilities("TIKTOK");
     assert.equal(caps.implemented, true);
     assert.equal(caps.supportsText, false);
-    assert.equal(caps.media.image, false);
+    assert.equal(caps.media.image, true);
     assert.equal(caps.media.video, true);
     assert.ok(caps.fields.some((field) => field.key === "privacy_level"));
     assert.ok(caps.fields.some((field) => field.key === "video_cover_timestamp_ms"));
+    assert.ok(caps.fields.some((field) => field.key === "photo_cover_index"));
   });
 });
 
@@ -72,12 +75,28 @@ describe("target overrides", () => {
 });
 
 describe("capability media validation", () => {
-  test("X media is hard-blocked", () => {
-    const result = validateTargetMedia(getPlatformCapabilities("X"), [
-      { type: "IMAGE", mimeType: "image/png" },
+  test("X accepts text, photos, GIF, and single video", () => {
+    const caps = getPlatformCapabilities("X");
+    assert.deepEqual(validateTargetMedia(caps, []), { ok: true });
+    assert.deepEqual(validateTargetMedia(caps, [{ type: "IMAGE", mimeType: "image/png" }]), {
+      ok: true,
+    });
+    assert.deepEqual(validateTargetMedia(caps, [{ type: "VIDEO", mimeType: "video/mp4" }]), {
+      ok: true,
+    });
+    const mixed = validateTargetMedia(caps, [
+      { type: "VIDEO", mimeType: "video/mp4" },
+      { type: "IMAGE", mimeType: "image/jpeg" },
     ]);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.match(result.error, /does not support image/);
+    assert.equal(mixed.ok, false);
+    const tooMany = validateTargetMedia(caps, [
+      { type: "IMAGE", mimeType: "image/jpeg" },
+      { type: "IMAGE", mimeType: "image/jpeg" },
+      { type: "IMAGE", mimeType: "image/jpeg" },
+      { type: "IMAGE", mimeType: "image/jpeg" },
+      { type: "IMAGE", mimeType: "image/jpeg" },
+    ]);
+    assert.equal(tooMany.ok, false);
   });
 
   test("Threads accepts a single MP4 video", () => {
@@ -89,26 +108,40 @@ describe("capability media validation", () => {
     );
   });
 
-  test("TikTok requires exactly one video", () => {
+  test("TikTok accepts one video or JPEG/WebP photos, rejects mixing", () => {
     const caps = getPlatformCapabilities("TIKTOK");
     const none = validateTargetMedia(caps, []);
     assert.equal(none.ok, false);
-    const two = validateTargetMedia(caps, [
+    const twoVideos = validateTargetMedia(caps, [
       { type: "VIDEO", mimeType: "video/mp4" },
       { type: "VIDEO", mimeType: "video/mp4" },
     ]);
-    assert.equal(two.ok, false);
-    const image = validateTargetMedia(caps, [
+    assert.equal(twoVideos.ok, false);
+    if (!twoVideos.ok) assert.match(twoVideos.error, /only one video/);
+    // PNG is not in the TikTok mime whitelist.
+    const png = validateTargetMedia(caps, [
       { type: "IMAGE", mimeType: "image/png" },
     ]);
-    assert.equal(image.ok, false);
-    if (!image.ok) assert.match(image.error, /exactly one MP4\/WebM video/);
+    assert.equal(png.ok, false);
     const unsupported = validateTargetMedia(caps, [
       { type: "VIDEO", mimeType: "video/x-msvideo" },
     ]);
     assert.equal(unsupported.ok, false);
-    const ok = validateTargetMedia(caps, [{ type: "VIDEO", mimeType: "video/mp4" }]);
-    assert.deepEqual(ok, { ok: true });
+    const videoOk = validateTargetMedia(caps, [{ type: "VIDEO", mimeType: "video/mp4" }]);
+    assert.deepEqual(videoOk, { ok: true });
+    const photoOk = validateTargetMedia(caps, [{ type: "IMAGE", mimeType: "image/jpeg" }]);
+    assert.deepEqual(photoOk, { ok: true });
+    const carouselOk = validateTargetMedia(caps, [
+      { type: "IMAGE", mimeType: "image/jpeg" },
+      { type: "IMAGE", mimeType: "image/webp" },
+    ]);
+    assert.deepEqual(carouselOk, { ok: true });
+    const mixed = validateTargetMedia(caps, [
+      { type: "VIDEO", mimeType: "video/mp4" },
+      { type: "IMAGE", mimeType: "image/jpeg" },
+    ]);
+    assert.equal(mixed.ok, false);
+    if (!mixed.ok) assert.match(mixed.error, /mixing photos and videos/);
   });
 
   test("unimplemented platforms are rejected at publish validation", () => {

@@ -253,12 +253,43 @@ export function classifyMediaIssue(message: string): PreviewIssueCode {
   if (message.includes("does not support image or video media publishing yet")) {
     return "media-not-supported";
   }
-  if (message.includes("requires exactly one media item")) {
+  if (
+    message.includes("requires exactly one media item") ||
+    message.includes("requires one video or at least one photo")
+  ) {
     return "media-required";
   }
   if (message.includes("supports at most")) return "media-too-many";
+  if (message.includes("supports only one video per post")) return "media-too-many";
   if (message.includes("requires exactly one MP4/WebM video")) {
     return "media-kind-required";
+  }
+  if (
+    message.includes("mixing photos and videos") ||
+    message.includes("combining a GIF with other media")
+  ) {
+    return "media-kind-unsupported";
+  }
+  if (
+    message.includes("X photo posts support") ||
+    message.includes("X video posts support")
+  ) {
+    return "media-mime-unsupported";
+  }
+  if (
+    message.includes("exceeds X's 5 MB per-photo limit") ||
+    message.includes("exceeds X's 15 MB")
+  ) {
+    return "media-too-large";
+  }
+  if (message.includes("TikTok photo posts support JPEG and WebP")) {
+    return "media-mime-unsupported";
+  }
+  if (message.includes("20 MB per-image limit")) {
+    return "media-too-large";
+  }
+  if (message.includes("cover index")) {
+    return "media-invalid";
   }
   if (message.includes("publishing is not implemented yet")) {
     return "platform-unimplemented";

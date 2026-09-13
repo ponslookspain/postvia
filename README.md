@@ -26,7 +26,11 @@ Implemented and connectable via OAuth: **Threads, X, TikTok, Instagram**.
 `Facebook`, `LinkedIn`, `YouTube`, `Pinterest` exist in the Prisma enum but
 are not implemented yet. Platform behavior is capability-driven
 (`src/lib/platforms/capabilities.ts`), so adding a platform does not require
-composer changes.
+composer changes. Current media support: Threads — text / 1 image / 1 video;
+X — text / up to 4 photos / 1 GIF / 1 video; TikTok — 1 video or 1–4 photos
+(JPEG/WebP, own title required); Instagram — 1 JPEG photo or 1 MP4 Reel.
+See [`docs/social-integrations.md`](docs/social-integrations.md) for the
+full matrix, retry/idempotency semantics, and portal requirements.
 
 ## App structure
 
@@ -179,7 +183,7 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (670 unit tests, fake stores)
+npm test           # node --test suite (826 unit tests, fake stores)
 npm run test:pg    # real-PostgreSQL concurrency suite (18 tests) —
                    # needs PG_INTEGRATION=1 + isolated test DB, never prod
 ```

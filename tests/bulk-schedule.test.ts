@@ -188,9 +188,8 @@ describe("validateBulkVideoForAccounts", () => {
     assert.ok(errors.every((message) => /webm/i.test(message)));
   });
 
-  test("X rejects any video (text-only platform)", () => {
-    const errors = validateBulkVideoForAccounts("video/mp4", [x]);
-    assert.equal(errors.length, 1);
+  test("X accepts mp4 video (v2 media upload)", () => {
+    assert.deepEqual(validateBulkVideoForAccounts("video/mp4", [x]), []);
   });
 
   test("mov passes TikTok but is rejected for Threads", () => {

@@ -28,7 +28,13 @@ export type MediaAddPlan = {
    * callers must not create object URLs or touch account selection.
    */
   limitExceeded: boolean;
-  /** Selected account ids that must be deselected (X can't publish media). */
+  /**
+   * Selected account ids that must be deselected. Always empty: every
+   * implemented platform (including X, via its v2 media upload) accepts
+   * media, so adding files must never silently drop a platform. The
+   * field stays so callers keep a single handling path; per-platform
+   * incompatibilities surface as explicit validation errors instead.
+   */
   deselectAccountIds: string[];
 };
 
@@ -70,16 +76,13 @@ export function planMediaAdd(args: {
       deselectAccountIds: [],
     };
   }
-  const xIds = new Set(
-    args.accounts
-      .filter((account) => account.platform === "X")
-      .map((account) => account.id)
-  );
+  // NOTE: selectedAccountIds/accounts stay in the signature for callers,
+  // but media never deselects a platform anymore (see deselectAccountIds).
   return {
     accepted,
     rejected,
     limitExceeded: false,
-    deselectAccountIds: args.selectedAccountIds.filter((id) => xIds.has(id)),
+    deselectAccountIds: [],
   };
 }
 

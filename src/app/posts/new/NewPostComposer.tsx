@@ -538,17 +538,15 @@ export default function NewPostComposer({
       return;
     }
     if (plan.accepted.length === 0) return;
+    // Adding media never deselects a platform: every implemented network
+    // (Threads, Instagram, TikTok, X) accepts media, and any
+    // platform-specific incompatibility surfaces as an explicit
+    // validation error instead of silently changing the selection.
     if (plan.deselectAccountIds.length > 0) {
       const deselect = new Set(plan.deselectAccountIds);
       setSelectedAccountIds((current) =>
         current.filter((id) => !deselect.has(id))
       );
-      toast.add({
-        title: "X deselected",
-        description:
-          "X can't publish media, so it was removed from the selected accounts.",
-        type: "warning",
-      });
     }
     const pending: DraftMedia[] = plan.accepted.map((entry) => ({
       key: nextMediaKey(),
@@ -1221,7 +1219,6 @@ export default function NewPostComposer({
             accounts={accounts}
             selectedAccountIds={selectedAccountIds}
             targetOverrides={targetOverrides}
-            mediaAttached={media.length > 0}
             disabled={saving || publishing || scheduling}
             mediaErrors={mediaErrors}
             onToggle={toggleAccountSelection}

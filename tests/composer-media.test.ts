@@ -25,7 +25,7 @@ const MOV = { name: "clip.mov", type: "video/quicktime", size: 1024 };
 const BAD = { name: "notes.txt", type: "text/plain", size: 100 };
 
 describe("planMediaAdd", () => {
-  test("accepts valid files and deselects X with an explicit plan", () => {
+  test("accepts valid files and never deselects a platform (X supports media)", () => {
     const plan = planMediaAdd({
       files: [PNG, MP4],
       existingCount: 0,
@@ -36,7 +36,7 @@ describe("planMediaAdd", () => {
     assert.equal(plan.limitExceeded, false);
     assert.equal(plan.rejected.length, 0);
     assert.equal(plan.accepted.length, 2);
-    assert.deepEqual(plan.deselectAccountIds, ["x-1"]);
+    assert.deepEqual(plan.deselectAccountIds, []);
     // Original file references are preserved, never spread into plain objects.
     assert.equal(plan.accepted[0]?.file, PNG);
     assert.equal(plan.accepted[0]?.kind, "IMAGE");

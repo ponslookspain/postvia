@@ -30,8 +30,7 @@ export type TargetAccountSelection = {
 export function validateTargetAccountSelection(
   accounts: readonly TargetAccountSelection[],
   requestedIds: readonly string[],
-  userId: string,
-  hasMedia: boolean
+  userId: string
 ): { ok: true; accounts: TargetAccountSelection[] } | { ok: false; error: string } {
   const uniqueIds = [...new Set(requestedIds)];
   if (uniqueIds.length === 0) {
@@ -42,12 +41,6 @@ export function validateTargetAccountSelection(
     return { ok: false, error: "One or more selected social accounts are unavailable" };
   }
   const resolved = selected as TargetAccountSelection[];
-  if (hasMedia && resolved.some((account) => account.platform === "X")) {
-    return {
-      ok: false,
-      error: "X media publishing is not implemented yet. Remove media or deselect X.",
-    };
-  }
   for (const account of resolved) {
     if (!getPlatformCapabilities(account.platform).implemented) {
       return {
@@ -158,23 +151,81 @@ export function validateTargetMedia(
       error: `${caps.label} does not support image or video media publishing yet`,
     };
   }
-  if (media.length === 0) {
-    return caps.supportsText
-      ? { ok: true }
-      : { ok: false, error: `${caps.label} requires exactly one media item` };
-  }
-  if (media.length > caps.media.maxItems) {
-    return {
-      ok: false,
-      error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
-    };
-  }
-  if (caps.media.requiredKind && caps.media.requiredKind === "VIDEO") {
-    if (media.some((item) => item.type !== "VIDEO")) {
+  // X supports text, up to 4 photos, 1 GIF, or 1 video per post
+  // (official v2 media upload + media_ids attach). Mixing photos and
+  // video is always rejected; the fine-grained rules (5 MB photos,
+  // 15 MB GIF, MP4/MOV video) live in resolveXMediaPolicy so the global
+  // media pipeline stays broader than X.
+  if (caps.platform === "X") {
+    if (media.length === 0) return { ok: true };
+    const hasVideo = media.some((item) => item.type === "VIDEO");
+    const hasImage = media.some((item) => item.type === "IMAGE");
+    if (hasVideo && hasImage) {
       return {
         ok: false,
-        error: `${caps.label} requires exactly one MP4/WebM video.`,
+        error:
+          "X does not support mixing photos and videos in one post. Publish the video and the photos as separate posts.",
       };
+    }
+    if (hasVideo && media.length > 1) {
+      return {
+        ok: false,
+        error: "X supports only one video per post.",
+      };
+    }
+    if (media.length > caps.media.maxItems) {
+      return {
+        ok: false,
+        error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
+      };
+    }
+  } else if (caps.platform === "TIKTOK") {
+    if (media.length === 0) {
+      return {
+        ok: false,
+        error: "TikTok requires one video or at least one photo (JPEG/WebP).",
+      };
+    }
+    const hasVideo = media.some((item) => item.type === "VIDEO");
+    const hasImage = media.some((item) => item.type === "IMAGE");
+    if (hasVideo && hasImage) {
+      return {
+        ok: false,
+        error:
+          "TikTok does not support mixing photos and videos in one post. Publish the video and the photos as separate posts.",
+      };
+    }
+    if (hasVideo && media.length > 1) {
+      return {
+        ok: false,
+        error: "TikTok supports only one video per post.",
+      };
+    }
+    if (media.length > caps.media.maxItems) {
+      return {
+        ok: false,
+        error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
+      };
+    }
+  } else {
+    if (media.length === 0) {
+      return caps.supportsText
+        ? { ok: true }
+        : { ok: false, error: `${caps.label} requires exactly one media item` };
+    }
+    if (media.length > caps.media.maxItems) {
+      return {
+        ok: false,
+        error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
+      };
+    }
+    if (caps.media.requiredKind && caps.media.requiredKind === "VIDEO") {
+      if (media.some((item) => item.type !== "VIDEO")) {
+        return {
+          ok: false,
+          error: `${caps.label} requires exactly one MP4/WebM video.`,
+        };
+      }
     }
   }
 if (!caps.implemented) {

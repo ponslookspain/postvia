@@ -143,30 +143,28 @@ describe("multi-account target selection security", () => {
     const result = validateTargetAccountSelection(
       accounts,
       ["threads-a", "threads-b"],
-      "u1",
-      false
+      "u1"
     );
     assert.ok(result.ok);
     assert.equal(result.accounts.length, 2);
   });
 
   test("rejects an account owned by another user", () => {
-    const result = validateTargetAccountSelection(accounts, ["other"], "u1", false);
+    const result = validateTargetAccountSelection(accounts, ["other"], "u1");
     assert.equal(result.ok, false);
   });
 
-  test("rejects X when global media exists", () => {
-    const result = validateTargetAccountSelection(accounts, ["x-a"], "u1", true);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.match(result.error, /X media/);
+  test("X stays selected when media exists (v2 media upload)", () => {
+    const result = validateTargetAccountSelection(accounts, ["x-a"], "u1");
+    assert.ok(result.ok);
+    assert.equal(result.accounts.length, 1);
   });
 
   test("rejects duplicate account ids without creating duplicate targets", () => {
     const result = validateTargetAccountSelection(
       accounts,
       ["threads-a", "threads-a"],
-      "u1",
-      false
+      "u1"
     );
     assert.ok(result.ok);
     assert.equal(result.accounts.length, 1);
@@ -174,11 +172,27 @@ describe("multi-account target selection security", () => {
 });
 
 describe("target media compatibility", () => {
-  test("X plus media is a hard validation error", () => {
-    const result = validateTargetMedia(getPlatformCapabilities("X"), [
-      { type: "IMAGE", mimeType: "image/png" },
+  test("X accepts photos, GIF, and single video; mixing fails closed", () => {
+    const caps = getPlatformCapabilities("X");
+    assert.deepEqual(validateTargetMedia(caps, [{ type: "IMAGE", mimeType: "image/png" }]), {
+      ok: true,
+    });
+    assert.deepEqual(
+      validateTargetMedia(caps, [
+        { type: "IMAGE", mimeType: "image/jpeg" },
+        { type: "IMAGE", mimeType: "image/jpeg" },
+      ]),
+      { ok: true }
+    );
+    assert.deepEqual(validateTargetMedia(caps, [{ type: "VIDEO", mimeType: "video/mp4" }]), {
+      ok: true,
+    });
+    const mixed = validateTargetMedia(caps, [
+      { type: "VIDEO", mimeType: "video/mp4" },
+      { type: "IMAGE", mimeType: "image/jpeg" },
     ]);
-    assert.equal(result.ok, false);
+    assert.equal(mixed.ok, false);
+    if (!mixed.ok) assert.match(mixed.error, /mixing/);
   });
 
   test("Threads image and video are accepted independently", () => {

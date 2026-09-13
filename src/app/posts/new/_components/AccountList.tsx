@@ -37,7 +37,6 @@ export function AccountList({
   accounts,
   selectedAccountIds,
   targetOverrides,
-  mediaAttached,
   disabled,
   mediaErrors,
   onToggle,
@@ -45,7 +44,6 @@ export function AccountList({
   accounts: ConnectedAccount[];
   selectedAccountIds: string[];
   targetOverrides: TargetOverrideState;
-  mediaAttached: boolean;
   disabled: boolean;
   mediaErrors: string[];
   onToggle: (accountId: string, checked: boolean) => void;
@@ -90,10 +88,7 @@ export function AccountList({
             <FieldGroup className="gap-2 sm:grid sm:grid-cols-2">
               {accounts.map((account) => {
                 const selected = selectedAccountIds.includes(account.id);
-                const blockedByMedia =
-                  mediaAttached && account.platform === "X";
-                const accountDisabled =
-                  !account.implemented || blockedByMedia;
+                const accountDisabled = !account.implemented;
                 const overrideEntry = targetOverrides[account.id];
                 const customized = Boolean(
                   overrideEntry &&
@@ -165,11 +160,6 @@ export function AccountList({
                       </FieldLabel>
                       {!account.implemented && (
                         <FieldDescription>Coming soon</FieldDescription>
-                      )}
-                      {account.implemented && blockedByMedia && (
-                        <FieldDescription>
-                          X media publishing is not available
-                        </FieldDescription>
                       )}
                     </FieldContent>
                     {selected && customized && (

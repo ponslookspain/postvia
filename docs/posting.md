@@ -31,7 +31,9 @@ hard ban** → schedule validation → quota + insert:
 - `POST …/publish` and `POST …/retry` (`maxDuration: 300`): claim targets
   with conditional `→PUBLISHING` transitions, continue in `waitUntil`,
   respond 202 while clients poll. Retry additionally recovers stale
-  `PUBLISHING` rows (6 min, jobless → `PENDING`) and is entitlement-gated.
+  `PUBLISHING` rows (6 min; jobless → `PENDING`, X `x-req-*` markers →
+  pending while fresh, `FAILED`-with-guidance after 10 min, never an
+  automatic second tweet) and is entitlement-gated.
 
 ## Bulk (`/posts/bulk`)
 
