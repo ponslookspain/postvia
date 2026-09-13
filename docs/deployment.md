@@ -43,10 +43,13 @@ or keyed `WHERE` statements only.
 
 ## Build & release checklist
 
-`npx prisma validate` → `npx prisma generate` → `npx tsc --noEmit` →
-`npm test` → `npm run test:pg` (isolated PG, never production) →
-`npm run build` → commit → push `main` (no force) → `vercel --prod` →
-post-deploy smoke.
+Local gates: `npx prisma validate` → `npx prisma generate` →
+`npx tsc --noEmit` → `npm test` → `npm run test:pg` (isolated PG, never
+production) → `npm run build`. Release flow (branches, Preview, PR,
+merge, Production, OpenCode stop-rule): [`docs/workflow.md`](workflow.md).
+`vercel --prod` is not part of the normal cycle — Production comes from
+`main` after an approved PR merge. Never force-push, never change the
+remote.
 
 ## Rollback
 

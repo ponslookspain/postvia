@@ -5,8 +5,8 @@ platform, and publish (or schedule) to every connected social profile.
 
 Docs: [`docs/`](docs/) (architecture, database, auth, social integrations,
 posting, billing, [abuse protection](docs/abuse-protection.md), environment,
-deployment, security, development). The code is the source of truth; docs
-mirror it.
+deployment, [workflow](docs/workflow.md), security, development). The code
+is the source of truth; docs mirror it.
 
 ## Stack
 
@@ -63,7 +63,9 @@ full matrix, retry/idempotency semantics, and portal requirements.
   badges, disconnect confirmation Dialog
 - `/settings` — profile name, sign-in methods, password, notification
   preferences, danger-zone account deletion (Dialog + confirmation phrase)
-- `/login`, `/signup`, `/verify-email` — auth flows with verification resend
+- `/login`, `/signup`, `/verify-otp`, `/onboarding` — email OTP auth
+  (6-digit code; password optional; Google via `/post-auth`), `/verify-email`
+  — legacy verification-link fallback
 - `/terms`, `/privacy` — legal pages
 - `/api/*` — posts CRUD + publish/retry, media prepare/upload/status,
   settings, per-platform OAuth connect/callback + account management, TikTok
@@ -100,8 +102,10 @@ full matrix, retry/idempotency semantics, and portal requirements.
   counts created posts via an atomic ledger (`PostUsage`) — deleting a post
   never refills it, and concurrent creates on the last slot grant one
   winner. Bulk batches attest their size server-side per item.
-- New users start on Free automatically — no plan selection, no checkout.
-  Paid landing CTAs route signup → `/billing` for an instant upgrade.
+- New users pick a plan during onboarding (Free → dashboard, paid →
+  `/billing` for checkout); the choice is stored server-side
+  (`User.selectedPlan`, never localStorage/`?plan=`). No `Subscription`
+  row → active Free.
 - Data: `Subscription` row per user (plan, status, period end,
   cancel-at-periodEnd, Stripe fields reserved). No row → active Free.
   Downgrades and expirations never delete data; only new actions are gated.
@@ -183,16 +187,18 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (826 unit tests, fake stores)
+npm test           # node --test suite (839 unit tests, fake stores)
 npm run test:pg    # real-PostgreSQL concurrency suite (18 tests) —
                    # needs PG_INTEGRATION=1 + isolated test DB, never prod
 ```
 
 ## Deploy
 
-Connected Vercel project `postvia` (see `.vercel/project.json`). Pushing to
-`main` deploys via the linked project; `vercel --prod` deploys the working
-tree explicitly. Scheduled publishing runs on the cron defined in
+Connected Vercel project `postvia` (see `.vercel/project.json`).
+Development happens on staging/feature branches → automatic Preview;
+`main` → automatic Production (`postvia.online`). Full process, stop-rule
+and release discipline: [`docs/workflow.md`](docs/workflow.md). Scheduled
+publishing runs on the cron defined in
 `vercel.json` (daily at 03:00 UTC — the maximum frequency on the current
 Hobby plan, so scheduled posts can go out up to ~24h late; a paid plan
 unlocks sub-daily schedules).
