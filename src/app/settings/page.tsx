@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireOnboardedUser } from "@/lib/onboarding";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/AppShell";
 import { SettingsClient } from "./SettingsClient";
@@ -6,7 +6,7 @@ import { SettingsClient } from "./SettingsClient";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const user = await requireUser();
+  const user = await requireOnboardedUser();
 
   const [prefs, authAccounts] = await Promise.all([
     prisma.userPreferences.findUnique({

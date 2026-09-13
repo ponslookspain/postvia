@@ -245,6 +245,7 @@ export function SettingsClient({
         type: "success",
         text: "Password set. You can now sign in with email and password.",
       });
+      router.refresh();
     } catch {
       setPasswordMessage({ type: "error", text: "Failed to set password" });
     } finally {

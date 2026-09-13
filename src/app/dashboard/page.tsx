@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireOnboardedUser } from "@/lib/onboarding";
 import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
 import { getDisplayPostsUsed, getEffectivePlan, getRemainingQuota, getUsage } from "@/lib/entitlements";
 import { getPlan } from "@/lib/plans";
@@ -108,7 +108,7 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireUser();
+  const user = await requireOnboardedUser();
   const params = await searchParams;
   const rawQ = typeof params.q === "string" ? params.q.trim() : "";
   const rawStatus = typeof params.status === "string" ? params.status : "all";

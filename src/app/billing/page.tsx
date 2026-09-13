@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
+import { getOnboardingState } from "@/lib/onboarding";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
@@ -48,6 +50,10 @@ export default async function BillingPage({
     );
   }
   const params = await searchParams;
+  // Incomplete onboardings finish name+plan first; billing is reachable
+  // right after (paid intent) or anytime later.
+  const onboarding = await getOnboardingState(user.id);
+  if (!onboarding?.onboardingCompleted) redirect("/onboarding");
   const checkoutResult =
     params?.checkout === "success"
       ? ("success" as const)

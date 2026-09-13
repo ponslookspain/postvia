@@ -35,6 +35,7 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resending, setResending] = useState(false);
@@ -65,8 +66,38 @@ export function LoginForm({
       return;
     }
 
-    router.push("/dashboard");
+    // Post-auth routing is server-side (onboarding/billing/dashboard).
+    router.push("/post-auth");
     router.refresh();
+  }
+
+  async function handleSignInWithCode() {
+    if (!email) {
+      setError("Enter your email first, then request a code.");
+      return;
+    }
+    setSendingCode(true);
+    setError(null);
+    try {
+      // Neutral endpoint: same response for existing and unknown emails,
+      // so this button is not an enumeration oracle. Unknown emails simply
+      // receive no code; the verify screen then rejects the attempt.
+      const res = await fetch("/api/auth/otp/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, mode: "login" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Unable to send code. Please try again.");
+        setSendingCode(false);
+        return;
+      }
+      router.push(`/verify-otp?${new URLSearchParams({ email, mode: "login" })}`);
+    } catch {
+      setError("Unable to send code. Please try again.");
+      setSendingCode(false);
+    }
   }
 
   async function handleResendVerification() {
@@ -183,6 +214,21 @@ export function LoginForm({
               {submitting && <Spinner data-icon="inline-start" />}
               {submitting ? "Signing in..." : "Sign in"}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={sendingCode || submitting}
+              onClick={() => void handleSignInWithCode()}
+              className="w-full"
+            >
+              {sendingCode && <Spinner data-icon="inline-start" />}
+              {sendingCode ? "Sending code..." : "Sign in with a code"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              No password yet? Use{" "}
+              <span className="font-medium">Sign in with a code</span> — we will
+              email you a 6-digit code.
+            </p>
           </FieldGroup>
         </form>
 
@@ -192,7 +238,7 @@ export function LoginForm({
           <Separator className="flex-1" />
         </div>
 
-        <GoogleButton />
+        <GoogleButton newUserCallbackURL="/post-auth" callbackURL="/post-auth" />
 
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}

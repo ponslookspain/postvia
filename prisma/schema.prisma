@@ -63,6 +63,20 @@ model User {
   emailVerified  Boolean          @default(false)
   name           String
   image          String?
+  /**
+   * Mobbin-style onboarding gate. False for every user created through the
+   * OTP flow; backfilled to true for pre-existing verified users (incl. the
+   * admin) so they never see onboarding. Server pages redirect to
+   * /onboarding while false — never trust client state for this.
+   */
+  onboardingCompleted Boolean @default(false)
+  /**
+   * Authoritative server-side plan intent (replaces the client-only
+   * localStorage ?plan= hint). Written by /api/onboarding and /api/billing
+   * actions only; the Stripe Subscription row stays the single source of
+   * truth for paid entitlements.
+   */
+  selectedPlan   Plan?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   posts          Post[]

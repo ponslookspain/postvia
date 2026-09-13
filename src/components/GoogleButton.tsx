@@ -28,7 +28,13 @@ function GoogleGlyph() {
   );
 }
 
-export function GoogleButton() {
+export function GoogleButton({
+  callbackURL = "/post-auth",
+  newUserCallbackURL = "/post-auth",
+}: {
+  callbackURL?: string;
+  newUserCallbackURL?: string;
+} = {}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,10 +42,14 @@ export function GoogleButton() {
     setLoading(true);
     setError(null);
     try {
+      // Single server decision point: /post-auth routes to onboarding
+      // (new/incomplete users, incl. paid-intent) or dashboard. Plan intent
+      // from ?plan= is persisted server-side at onboarding — never trusted
+      // from the client.
       const { data, error: oauthError } = await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
-        newUserCallbackURL: "/dashboard",
+        callbackURL,
+        newUserCallbackURL,
         errorCallbackURL: "/login",
       });
       if (oauthError) {
