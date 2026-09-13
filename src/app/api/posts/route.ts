@@ -15,11 +15,10 @@ import {
   liveQuotaStore,
 } from "@/lib/entitlements";
 import {
-  enforceFreeIdentityGate,
   getAbusePepper,
   isAbuseEnforcementEnabled,
-  liveAbuseStores,
 } from "@/lib/abuse";
+import { createFreePostAtomic } from "@/lib/free-post-kernel";
 import {
   validateCreatePostContent,
   validateTargetAccountSelection,
@@ -225,49 +224,79 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Atomic quota claim + insert. The early gate above fast-fails the
-    // common over-limit case; this claim closes the check-then-create race:
-    // concurrent requests on the last slot grant exactly one winner. The
-    // ledger only grows — deleting a post never refills it.
-    //
-    // Identity-level Free enforcement (authoritative for Free): the monthly
+    // Atomic Free creation kernel (authoritative for Free): the monthly
     // allowance belongs to the abuse identity shared by every linked user,
-    // so new accounts cannot mint fresh Free quota. Paid plans and the
-    // admin bypass skip this entirely — each paid subscription keeps its
-    // own per-user limits. Transient identity-store failures degrade to
-    // the PostUsage-only path below (still gated); a missing migration
-    // fails closed and loud.
+    // so new accounts cannot mint fresh Free quota. Identity claim +
+    // per-user claim + insert run in ONE transaction — a failed insert
+    // rolls every ledger mutation back (no phantom consumption, no
+    // double-spend on retry) and concurrent last-slot attempts grant
+    // exactly one winner. Paid plans and the admin bypass skip this
+    // entirely — each paid subscription keeps its own per-user limits.
+    // Transient identity-store failures degrade to the PostUsage-only path
+    // (still gated); a missing migration/misconfiguration fails closed.
     const monthStart = getMonthStart();
     const enforceAbuse = isAbuseEnforcementEnabled();
-    if (effective.plan === "free" && !effective.bypass) {
-      const freeLimit = effective.entitlements.monthlyPosts;
-      if (freeLimit !== null) {
-        const gate = await enforceFreeIdentityGate({
-          userId: user.id,
-          email: user.email,
-          limit: freeLimit,
-          enforce: enforceAbuse,
-          pepper: getAbusePepper(),
-          period: getPeriodKey(),
-          monthStart,
-          stores: liveAbuseStores,
-        });
-        if (!gate.ok) {
-          return NextResponse.json(
-            {
-              code: "UPGRADE_REQUIRED",
-              reason:
-                gate.code === "RESTRICTED"
-                  ? "This account is restricted. Contact support."
-                  : `Monthly post limit reached (${gate.observed}/${freeLimit}).`,
-              upgradeTo: getUpgradeTarget(effective.plan),
+    const isFreePlan = effective.plan === "free" && !effective.bypass;
+    const freeLimit =
+      isFreePlan && effective.entitlements.monthlyPosts !== null
+        ? (effective.entitlements.monthlyPosts as number)
+        : null;
+    let created: Awaited<ReturnType<typeof createWithMonthlyQuota>> | null =
+      null;
+    if (freeLimit !== null) {
+      const kernel = await createFreePostAtomic({
+        userId: user.id,
+        email: user.email,
+        limit: freeLimit,
+        enforce: enforceAbuse,
+        pepper: getAbusePepper(),
+        period: getPeriodKey(),
+        monthStart,
+        buildInsert: (tx) =>
+          tx.post.create({
+            data: {
+              userId: user.id,
+              text: text.trim(),
+              status: isScheduled ? "SCHEDULED" : "DRAFT",
+              scheduledAt: scheduledAtDate,
+              publishedAt: null,
+              targets: { create: targets },
             },
-            { status: 403 }
-          );
-        }
+            include: { targets: true },
+          }),
+        liveCountForBackfill: () =>
+          prisma.post.count({
+            where: { userId: user.id, createdAt: { gte: monthStart } },
+          }),
+        legacyInsert: () =>
+          prisma.post.create({
+            data: {
+              userId: user.id,
+              text: text.trim(),
+              status: isScheduled ? "SCHEDULED" : "DRAFT",
+              scheduledAt: scheduledAtDate,
+              publishedAt: null,
+              targets: { create: targets },
+            },
+            include: { targets: true },
+          }),
+      });
+      if (!kernel.ok) {
+        return NextResponse.json(
+          {
+            code: "UPGRADE_REQUIRED",
+            reason:
+              kernel.code === "RESTRICTED"
+                ? "This account is restricted. Contact support."
+                : `Monthly post limit reached (${kernel.observed}/${freeLimit}).`,
+            upgradeTo: getUpgradeTarget(effective.plan),
+          },
+          { status: 403 }
+        );
       }
+      return NextResponse.json(kernel.value, { status: 201 });
     }
-    const created = await createWithMonthlyQuota({
+    created = await createWithMonthlyQuota({
       userId: user.id,
       limit: effective.entitlements.monthlyPosts,
       bypass: effective.bypass,

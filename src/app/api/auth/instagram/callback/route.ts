@@ -5,6 +5,7 @@ import { getEffectivePlan } from "@/lib/entitlements";
 import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
+  gateOAuthCallback,
   isPaidActivePlan,
 } from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
@@ -56,6 +57,13 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return clearState(
         NextResponse.redirect(new URL("/accounts?error=invalid_session", request.url))
+      );
+    }
+    // Callback flood protection (initiation-only limits leave this path
+    // open): per-IP + per-user buckets.
+    if (!(await gateOAuthCallback({ request, userId: user.id }))) {
+      return clearState(
+        NextResponse.redirect(new URL("/accounts?error=too_many_requests", request.url))
       );
     }
     if (!isInstagramConfigured()) {

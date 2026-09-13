@@ -6,6 +6,7 @@ import { getEffectivePlan } from "@/lib/entitlements";
 import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
+  gateOAuthCallback,
   isPaidActivePlan,
 } from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
@@ -38,7 +39,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (state !== storedState) {
+  if (state.length !== storedState.length) {
+    return NextResponse.redirect(
+      new URL("/accounts?error=invalid_state", request.url)
+    );
+  }
+  let stateDiff = 0;
+  for (let i = 0; i < state.length; i++) {
+    stateDiff |= state.charCodeAt(i) ^ storedState.charCodeAt(i);
+  }
+  if (stateDiff !== 0) {
     return NextResponse.redirect(
       new URL("/accounts?error=invalid_state", request.url)
     );
@@ -48,6 +58,14 @@ export async function GET(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.redirect(new URL("/login", request.url));
+    }
+
+    // Callback flood protection (initiation-only limits leave this path
+    // open): per-IP + per-user buckets. Denied attempts redirect, never 500.
+    if (!(await gateOAuthCallback({ request, userId: user.id }))) {
+      return NextResponse.redirect(
+        new URL("/accounts?error=too_many_requests", request.url)
+      );
     }
 
     const xProvider = new XProvider();

@@ -1,7 +1,12 @@
-# Postvia
+# PostVia
 
 Publish to social media in one place. Postvia lets you write once, preview per
 platform, and publish (or schedule) to every connected social profile.
+
+Docs: [`docs/`](docs/) (architecture, database, auth, social integrations,
+posting, billing, [abuse protection](docs/abuse-protection.md), environment,
+deployment, security, development). The code is the source of truth; docs
+mirror it.
 
 ## Stack
 
@@ -123,6 +128,18 @@ composer changes.
   the same `Subscription` fields (`plan`, `status`, `currentPeriodEnd`,
   `cancelAtPeriodEnd`) — UI and entitlements stay unchanged.
 
+## Anti-abuse (Free multi-account protection)
+
+Free monthly value belongs to an `AbuseIdentity`, not to a `User`: shared
+email/Google/social signals resolve to one identity with one shared ledger,
+so new accounts, re-registrations and re-links never mint fresh quota.
+`POST /api/posts` runs resolve + identity claim + per-user claim + insert
+in a single transaction (no phantom quota, one last-slot winner); merges
+preserve max risk and conserve usage; device/IP stay secondary signals.
+Paid plans and the admin bypass never touch the Free ledger. Details,
+invariants and the fail-open/fail-closed matrix:
+[`docs/abuse-protection.md`](docs/abuse-protection.md).
+
 ## Design system
 
 - Nova neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
@@ -142,8 +159,10 @@ composer changes.
 
 ```bash
 npm install
-# configure .env (DATABASE_URL_POSTGRES_PRISMA_URL, auth + OAuth + Resend + Blob keys)
-npx prisma db push
+# configure .env (DATABASE_URL_POSTGRES_PRISMA_URL, BETTER_AUTH_SECRET,
+# GOOGLE_CLIENT_ID/SECRET, provider keys, RESEND_API_KEY, Blob keys,
+# ABUSE_HASH_PEPPER, ADMIN_EMAILS) — see docs/environment.md
+npx prisma db push   # empty/dev databases only — never production
 npm run dev
 ```
 
@@ -157,7 +176,9 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (402 tests)
+npm test           # node --test suite (670 unit tests, fake stores)
+npm run test:pg    # real-PostgreSQL concurrency suite (18 tests) —
+                   # needs PG_INTEGRATION=1 + isolated test DB, never prod
 ```
 
 ## Deploy

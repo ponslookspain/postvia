@@ -2,8 +2,10 @@
  * One-off backfill: builds AbuseIdentity rows for pre-existing users.
  *
  * Idempotent and safe to re-run: every write is P2002-tolerant, merges
- * converge, and the identity Free ledger only ever floor-raises to the max
- * of the linked users' PostUsage — current access is never reduced.
+ * converge with max-risk preserved, and the identity Free ledger only ever
+ * floor-raises to the SUM of the linked users' PostUsage ledger counts
+ * (live post count as a legacy lower bound) — current access is never
+ * reduced. Same invariants as the live claim path (syncIdentityFloor).
  * Enforcement stays behind ABUSE_ENFORCEMENT (default: observe), so this
  * script only prepares data, it never blocks anyone.
  *

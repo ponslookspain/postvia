@@ -1,5 +1,7 @@
 /**
- * Pricing plans (TEST MODE — no billing backend, no Stripe, no payment).
+ * Pricing plans. Stripe checkout/portal/webhook is the billing backend
+ * (see /api/billing/* and src/lib/stripe.ts); the BillingTestOverride table
+ * is an admin-only sandbox for testing without paying.
  *
  * This module is the single source of truth for plan identity, pricing
  * AND entitlements. UI, API and tests must import limits from here —

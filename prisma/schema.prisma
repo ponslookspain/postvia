@@ -167,6 +167,32 @@ enum AbuseSignalKind {
   IP_HASH
 }
 
+enum AbuseEventKind {
+  CREATED
+  MERGED
+  SIGNAL
+  TOMBSTONE_HIT
+  RISK
+  LINK_DENY
+  POST_DENY
+}
+
+/**
+ * Minimal immutable-ish abuse audit trail. Best-effort telemetry only:
+ * never blocks the hot path, never stores raw PII (counts and ids only).
+ * The authoritative security state lives in AbuseIdentity/AbuseFreeUsage,
+ * never here.
+ */
+model AbuseEvent {
+  id         String         @id @default(cuid())
+  identityId String?
+  kind       AbuseEventKind
+  createdAt  DateTime       @default(now())
+
+  @@index([identityId])
+  @@index([createdAt])
+}
+
 /**
  * Abuse identity: the unit Free value belongs to. One human may own several
  * Postvia users (AbuseIdentityLink), but the Free monthly allowance is
@@ -243,7 +269,8 @@ model AbuseTombstone {
 /**
  * Identity-level Free ledger. One row per identity per UTC calendar month
  * (period "YYYY-MM"); the counter only grows. Created lazily on the first
- * Free claim, initialized to the max of the linked users' PostUsage so
+ * Free claim, initialized to the SUM of the linked users' PostUsage ledger
+ * counts (with the live post count as a legacy lower bound), so
  * already-consumed value is never re-granted. Claimed atomically with a
  * conditional increment — concurrent claims on the last unit grant exactly
  * one winner. Paid plans never touch this table.

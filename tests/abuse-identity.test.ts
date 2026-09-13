@@ -182,6 +182,15 @@ function makeAbuseStores() {
         row.riskReason = reason;
       }
     },
+    escalateRisk: async (identityId, level, reason) => {
+      await tick();
+      const rank = { LOW: 0, MEDIUM: 1, HIGH: 2, ABUSE: 3 } as const;
+      const row = identities.get(identityId);
+      if (row && rank[row.riskLevel] < rank[level]) {
+        row.riskLevel = level;
+        row.riskReason = reason;
+      }
+    },
     touchLinked: async (identityId, now) => {
       await tick();
       const row = identities.get(identityId);
@@ -1040,8 +1049,8 @@ describe("persistent rate limiting", () => {
   });
 });
 
-describe("device signal and floor sync", () => {
-  test("shared device cookie merges users into one identity", async () => {
+describe("device signal is secondary (never merges strangers)", () => {
+  test("shared device cookie does NOT merge two independent users", async () => {
     const { stores } = makeAbuseStores();
     const device = deviceSignal(newDeviceId(), PEPPER);
     const first = await resolveAbuseIdentity({
@@ -1054,7 +1063,13 @@ describe("device signal and floor sync", () => {
       signals: [emailSig("d2@x.com"), device],
       stores,
     });
-    assert.equal(second.identityId, first.identityId);
+    // Family / office / library sharing one machine: distinct humans keep
+    // distinct identities and distinct Free allowances.
+    assert.notEqual(second.identityId, first.identityId);
+    // The device is still recorded as supporting evidence on the first
+    // identity (risk/rate-limit use), not as an ownership edge.
+    const owners = await stores.findSignalOwners([device]);
+    assert.ok(owners.some((o) => o.identityId === first.identityId));
   });
   test("floor sync raises to linked usage, never lowers", async () => {
     const { stores, seedPostUsage, readFreeUsage } = makeAbuseStores();

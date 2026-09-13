@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { logDiagnostic, reportError } from "@/lib/diagnostics";
-import type { AbuseRisk, AbuseSignalKind } from "@prisma/client";
+import { Prisma, type AbuseRisk, type AbuseSignalKind } from "@prisma/client";
 
 /**
  * Anti-abuse identity layer (server-only: hashes with a secret pepper).
@@ -135,6 +135,84 @@ export function getAbusePepper(
   return DEV_PEPPER;
 }
 
+/** True when the error is a missing-pepper misconfiguration (fail closed). */
+export function isPepperMissingError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("ABUSE_HASH_PEPPER is required")
+  );
+}
+
+/**
+ * Fail-closed vs fail-open classification for abuse paths.
+ *
+ * FAIL CLOSED (loud, never silent allow):
+ * - missing ABUSE_HASH_PEPPER in production (misconfiguration);
+ * - missing abuse Prisma tables (P2021 — migration not applied).
+ *
+ * FAIL OPEN (log + safe fallback, never block legitimate users):
+ * - transient connectivity/runtime errors: P1001/P1002/P1008/P1017/P2024/P2034,
+ *   timeouts, connection resets, and any other unexpected store failure.
+ */
+export function isFailClosedAbuseError(error: unknown): boolean {
+  return isMissingTableError(error) || isPepperMissingError(error);
+}
+
+/**
+ * Transient connectivity errors eligible for fail-open fallback.
+ * Conservative by design: only Prisma connection/pool/transaction-retry
+ * codes plus explicit network failure messages qualify. Anything else
+ * (validation, FK violations, business/insert failures) is NOT transient —
+ * falling back on those would consume quota outside any transaction and
+ * reintroduce the phantom-consumption the atomic kernel exists to prevent.
+ */
+const TRANSIENT_PRISMA_CODES = new Set([
+  "P1001", // cannot reach database server
+  "P1002", // database server timed out
+  "P1008", // operations timed out
+  "P1017", // server closed the connection
+  "P2024", // connection pool timeout
+  "P2034", // transaction failed, please retry
+]);
+
+export function isTransientAbuseError(error: unknown): boolean {
+  if (error instanceof Error && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && TRANSIENT_PRISMA_CODES.has(code)) {
+      return true;
+    }
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  return /connection (reset|refused|closed|timed out)|timed out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|fetch failed|pool/i.test(
+    message
+  );
+}
+
+/**
+ * Hard identity signals: stable account-bound identifiers that may own,
+ * merge and re-resolve an AbuseIdentity. DEVICE_COOKIE is deliberately
+ * excluded — it is a secondary/risk signal only (shared machines must
+ * never merge strangers into one identity or pool their Free quota).
+ */
+export function isHardIdentitySignal(kind: AbuseSignalKind): boolean {
+  return (
+    kind === "EMAIL_HASH" || kind === "GOOGLE_SUB" || kind === "SOCIAL_LINK"
+  );
+}
+
+/** Risk rank: higher number = more severe. Automatic paths only escalate. */
+export const ABUSE_RISK_RANK: Record<AbuseRisk, number> = {
+  LOW: 0,
+  MEDIUM: 1,
+  HIGH: 2,
+  ABUSE: 3,
+};
+
+/** Returns the more severe of two risk levels (ties keep `a`). */
+export function maxRisk(a: AbuseRisk, b: AbuseRisk): AbuseRisk {
+  return ABUSE_RISK_RANK[b] > ABUSE_RISK_RANK[a] ? b : a;
+}
+
 export function hashSignal(
   value: string,
   pepper: string,
@@ -250,6 +328,17 @@ export function evaluateRisk(input: {
   return { level, reason };
 }
 
+/** Tombstone is live while within its kind TTL; expired rows await sweep. */
+export function isTombstoneLive(
+  kind: AbuseSignalKind,
+  deletedAt: Date,
+  nowMs: number
+): boolean {
+  const ttl =
+    kind === "SOCIAL_LINK" ? TOMBSTONE_SOCIAL_TTL_MS : TOMBSTONE_EMAIL_TTL_MS;
+  return nowMs - deletedAt.getTime() < ttl;
+}
+
 export function isWithinCooldown(
   sinceMs: number | null,
   cooldownMs: number,
@@ -290,16 +379,31 @@ export function deviceSetCookieHeader(value: string, secure: boolean): string {
 
 /**
  * Client IP for rate limiting / risk scoring only — never for hard blocks
- * or identity. Trusts Vercel's forwarded headers (known proxy boundary).
+ * or identity. Trust assumption: the app runs behind the Vercel edge /
+ * a trusted reverse proxy that sets x-forwarded-for with the real client
+ * first. The header is validated (IPv4/IPv6 shape) and never trusted
+ * blindly: malformed or empty values yield null (no bucket). A spoofed
+ * XFF can at most shift the caller into a different bucket — it can never
+ * mint quota or merge identities.
  */
 export function getClientIp(request: Request): string | null {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    if (first && isPlausibleIp(first)) return first;
   }
   const real = request.headers.get("x-real-ip")?.trim();
-  return real || null;
+  if (real && isPlausibleIp(real)) return real;
+  return null;
+}
+
+function isPlausibleIp(value: string): boolean {
+  if (value.length > 45) return false;
+  // IPv4 (dotted quad) or IPv6 (hex + colons, optional zone).
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(value)) {
+    return value.split(".").every((octet) => Number(octet) <= 255);
+  }
+  return /^[0-9a-fA-F:.%]+$/.test(value) && value.includes(":");
 }
 
 export function dayKey(nowMs: number = Date.now()): string {
@@ -308,6 +412,13 @@ export function dayKey(nowMs: number = Date.now()): string {
 
 /** Storage surface for identity resolution; faked in tests. */
 export type AbuseStores = {
+  /**
+   * True when these stores join an ambient transaction (kernel tx-bound
+   * stores). Best-effort swallows are forbidden there: any failed statement
+   * aborts the whole Postgres transaction (25P02 on everything after), so
+   * errors must propagate to the caller's retry/map logic instead.
+   */
+  isTransactional?: boolean;
   findSignalOwners: (
     signals: SignalInput[]
   ) => Promise<{ identityId: string; firstSeenAt: Date }[]>;
@@ -326,6 +437,17 @@ export type AbuseStores = {
     firstSeenAt: Date;
   } | null>;
   setRisk: (
+    identityId: string,
+    level: AbuseRisk,
+    reason: string
+  ) => Promise<void>;
+  /**
+   * Escalate-only risk write: raises to `level` when the stored level is
+   * lower, never lowers. Single conditional statement (no read-modify-write),
+   * so concurrent merges commute to max and the call can never downgrade a
+   * manual ABUSE set between a read and a write.
+   */
+  escalateRisk: (
     identityId: string,
     level: AbuseRisk,
     reason: string
@@ -363,7 +485,7 @@ export type AbuseStores = {
     period: string,
     floor: number
   ) => Promise<void>;
-  /** Sum of per-user creation counts — the only safe floor (never MAX). */
+  /** SUM of the PostUsage ledger counts (legacy lower-bounded by live posts). */
   sumPostUsage: (
     userIds: string[],
     period: string,
@@ -388,10 +510,13 @@ export type IdentityResolution = {
 
 /**
  * Resolves (or creates/merges) the abuse identity for a user from its
- * signals. Race-safe: concurrent resolves with a shared signal collapse
- * into one identity via the (kind, valueHash) unique key. Tombstoned
- * identities (deleted users) are candidates too, so re-registration
- * inherits consumed Free value instead of minting a fresh allowance.
+ * signals. Race-safe: concurrent resolves with a shared HARD signal
+ * collapse into one identity via the (kind, valueHash) unique key.
+ * DEVICE_COOKIE signals are secondary: they are attached to the final
+ * identity for risk/rate-limit evidence but never drive owner lookup,
+ * winner choice or merging — two strangers sharing a machine must never
+ * merge. Tombstoned identities (deleted users) are candidates too, so
+ * re-registration inherits consumed Free value instead of minting fresh.
  */
 export async function resolveAbuseIdentity(input: {
   userId: string;
@@ -411,8 +536,18 @@ export async function resolveAbuseIdentity(input: {
     };
   }
   const now = new Date(input.nowMs ?? Date.now());
-  const owners = await input.stores.findSignalOwners(input.signals);
-  const tombs = await input.stores.findTombstones(input.signals);
+  // Only hard signals participate in owner discovery and merging.
+  const hardSignals = input.signals.filter((s) => isHardIdentitySignal(s.kind));
+  const softSignals = input.signals.filter(
+    (s) => !isHardIdentitySignal(s.kind)
+  );
+  const owners = await input.stores.findSignalOwners(hardSignals);
+  const rawTombs = await input.stores.findTombstones(hardSignals);
+  // Expired tombstones are not hard evidence: they await the sweeper and
+  // must not block or escalate forever.
+  const tombs = rawTombs.filter((t) =>
+    isTombstoneLive(t.kind, t.deletedAt, now.getTime())
+  );
   const tombIds = [
     ...new Set(
       tombs
@@ -438,28 +573,51 @@ export async function resolveAbuseIdentity(input: {
   let identityId: string | undefined;
   let created = false;
   let merged = false;
+  /**
+   * Our own fresh identity, if we created one. When we end up adopting a
+   * foreign winner, the fresh row would otherwise linger as an empty husk
+   * (no signals — the unique race was lost; no links — we link after
+   * adopting). It is folded into the winner before returning so
+   * registration storms don't accumulate invisible rows.
+   */
+  let freshId: string | undefined;
   const preLink = await input.stores.findIdentityIdByUser(input.userId);
 
+  const refreshDistinct = async (): Promise<boolean> => {
+    const owners = await input.stores.findSignalOwners(hardSignals);
+    distinct.length = 0;
+    for (const owner of owners) distinct.push(owner);
+    return distinct.length > 0;
+  };
+
   /**
-   * Up to two passes: the second converges identities created concurrently
-   * with ours (their signal attach wins the unique key after our read) and
-   * recovers from linking into an identity merged away mid-flight.
+   * Up to four passes. Pass 1 handles the common case; extra passes
+   * converge identities created concurrently with ours and recover when
+   * our identity is merged away mid-flight (attaches/links then hit
+   * P2003/P2002 against the deleted row). Every pass re-reads owners and
+   * links, so racers fold into one identity instead of throwing.
    */
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (distinct.length === 0 && attempt === 0) {
-      const fresh = await input.stores.createIdentity();
-      identityId = fresh.id;
-      created = true;
-      await input.stores.attachSignals(identityId, input.signals);
-    } else {
-      if (distinct.length === 0) {
-        const owners = await input.stores.findSignalOwners(input.signals);
-        for (const owner of owners) {
-          if (!distinct.some((o) => o.identityId === owner.identityId)) {
-            distinct.push(owner);
-          }
+  const MAX_ATTEMPTS = 4;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    const lastAttempt = attempt === MAX_ATTEMPTS - 1;
+    if (distinct.length === 0) {
+      if (attempt === 0) {
+        const fresh = await input.stores.createIdentity();
+        identityId = fresh.id;
+        freshId = fresh.id;
+        created = true;
+      } else {
+        await refreshDistinct();
+        if (distinct.length === 0) {
+          // Sole candidate vanished mid-flight: start over once.
+          const fresh = await input.stores.createIdentity();
+          identityId = fresh.id;
+          freshId = fresh.id;
+          created = true;
         }
       }
+    }
+    if (distinct.length > 0) {
       // Deterministic winner: lowest id is a total order every
       // concurrent resolver agrees on for the same set (timestamps tie
       // under load, insertion order differs per observer).
@@ -468,20 +626,37 @@ export async function resolveAbuseIdentity(input: {
       if (!winner) throw new Error("Signal owners vanished");
       identityId = winner.identityId;
       if (distinct.length > 1) {
-        await input.stores.mergeIdentities(
-          identityId,
-          distinct.slice(1).map((o) => o.identityId)
-        );
+        try {
+          await mergeIdentitiesPreservingRisk(
+            input.stores,
+            identityId,
+            distinct.slice(1).map((o) => o.identityId)
+          );
+        } catch (error) {
+          if (!isRaceConflictError(error) || lastAttempt) throw error;
+          await refreshDistinct();
+          continue;
+        }
         merged = true;
       }
-      await input.stores.attachSignals(identityId, input.signals);
+    }
+    if (!identityId) throw new Error("Identity resolution produced no identity");
+    try {
+      await input.stores.attachSignals(identityId, hardSignals);
+    } catch (error) {
+      // Our identity was merged away between merge and attach (P2003):
+      // refresh and converge onto the surviving winner.
+      if (!isRaceConflictError(error) || lastAttempt) throw error;
+      await refreshDistinct();
+      continue;
     }
 
     // Converge: another resolver may own our signals now (their attach
     // won the unique key after our read). A foreign live owner always wins
     // over our fresh creation, so every concurrent resolver folds into the
     // same identity in one round; remaining multi-owner sets use lowest id.
-    const recheck = await input.stores.findSignalOwners(input.signals);
+    // Device signals are excluded: they never force convergence.
+    const recheck = await input.stores.findSignalOwners(hardSignals);
     const foreign = recheck.filter((o) => o.identityId !== identityId);
     const recheckIds = [
       ...new Set(
@@ -502,14 +677,24 @@ export async function resolveAbuseIdentity(input: {
         foreignLive.length > 0
           ? foreignLive
           : live.sort((a, b) => (a.id < b.id ? -1 : 1));
-      const finalWinner = pool[0] ?? { id: identityId };
-      await input.stores.mergeIdentities(
-        finalWinner.id,
-        pool
-          .slice(1)
-          .map((meta) => meta.id)
-          .filter((id) => id !== finalWinner.id)
-      );
+      // Fallback: every candidate vanished mid-read. identityId is always
+      // set at this point (created fresh or selected above); the merge
+      // below is then a no-op and the loop re-verifies.
+      const finalWinner = pool[0] ?? { id: identityId as string };
+      try {
+        await mergeIdentitiesPreservingRisk(
+          input.stores,
+          finalWinner.id,
+          pool
+            .slice(1)
+            .map((meta) => meta.id)
+            .filter((id) => id !== finalWinner.id)
+        );
+      } catch (error) {
+        if (!isRaceConflictError(error) || lastAttempt) throw error;
+        await refreshDistinct();
+        continue;
+      }
       merged = true;
       identityId = finalWinner.id;
       continue;
@@ -523,28 +708,137 @@ export async function resolveAbuseIdentity(input: {
           existingLink < identityId
             ? [existingLink, identityId]
             : [identityId, existingLink];
-        await input.stores.mergeIdentities(first, [second]);
+        await mergeIdentitiesPreservingRisk(input.stores, first, [second]);
         merged = true;
         identityId = first;
       } else if (!existingLink) {
         await input.stores.linkUser(identityId, input.userId);
       }
       break;
-    } catch {
+    } catch (error) {
       // Linked into an identity merged away mid-flight (or a lost link
-      // race): refresh the owner set and converge once more.
-      const retryOwners = await input.stores.findSignalOwners(input.signals);
-      distinct.length = 0;
-      for (const owner of retryOwners) distinct.push(owner);
-      if (attempt === 1) {
-        const current = await input.stores.findIdentityIdByUser(input.userId);
-        if (!current) throw new Error("Identity link vanished after conflict");
+      // race): adopt the surviving link when one exists, else refresh and
+      // converge again. Only the final attempt gives up loudly.
+      if (!isRaceConflictError(error)) throw error;
+      const current = await tolerate(input.stores, () =>
+        input.stores.findIdentityIdByUser(input.userId)
+      , null);
+      if (current) {
         identityId = current;
+        break;
       }
+      if (lastAttempt) {
+        throw new Error("Identity link vanished after conflict");
+      }
+      await refreshDistinct();
     }
   }
 
   if (!identityId) throw new Error("Identity resolution produced no identity");
+  // Adopt the surviving link: a concurrent merge may have moved our link
+  // to the winner after our last read — the link row is authoritative.
+  const settled = await tolerate(input.stores, () =>
+    input.stores.findIdentityIdByUser(input.userId)
+  , null);
+  if (settled) identityId = settled;
+
+  /**
+   * Post-link convergence. The main loop can break out early with a
+   * signal-less private identity: our attach raced a rival's attach for
+   * the same value (unique key — exactly one wins) and our recheck ran
+   * before the winner's attach committed. Without this pass, N concurrent
+   * first-registrations fragment into N identities (proven by PG test: 30
+   * concurrent same-email resolves left 18). Each round strictly reduces
+   * fragments: a resolver that owns none of its signals folds itself into
+   * the survivor; co-owners merge into the deterministic lowest id. Signal
+   * values are globally unique, so merging co-owners is always correct.
+   * Every round also re-validates liveness: our identity may itself have
+   * been merged away after our last sighting, in which case we adopt the
+   * surviving link/owner instead of returning a dead id.
+   */
+  if (hardSignals.length > 0) {
+    for (let round = 0; round < 6; round += 1) {
+      const [owners, link] = await Promise.all([
+        input.stores.findSignalOwners(hardSignals),
+        tolerate(input.stores, () => input.stores.findIdentityIdByUser(input.userId), null),
+      ]);
+      if (link && link !== identityId) identityId = link;
+      const selfId = identityId;
+      if (!selfId) continue;
+      const alive = await tolerate(input.stores, () => input.stores.getIdentity(selfId), null);
+      if (!alive) continue;
+      const foreignIds = [
+        ...new Set(owners.map((o) => o.identityId)),
+      ].filter((id) => id !== identityId);
+      if (foreignIds.length === 0) break;
+      const own = owners.some((o) => o.identityId === identityId);
+      try {
+        if (!own) {
+          const winner = [...foreignIds].sort()[0] as string;
+          await mergeIdentitiesPreservingRisk(input.stores, winner, [identityId]);
+          merged = true;
+          identityId = winner;
+        } else {
+          const pool = [identityId, ...foreignIds];
+          const winner = [...pool].sort()[0] as string;
+          await mergeIdentitiesPreservingRisk(
+            input.stores,
+            winner,
+            pool.filter((id) => id !== winner)
+          );
+          merged = true;
+          identityId = winner;
+        }
+      } catch (error) {
+        if (!isRaceConflictError(error)) throw error;
+        // A rival merged mid-verify: next round re-reads (bounded).
+      }
+    }
+    // Final liveness guard: never return a merged-away identity. A rival
+    // merge between our last round and this read is handled by adopting
+    // the surviving link (merge moves links atomically with the delete);
+    // only a genuinely inconsistent state throws loudly (retryable).
+    const aliveFinal = await tolerate(input.stores, () => {
+      const selfId = identityId;
+      if (!selfId) throw new Error("Identity resolution produced no identity");
+      return input.stores.getIdentity(selfId);
+    }, null);
+    if (!aliveFinal) {
+      const link = await tolerate(input.stores, () => input.stores.findIdentityIdByUser(input.userId), null);
+      const owners = await input.stores.findSignalOwners(hardSignals);
+      const target =
+        link ?? [...new Set(owners.map((o) => o.identityId))].sort()[0];
+      if (!target) throw new Error("Identity resolution converged on a deleted identity");
+      identityId = target;
+      try {
+        await input.stores.linkUser(identityId, input.userId);
+      } catch (error) {
+        if (!isRaceConflictError(error)) throw error;
+        const retryLink = await tolerate(input.stores, () => input.stores.findIdentityIdByUser(input.userId), null);
+        if (retryLink) identityId = retryLink;
+      }
+    }
+  }
+  // Fold our abandoned fresh identity into the adopted winner. It owns no
+  // discoverable state (the unique race for its signals was lost and we
+  // link only after adopting), so this is a pure husk deletion — but even
+  // a non-empty surprise is preserved by the merge, never dropped.
+  if (freshId && freshId !== identityId && identityId) {
+    const target: string = identityId;
+    const husk: string = freshId;
+    await tolerate(input.stores, () =>
+      mergeIdentitiesPreservingRisk(input.stores, target, [husk])
+    , undefined);
+    freshId = undefined;
+  }
+  // Secondary signals ride along: attached for risk/rate-limit evidence,
+  // never for ownership. A shared device joins the identity's evidence set
+  // without merging strangers.
+  if (softSignals.length > 0) {
+    await tolerate(input.stores, () =>
+      input.stores.attachSignals(identityId, softSignals)
+    , undefined);
+  }
   const meta = await input.stores.getIdentity(identityId);
   const linkedUsers = await input.stores.findUserIdsByIdentity(identityId);
   // A tombstone counts when it points elsewhere (another human's history)
@@ -570,7 +864,7 @@ export async function resolveAbuseIdentity(input: {
   if (meta) {
     // Steady-state reads update lastSeenAt only — lastLinkedAt drives the
     // MEDIUM cooldown and must not be extended by ordinary activity.
-    await input.stores.touchSeen(identityId, now).catch(() => null);
+    await tolerate(input.stores, () => input.stores.touchSeen(identityId, now), undefined);
   }
   const finalMeta = await input.stores.getIdentity(identityId);
   return {
@@ -580,6 +874,77 @@ export async function resolveAbuseIdentity(input: {
     tombstoneHits: countedTombs.length,
     risk: finalMeta?.riskLevel ?? "LOW",
   };
+}
+
+/**
+ * Merge wrapper that preserves the maximum risk across winner + losers.
+ * The store-level merge moves rows; this wrapper guarantees the surviving
+ * identity keeps `max(all risks)` with the corresponding reason, so a LOW
+ * winner can never swallow a HIGH/ABUSE loser. Manual ABUSE always survives
+ * automatic flows (email change, re-registration, concurrent resolves).
+ */
+export async function mergeIdentitiesPreservingRisk(
+  stores: AbuseStores,
+  winnerId: string,
+  loserIds: string[]
+): Promise<void> {
+  const pruned = loserIds.filter((id) => id !== winnerId);
+  if (pruned.length === 0) return;
+  const metas = await Promise.all(
+    [winnerId, ...pruned].map((id) => tolerate(stores, () => stores.getIdentity(id), null))
+  );
+  let top: AbuseRisk = "LOW";
+  let topReason: string | null = null;
+  for (const meta of metas) {
+    if (!meta) continue;
+    if (ABUSE_RISK_RANK[meta.riskLevel] > ABUSE_RISK_RANK[top]) {
+      top = meta.riskLevel;
+      topReason = meta.riskReason;
+    }
+  }
+  await stores.mergeIdentities(winnerId, pruned);
+  if (ABUSE_RISK_RANK[top] > 0) {
+    // Single conditional statement — no read-then-write window in which a
+    // concurrent manual ABUSE escalation could be overwritten (TOCTOU).
+    await tolerate(
+      stores,
+      () => stores.escalateRisk(winnerId, top, topReason ?? "preserved from merged identity"),
+      undefined
+    );
+  }
+  void recordAbuseEvent({ identityId: winnerId, kind: "MERGED" });
+}
+
+/**
+ * Best-effort abuse audit trail. Never throws, never blocks the hot path:
+ * a failed event write is logged and dropped. Stores no PII — identity id
+ * and kind only. The authoritative security state never depends on events.
+ */
+export async function recordAbuseEvent(input: {
+  identityId?: string | null;
+  kind:
+    | "CREATED"
+    | "MERGED"
+    | "SIGNAL"
+    | "TOMBSTONE_HIT"
+    | "RISK"
+    | "LINK_DENY"
+    | "POST_DENY";
+}): Promise<void> {
+  try {
+    await prisma.abuseEvent.create({
+      data: { identityId: input.identityId ?? null, kind: input.kind },
+    });
+  } catch (error) {
+    // Telemetry only: event loss must never break enforcement.
+    // P2021 (table missing pre-migration) is silent here by design —
+    // the enforcing gates themselves fail closed on P2021.
+    if (!isMissingTableError(error)) {
+      reportError("abuse", "abuse event write failed", error, {
+        kind: input.kind,
+      });
+    }
+  }
 }
 
 /**
@@ -727,11 +1092,12 @@ export async function checkSocialLink(input: {
     }
     // Orphaned signal (previous owner deleted): merge its identity in so
     // already-consumed Free value is inherited, not re-granted.
+    // Risk is preserved at max: an ABUSE/HIGH orphan never dilutes.
     const [first, second] =
       identityId < foreignOwner.identityId
         ? [identityId, foreignOwner.identityId]
         : [foreignOwner.identityId, identityId];
-    await input.stores.mergeIdentities(first, [second]);
+    await mergeIdentitiesPreservingRisk(input.stores, first, [second]);
     identityId = first;
   } else {
     // No live owner: the pair may still carry consumed value on a
@@ -741,8 +1107,12 @@ export async function checkSocialLink(input: {
     // link starts fresh and the fact is logged.
   // Tombstones for this pair, including our own history (re-linking a
   // pair this identity owned before is exempt from the MEDIUM cooldown —
-  // linking consumes no value by itself, posting does).
-  const tombs = await input.stores.findTombstones([social]);
+  // linking consumes no value by itself, posting does). Expired tombstones
+  // are ignored (they await the sweeper, never block forever).
+  const rawTombs = await input.stores.findTombstones([social]);
+  const tombs = rawTombs.filter((t) =>
+    isTombstoneLive(t.kind, t.deletedAt, nowMs)
+  );
   ownTomb = tombs.some((tomb) => tomb.identityId === identityId);
   const tombIds = [
     ...new Set(
@@ -754,10 +1124,35 @@ export async function checkSocialLink(input: {
     ),
   ];
   const orphans: string[] = [];
+  // Supporting device evidence: the device cookie never merges identities
+  // by itself, but when the requester's device is already owned by a
+  // tombstoned identity with live users, that is same-human evidence for
+  // THIS pair (the requester re-links from the same browser) — inherit
+  // instead of treating it as a handoff to a stranger. Without device
+  // overlap a live-users tombstone stays a handoff (fresh allowance).
+  let deviceOwnerIds: Set<string> | null = null;
   for (const tombId of tombIds) {
     const users = await input.stores.findUserIdsByIdentity(tombId);
     if (users.length === 0) {
       orphans.push(tombId);
+      continue;
+    }
+    let sameHuman = false;
+    if (input.deviceId) {
+      if (!deviceOwnerIds) {
+        const owners = await input.stores
+          .findSignalOwners([deviceSignal(input.deviceId, pepper)])
+          .catch(() => []);
+        deviceOwnerIds = new Set(owners.map((o) => o.identityId));
+      }
+      sameHuman = deviceOwnerIds.has(tombId);
+    }
+    if (sameHuman) {
+      orphans.push(tombId);
+      logDiagnostic("abuse", "same-device re-link inherits usage", {
+        userId: input.userId,
+        identityId,
+      });
     } else {
       logDiagnostic("abuse", "social handoff without inheritance", {
         userId: input.userId,
@@ -766,7 +1161,11 @@ export async function checkSocialLink(input: {
     }
   }
   if (orphans.length > 0) {
-    await input.stores.mergeIdentities(identityId, orphans);
+    // Deterministic winner (lowest id) so concurrent inheritors converge.
+    const sorted = [identityId, ...orphans].sort();
+    const winner = sorted[0] as string;
+    await mergeIdentitiesPreservingRisk(input.stores, winner, sorted.slice(1));
+    identityId = winner;
     logDiagnostic("abuse", "inherited tombstoned usage", {
       userId: input.userId,
       identityId,
@@ -775,7 +1174,7 @@ export async function checkSocialLink(input: {
   }
 
   if (input.isPaid) {
-    await input.stores.attachSignals(identityId, [social]).catch(() => null);
+    await tolerate(input.stores, () => input.stores.attachSignals(identityId, [social]), undefined);
     return { ok: true, identityId };
   }
 
@@ -793,6 +1192,7 @@ export async function checkSocialLink(input: {
       });
       return { ok: true, identityId };
     }
+    void recordAbuseEvent({ identityId, kind: "LINK_DENY" });
     return { ok: false, code, reason };
   };
   if (risk === "ABUSE") {
@@ -818,7 +1218,22 @@ export async function checkSocialLink(input: {
 
   try {
     await input.stores.attachSignals(identityId, [social]);
-  } catch {
+  } catch (error) {
+    // P2002: a rival linked the pair first — ownership decides below.
+    // P2003: OUR identity was merged away mid-flight — the merge moved our
+    // link row to the winner, so re-resolve and attach there instead of
+    // silently dropping the signal (dropped signals weaken inheritance).
+    if (isRaceConflictError(error)) {
+      const fresh = await tolerate(input.stores, () =>
+        input.stores.findIdentityIdByUser(input.userId)
+      , null);
+      if (fresh && fresh !== identityId) {
+        identityId = fresh;
+        await input.stores.attachSignals(identityId, [social]);
+      }
+    } else {
+      throw error;
+    }
     const recheck = await input.stores.findSignalOwners([social]);
     if (recheck.some((o) => o.identityId !== identityId)) {
       return {
@@ -828,7 +1243,7 @@ export async function checkSocialLink(input: {
       };
     }
   }
-  await input.stores.touchLinked(identityId, new Date(nowMs)).catch(() => null);
+  await tolerate(input.stores, () => input.stores.touchLinked(identityId, new Date(nowMs)), undefined);
   return { ok: true, identityId };
 }
 
@@ -839,8 +1254,14 @@ export type SocialLinkGate =
 /**
  * Thin composition for OAuth callbacks: resolves the caller's paid status,
  * runs checkSocialLink, and maps decisions onto whitelisted redirect codes.
- * Fail-open by design (logs and allows): a broken abuse store must never
- * strand a legitimate OAuth flow — post creation stays authoritative.
+ *
+ * Failure policy (explicit split, never catch-all allow):
+ * - fail-closed (loud deny): missing pepper / missing abuse tables (P2021).
+ *   The callback is denied with connection_restricted so misconfiguration
+ *   can never silently disable protection.
+ * - fail-open (log + allow): transient store failures. A broken abuse store
+ *   must never strand a legitimate OAuth flow — post creation stays the
+ *   authoritative enforcement point.
  * Google-sub signals arrive via auth account hooks and the backfill, not
  * here, so this helper needs no extra database access beyond the stores.
  */
@@ -885,6 +1306,12 @@ export async function gateNewSocialLink(input: {
             : "connection_restricted",
     };
   } catch (error) {
+    if (isFailClosedAbuseError(error)) {
+      reportError("abuse", "social link gate misconfigured, denying", error, {
+        userId: input.userId,
+      });
+      return { ok: false, errorParam: "connection_restricted" };
+    }
     reportError("abuse", "social link gate failed", error, {
       userId: input.userId,
     });
@@ -921,9 +1348,310 @@ export function hashRateKey(parts: string[], pepper: string): string {
     .digest("hex");
 }
 
+type AbuseDbClient = Pick<
+  typeof prisma,
+  "abuseIdentity" | "abuseIdentityLink" | "abuseSignal" | "abuseFreeUsage"
+>;
+
+function prismaCode(error: unknown): string | null {
+  if (error instanceof Error && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string") return code;
+  }
+  return null;
+}
+
+/**
+ * Unique/FK/not-found conflicts are the fingerprints of a concurrent
+ * merge or link race (our identity was merged away mid-flight, a rival
+ * attached first, a row vanished). They trigger refresh-and-retry, never
+ * silent allow. Anything else propagates.
+ */
+const RACE_PRISMA_CODES = new Set(["P2002", "P2003", "P2025"]);
+
+export function isRaceConflictError(error: unknown): boolean {
+  return prismaCode(error) !== null && RACE_PRISMA_CODES.has(prismaCode(error) as string);
+}
+
+/**
+ * Best-effort wrapper for cosmetic writes/reads (touch timestamps, soft
+ * signals, husk cleanup, telemetry-adjacent lookups). Outside a transaction
+ * failures are ignored; INSIDE a transaction (kernel tx-bound stores) the
+ * error propagates — swallowing it would poison the Postgres transaction
+ * (every later statement fails 25P02) and misclassify the failure.
+ */
+async function tolerate<T>(
+  stores: AbuseStores,
+  fn: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  if (stores.isTransactional) return fn();
+  try {
+    return await fn();
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Poison-free link (Postgres rule: ANY failed statement aborts the whole
+ * transaction, so `create` + `catch P2002 and continue` corrupts every
+ * later statement with 25P02). `createMany + skipDuplicates` maps to
+ * ON CONFLICT DO NOTHING — unique races never throw, FK violations still
+ * do (the caller retries/aborts, which is correct).
+ */
+export async function linkUserWithClient(
+  db: Pick<AbuseDbClient, "abuseIdentityLink">,
+  identityId: string,
+  userId: string
+): Promise<void> {
+  await db.abuseIdentityLink.createMany({
+    data: [{ identityId, userId }],
+    skipDuplicates: true,
+  });
+}
+
+/**
+ * Poison-free usage init: insert-if-absent then read. Never
+ * catch-continues inside a transaction (see above).
+ */
+export async function initFreeUsageWithClient(
+  db: Pick<AbuseDbClient, "abuseFreeUsage">,
+  identityId: string,
+  period: string,
+  count: number
+): Promise<number> {
+  await db.abuseFreeUsage.createMany({
+    data: [{ identityId, period, count }],
+    skipDuplicates: true,
+  });
+  const row = await db.abuseFreeUsage.findUnique({
+    where: { identityId_period: { identityId, period } },
+    select: { count: true },
+  });
+  if (!row) throw new Error("FreeUsage row vanished after conflict");
+  return row.count;
+}
+
+/**
+ * Poison-free persistent rate take, safe inside and outside transactions.
+ * Protocol: fast conditional bump first; otherwise insert-if-absent with a
+ * count=0 sentinel (an unconsumed reservation — concurrent inserters agree
+ * via skipDuplicates), then exactly one claimant flips 0→1 while the rest
+ * fall through to the normal conditional increment. Every request consumes
+ * at most one unit; exactly `max` requests win per window.
+ */
+export async function rateTakeWithClient(
+  db: Pick<typeof prisma, "abuseRateBucket">,
+  scope: string,
+  keyHash: string,
+  max: number,
+  windowMs: number,
+  nowMs: number
+): Promise<boolean> {
+  if (max <= 0) return false;
+  const bumped = await db.abuseRateBucket.updateMany({
+    where: {
+      scope,
+      keyHash,
+      resetAt: { gt: new Date(nowMs) },
+      count: { lt: max },
+    },
+    data: { count: { increment: 1 } },
+  });
+  if (bumped.count > 0) return true;
+  await db.abuseRateBucket.createMany({
+    data: [{ scope, keyHash, count: 0, resetAt: new Date(nowMs + windowMs) }],
+    skipDuplicates: true,
+  });
+  const bucket = await db.abuseRateBucket.findUnique({
+    where: { scope_keyHash: { scope, keyHash } },
+    select: { id: true, count: true, resetAt: true },
+  });
+  if (!bucket) return true;
+  if (bucket.resetAt.getTime() <= nowMs) {
+    // Conditional reset: exactly one concurrent resetter wins the new
+    // window; losers fall through below and consume via the normal bump.
+    const reset = await db.abuseRateBucket.updateMany({
+      where: { id: bucket.id, resetAt: { lte: new Date(nowMs) } },
+      data: { count: 1, resetAt: new Date(nowMs + windowMs) },
+    });
+    if (reset.count > 0) return true;
+  }
+  if (bucket.count === 0) {
+    const claimed = await db.abuseRateBucket.updateMany({
+      where: { id: bucket.id, count: 0 },
+      data: { count: 1 },
+    });
+    if (claimed.count > 0) return true;
+  }
+  // Lost a race (or the row pre-existed): decide from a FRESH read so a
+  // window that expired mid-flight resets instead of wrongly denying.
+  const fresh = await db.abuseRateBucket.findUnique({
+    where: { scope_keyHash: { scope, keyHash } },
+    select: { id: true, count: true, resetAt: true },
+  });
+  if (!fresh) return true;
+  if (fresh.resetAt.getTime() <= nowMs) {
+    // Exactly one concurrent resetter wins the new window (conditional on
+    // the window still being expired); losers fall through to the bump
+    // below and consume normally instead of all returning true.
+    const reset = await db.abuseRateBucket.updateMany({
+      where: { id: fresh.id, resetAt: { lte: new Date(nowMs) } },
+      data: { count: 1, resetAt: new Date(nowMs + windowMs) },
+    });
+    if (reset.count > 0) return true;
+    const afterReset = await db.abuseRateBucket.findUnique({
+      where: { scope_keyHash: { scope, keyHash } },
+      select: { id: true, count: true, resetAt: true },
+    });
+    if (!afterReset) return true;
+    if (afterReset.resetAt.getTime() > nowMs && afterReset.count < max) {
+      const top = await db.abuseRateBucket.updateMany({
+        where: { id: afterReset.id, resetAt: { gt: new Date(nowMs) }, count: { lt: max } },
+        data: { count: { increment: 1 } },
+      });
+      return top.count > 0;
+    }
+    return false;
+  }
+  const top = await db.abuseRateBucket.updateMany({
+    where: { id: fresh.id, resetAt: { gt: new Date(nowMs) }, count: { lt: max } },
+    data: { count: { increment: 1 } },
+  });
+  return top.count > 0;
+}
+
+/**
+ * Merge body shared by the live store (wrapped in $transaction) and the
+ * atomic post kernel (already inside the caller's transaction — never
+ * nests). Idempotent: repeat merges find no loser rows and no-op. Usage
+ * carry is a conditional raise so racers cannot double it; risk settles at
+ * max via a conditional escalate-only update.
+ *
+ * Postgres rule: NO statement inside this body may fail-and-continue (any
+ * failed statement aborts the whole transaction with 25P02). All moves use
+ * violation-free primitives (updateMany re-pointing, insert-if-absent +
+ * conditional raise); residual microsecond races abort and are retried once
+ * by the live wrapper — the body is idempotent so retry is safe.
+ */
+export async function mergeIdentitiesWithClient(
+  db: Prisma.TransactionClient,
+  winnerId: string,
+  loserIds: string[]
+): Promise<void> {
+  const pruned = loserIds.filter((id) => id !== winnerId);
+  if (pruned.length === 0) return;
+  const risks = await db.abuseIdentity.findMany({
+    where: { id: { in: [winnerId, ...pruned] } },
+    select: { id: true, riskLevel: true, riskReason: true },
+  });
+  const winnerSignals = await db.abuseSignal.findMany({
+    where: { identityId: winnerId },
+    select: { kind: true, valueHash: true },
+  });
+  // Move links by re-pointing: a user owns at most one link row, so this
+  // can never violate uniqueness (already-moved rows match zero rows).
+  await db.abuseIdentityLink.updateMany({
+    where: { identityId: { in: pruned } },
+    data: { identityId: winnerId },
+  });
+  // Move signals by re-pointing: first drop loser rows whose value the
+  // winner already owns (global uniqueness), then re-point the rest.
+  if (winnerSignals.length > 0) {
+    await db.abuseSignal.deleteMany({
+      where: {
+        identityId: { in: pruned },
+        OR: winnerSignals.map((s) => ({ kind: s.kind, valueHash: s.valueHash })),
+      },
+    });
+  }
+  await db.abuseSignal.updateMany({
+    where: { identityId: { in: pruned } },
+    data: { identityId: winnerId },
+  });
+  await db.abuseIdentityLink.deleteMany({
+    where: { identityId: { in: pruned } },
+  });
+  // Atomic carry of consumed Free value: exclusively consume the losers'
+  // ledger rows (DELETE..RETURNING — exactly one concurrent merge can
+  // observe each row) and credit the winner with one atomic add
+  // (INSERT..ON CONFLICT-add commutes with concurrent quota claims).
+  // App-level read-modify-write here double-carries under concurrency
+  // (proven by PG test: 3+5+7 became 27). SUM semantics preserved: winner
+  // and losers counted disjoint user sets (3 + 12 carries 15, not 12).
+  const consumed = await db.$queryRaw<Array<{ period: string; count: number }>>(
+    Prisma.sql`DELETE FROM "AbuseFreeUsage" WHERE "identityId" IN (${Prisma.join(pruned)}) RETURNING period, count`
+  );
+  if (consumed.length > 0) {
+    const byPeriod = new Map<string, number>();
+    for (const row of consumed) {
+      byPeriod.set(row.period, (byPeriod.get(row.period) ?? 0) + row.count);
+    }
+    await db.$executeRaw(
+      Prisma.sql`INSERT INTO "AbuseFreeUsage" (id, "identityId", period, count, "createdAt", "updatedAt") VALUES ${Prisma.join(
+        [...byPeriod.entries()].map(
+          ([period, count]) =>
+            Prisma.sql`(${randomUUID()}, ${winnerId}, ${period}, ${count}, NOW(), NOW())`
+        )
+      )} ON CONFLICT ("identityId", period) DO UPDATE SET count = "AbuseFreeUsage".count + EXCLUDED.count, "updatedAt" = NOW()`
+    );
+  }
+  let top: AbuseRisk = "LOW";
+  let topReason: string | null = null;
+  for (const row of risks) {
+    if (ABUSE_RISK_RANK[row.riskLevel] > ABUSE_RISK_RANK[top]) {
+      top = row.riskLevel;
+      topReason = row.riskReason;
+    }
+  }
+  await db.abuseIdentity.deleteMany({
+    where: { id: { in: pruned } },
+  });
+  if (ABUSE_RISK_RANK[top] > 0) {
+    await db.abuseIdentity.updateMany({
+      where: {
+        id: winnerId,
+        ...(top === "ABUSE"
+          ? { riskLevel: { not: "ABUSE" } }
+          : top === "HIGH"
+            ? { riskLevel: { in: ["LOW", "MEDIUM"] } }
+            : { riskLevel: "LOW" }),
+      },
+      data: {
+        riskLevel: top,
+        riskReason: topReason ?? "preserved from merged identity",
+      },
+    });
+  }
+}
+
+/**
+ * Ledger-based identity floor shared by live stores and the atomic kernel:
+ * SUM(PostUsage.count) with the live post count as a legacy lower bound.
+ */
+export async function sumPostUsageWithClient(
+  db: Pick<typeof prisma, "post" | "postUsage">,
+  userIds: string[],
+  period: string,
+  monthStart: Date
+): Promise<number> {
+  if (userIds.length === 0) return 0;
+  const [ledgerRows, liveCount] = await Promise.all([
+    db.postUsage.findMany({
+      where: { userId: { in: userIds }, period },
+      select: { count: true },
+    }),
+    db.post.count({
+      where: { userId: { in: userIds }, createdAt: { gte: monthStart } },
+    }),
+  ]);
+  const ledgerSum = ledgerRows.reduce((sum, row) => sum + row.count, 0);
+  return Math.max(ledgerSum, liveCount);
+}
+
 /** Prisma-backed stores. All conflict paths are P2002-tolerant. */
-export const liveAbuseStores: AbuseStores = {
-  findSignalOwners: async (signals) => {
+export const liveAbuseStores: AbuseStores = {  findSignalOwners: async (signals) => {
     if (signals.length === 0) return [];
     const rows = await prisma.abuseSignal.findMany({
       where: {
@@ -943,22 +1671,8 @@ export const liveAbuseStores: AbuseStores = {
     });
     return row;
   },
-  linkUser: async (identityId, userId) => {
-    try {
-      await prisma.abuseIdentityLink.create({
-        data: { identityId, userId },
-      });
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        (error as { code?: string }).code === "P2002"
-      ) {
-        return;
-      }
-      throw error;
-    }
-  },
+  linkUser: async (identityId, userId) =>
+    linkUserWithClient(prisma, identityId, userId),
   findIdentityIdByUser: async (userId) => {
     const row = await prisma.abuseIdentityLink.findUnique({
       where: { userId },
@@ -986,7 +1700,11 @@ export const liveAbuseStores: AbuseStores = {
         skipDuplicates: true,
       });
     } catch (error) {
-      reportError("abuse", "signal attach failed", error, { identityId });
+      // P2003 (identity merged away mid-flight) is an expected race the
+      // caller recovers from by re-resolving — don't log it as an error.
+      if (prismaCode(error) !== "P2003") {
+        reportError("abuse", "signal attach failed", error, { identityId });
+      }
       throw error;
     }
   },
@@ -999,85 +1717,21 @@ export const liveAbuseStores: AbuseStores = {
     });
   },
   mergeIdentities: async (winnerId, loserIds) => {
-    if (loserIds.length === 0) return;
-    const [links, signals, loserUsage] = await Promise.all([
-      prisma.abuseIdentityLink.findMany({
-        where: { identityId: { in: loserIds } },
-        select: { userId: true },
-      }),
-      prisma.abuseSignal.findMany({
-        where: { identityId: { in: loserIds } },
-        select: { kind: true, valueHash: true },
-      }),
-      prisma.abuseFreeUsage.findMany({
-        where: { identityId: { in: loserIds } },
-        select: { period: true, count: true },
-      }),
-    ]);
-    for (const link of links) {
-      try {
-        await prisma.abuseIdentityLink.create({
-          data: { identityId: winnerId, userId: link.userId },
-        });
-      } catch {
-        // Already linked to the winner (or elsewhere): keep going.
-      }
+    const pruned = loserIds.filter((id) => id !== winnerId);
+    if (pruned.length === 0) return;
+    // Single transaction per attempt; exactly one retry for residual
+    // microsecond races (e.g. a concurrent attach landing the same signal
+    // on the winner between our read and re-point aborts the tx). The body
+    // is idempotent, so retry is safe and never doubles usage.
+    const run = () =>
+      prisma.$transaction((tx) =>
+        mergeIdentitiesWithClient(tx, winnerId, pruned)
+      );
+    try {
+      await run();
+    } catch {
+      await run();
     }
-    if (signals.length > 0) {
-      await prisma.abuseSignal.createMany({
-        data: signals.map((s) => ({
-          identityId: winnerId,
-          kind: s.kind,
-          valueHash: s.valueHash,
-          pepperVersion: 1,
-        })),
-        skipDuplicates: true,
-      });
-    }
-    await prisma.abuseSignal.deleteMany({
-      where: { identityId: { in: loserIds } },
-    });
-    await prisma.abuseIdentityLink.deleteMany({
-      where: { identityId: { in: loserIds } },
-    });
-    // Carry consumed Free value over as a SUM: winner and losers counted
-    // disjoint user sets, so adding preserves the true total while MAX
-    // would undercount (3 + 12 must carry 15, not 12).
-    for (const usage of loserUsage) {
-      const current = await prisma.abuseFreeUsage.findUnique({
-        where: {
-          identityId_period: { identityId: winnerId, period: usage.period },
-        },
-        select: { count: true },
-      });
-      const carried = (current?.count ?? 0) + usage.count;
-      if (current === null) {
-        await prisma.abuseFreeUsage.create({
-          data: {
-            identityId: winnerId,
-            period: usage.period,
-            count: carried,
-          },
-        });
-      } else if (current.count < carried) {
-        await prisma.abuseFreeUsage.updateMany({
-          where: {
-            identityId: winnerId,
-            period: usage.period,
-            count: { lt: carried },
-          },
-          data: { count: carried },
-        });
-      }
-    }
-    await prisma.abuseFreeUsage.deleteMany({
-      where: { identityId: { in: loserIds } },
-    });
-    await prisma.abuseIdentity.deleteMany({
-      where: { id: { in: loserIds } },
-    });
-    // Risk is re-evaluated by the caller from the merged user count —
-    // merges of one human's own signals (email + google + device) stay LOW.
   },
   getIdentity: async (identityId) => {
     const row = await prisma.abuseIdentity.findUnique({
@@ -1098,14 +1752,30 @@ export const liveAbuseStores: AbuseStores = {
       data: { riskLevel: level, riskReason: reason },
     });
   },
+  escalateRisk: async (identityId, level, reason) => {
+    // updateMany (not update): missing rows are a no-op, never P2025 —
+    // safe to call on identities racing deletion, in or out of tx.
+    // Predicates are escalate-only, so concurrent writers commute to max.
+    await prisma.abuseIdentity.updateMany({
+      where: {
+        id: identityId,
+        ...(level === "ABUSE"
+          ? { riskLevel: { not: "ABUSE" } }
+          : level === "HIGH"
+            ? { riskLevel: { in: ["LOW", "MEDIUM"] } }
+            : { riskLevel: "LOW" }),
+      },
+      data: { riskLevel: level, riskReason: reason },
+    });
+  },
   touchLinked: async (identityId, now) => {
-    await prisma.abuseIdentity.update({
+    await prisma.abuseIdentity.updateMany({
       where: { id: identityId },
       data: { lastSeenAt: now, lastLinkedAt: now },
     });
   },
   touchSeen: async (identityId, now) => {
-    await prisma.abuseIdentity.update({
+    await prisma.abuseIdentity.updateMany({
       where: { id: identityId },
       data: { lastSeenAt: now },
     });
@@ -1144,22 +1814,8 @@ export const liveAbuseStores: AbuseStores = {
     });
     return row?.count ?? null;
   },
-  initFreeUsage: async (identityId, period, count) => {
-    try {
-      const row = await prisma.abuseFreeUsage.create({
-        data: { identityId, period, count },
-        select: { count: true },
-      });
-      return row.count;
-    } catch {
-      const row = await prisma.abuseFreeUsage.findUnique({
-        where: { identityId_period: { identityId, period } },
-        select: { count: true },
-      });
-      if (!row) throw new Error("FreeUsage row vanished after conflict");
-      return row.count;
-    }
-  },
+  initFreeUsage: async (identityId, period, count) =>
+    initFreeUsageWithClient(prisma, identityId, period, count),
   incrementFreeIfBelow: async (identityId, period, limit) => {
     const updated = await prisma.abuseFreeUsage.updateMany({
       where: { identityId, period, count: { lt: limit } },
@@ -1173,52 +1829,18 @@ export const liveAbuseStores: AbuseStores = {
       data: { count: floor },
     });
   },
-  sumPostUsage: async (userIds, _period, monthStart) => {
-    if (userIds.length === 0) return 0;
-    const groups = await prisma.post.groupBy({
-      by: ["userId"],
-      where: {
-        userId: { in: userIds },
-        createdAt: { gte: monthStart },
-      },
-      _count: { _all: true },
-    });
-    return groups.reduce(
-      (sum, group) => sum + group._count._all,
-      0
-    );
+  sumPostUsage: async (userIds, period, monthStart) => {
+    return sumPostUsageWithClient(prisma, userIds, period, monthStart);
   },
-  rateTake: async (scope, keyHash, max, windowMs, nowMs) => {
-    try {
-      await prisma.abuseRateBucket.create({
-        data: { scope, keyHash, count: 1, resetAt: new Date(nowMs + windowMs) },
-      });
-      return true;
-    } catch {
-      const bucket = await prisma.abuseRateBucket.findUnique({
-        where: { scope_keyHash: { scope, keyHash } },
-        select: { id: true, count: true, resetAt: true },
-      });
-      if (!bucket) return true;
-      if (bucket.resetAt.getTime() <= nowMs) {
-        await prisma.abuseRateBucket.update({
-          where: { id: bucket.id },
-          data: { count: 1, resetAt: new Date(nowMs + windowMs) },
-        });
-        return true;
-      }
-      const updated = await prisma.abuseRateBucket.updateMany({
-        where: { id: bucket.id, count: { lt: max } },
-        data: { count: { increment: 1 } },
-      });
-      return updated.count > 0;
-    }
-  },
+  rateTake: async (scope, keyHash, max, windowMs, nowMs) =>
+    rateTakeWithClient(prisma, scope, keyHash, max, windowMs, nowMs),
 };
 
 /**
  * Best-effort gate for OAuth connect initiation: per-IP persistent bucket.
- * Fail-open (logs and allows) so abuse bookkeeping can never break login.
+ * Failure policy matches gateNewSocialLink: misconfiguration fails closed
+ * (deny), transient failures fail open (log + allow) so abuse bookkeeping
+ * can never break login. Post creation stays authoritative.
  */
 export async function gateOAuthInit(
   request: Request,
@@ -1242,7 +1864,74 @@ export async function gateOAuthInit(
       stores: liveAbuseStores,
     });
   } catch (error) {
+    if (isFailClosedAbuseError(error)) {
+      reportError("abuse", "oauth init gate misconfigured, denying", error);
+      return false;
+    }
     reportError("abuse", "oauth rate gate failed", error);
+    return true;
+  }
+}
+
+/**
+ * OAuth callback flood protection: dual buckets — per-IP (pre-auth
+ * attackers rotating accounts) and per-user (authenticated flood after
+ * initiation). Callbacks exchange codes server-side and create account
+ * rows, so initiation-only protection leaves a bypass. Limits are sized
+ * for the real flow (a handful of redirects per connect, retries on
+ * provider errors): 60/10m per IP, 30/10m per user. Fail-open on transient
+ * errors (the social-link gate + unique constraint still enforce
+ * ownership); fail-closed on misconfiguration.
+ */
+export const OAUTH_CALLBACK_IP_MAX = 60;
+export const OAUTH_CALLBACK_USER_MAX = 30;
+export const OAUTH_CALLBACK_WINDOW_MS = 10 * 60_000;
+
+export async function gateOAuthCallback(input: {
+  request: Request;
+  userId: string;
+  scopePrefix?: string;
+  stores?: AbuseStores;
+  pepper?: string;
+  nowMs?: number;
+  disabled?: boolean;
+}): Promise<boolean> {
+  try {
+    if (input.disabled ?? isAbuseDisabled()) return true;
+    const stores = input.stores ?? liveAbuseStores;
+    const pepper = input.pepper ?? getAbusePepper();
+    const nowMs = input.nowMs ?? Date.now();
+    const prefix = input.scopePrefix ?? "oauth-callback";
+    const ip = getClientIp(input.request);
+    if (ip) {
+      const ipAllowed = await checkAbuseRate({
+        scope: `${prefix}-ip`,
+        keyHash: hashRateKey([`${prefix}-ip`, ip, dayKey(nowMs)], pepper),
+        max: OAUTH_CALLBACK_IP_MAX,
+        windowMs: OAUTH_CALLBACK_WINDOW_MS,
+        stores,
+        nowMs,
+      });
+      if (!ipAllowed) return false;
+    }
+    return await checkAbuseRate({
+      scope: `${prefix}-user`,
+      keyHash: hashRateKey([`${prefix}-user`, input.userId], pepper),
+      max: OAUTH_CALLBACK_USER_MAX,
+      windowMs: OAUTH_CALLBACK_WINDOW_MS,
+      stores,
+      nowMs,
+    });
+  } catch (error) {
+    if (isFailClosedAbuseError(error)) {
+      reportError("abuse", "oauth callback gate misconfigured, denying", error, {
+        userId: input.userId,
+      });
+      return false;
+    }
+    reportError("abuse", "oauth callback gate failed", error, {
+      userId: input.userId,
+    });
     return true;
   }
 }
@@ -1289,9 +1978,19 @@ export type FreeGateResult =
 /**
  * Identity-level Free gate for post creation. Resolves the caller's
  * identity and claims one shared unit. Denials map onto the standard
- * 403 denial contract by the caller. Transient store failures degrade to
- * the PostUsage-only path (which still gates per user) — only a missing
- * migration or misconfiguration fails closed and loud.
+ * 403 denial contract by the caller.
+ *
+ * Failure policy (explicit split):
+ * - fail closed (throw loud): missing pepper / missing abuse tables
+ *   (P2021) — misconfiguration must never silently disable enforcement.
+ * - fail open (PostUsage-only fallback): transient store failures. The
+ *   per-user PostUsage ledger still gates, so legitimate users are not
+ *   blocked by an abuse-store blip.
+ *
+ * NOTE: the atomic post kernel (src/lib/free-post-kernel.ts) is the
+ * preferred Free path — it claims identity + per-user quota + insert in
+ * one transaction with no phantom consumption. This gate remains for
+ * pre-checks and non-transactional callers.
  */
 export async function enforceFreeIdentityGate(input: {
   userId: string;
@@ -1308,6 +2007,15 @@ export async function enforceFreeIdentityGate(input: {
   if (input.disabled ?? isAbuseDisabled()) {
     return { ok: true, identityId: null };
   }
+  // Misconfigured pepper must fail closed before any store access: an
+  // empty pepper would otherwise hash every signal identically.
+  if (!input.pepper || !input.pepper.trim()) {
+    const error = new Error("ABUSE_HASH_PEPPER is required in production");
+    reportError("abuse", "identity gate misconfigured", error, {
+      userId: input.userId,
+    });
+    throw error;
+  }
   try {
     const resolution = await resolveAbuseIdentity({
       userId: input.userId,
@@ -1317,6 +2025,10 @@ export async function enforceFreeIdentityGate(input: {
       nowMs: input.nowMs,
     });
     if (input.enforce && resolution.risk === "ABUSE") {
+      void recordAbuseEvent({
+        identityId: resolution.identityId,
+        kind: "POST_DENY",
+      });
       return { ok: false, code: "RESTRICTED" };
     }
     const linked = await input.stores.findUserIdsByIdentity(
@@ -1338,11 +2050,15 @@ export async function enforceFreeIdentityGate(input: {
         });
         return { ok: true, identityId: resolution.identityId };
       }
+      void recordAbuseEvent({
+        identityId: resolution.identityId,
+        kind: "POST_DENY",
+      });
       return { ok: false, code: "LIMIT", observed: claim.observed };
     }
     return { ok: true, identityId: resolution.identityId };
   } catch (error) {
-    if (isMissingTableError(error)) throw error;
+    if (isFailClosedAbuseError(error)) throw error;
     reportError(
       "abuse",
       "identity gate failed, PostUsage-only fallback",
@@ -1377,6 +2093,48 @@ export async function recordDisconnect(input: {
     await stores.removeSignals([signal]);
   } catch (error) {
     reportError("abuse", "disconnect tombstone failed", error, {
+      userId: input.userId,
+    });
+  }
+}
+
+/**
+ * Records an email change: the OLD address keeps its anti-abuse history
+ * explicitly. The old live signal is released (removed) so a future,
+ * unrelated owner of the recycled address does not silently merge into
+ * this live identity; a tombstone with the identity id remains as risk
+ * evidence, so re-registration with the old address still inherits
+ * consumed Free value (flagged MEDIUM) instead of minting fresh quota.
+ * Only hashes are stored — never the raw address. Best-effort.
+ */
+export async function recordEmailChange(input: {
+  userId: string;
+  oldEmail: string;
+  newEmail: string;
+  stores?: AbuseStores;
+  pepper?: string;
+}): Promise<void> {
+  try {
+    const stores = input.stores ?? liveAbuseStores;
+    const pepper = input.pepper ?? getAbusePepper();
+    if (
+      canonicalizeEmail(input.oldEmail) === canonicalizeEmail(input.newEmail)
+    ) {
+      return;
+    }
+    const oldSignal = emailSignal(input.oldEmail, pepper);
+    const identityId = await stores
+      .findIdentityIdByUser(input.userId)
+      .catch(() => null);
+    await stores.writeTombstones([{ ...oldSignal, identityId }]);
+    await stores.removeSignals([oldSignal]);
+    await resolveAbuseIdentity({
+      userId: input.userId,
+      signals: [emailSignal(input.newEmail, pepper)],
+      stores,
+    }).catch(() => null);
+  } catch (error) {
+    reportError("abuse", "email change tombstone failed", error, {
       userId: input.userId,
     });
   }

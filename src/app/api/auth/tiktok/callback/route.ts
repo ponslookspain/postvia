@@ -6,6 +6,7 @@ import { getEffectivePlan } from "@/lib/entitlements";
 import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
+  gateOAuthCallback,
   isPaidActivePlan,
 } from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
@@ -87,6 +88,12 @@ export async function GET(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return response("/accounts?error=invalid_session");
+    }
+
+    // Callback flood protection (initiation-only limits leave this path
+    // open): per-IP + per-user buckets.
+    if (!(await gateOAuthCallback({ request, userId: user.id }))) {
+      return response("/accounts?error=too_many_requests");
     }
 
     // Code exchange happens strictly server-side; the client secret never

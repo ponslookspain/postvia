@@ -1,0 +1,34 @@
+# Environment variables
+
+Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
+`src/lib/*.client config`, `.env.example`. `(src)` = read in app code.
+
+| Variable | Required | Env | Purpose | Sensitive |
+|---|---|---|---|---|
+| `DATABASE_URL_POSTGRES_PRISMA_URL` | yes | all | Prisma datasource (Neon pooled URL) | **yes** |
+| `BETTER_AUTH_SECRET` | yes | all | Better Auth signing secret (src) | **yes** |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | yes (auth) | all | Google OAuth (src) | **yes** |
+| `ADMIN_EMAILS` | no | prod | Admin allowlist CSV, `isAdminEmail` (src) | no |
+| `ABUSE_HASH_PEPPER` | prod yes | prod | Identity/rate hash pepper; missing ⇒ fail-closed (src) | **yes** |
+| `ABUSE_ENFORCEMENT` | no | all | `enforce` = deny, else observe; `off` = fully disabled (src). Default: observe | no |
+| `RESEND_API_KEY` | prod yes | prod | Verification mail; missing ⇒ throw prod / skip dev (src) | **yes** |
+| `EMAIL_FROM` / `EMAIL_REPLY_TO` | no | all | Sender overrides, default `hello@postvia.online` (src) | no |
+| `X_CLIENT_ID` / `X_CLIENT_SECRET` / `X_REDIRECT_URI` | yes (X) | all | X OAuth + PKCE (src) | **yes** |
+| `THREADS_APP_ID` / `THREADS_APP_SECRET` / `THREADS_REDIRECT_URI` | yes (Threads) | all | Threads OAuth (src) | **yes** |
+| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` / `TIKTOK_REDIRECT_URI` | yes (TikTok) | all | TikTok OAuth (src) | **yes** |
+| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` / `INSTAGRAM_REDIRECT_URI` | yes (Instagram) | all | Instagram OAuth (src) | **yes** |
+| `STRIPE_SECRET_KEY` | yes (billing) | per-env | Live keys prod, `sk_test_*` preview (src) | **yes** |
+| `STRIPE_WEBHOOK_SECRET` | yes (billing) | per-env | Webhook signature (src) | **yes** |
+| `STRIPE_PRICE_GROWTH` / `STRIPE_PRICE_SCALE` | yes (billing) | per-env | Test prices required for test mode (src) | no |
+| `CRON_SECRET` | prod yes | prod | Cron Bearer auth; missing ⇒ always 401 (src) | **yes** |
+| `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src) | **yes** |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | all | Error reporting; missing ⇒ console-only (src) | no |
+| `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | no | CI | Sourcemap upload | **yes** |
+| `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src) | no |
+| `THREADS_POLL_DELAY_MS` (+ `MAX_ATTEMPTS`, `TIMEOUT_MS`, `VIDEO_*`) | no | all | Threads publish polling tuning (src) | no |
+
+Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
+`VERCEL_PROJECT_PRODUCTION_URL`. `NODE_ENV` switches dev/prod defaults.
+`NEXT_RUNTIME` is branched in Blob code. Local-only: `DATABASE_URL`
+(example), `CRON_SECRET` dev value, `VERCEL_OIDC_TOKEN` (CLI auth).

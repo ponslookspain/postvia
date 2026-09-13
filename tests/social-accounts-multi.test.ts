@@ -605,6 +605,14 @@ function makeLinkStores() {
         row.riskReason = reason;
       }
     },
+    escalateRisk: async (identityId, level, reason) => {
+      const rank = { LOW: 0, MEDIUM: 1, HIGH: 2, ABUSE: 3 } as const;
+      const row = identities.get(identityId);
+      if (row && rank[row.riskLevel] < rank[level]) {
+        row.riskLevel = level;
+        row.riskReason = reason;
+      }
+    },
     touchLinked: async (identityId, now) => {
       const row = identities.get(identityId);
       if (row) row.lastLinkedAt = now;

@@ -7,11 +7,13 @@ import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
 import { resolveBaseURL } from "@/lib/base-url";
 import {
+  canonicalizeEmail,
   emailSignal,
   getAbusePepper,
   googleSignal,
   isDisposableEmail,
   liveAbuseStores,
+  recordEmailChange,
   resolveAbuseIdentity,
 } from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
@@ -66,6 +68,37 @@ async function trackGoogleLink(userId: string, googleSub: string): Promise<void>
   }
 }
 
+/**
+ * Releases the previous address before it is overwritten: the old hash
+ * keeps a tombstone (re-registration inherits consumed value, flagged),
+ * the live old signal is freed so an unrelated future owner of the
+ * recycled address does not silently merge into this live identity.
+ * Runs in update.before while the DB row still carries the old address.
+ */
+async function releaseOldEmail(
+  userId: string,
+  newEmail: string
+): Promise<void> {
+  try {
+    const current = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    if (!current?.email) return;
+    if (canonicalizeEmail(current.email) === canonicalizeEmail(newEmail)) {
+      return;
+    }
+    await recordEmailChange({
+      userId,
+      oldEmail: current.email,
+      newEmail,
+      stores: liveAbuseStores,
+    });
+  } catch (error) {
+    reportError("abuse", "release old email failed", error, { userId });
+  }
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   databaseHooks: {
@@ -94,6 +127,11 @@ export const auth = betterAuth({
           // address is refused before it is persisted.
           if (email && isDisposableEmail(email)) {
             return false;
+          }
+          // Release the previous address while the row still has it.
+          const record = user as unknown as Record<string, unknown>;
+          if (email && typeof record.id === "string") {
+            await releaseOldEmail(record.id, email);
           }
         },
         after: async (user) => {
