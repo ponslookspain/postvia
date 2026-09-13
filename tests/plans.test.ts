@@ -32,17 +32,17 @@ describe("plans", () => {
 
   test("entitlement table matches the product contract", () => {
     const free = getPlan("free").entitlements;
-    assert.equal(free.maxAccountsPerPlatform, 1);
+    assert.equal(free.maxTotalAccounts, 1);
     assert.equal(free.monthlyPosts, 15);
     assert.equal(free.maxBulkVideos, 0);
     assert.equal(free.bulk, false);
     assert.equal(free.calendar, true);
     const growth = getPlan("growth").entitlements;
-    assert.equal(growth.maxAccountsPerPlatform, 5);
+    assert.equal(growth.maxTotalAccounts, 5);
     assert.equal(growth.monthlyPosts, 300);
     assert.equal(growth.maxBulkVideos, 10);
     const scale = getPlan("scale").entitlements;
-    assert.equal(scale.maxAccountsPerPlatform, null);
+    assert.equal(scale.maxTotalAccounts, null);
     assert.equal(scale.monthlyPosts, null);
     assert.equal(scale.maxBulkVideos, 10);
   });

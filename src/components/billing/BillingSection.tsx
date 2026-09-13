@@ -41,6 +41,7 @@ export type BillingView = {
   postsUsed: number;
   postsLimit: number | null;
   totalAccounts: number;
+  accountsLimit: number | null;
   /** Checkout started, no authoritative subscription state yet — no paid grant. */
   checkoutPending: boolean;
   checkoutResult: "success" | "cancelled" | null;
@@ -74,11 +75,11 @@ function planFeatureRows(plan: Plan): string[] {
     e.monthlyPosts === null
       ? "Unlimited posts"
       : `${e.monthlyPosts} posts / month`,
-    e.maxAccountsPerPlatform === null
+    e.maxTotalAccounts === null
       ? "Unlimited accounts"
-      : e.maxAccountsPerPlatform === 1
-        ? "1 account / platform"
-        : `${e.maxAccountsPerPlatform} accounts / platform`,
+      : e.maxTotalAccounts === 1
+        ? "1 connected account"
+        : `${e.maxTotalAccounts} connected accounts`,
   ];
   if (e.calendar) rows.push("Calendar");
   if (e.bulk)
@@ -266,7 +267,9 @@ export function BillingSection({
                 <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
                   <dt className="text-muted-foreground">Connected accounts</dt>
                   <dd className="font-medium tabular-nums">
-                    {initial.totalAccounts}
+                    {initial.accountsLimit === null
+                      ? `${initial.totalAccounts} (unlimited)`
+                      : `${initial.totalAccounts} of ${initial.accountsLimit}`}
                   </dd>
                 </div>
                 <Separator />

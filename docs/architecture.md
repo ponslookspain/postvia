@@ -54,7 +54,7 @@ Sentry (error reporting), Vercel Cron (scheduler trigger).
 1. Route edge: `getApiUser`/`requireUser` on every authenticated surface.
 2. Ownership: every mutation re-scopes queries by `userId` (posts, accounts, media, settings).
 3. Entitlement: server-side `getEffectivePlan` + ledger checks; client UI only reflects denials.
-4. Anti-abuse: identity ledger (Free), per-platform account limits, OAuth rate buckets, unique DB constraints as the final arbiter.
+4. Anti-abuse: identity ledger (Free), global total account limits, OAuth rate buckets, unique DB constraints as the final arbiter.
 
 ## Transaction boundaries
 

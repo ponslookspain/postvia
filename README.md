@@ -90,8 +90,8 @@ composer changes.
 
 - Plans: Free ($0), Growth ($20), Scale ($50). Single source of truth:
   `src/lib/plans.ts` (prices, features, entitlements) — never duplicated.
-- Limits: Free `{1 account/platform, 15 posts/month, no bulk}`,
-  Growth `{5/platform, 300/month, 10-video bulk}`, Scale `{unlimited
+- Limits: Free `{1 account total, 15 posts/month, no bulk}`,
+  Growth `{5 accounts total, 300/month, 10-video bulk}`, Scale `{unlimited
   accounts/posts, 10-video bulk}`. Media limits stay global. Monthly quota
   counts created posts via an atomic ledger (`PostUsage`) — deleting a post
   never refills it, and concurrent creates on the last slot grant one
@@ -103,7 +103,7 @@ composer changes.
   Downgrades and expirations never delete data; only new actions are gated.
 - Enforcement lives in `src/lib/entitlements.ts` and is applied
   server-side: `POST /api/posts` (monthly quota → 403 `UPGRADE_REQUIRED`),
-  OAuth callbacks (per-platform account quota, reconnects exempt), retry +
+  OAuth callbacks (global total account quota, reconnects exempt), retry +
   reschedule PATCH, calendar page, bulk (plan cap + quota pre-check, with
   per-post server backstop). UI only reflects denials.
 - Test-mode billing API: `POST /api/billing/change` and

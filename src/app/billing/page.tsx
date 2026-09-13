@@ -90,6 +90,7 @@ export default async function BillingPage({
     postsUsed: usage.postsThisMonth,
     postsLimit: effective.entitlements.monthlyPosts,
     totalAccounts: usage.totalAccounts,
+    accountsLimit: effective.entitlements.maxTotalAccounts,
     checkoutPending,
     checkoutResult,
     hasBillingCustomer: !!subscription?.stripeCustomerId,

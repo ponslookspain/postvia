@@ -54,8 +54,8 @@ device cookie (`applyDeviceCookie`).
   query) → provider revoke (best-effort; Threads revoke is a documented
   no-op) → `recordDisconnect` (social tombstone + live signal release) →
   row delete.
-- Per-platform account limits come from entitlements (Free 1/platform,
-  Growth 5, Scale unlimited); reconnects never consume quota.
+- Global total account limits come from entitlements (Free 1 total,
+  Growth 5 total, Scale unlimited); reconnects never consume quota.
 
 ## Publishing primitives (`src/lib/social/*`)
 

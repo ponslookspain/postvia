@@ -7,9 +7,9 @@ import {
 /**
  * Race-safe SocialAccount creation shared by all OAuth callbacks.
  *
- * Multi-account model: one user may own many SocialAccount rows per
- * platform (distinct externalId each), bounded by
- * `entitlements.maxAccountsPerPlatform`. Reconnects (same
+ * Multi-account model: one user may own many SocialAccount rows across
+ * platforms (distinct externalId each), bounded by the GLOBAL total
+ * `entitlements.maxTotalAccounts` (COUNT WHERE userId). Reconnects (same
  * userId + platform + externalId) update in place and never consume quota.
  *
  * Two races are folded here so callbacks stay small:
@@ -19,9 +19,9 @@ import {
  *     `account_in_use` (another live user owns the pair).
  *  2. Concurrent fresh connects on the last free slot: check-then-create
  *     cannot be atomic without schema changes, so the just-created row is
- *     ranked oldest-first against the limit and the loser deletes its own
- *     row and reports `account_limit_reached`. Exactly one winner keeps
- *     the slot.
+ *     ranked oldest-first against the GLOBAL total limit and the loser
+ *     deletes its own row and reports `account_limit_reached`. Exactly one
+ *     winner keeps the slot.
  */
 
 export type SocialAccountData = {
@@ -63,16 +63,13 @@ export type SocialAccountStore = {
     platform: string,
     externalId: string
   ) => Promise<{ id: string } | null>;
-  countByPlatform: (userId: string, platform: string) => Promise<number>;
+  countTotal: (userId: string) => Promise<number>;
   create: (input: {
     userId: string;
     platform: string;
     data: SocialAccountData;
   }) => Promise<{ id: string }>;
-  listIdsByPlatformOldestFirst: (
-    userId: string,
-    platform: string
-  ) => Promise<string[]>;
+  listIdsOldestFirst: (userId: string) => Promise<string[]>;
   updateAccount: (id: string, data: SocialAccountData) => Promise<void>;
   deleteOwnById: (id: string, userId: string) => Promise<void>;
 };
@@ -87,18 +84,18 @@ export const liveSocialAccountStore: SocialAccountStore = {
       },
       select: { id: true },
     }),
-  countByPlatform: async (userId, platform) =>
+  countTotal: async (userId) =>
     prisma.socialAccount.count({
-      where: { userId, platform: platform as "X" },
+      where: { userId },
     }),
   create: async ({ userId, platform, data }) =>
     prisma.socialAccount.create({
       data: { userId, platform: platform as "X", ...data },
       select: { id: true },
     }),
-  listIdsByPlatformOldestFirst: async (userId, platform) => {
+  listIdsOldestFirst: async (userId) => {
     const rows = await prisma.socialAccount.findMany({
-      where: { userId, platform: platform as "X" },
+      where: { userId },
       select: { id: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
@@ -202,9 +199,9 @@ export async function createSocialAccountRaceSafe(input: {
     return { ok: true, reconnected: true, id: pre.id };
   }
 
-  // Fast-path limit check before the insert.
-  const count = await store.countByPlatform(input.userId, input.platform);
-  const gate = canConnectAccount(input.effective, input.platform, count);
+  // Fast-path limit check before the insert (global total per user).
+  const count = await store.countTotal(input.userId);
+  const gate = canConnectAccount(input.effective, count);
   if (!gate.ok) {
     return {
       ok: false,
@@ -234,17 +231,15 @@ export async function createSocialAccountRaceSafe(input: {
     return { ok: false, code: "account_in_use" };
   }
 
-  // Post-create rank enforcement: oldest-first wins the remaining slots,
-  // so concurrent inserts on the last slot grant exactly one winner.
-  const limit = input.effective.entitlements.maxAccountsPerPlatform;
+  // Post-create rank enforcement: oldest-first wins the remaining slots
+  // of the GLOBAL total, so concurrent inserts on the last slot grant
+  // exactly one winner.
+  const limit = input.effective.entitlements.maxTotalAccounts;
   if (!input.effective.bypass && limit !== null) {
-    const ids = await store.listIdsByPlatformOldestFirst(
-      input.userId,
-      input.platform
-    );
+    const ids = await store.listIdsOldestFirst(input.userId);
     if (!createdRowKeepsSlot(ids, id, limit)) {
       await store.deleteOwnById(id, input.userId);
-      const denial = canConnectAccount(input.effective, input.platform, limit);
+      const denial = canConnectAccount(input.effective, limit);
       return {
         ok: false,
         code: "account_limit_reached",

@@ -2,7 +2,7 @@
 
 ## Plans (`src/lib/plans.ts` — single source of truth)
 
-| Plan | Price | Accounts/platform | Posts/month | Bulk |
+| Plan | Price | Accounts (total) | Posts/month | Bulk |
 |---|---|---|---|---|
 | Free | $0 | 1 | 15 | no |
 | Growth | $20 | 5 | 300 | ≤10 videos |

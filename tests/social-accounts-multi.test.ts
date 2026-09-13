@@ -71,8 +71,8 @@ function makeAccountStore() {
       );
       return row ? { id: row.id } : null;
     },
-    countByPlatform: async (userId, platform) =>
-      rows.filter((r) => r.userId === userId && r.platform === platform).length,
+    countTotal: async (userId) =>
+      rows.filter((r) => r.userId === userId).length,
     create: async ({ userId, platform, data }) => {
       if (
         rows.some(
@@ -98,10 +98,8 @@ function makeAccountStore() {
       rows.push(row);
       return { id: row.id };
     },
-    listIdsByPlatformOldestFirst: async (userId, platform) =>
-      rows
-        .filter((r) => r.userId === userId && r.platform === platform)
-        .map((r) => r.id),
+    listIdsOldestFirst: async (userId) =>
+      rows.filter((r) => r.userId === userId).map((r) => r.id),
     updateAccount: async (id, data) => {
       const row = rows.find((r) => r.id === id);
       if (!row) throw new Error("missing");
@@ -245,7 +243,7 @@ describe("Threads multi-account limits", () => {
     assert.equal(rows[0].data.username, "alice-renamed");
   });
 
-  test("limits are per platform: Threads full does not block X", async () => {
+  test("limits are global total: Threads full blocks X on free", async () => {
     const { store } = makeAccountStore();
     await createSocialAccountRaceSafe({
       userId: "u1",
@@ -263,7 +261,206 @@ describe("Threads multi-account limits", () => {
       effective: effective("free"),
       store,
     });
-    assert.equal(x.ok, true);
+    assert.equal(x.ok, false);
+    assert.equal((x as { code?: string }).code, "account_limit_reached");
+  });
+
+  test("free + X blocks Threads (reverse direction)", async () => {
+    const { store } = makeAccountStore();
+    await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "X",
+      externalId: "x1",
+      data: accountData("x1", "alice-x"),
+      effective: effective("free"),
+      store,
+    });
+    const threads = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "THREADS",
+      externalId: "t1",
+      data: accountData("t1", "alice"),
+      effective: effective("free"),
+      store,
+    });
+    assert.equal(threads.ok, false);
+  });
+
+  test("free + Instagram blocks TikTok", async () => {
+    const { store } = makeAccountStore();
+    await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "INSTAGRAM",
+      externalId: "i1",
+      data: accountData("i1", "alice-ig"),
+      effective: effective("free"),
+      store,
+    });
+    const tiktok = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "TIKTOK",
+      externalId: "k1",
+      data: accountData("k1", "alice-tt"),
+      effective: effective("free"),
+      store,
+    });
+    assert.equal(tiktok.ok, false);
+  });
+
+  test("free disconnect frees the single total slot", async () => {
+    const { store, rows } = makeAccountStore();
+    const first = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "THREADS",
+      externalId: "t1",
+      data: accountData("t1", "alice"),
+      effective: effective("free"),
+      store,
+    });
+    assert.equal(first.ok, true);
+    if (first.ok) await store.deleteOwnById(first.id, "u1");
+    assert.equal(rows.length, 0);
+    const next = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "X",
+      externalId: "x1",
+      data: accountData("x1", "alice-x"),
+      effective: effective("free"),
+      store,
+    });
+    assert.equal(next.ok, true);
+    assert.equal(rows.length, 1);
+  });
+});
+
+describe("growth global total across platforms", () => {
+  async function fill(
+    store: SocialAccountStore,
+    plan: "free" | "growth" | "scale",
+    specs: { platform: string; externalId: string }[]
+  ) {
+    for (const spec of specs) {
+      const result = await createSocialAccountRaceSafe({
+        userId: "u1",
+        platform: spec.platform,
+        externalId: spec.externalId,
+        data: accountData(spec.externalId, `user-${spec.externalId}`),
+        effective: effective(plan),
+        store,
+      });
+      assert.equal(result.ok, true);
+    }
+  }
+
+  test("growth: Threads x3 + X x1 + Instagram x1 = 5 allowed", async () => {
+    const { store, rows } = makeAccountStore();
+    await fill(store, "growth", [
+      { platform: "THREADS", externalId: "t1" },
+      { platform: "THREADS", externalId: "t2" },
+      { platform: "THREADS", externalId: "t3" },
+      { platform: "X", externalId: "x1" },
+      { platform: "INSTAGRAM", externalId: "i1" },
+    ]);
+    assert.equal(rows.length, 5);
+  });
+
+  test("growth: 3+1+1 then TikTok denied as sixth", async () => {
+    const { store } = makeAccountStore();
+    await fill(store, "growth", [
+      { platform: "THREADS", externalId: "t1" },
+      { platform: "THREADS", externalId: "t2" },
+      { platform: "THREADS", externalId: "t3" },
+      { platform: "X", externalId: "x1" },
+      { platform: "INSTAGRAM", externalId: "i1" },
+    ]);
+    const sixth = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "TIKTOK",
+      externalId: "k1",
+      data: accountData("k1", "user-k1"),
+      effective: effective("growth"),
+      store,
+    });
+    assert.equal(sixth.ok, false);
+    assert.equal((sixth as { code?: string }).code, "account_limit_reached");
+  });
+
+  test("growth: X x2 + Threads x2 + Instagram x1 = 5, sixth denied", async () => {
+    const { store, rows } = makeAccountStore();
+    await fill(store, "growth", [
+      { platform: "X", externalId: "x1" },
+      { platform: "X", externalId: "x2" },
+      { platform: "THREADS", externalId: "t1" },
+      { platform: "THREADS", externalId: "t2" },
+      { platform: "INSTAGRAM", externalId: "i1" },
+    ]);
+    assert.equal(rows.length, 5);
+    const sixth = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "TIKTOK",
+      externalId: "k1",
+      data: accountData("k1", "user-k1"),
+      effective: effective("growth"),
+      store,
+    });
+    assert.equal(sixth.ok, false);
+  });
+
+  test("growth: 4 total then fifth on any platform allowed", async () => {
+    const { store, rows } = makeAccountStore();
+    await fill(store, "growth", [
+      { platform: "THREADS", externalId: "t1" },
+      { platform: "X", externalId: "x1" },
+      { platform: "INSTAGRAM", externalId: "i1" },
+      { platform: "TIKTOK", externalId: "k1" },
+    ]);
+    const fifth = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "X",
+      externalId: "x2",
+      data: accountData("x2", "user-x2"),
+      effective: effective("growth"),
+      store,
+    });
+    assert.equal(fifth.ok, true);
+    assert.equal(rows.length, 5);
+  });
+
+  test("growth: reconnect at the total limit stays allowed", async () => {
+    const { store, rows } = makeAccountStore();
+    await fill(store, "growth", [
+      { platform: "THREADS", externalId: "t1" },
+      { platform: "THREADS", externalId: "t2" },
+      { platform: "THREADS", externalId: "t3" },
+      { platform: "X", externalId: "x1" },
+      { platform: "INSTAGRAM", externalId: "i1" },
+    ]);
+    const reconnect = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "THREADS",
+      externalId: "t1",
+      data: { ...accountData("t1", "renamed"), accessToken: "new-token" },
+      effective: effective("growth"),
+      store,
+    });
+    assert.equal(reconnect.ok, true);
+    assert.equal((reconnect as { reconnected?: boolean }).reconnected, true);
+    assert.equal(rows.length, 5);
+  });
+
+  test("scale: arbitrary mixed-platform total allowed", async () => {
+    const { store, rows } = makeAccountStore();
+    await fill(store, "scale", [
+      { platform: "THREADS", externalId: "t1" },
+      { platform: "THREADS", externalId: "t2" },
+      { platform: "THREADS", externalId: "t3" },
+      { platform: "X", externalId: "x1" },
+      { platform: "X", externalId: "x2" },
+      { platform: "INSTAGRAM", externalId: "i1" },
+      { platform: "TIKTOK", externalId: "k1" },
+      { platform: "TIKTOK", externalId: "k2" },
+    ]);
+    assert.equal(rows.length, 8);
   });
 });
 
@@ -308,11 +505,11 @@ describe("race conditions on connect", () => {
 
   test("concurrent fresh connects on the last free slot grant exactly one winner", async () => {
     const { store, rows } = makeAccountStore();
-    // Both racers observe a stale count of 0; both inserts land; the
-    // oldest-first rank keeps exactly one of them.
+    // Both racers observe a stale total count of 0; both inserts land; the
+    // oldest-first global rank keeps exactly one of them.
     const staleCount: SocialAccountStore = {
       ...store,
-      countByPlatform: async () => 0,
+      countTotal: async () => 0,
     };
     const [a, b] = await Promise.all([
       createSocialAccountRaceSafe({
@@ -341,6 +538,83 @@ describe("race conditions on connect", () => {
       "account_limit_reached"
     );
     assert.equal(rows.length, 1);
+  });
+
+  test("concurrent Threads + X connects on free keep total <= 1", async () => {
+    const { store, rows } = makeAccountStore();
+    const staleCount: SocialAccountStore = {
+      ...store,
+      countTotal: async () => 0,
+    };
+    const [a, b] = await Promise.all([
+      createSocialAccountRaceSafe({
+        userId: "u1",
+        platform: "THREADS",
+        externalId: "t1",
+        data: accountData("t1", "threads-user"),
+        effective: effective("free"),
+        store: staleCount,
+      }),
+      createSocialAccountRaceSafe({
+        userId: "u1",
+        platform: "X",
+        externalId: "x1",
+        data: accountData("x1", "x-user"),
+        effective: effective("free"),
+        store: staleCount,
+      }),
+    ]);
+    const winners = [a, b].filter((r) => r.ok);
+    assert.equal(winners.length, 1);
+    assert.equal(rows.length, 1);
+  });
+
+  test("concurrent two-account connect at growth 4 keeps total <= 5", async () => {
+    const { store, rows } = makeAccountStore();
+    for (const [platform, externalId] of [
+      ["THREADS", "t1"],
+      ["THREADS", "t2"],
+      ["X", "x1"],
+      ["INSTAGRAM", "i1"],
+    ] as const) {
+      const seeded = await createSocialAccountRaceSafe({
+        userId: "u1",
+        platform,
+        externalId,
+        data: accountData(externalId, `user-${externalId}`),
+        effective: effective("growth"),
+        store,
+      });
+      assert.equal(seeded.ok, true);
+    }
+    assert.equal(rows.length, 4);
+    // Both racers observe a stale total of 4; both inserts land; the
+    // global oldest-first rank keeps exactly one of them.
+    const staleCount: SocialAccountStore = {
+      ...store,
+      countTotal: async () => 4,
+    };
+    const [a, b] = await Promise.all([
+      createSocialAccountRaceSafe({
+        userId: "u1",
+        platform: "TIKTOK",
+        externalId: "k1",
+        data: accountData("k1", "tt-1"),
+        effective: effective("growth"),
+        store: staleCount,
+      }),
+      createSocialAccountRaceSafe({
+        userId: "u1",
+        platform: "X",
+        externalId: "x2",
+        data: accountData("x2", "x-2"),
+        effective: effective("growth"),
+        store: staleCount,
+      }),
+    ]);
+    const winners = [a, b].filter((r) => r.ok);
+    assert.equal(winners.length, 1);
+    assert.equal(rows.length, 5);
   });
 
   test("same externalId owned by another live user maps to account_in_use", async () => {

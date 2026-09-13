@@ -323,7 +323,7 @@ export function resolveEffectiveFromRows(input: {
 /** Bypass grants everything without touching any plan row. */
 function unlimitedEntitlements(): PlanEntitlements {
   return {
-    maxAccountsPerPlatform: null,
+    maxTotalAccounts: null,
     monthlyPosts: null,
     maxBulkVideos: Number.MAX_SAFE_INTEGER,
     calendar: true,
@@ -549,16 +549,15 @@ export const liveQuotaStore: QuotaClaimStore = {
 
 export function canConnectAccount(
   eff: EffectiveSubscription,
-  platform: string,
-  currentCountForPlatform: number
+  currentTotalAccounts: number
 ): Check {
   if (eff.bypass) return { ok: true };
-  const limit = eff.entitlements.maxAccountsPerPlatform;
+  const limit = eff.entitlements.maxTotalAccounts;
   if (limit === null) return { ok: true };
-  if (currentCountForPlatform < limit) return { ok: true };
+  if (currentTotalAccounts < limit) return { ok: true };
   return upgradeDenial(
     eff.plan,
-    `Account limit reached for this platform (${currentCountForPlatform}/${limit}).`
+    `Account limit reached (${currentTotalAccounts}/${limit} connected accounts).`
   );
 }
 
@@ -645,23 +644,22 @@ export function isKnownPlanId(value: unknown): value is PlanId {
 }
 
 /**
- * Server gate for OAuth connect callbacks. Counts existing accounts on the
- * platform and checks the entitlement — reconnects (existing row found by
- * the caller) skip this entirely and never consume quota.
+ * Server gate for OAuth connect callbacks. Counts all connected accounts
+ * of the user (global total) and checks the entitlement — reconnects
+ * (existing row found by the caller) skip this entirely and never consume
+ * quota.
  */
 export async function assertCanConnectAccount(input: {
   userId: string;
   userEmail?: string | null;
-  platform: string;
 }): Promise<Check> {
   const [effective, count] = await Promise.all([
     getEffectivePlan({ userId: input.userId, userEmail: input.userEmail }),
     prisma.socialAccount.count({
       where: {
         userId: input.userId,
-        platform: input.platform as "X",
       },
     }),
   ]);
-  return canConnectAccount(effective, input.platform, count);
+  return canConnectAccount(effective, count);
 }

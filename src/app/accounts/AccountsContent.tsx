@@ -101,7 +101,7 @@ function getSearchParamMessage(searchParams: URLSearchParams): {
     if (error === "account_limit_reached") {
       const upgradeTo = searchParams.get("upgradeTo");
       return {
-        text: "Account limit reached for this platform on your current plan.",
+        text: "Account limit reached for connected accounts on your current plan.",
         error: true,
         upgradeTo: parsePlanParam(upgradeTo),
       };
@@ -141,13 +141,16 @@ export default function AccountsContent({
   tiktokAccounts: initialTiktokAccounts,
   instagramAccounts: initialInstagramAccounts,
   accountsLimit,
+  totalAccounts: initialTotalAccounts,
 }: {
   xAccounts: PlatformAccount[];
   threadsAccounts: PlatformAccount[];
   tiktokAccounts: PlatformAccount[];
   instagramAccounts: PlatformAccount[];
-  /** Max accounts per platform on the current plan (null = unlimited). */
+  /** Max connected social accounts in total on the current plan (null = unlimited). */
   accountsLimit: number | null;
+  /** Connected accounts in total across all platforms (server-rendered). */
+  totalAccounts: number;
 }) {
   const searchParams = useSearchParams();
   const [multiAccounts, setMultiAccounts] = useState<
@@ -231,10 +234,15 @@ export default function AccountsContent({
     await runDisconnectMulti(pending.config, pending.account);
   }
 
-  function limitLabel(count: number): string {
+  function totalLabel(): string {
+    const liveTotal = Object.values(multiAccounts).reduce(
+      (sum, list) => sum + list.length,
+      0
+    );
+    const total = Math.max(initialTotalAccounts, liveTotal);
     return accountsLimit === null
-      ? `${count} of unlimited accounts`
-      : `${count} of ${accountsLimit} accounts`;
+      ? `${total} connected accounts (unlimited)`
+      : `${total} of ${accountsLimit} connected accounts`;
   }
 
   return (
@@ -243,6 +251,9 @@ export default function AccountsContent({
         title="Connected accounts"
         description="Choose where your posts go. Connect a profile on each channel to publish to it."
       />
+      <p className="mb-4 text-xs text-muted-foreground tabular-nums">
+        {totalLabel()}
+      </p>
 
       {message?.error ? (
         <ErrorBlock
@@ -251,7 +262,7 @@ export default function AccountsContent({
           action={
             message.upgradeTo ? (
               <UpgradeCta
-                reason="Upgrade to connect more accounts on this platform."
+                reason="Upgrade to connect more accounts."
                 upgradeTo={parsePlanParam(message.upgradeTo)}
                 compact
               />
@@ -310,11 +321,6 @@ export default function AccountsContent({
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col gap-3">
-                  {config.multi && connected && (
-                    <p className="text-xs text-muted-foreground tabular-nums">
-                      {limitLabel(accounts.length)}
-                    </p>
-                  )}
                   {connected ? (
                     <ul className="flex flex-col gap-2">
                       {accounts.map((account) => {

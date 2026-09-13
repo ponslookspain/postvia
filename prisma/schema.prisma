@@ -432,5 +432,6 @@ model SocialAccount {
 
   @@unique([userId, platform, externalId])
   @@unique([platform, externalId])
+  @@index([userId])
   @@index([userId, platform])
 }

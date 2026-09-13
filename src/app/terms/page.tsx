@@ -120,7 +120,7 @@ export default function TermsPage() {
           </li>
         </ul>
         <p>
-          The number of accounts you may connect per platform is subject to
+          The number of accounts you may connect in total is subject to
           your plan (see section 20). You can disconnect any connected
           account at any time from the Accounts page. You are responsible
           for the social accounts you connect and for complying with each
@@ -422,7 +422,7 @@ export default function TermsPage() {
           Postvia offers Free, Growth, and Scale plans that differ by usage
           limits &mdash; currently the number of posts you can create per
           calendar month (Free: 15, Growth: 300, Scale: unlimited), the
-          number of connected accounts per platform (Free: 1, Growth: 5,
+          number of connected accounts in total (Free: 1, Growth: 5,
           Scale: unlimited), and access to bulk video scheduling (Growth and
           Scale, up to 10 videos per batch). New accounts start on the Free
           plan.

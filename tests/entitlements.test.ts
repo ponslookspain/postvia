@@ -174,17 +174,17 @@ describe("free 15 post quota", () => {
   });
 });
 
-describe("account quota", () => {
-  test("free allows one per platform, second needs growth", () => {
-    assert.deepEqual(canConnectAccount(eff("free"), "THREADS", 0), { ok: true });
-    const denied = canConnectAccount(eff("free"), "THREADS", 1);
+describe("account quota (global total per user)", () => {
+  test("free allows one total account, second on any platform needs growth", () => {
+    assert.deepEqual(canConnectAccount(eff("free"), 0), { ok: true });
+    const denied = canConnectAccount(eff("free"), 1);
     assert.equal(denied.ok, false);
     if (!denied.ok) assert.equal(denied.upgradeTo, "growth");
   });
-  test("growth allows five, scale unlimited", () => {
-    assert.deepEqual(canConnectAccount(eff("growth"), "THREADS", 4), { ok: true });
-    assert.equal(canConnectAccount(eff("growth"), "THREADS", 5).ok, false);
-    assert.deepEqual(canConnectAccount(eff("scale"), "X", 99), { ok: true });
+  test("growth allows five total, sixth denied; scale unlimited", () => {
+    assert.deepEqual(canConnectAccount(eff("growth"), 4), { ok: true });
+    assert.equal(canConnectAccount(eff("growth"), 5).ok, false);
+    assert.deepEqual(canConnectAccount(eff("scale"), 99), { ok: true });
   });
 });
 
@@ -229,7 +229,7 @@ describe("admin bypass", () => {
   const bypass = eff("scale", { bypass: true, source: "admin-override" });
   test("bypass allows everything", () => {
     assert.deepEqual(canCreatePost(bypass, usage(9999)), { ok: true });
-    assert.deepEqual(canConnectAccount(bypass, "X", 99), { ok: true });
+    assert.deepEqual(canConnectAccount(bypass, 99), { ok: true });
     assert.deepEqual(canBulkSchedule(bypass, 500), { ok: true });
     assert.equal(getRemainingQuota(bypass, usage(9999)).postsLeft, null);
   });
@@ -291,21 +291,21 @@ describe("admin plan enforcement", () => {
     const resolved = enforced("FREE");
     assert.equal(resolved.plan, "free");
     assert.equal(resolved.bypass, false);
-    assert.equal(canConnectAccount(resolved, "THREADS", 1).ok, false);
+    assert.equal(canConnectAccount(resolved, 1).ok, false);
     assert.equal(canCreatePost(resolved, usage(15)).ok, false);
     assert.equal(canBulkSchedule(resolved, 1).ok, false);
   });
   test("GROWTH enforcement behaves like growth", () => {
     const resolved = enforced("GROWTH");
     assert.equal(resolved.plan, "growth");
-    assert.deepEqual(canConnectAccount(resolved, "THREADS", 1), { ok: true });
+    assert.deepEqual(canConnectAccount(resolved, 1), { ok: true });
     assert.deepEqual(canBulkSchedule(resolved, 10), { ok: true });
     assert.equal(canCreatePost(resolved, usage(300)).ok, false);
   });
   test("SCALE enforcement behaves like scale", () => {
     const resolved = enforced("SCALE");
     assert.deepEqual(canCreatePost(resolved, usage(9999)), { ok: true });
-    assert.deepEqual(canConnectAccount(resolved, "X", 99), { ok: true });
+    assert.deepEqual(canConnectAccount(resolved, 99), { ok: true });
   });
   test("admin cancellation simulation keeps access until the end", () => {
     const future = new Date(NOW + 5 * DAY);

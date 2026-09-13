@@ -41,7 +41,7 @@ const faqs: { question: string; answer: React.ReactNode }[] = [
   {
     question: "Can I connect multiple accounts?",
     answer:
-      "Yes, including several handles on the same platform where supported. Each account can be reconnected or disconnected independently.",
+      "Yes, up to your plan's total limit (Free: 1, Growth: 5, Scale: unlimited), including several handles on the same platform where supported. Each account can be reconnected or disconnected independently.",
   },
   {
     question: "How does media storage work?",

@@ -14,8 +14,8 @@
 export type PlanId = "free" | "growth" | "scale";
 
 export type PlanEntitlements = {
-  /** Max connected social accounts per platform (null = unlimited). */
-  maxAccountsPerPlatform: number | null;
+  /** Max connected social accounts in total per user (null = unlimited). */
+  maxTotalAccounts: number | null;
   /** Posts creatable per calendar month (null = unlimited). */
   monthlyPosts: number | null;
   /** Max videos per bulk batch (0 = bulk disabled). */
@@ -47,10 +47,10 @@ export const PLANS: Plan[] = [
       "Publish to Instagram, Threads, TikTok and X",
       "Schedule posts ahead",
       "Per-platform previews",
-      "1 connected account per platform",
+      "1 connected account",
     ],
     entitlements: {
-      maxAccountsPerPlatform: 1,
+      maxTotalAccounts: 1,
       monthlyPosts: 15,
       maxBulkVideos: 0,
       calendar: true,
@@ -68,12 +68,12 @@ export const PLANS: Plan[] = [
       "Everything in Free",
       "Visual content calendar",
       "Bulk video scheduling up to 10 videos",
-      "Multiple accounts per platform",
+      "Up to 5 connected accounts",
       "Retry and reschedule controls",
     ],
     highlighted: true,
     entitlements: {
-      maxAccountsPerPlatform: 5,
+      maxTotalAccounts: 5,
       monthlyPosts: 300,
       maxBulkVideos: 10,
       calendar: true,
@@ -94,7 +94,7 @@ export const PLANS: Plan[] = [
       "All current and future platforms",
     ],
     entitlements: {
-      maxAccountsPerPlatform: null,
+      maxTotalAccounts: null,
       monthlyPosts: null,
       maxBulkVideos: 10,
       calendar: true,
