@@ -36,9 +36,10 @@ export function MobileComposerBar({
       <div className="flex gap-2 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Button
           variant="outline"
+          size="lg"
           onClick={onSaveDraft}
           disabled={!canSave}
-          className="flex-1"
+          className="min-h-11 flex-1"
           aria-label={saving ? "Saving draft" : "Save draft"}
         >
           {saving && <Spinner data-icon="inline-start" />}
@@ -47,6 +48,7 @@ export function MobileComposerBar({
         </Button>
         <Button
           variant="outline"
+          size="lg"
           onClick={onScheduleClick}
           disabled={scheduling}
           title={
@@ -54,16 +56,17 @@ export function MobileComposerBar({
               ? "Scheduling for X is not available yet. Use Threads."
               : "Schedule this post"
           }
-          className="flex-1"
+          className="min-h-11 flex-1"
           aria-label={scheduling ? "Scheduling post" : "Schedule post"}
         >
           <CalendarClockIcon data-icon="inline-start" />
           {scheduling ? "..." : "Schedule"}
         </Button>
         <Button
+          size="lg"
           onClick={onPublish}
           disabled={!canPublish}
-          className="flex-1"
+          className="min-h-11 flex-1"
           aria-label={publishing ? "Publishing post" : "Publish post now"}
         >
           {publishing && <Spinner data-icon="inline-start" />}

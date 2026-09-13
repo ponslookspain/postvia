@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSessionUser } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import {
   getEffectivePlan,
@@ -56,16 +57,16 @@ export default async function BillingPage() {
 
   return (
     <AppShell user={user}>
-      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
+      <PageContainer>
         <PageHeader
           title="Billing"
-          description="Your plan, usage and subscription status"
+          description="Your plan, usage and subscription"
         />
-        <div className="flex flex-col gap-10">
+        <PageSections>
           <BillingSection initial={billing} canChangePlan={isAdmin} />
           {isAdmin && <AdminBillingPanel />}
-        </div>
-      </div>
+        </PageSections>
+      </PageContainer>
     </AppShell>
   );
 }

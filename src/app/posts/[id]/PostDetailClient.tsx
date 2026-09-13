@@ -15,11 +15,19 @@ import {
   localTimeInputValue,
 } from "@/lib/schedule";
 import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -35,9 +43,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import { Separator } from "@/components/ui/separator";
-import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 
 interface Post {
@@ -415,7 +421,7 @@ export default function PostDetailPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-4 md:p-8">
+    <PageContainer>
       <PageHeader
         title="Post"
         description={`Created ${new Date(post.createdAt).toLocaleDateString(
@@ -433,201 +439,228 @@ export default function PostDetailPage({
         </Alert>
       )}
 
-      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0 animate-[post-in_.45s_ease_both] motion-reduce:animate-none">
-          {editing ? (
-            <FieldGroup>
-              <Field data-invalid={isOverLimit || undefined}>
-                <FieldLabel htmlFor="post-text" className="sr-only">
-                  Post text
-                </FieldLabel>
-                <Textarea
-                  id="post-text"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  rows={5}
-                  aria-invalid={isOverLimit || undefined}
-                />
-                <div className="flex items-center justify-between gap-2">
-                  <FieldDescription>
-                    Platform: {formatPlatformName(platform)}
-                  </FieldDescription>
-                  <Badge
-                    variant={isOverLimit ? "destructive" : "secondary"}
-                  >
-                    {charCount} / {charLimit}
-                  </Badge>
-                </div>
-                {isOverLimit && (
-                  <FieldError>
-                    Post exceeds the {charLimit} character limit
-                  </FieldError>
-                )}
-              </Field>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button onClick={() => void handleSave()} disabled={!canSave}>
-                  {saving && <Spinner data-icon="inline-start" />}
-                  {saving ? "Saving..." : "Save changes"}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setEditing(false);
-                    setText(post.text);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </FieldGroup>
-          ) : (
-            <>
-              {post.media.length > 0 && (
-                <MediaHero
-                  media={post.media}
-                  selectedId={selectedMediaId}
-                  onSelect={setSelectedMediaId}
-                  deletingMediaId={deletingMediaId}
-                  onRemove={(mediaId) => void handleDeleteMedia(mediaId)}
-                />
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <Card className="min-w-0">
+          <CardContent className="flex flex-col gap-5">
+            <div className="animate-[post-in_.45s_ease_both] motion-reduce:animate-none">
+              {editing ? (
+                <FieldGroup>
+                  <Field data-invalid={isOverLimit || undefined}>
+                    <FieldLabel htmlFor="post-text" className="sr-only">
+                      Post text
+                    </FieldLabel>
+                    <Textarea
+                      id="post-text"
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      rows={5}
+                      aria-invalid={isOverLimit || undefined}
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <FieldDescription>
+                        Platform: {formatPlatformName(platform)}
+                      </FieldDescription>
+                      <Badge
+                        variant={isOverLimit ? "destructive" : "secondary"}
+                      >
+                        {charCount} / {charLimit}
+                      </Badge>
+                    </div>
+                    {isOverLimit && (
+                      <FieldError>
+                        Post exceeds the {charLimit} character limit
+                      </FieldError>
+                    )}
+                  </Field>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      onClick={() => void handleSave()}
+                      disabled={!canSave}
+                    >
+                      {saving && <Spinner data-icon="inline-start" />}
+                      {saving ? "Saving..." : "Save changes"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setEditing(false);
+                        setText(post.text);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </FieldGroup>
+              ) : (
+                <>
+                  {post.media.length > 0 && (
+                    <MediaHero
+                      media={post.media}
+                      selectedId={selectedMediaId}
+                      onSelect={setSelectedMediaId}
+                      deletingMediaId={deletingMediaId}
+                      onRemove={(mediaId) => void handleDeleteMedia(mediaId)}
+                    />
+                  )}
+                  <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                    {post.text}
+                  </p>
+                  {post.status === "DRAFT" && (
+                    <div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditing(true)}
+                      >
+                        <PencilIcon data-icon="inline-start" />
+                        Edit caption
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
-              <p className="mt-5 text-lg leading-relaxed break-words whitespace-pre-wrap">
-                {post.text}
-              </p>
-              {post.status === "DRAFT" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditing(true)}
-                  className="mt-3"
-                >
-                  <PencilIcon data-icon="inline-start" />
-                  Edit caption
-                </Button>
-              )}
-            </>
-          )}
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <aside className="flex min-w-0 flex-col gap-6 animate-[post-in_.45s_ease_both] motion-reduce:animate-none" style={{ animationDelay: "80ms" }}>
-          <section aria-label="Publication status">
-            <StatusBadge status={post.status} />
-            <dl className="mt-3 flex flex-col gap-2 text-sm">
-              {post.scheduledAt && (
-                <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-muted-foreground">Scheduled</dt>
-                  <dd className="text-right">
-                    {new Date(post.scheduledAt).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </dd>
-                </div>
-              )}
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-muted-foreground">Published</dt>
-                <dd className="text-right text-muted-foreground">
-                  {post.publishedAt
-                    ? new Date(post.publishedAt).toLocaleDateString("en-GB", {
+        <aside
+          className="flex min-w-0 flex-col gap-4 animate-[post-in_.45s_ease_both] motion-reduce:animate-none"
+          style={{ animationDelay: "80ms" }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Publishing</CardTitle>
+              <CardDescription>
+                {post.targets.length === 1
+                  ? "1 connected channel"
+                  : `${post.targets.length} connected channels`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="flex flex-col gap-1">
+                {post.targets.map((targetItem) => (
+                  <li
+                    key={targetItem.id}
+                    className="flex items-center justify-between gap-3 rounded-md px-2 py-2"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex size-5 shrink-0 items-center justify-center [&_svg]:size-5">
+                        <PlatformIcon platform={targetItem.platform} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {formatPlatformName(targetItem.platform)}
+                          {targetItem.socialAccount?.username
+                            ? ` @${targetItem.socialAccount.username}`
+                            : ""}
+                        </p>
+                        {targetItem.errorMessage && (
+                          <p className="truncate text-xs text-destructive">
+                            {targetItem.errorMessage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {targetItem.status === "PUBLISHED" &&
+                        targetPostUrl(targetItem) && (
+                          <a
+                            href={targetPostUrl(targetItem)!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-sm text-xs text-muted-foreground underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                          >
+                            View
+                          </a>
+                        )}
+                      <Badge variant="secondary">
+                        {targetItem.status.toLowerCase()}
+                      </Badge>
+                      {targetItem.status === "FAILED" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleRetry(targetItem.id)}
+                          disabled={retrying}
+                        >
+                          {retrying && <Spinner data-icon="inline-start" />}
+                          Retry
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Schedule</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="flex flex-col gap-2 text-sm">
+                {post.scheduledAt && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted-foreground">Scheduled</dt>
+                    <dd className="text-right tabular-nums">
+                      {new Date(post.scheduledAt).toLocaleDateString("en-GB", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
-                      })
-                    : "—"}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-muted-foreground">Created</dt>
-                <dd className="text-right text-muted-foreground">
-                  {new Date(post.createdAt).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </dd>
-              </div>
-              {externalPostId && (
+                      })}
+                    </dd>
+                  </div>
+                )}
                 <div className="flex items-baseline justify-between gap-3">
-                  <dt className="text-muted-foreground">External ID</dt>
-                  <dd className="truncate text-right font-mono text-xs text-muted-foreground">
-                    {externalPostId}
+                  <dt className="text-muted-foreground">Published</dt>
+                  <dd className="text-right text-muted-foreground tabular-nums">
+                    {post.publishedAt
+                      ? new Date(post.publishedAt).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
                   </dd>
                 </div>
-              )}
-            </dl>
-          </section>
-
-          <section aria-label="Publishing targets">
-            <Separator className="mb-4" />
-            <ul className="flex flex-col gap-1">
-              {post.targets.map((targetItem) => (
-                <li
-                  key={targetItem.id}
-                  className="flex items-center justify-between gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span className="flex size-5 shrink-0 items-center justify-center [&_svg]:size-5">
-                      <PlatformIcon platform={targetItem.platform} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {formatPlatformName(targetItem.platform)}
-                        {targetItem.socialAccount?.username
-                          ? ` @${targetItem.socialAccount.username}`
-                          : ""}
-                      </p>
-                      {targetItem.errorMessage && (
-                        <p className="truncate text-xs text-destructive">
-                          {targetItem.errorMessage}
-                        </p>
-                      )}
-                    </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">Created</dt>
+                  <dd className="text-right text-muted-foreground tabular-nums">
+                    {new Date(post.createdAt).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </dd>
+                </div>
+                {externalPostId && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <dt className="text-muted-foreground">External ID</dt>
+                    <dd className="truncate text-right font-mono text-xs text-muted-foreground">
+                      {externalPostId}
+                    </dd>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {targetItem.status === "PUBLISHED" &&
-                      targetPostUrl(targetItem) && (
-                        <a
-                          href={targetPostUrl(targetItem)!}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-sm text-xs text-muted-foreground underline outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                        >
-                          View
-                        </a>
-                      )}
-                    <Badge variant="secondary">
-                      {targetItem.status.toLowerCase()}
-                    </Badge>
-                    {targetItem.status === "FAILED" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleRetry(targetItem.id)}
-                        disabled={retrying}
-                      >
-                        {retrying && <Spinner data-icon="inline-start" />}
-                        Retry
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
+                )}
+              </dl>
+            </CardContent>
+          </Card>
 
           {!editing && (
-            <section aria-label="Post actions">
-              <Separator className="mb-4" />
-              <div className="flex flex-col gap-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
                 {post.status === "DRAFT" && (
                   <Button
                     onClick={() => void handlePublish()}
                     disabled={publishing}
+                    className="w-full"
                   >
                     {publishing && <Spinner data-icon="inline-start" />}
                     {!publishing && <SendIcon data-icon="inline-start" />}
@@ -650,6 +683,7 @@ export default function PostDetailPage({
                         rel="noopener noreferrer"
                       />
                     }
+                    className="w-full"
                   >
                     View on {platform === "THREADS" ? "Threads" : "X"}
                   </Button>
@@ -659,6 +693,7 @@ export default function PostDetailPage({
                   <Button
                     onClick={() => void handleRetry()}
                     disabled={retrying}
+                    className="w-full"
                   >
                     {retrying && <Spinner data-icon="inline-start" />}
                     {retrying ? "Retrying..." : "Retry"}
@@ -672,6 +707,7 @@ export default function PostDetailPage({
                       variant="outline"
                       onClick={openReschedule}
                       disabled={rescheduling || publishing}
+                      className="w-full"
                     >
                       {post.status === "SCHEDULED" ? "Reschedule" : "Schedule"}
                     </Button>
@@ -684,13 +720,14 @@ export default function PostDetailPage({
                     variant="destructive"
                     onClick={() => setDeleteOpen(true)}
                     disabled={deleting}
+                    className="w-full"
                   >
                     {deleting && <Spinner data-icon="inline-start" />}
                     {deleting ? "Deleting..." : "Delete"}
                   </Button>
                 )}
-              </div>
-            </section>
+              </CardContent>
+            </Card>
           )}
         </aside>
       </div>
@@ -797,6 +834,6 @@ export default function PostDetailPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

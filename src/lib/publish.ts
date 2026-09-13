@@ -11,11 +11,14 @@ import {
 } from "@/lib/social/threads";
 import type { PublishMedia, SocialProvider } from "@/lib/social/provider";
 import {
+  isTiktokAuthErrorCode,
   TiktokApiError,
   ensureFreshTiktokToken,
   fetchTiktokPublishStatus,
   publishTiktokDirectVideo,
   tiktokErrorMessage,
+  tiktokFailReasonMessage,
+  TIKTOK_CAPTION_MAX_LENGTH,
   TIKTOK_STATUS_COMPLETE,
   TIKTOK_STATUS_FAILED,
   type TiktokPublishSettings,
@@ -492,10 +495,26 @@ async function executeTiktokTarget(
     return failedOutcome(target, mediaValidation.error);
   }
   const video = post.media[0];
-  const title =
-    typeof effective.content.title === "string" && effective.content.title.trim().length > 0
-      ? effective.content.title
-      : post.text;
+  // TikTok Direct Post requires its own title: the global post text is
+  // never a fallback. A missing title is a validation failure, not a
+  // reason to publish the wrong caption.
+  const rawTitle = typeof effective.content.title === "string" ? effective.content.title : "";
+  const title = rawTitle.trim();
+  if (!title) {
+    const error = "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback.";
+    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    return failedOutcome(target, error);
+  }
+  if (Array.from(title).length > TIKTOK_CAPTION_MAX_LENGTH) {
+    const error = `TikTok title exceeds the ${TIKTOK_CAPTION_MAX_LENGTH} character limit.`;
+    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    return failedOutcome(target, error);
+  }
+  if (!video) {
+    const error = "TikTok requires exactly one MP4/WebM video.";
+    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    return failedOutcome(target, error);
+  }
 
   let accessToken: string;
   let mediaReadUrl: string;
@@ -731,9 +750,7 @@ export async function resumeTiktokTarget(
           // Terminal job result: clear the id so a later manual retry can
           // start a fresh publish instead of polling a dead job forever.
           externalJobId: null,
-          errorMessage: status.failReason
-            ? `TikTok could not publish the video: ${status.failReason}`
-            : "TikTok rejected the video post.",
+          errorMessage: tiktokFailReasonMessage(status.failReason),
         },
       });
       return "failed";
@@ -741,12 +758,7 @@ export async function resumeTiktokTarget(
     return "pending";
   } catch (error) {
     const code = error instanceof TiktokApiError ? error.code : "";
-    if (
-      code === "scope_not_authorized" ||
-      code === "token_expired" ||
-      code === "invalid_refresh_token" ||
-      code === "refresh_token_expired"
-    ) {
+    if (isTiktokAuthErrorCode(code)) {
       await prisma.postTarget.update({
         where: { id: targetId },
         data: {

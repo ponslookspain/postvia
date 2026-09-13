@@ -11,8 +11,22 @@
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --success: #22c55e;
-  --warning: #f59e0b;
+  --success: oklch(0.55 0.15 150);
+  --warning: oklch(0.62 0.15 75);
+  /* Postvia dispatch-desk tokens. One signal color only: Signal indigo is
+     reserved for scheduled state and primary actions. Status hues appear
+     solely in dots and badges, never as page decoration.
+     Paper #FFFFFF · Wash #F5F5F3 · Line #E6E6E1 · Ink #1A1B1E
+     Signal #2E3BEB · Moss #15803D · Honey #B54708 · Ember #C81E1E */
+  --signal: oklch(0.48 0.24 266);
+  --signal-foreground: oklch(0.985 0 0);
+  --wash: oklch(0.97 0.002 100);
+  /* Layout scale. Pages: narrow 48rem (forms), default 64rem (lists),
+     wide 76rem (calendar, composer). Section rhythm is 2.5rem. */
+  --page-narrow: 48rem;
+  --page-default: 64rem;
+  --page-wide: 76rem;
+  --section-gap: 2.5rem;
   --x-color: #000000;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -53,6 +67,9 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-signal: var(--signal);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-wash: var(--wash);
   --color-x-color: var(--x-color);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -100,6 +117,10 @@ body {
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+  --signal: oklch(0.72 0.18 266);
+  --signal-foreground: oklch(0.145 0 0);
+  --success: oklch(0.72 0.15 150);
+  --warning: oklch(0.78 0.13 75);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
@@ -140,6 +161,12 @@ body {
   }
   html {
     @apply font-sans;
+  }
+  /* Postvia type scale (Geist Sans only, left-aligned):
+     page title 24/32 semibold tight · section title 18/28 medium ·
+     body 14/20 · meta 12/16 muted. Descriptions cap at 68ch. */
+  ::selection {
+    background: color-mix(in oklch, var(--signal) 18%, transparent);
   }
 }
 

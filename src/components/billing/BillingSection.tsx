@@ -7,6 +7,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -14,8 +22,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { TriangleAlertIcon } from "lucide-react";
-import { getPlan, PLANS, type PlanId } from "@/lib/plans";
+import { Separator } from "@/components/ui/separator";
+import { ErrorBlock } from "@/components/StateBlock";
+import { Section, SectionHeader } from "@/components/Section";
+import { CheckIcon } from "lucide-react";
+import { cn } from "cn";
+import { getPlan, PLANS, type Plan, type PlanId } from "@/lib/plans";
 import { isStripeRedirectUrl } from "@/lib/stripe-redirect";
 import { PlanBadge, UsageBar } from "@/components/billing/BillingWidgets";
 
@@ -44,6 +56,30 @@ type PaidPlanId = Extract<PlanId, "growth" | "scale">;
 
 function isPaidPlanId(plan: PlanId): plan is PaidPlanId {
   return plan === "growth" || plan === "scale";
+}
+
+/**
+ * Compact feature rows derived from live entitlements — never enum
+ * names, never duplicated limits. What the plan gates is what the
+ * card lists.
+ */
+function planFeatureRows(plan: Plan): string[] {
+  const e = plan.entitlements;
+  const rows = [
+    e.monthlyPosts === null
+      ? "Unlimited posts"
+      : `${e.monthlyPosts} posts / month`,
+    e.maxAccountsPerPlatform === null
+      ? "Unlimited accounts"
+      : e.maxAccountsPerPlatform === 1
+        ? "1 account / platform"
+        : `${e.maxAccountsPerPlatform} accounts / platform`,
+  ];
+  if (e.calendar) rows.push("Calendar");
+  if (e.bulk)
+    rows.push(`Bulk video scheduling (up to ${e.maxBulkVideos} videos)`);
+  if (e.retryReschedule) rows.push("Retry failed posts");
+  return rows;
 }
 
 export function BillingSection({
@@ -169,169 +205,240 @@ export function BillingSection({
   }
 
   const periodEnd = formatPeriodEnd(initial.currentPeriodEnd);
+  const currentPlan = getPlan(initial.plan);
+  const showPortal =
+    !canChangePlan &&
+    initial.plan !== "free" &&
+    initial.status !== "CANCELED" &&
+    initial.status !== "EXPIRED";
+  const showCancel =
+    canChangePlan &&
+    initial.plan !== "free" &&
+    initial.status !== "CANCELED" &&
+    initial.status !== "EXPIRED";
+  const renewalLabel = !periodEnd
+    ? null
+    : initial.status === "CANCELLING" || initial.cancelAtPeriodEnd
+      ? `Ends ${periodEnd}`
+      : `Renews ${periodEnd}`;
 
   return (
-    <section aria-labelledby="settings-billing" id="billing" className="scroll-mt-20">
-      <h2 id="settings-billing" className="text-lg font-medium">
-        Billing
-      </h2>
-      <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        Your plan, usage and subscription status
-      </p>
-      <div className="flex max-w-md flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <PlanBadge plan={initial.plan} status={initial.status} />
-          <span className="text-sm text-muted-foreground">
-            ${initial.price} / {initial.period}
-          </span>
-        </div>
-        {initial.status === "CANCELLING" && periodEnd && (
-          <Alert>
-            <AlertTitle>Canceling on {periodEnd}</AlertTitle>
-            <AlertDescription>
-              Full access until then; afterwards the Free plan applies.
-            </AlertDescription>
-          </Alert>
-        )}
-        {initial.status === "PAST_DUE" && (
-          <Alert variant="destructive">
-            <TriangleAlertIcon />
-            <AlertTitle>Payment past due</AlertTitle>
-            <AlertDescription>
-              Update payment in billing management to keep your plan.
-            </AlertDescription>
-          </Alert>
-        )}
-        <UsageBar
-          used={initial.postsUsed}
-          limit={initial.postsLimit}
-          label="Posts this month"
+    <>
+      <Section labelledBy="billing-summary">
+        <SectionHeader
+          id="billing-summary"
+          title="Current plan"
+          description="What you pay, what you use, and when it renews."
         />
-        <p className="text-xs text-muted-foreground">
-          {initial.totalAccounts} connected{" "}
-          {initial.totalAccounts === 1 ? "account" : "accounts"}
-          {periodEnd && ` · Period ends ${periodEnd}`}
-        </p>
-        {error && (
-          <Alert variant="destructive">
-            <TriangleAlertIcon />
-            <AlertTitle>Something went wrong</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {canChangePlan ? (
-          <div>
-            <p className="mb-2 text-sm font-medium">Change plan</p>
-            <p className="mb-2 text-xs text-muted-foreground">
-              Admin testing only — ordinary users check out through Stripe.
+        <Card>
+          <CardHeader>
+            <CardTitle>{currentPlan.name}</CardTitle>
+            <CardDescription>{currentPlan.description}</CardDescription>
+            <CardAction>
+              <PlanBadge plan={initial.plan} status={initial.status} />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            <p className="text-3xl font-semibold tracking-tight tabular-nums">
+              €{initial.price}
+              <span className="text-base font-normal text-muted-foreground">
+                {" "}
+                / {initial.period}
+              </span>
             </p>
-            <div className="flex flex-col gap-2">
-              {PLANS.map((plan) => {
-                const current = plan.id === initial.plan;
-                return (
-                  <div
-                    key={plan.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-sm font-medium">
-                        {plan.name}
-                        {current && <Badge variant="secondary">Current</Badge>}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        ${plan.price} / {plan.period}
-                      </p>
-                    </div>
-                    {!current && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={changing !== null}
-                        onClick={() => void changePlan(plan.id)}
-                      >
-                        {changing === plan.id ? "Switching…" : "Switch"}
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
+            <UsageBar
+              used={initial.postsUsed}
+              limit={initial.postsLimit}
+              label="Posts this month"
+            />
+            <div>
+              <Separator />
+              <dl className="flex flex-col">
+                <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
+                  <dt className="text-muted-foreground">Connected accounts</dt>
+                  <dd className="font-medium tabular-nums">
+                    {initial.totalAccounts}
+                  </dd>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
+                  <dt className="text-muted-foreground">Billing period</dt>
+                  <dd className="font-medium">
+                    {renewalLabel ?? "No renewal date"}
+                  </dd>
+                </div>
+              </dl>
+              <Separator />
             </div>
-          </div>
-        ) : (
-          <div>
-            <p className="mb-2 text-sm font-medium">Plans</p>
-            <div className="flex flex-col gap-2">
-              {PLANS.map((plan) => {
-                const current = plan.id === initial.plan;
-                // Paid plans are bought through Stripe Checkout, but only
-                // from Free: plan changes on an active subscription go
-                // through Manage subscription (Customer Portal) instead of
-                // stacking a second checkout. Free itself needs no action.
-                const paidId = isPaidPlanId(plan.id) ? plan.id : null;
-                const subscribable = paidId !== null && initial.plan === "free";
-                return (
-                  <div
-                    key={plan.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+            {initial.status === "CANCELLING" && periodEnd && (
+              <Alert>
+                <AlertTitle>Canceling on {periodEnd}</AlertTitle>
+                <AlertDescription>
+                  Full access until then; afterwards the Free plan applies.
+                </AlertDescription>
+              </Alert>
+            )}
+            {initial.status === "PAST_DUE" && (
+              <Alert variant="destructive">
+                <AlertTitle>Payment past due</AlertTitle>
+                <AlertDescription>
+                  Update payment in billing management to keep your plan.
+                </AlertDescription>
+              </Alert>
+            )}
+            {error && (
+              <ErrorBlock title="Something went wrong" description={error} />
+            )}
+            {(showPortal || showCancel) && (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {showPortal && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    disabled={redirecting !== null}
+                    onClick={() => void openPortal()}
+                    className="min-h-11 w-full sm:w-auto"
                   >
-                    <div className="min-w-0">
-                      <p className="flex items-center gap-2 text-sm font-medium">
-                        {plan.name}
-                        {current && <Badge variant="secondary">Current</Badge>}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        ${plan.price} / {plan.period}
-                      </p>
-                    </div>
-                    {subscribable && paidId !== null && (
+                    {redirecting === "portal"
+                      ? "Opening…"
+                      : "Manage subscription"}
+                  </Button>
+                )}
+                {showCancel && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    disabled={initial.cancelAtPeriodEnd}
+                    onClick={() => setCancelOpen(true)}
+                    className="min-h-11 w-full sm:w-auto"
+                  >
+                    {initial.cancelAtPeriodEnd
+                      ? "Cancellation scheduled"
+                      : "Cancel subscription"}
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </Section>
+
+      <Section labelledBy="billing-plans">
+        <SectionHeader
+          id="billing-plans"
+          title="Plans"
+          description={
+            canChangePlan
+              ? "Admin testing only — ordinary users check out through Stripe."
+              : "Upgrade when you need more posts and accounts."
+          }
+        />
+        <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {PLANS.map((plan) => {
+            const current = plan.id === initial.plan;
+            const recommended = plan.id === "growth";
+            const paidId = isPaidPlanId(plan.id) ? plan.id : null;
+            // Paid plans are bought through Stripe Checkout, but only
+            // from Free: plan changes on an active subscription go
+            // through Manage subscription (Customer Portal) instead of
+            // stacking a second checkout. Free itself needs no action.
+            const subscribable = paidId !== null && initial.plan === "free";
+            return (
+              <Card
+                key={plan.id}
+                className={cn(
+                  "h-full",
+                  recommended && "border-signal/60 bg-signal/[0.04]"
+                )}
+              >
+                <CardHeader>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle>{plan.name}</CardTitle>
+                    {recommended && (
+                      <Badge className="border-signal/30 bg-signal/10 text-signal">
+                        Recommended
+                      </Badge>
+                    )}
+                    {current && <Badge variant="secondary">Current</Badge>}
+                  </div>
+                  <CardDescription>{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col gap-5">
+                  <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                    €{plan.price}
+                    <span className="text-base font-normal text-muted-foreground">
+                      {" "}
+                      / {plan.period}
+                    </span>
+                  </p>
+                  <ul className="flex flex-col gap-2 text-sm">
+                    {planFeatureRows(plan).map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5">
+                        <CheckIcon
+                          aria-hidden="true"
+                          className={cn(
+                            "mt-0.5 size-4 shrink-0",
+                            recommended ? "text-signal" : "text-muted-foreground"
+                          )}
+                        />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-auto pt-1">
+                    {canChangePlan ? (
+                      current ? null : (
+                        <Button
+                          variant={recommended ? "default" : "outline"}
+                          size="lg"
+                          disabled={changing !== null}
+                          onClick={() => void changePlan(plan.id)}
+                          className="min-h-11 w-full"
+                        >
+                          {changing === plan.id ? "Switching…" : "Switch"}
+                        </Button>
+                      )
+                    ) : current ? (
+                      showPortal ? (
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          disabled={redirecting !== null}
+                          onClick={() => void openPortal()}
+                          className="min-h-11 w-full"
+                        >
+                          {redirecting === "portal"
+                            ? "Opening…"
+                            : "Manage subscription"}
+                        </Button>
+                      ) : null
+                    ) : subscribable && paidId !== null ? (
                       <Button
-                        size="sm"
-                        variant="outline"
+                        variant={recommended ? "default" : "outline"}
+                        size="lg"
                         disabled={redirecting !== null}
                         onClick={() => void startCheckout(paidId)}
+                        className="min-h-11 w-full"
                       >
-                        {redirecting === paidId ? "Redirecting…" : "Subscribe"}
+                        {redirecting === paidId
+                          ? "Redirecting…"
+                          : "Subscribe"}
                       </Button>
-                    )}
+                    ) : null}
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        {error && (
+          <ErrorBlock
+            title="Something went wrong"
+            description={error}
+            className="mt-4"
+          />
         )}
-        {!canChangePlan &&
-          initial.plan !== "free" &&
-          initial.status !== "CANCELED" &&
-          initial.status !== "EXPIRED" && (
-            <div>
-              <Button
-                variant="outline"
-                disabled={redirecting !== null}
-                onClick={() => void openPortal()}
-              >
-                {redirecting === "portal"
-                  ? "Opening…"
-                  : "Manage subscription"}
-              </Button>
-            </div>
-          )}
-        {canChangePlan &&
-          initial.plan !== "free" &&
-          initial.status !== "CANCELED" &&
-          initial.status !== "EXPIRED" && (
-          <div>
-            <Button
-              variant="outline"
-              disabled={initial.cancelAtPeriodEnd}
-              onClick={() => setCancelOpen(true)}
-            >
-              {initial.cancelAtPeriodEnd
-                ? "Cancellation scheduled"
-                : "Cancel subscription"}
-            </Button>
-          </div>
-        )}
-      </div>
+      </Section>
 
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogContent>
@@ -356,6 +463,6 @@ export function BillingSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
+    </>
   );
 }

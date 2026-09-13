@@ -1,11 +1,19 @@
 "use client";
 
 import { useRef } from "react";
-import { ImagePlusIcon, RotateCcwIcon, XIcon, TriangleAlertIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ImagePlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { ErrorBlock } from "@/components/StateBlock";
 import { formatFileSize } from "./media-utils";
 import type { DraftMedia } from "./types";
 
@@ -31,23 +39,37 @@ export function MediaGrid({
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <section aria-labelledby="composer-media">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <h2 id="composer-media" className="text-lg font-medium">
-            Media
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            JPG, PNG, WebP or GIF images up to 10 MB; MP4, WebM or MOV videos
-            up to 100 MB.
-          </p>
-        </div>
-        <Badge variant="secondary">
-          {media.length}/{maxMedia}
-        </Badge>
-      </div>
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start gap-3">
-          {media.map((item) => (
+      <Card>
+        <CardHeader>
+          <CardTitle>Media</CardTitle>
+          <CardDescription>
+            JPG, PNG, WebP or GIF images up to 10 MB; MP4, WebM or MOV
+            videos up to 100 MB.
+          </CardDescription>
+          <CardAction>
+            <Badge variant="secondary" className="tabular-nums">
+              {media.length}/{maxMedia}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {media.length === 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              className="h-28 w-full flex-col gap-1.5 border-dashed py-4"
+            >
+              <ImagePlusIcon data-icon="inline-start" />
+              Add media
+              <span className="text-xs font-normal text-muted-foreground">
+                Images or video, up to {maxMedia} files
+              </span>
+            </Button>
+          ) : (
+            <div className="flex flex-wrap items-start gap-3">
+              {media.map((item) => (
             <div key={item.key} className="flex flex-col gap-1.5">
               <div className="relative size-28 overflow-hidden rounded-md border bg-muted">
                 {item.kind === "IMAGE" ? (
@@ -124,38 +146,36 @@ export function MediaGrid({
               )}
             </div>
           ))}
-          {media.length < maxMedia && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled}
-              className="h-28 w-28 flex-col border-dashed"
-            >
-              <ImagePlusIcon data-icon="inline-start" />
-              Add media
-            </Button>
+              {media.length < maxMedia && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled}
+                  className="h-28 w-28 flex-col border-dashed"
+                >
+                  <ImagePlusIcon data-icon="inline-start" />
+                  Add media
+                </Button>
+              )}
+            </div>
           )}
-        </div>
-        {mediaUploadNote && (
-          <Alert>
-            <TriangleAlertIcon />
-            <AlertTitle>Media upload</AlertTitle>
-            <AlertDescription>{mediaUploadNote}</AlertDescription>
-          </Alert>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.mp4,.m4v,.webm,.mov"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files) onAddFiles(Array.from(e.target.files));
-            e.target.value = "";
-          }}
-        />
-      </div>
+          {mediaUploadNote && (
+            <ErrorBlock title="Media upload" description={mediaUploadNote} />
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.mp4,.m4v,.webm,.mov"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) onAddFiles(Array.from(e.target.files));
+              e.target.value = "";
+            }}
+          />
+        </CardContent>
+      </Card>
     </section>
   );
 }

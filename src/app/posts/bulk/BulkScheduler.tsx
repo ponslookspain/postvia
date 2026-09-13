@@ -31,20 +31,23 @@ import {
   type BulkAccountRef,
 } from "@/lib/bulk-schedule";
 import type { PlanId } from "@/lib/plans";
+import { PageHeader } from "@/components/PageHeader";
+import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { EmptyBlock } from "@/components/StateBlock";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldContent,
@@ -119,6 +122,13 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+const PLATFORM_NAMES: Record<string, string> = {
+  THREADS: "Threads",
+  X: "X",
+  INSTAGRAM: "Instagram",
+  TIKTOK: "TikTok",
+};
 
 function formatInZone(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleString("en-GB", {
@@ -531,61 +541,53 @@ export function BulkScheduler({
 
   if (accounts.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ClapperboardIcon />
-            </EmptyMedia>
-            <EmptyTitle>No video accounts connected</EmptyTitle>
-            <EmptyDescription>
-              Connect a profile that supports video to schedule a batch.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
+      <PageContainer size="narrow">
+        <EmptyBlock
+          icon={<ClapperboardIcon />}
+          title="No video accounts connected"
+          description="Connect a profile that supports video to schedule a batch."
+          actions={
             <Button size="sm" nativeButton={false} render={<Link href="/accounts" />}>
               Connect account
             </Button>
-          </EmptyContent>
-        </Empty>
-      </div>
+          }
+        />
+      </PageContainer>
     );
   }
 
   if (!billing.bulk) {
     return (
-      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ClapperboardIcon />
-            </EmptyMedia>
-            <EmptyTitle>Bulk scheduling needs a bigger plan</EmptyTitle>
-            <EmptyDescription>
-              <UpgradeCta
-                reason="Bulk video scheduling is not included in your current plan."
-                upgradeTo={billing.upgradeTo}
-              />
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      </div>
+      <PageContainer size="narrow">
+        <EmptyBlock
+          icon={<ClapperboardIcon />}
+          title="Bulk scheduling needs a bigger plan"
+          actions={
+            <UpgradeCta
+              reason="Bulk video scheduling is not included in your current plan."
+              upgradeTo={billing.upgradeTo}
+            />
+          }
+        />
+      </PageContainer>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Bulk video scheduling</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload several videos and schedule one post per video, spaced by a
-          fixed interval. Publishing runs on the regular schedule engine.
-        </p>
-      </div>
+    <PageContainer size="wide">
+      <PageHeader
+        title="Bulk video scheduling"
+        description="Upload several videos and schedule one post per video, spaced by a fixed interval. Publishing runs on the regular schedule engine."
+        actions={
+          <Badge variant="secondary" className="tabular-nums">
+            {items.length}/{batchCap} videos
+          </Badge>
+        }
+      />
 
       <ol
         aria-label="Batch progress"
-        className="mb-10 flex items-center gap-2"
+        className="mb-8 flex items-center gap-2"
       >
         {steps.map((label, index) => {
           const stepNumber = index + 1;
@@ -624,165 +626,254 @@ export function BulkScheduler({
         })}
       </ol>
 
-      <div className="flex flex-col gap-10">
+      <PageSections>
+        <div className="grid items-start gap-6 lg:grid-cols-3">
+          <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
         <section aria-labelledby="bulk-videos">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <h2 id="bulk-videos" className="text-lg font-medium">
-                Videos
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+          <Card>
+            <CardHeader>
+              <CardTitle>Videos</CardTitle>
+              <CardDescription>
                 MP4, WebM or MOV, up to {batchCap} per batch. Each file is
                 uploaded separately with its own progress.
-              </p>
-            </div>
-            <Badge variant="secondary">
-              {items.length}/{batchCap}
-            </Badge>
-          </div>
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-start gap-3">
-              {items.map((item) => (
-                <div key={item.key} className="flex w-36 flex-col gap-1.5">
-                  <div className="relative flex h-24 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-                    <ClapperboardIcon className="size-6 text-muted-foreground" aria-hidden="true" />
-                    {item.status !== "queued" && item.status !== "error" && item.status !== "done" && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-foreground/60 p-2">
-                        <Spinner data-icon="inline-start" className="text-white" />
-                        <span className="text-xs font-medium text-white tabular-nums">
-                          {item.status === "uploading" ? `${item.progress}%` : item.status}
-                        </span>
-                        {item.status === "uploading" && (
-                          <Progress value={item.progress} aria-label={`Uploading ${item.file.name}`} className="w-full" />
-                        )}
-                      </div>
-                    )}
-                    {item.status === "done" && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-primary/70">
-                        <CircleCheckIcon className="size-6 text-primary-foreground" aria-hidden="true" />
-                      </div>
-                    )}
-                    {item.status === "error" && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-destructive/60">
-                        <OctagonXIcon className="size-6 text-white" aria-hidden="true" />
-                      </div>
-                    )}
-                    {!running && item.status !== "done" && (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="icon-sm"
-                        onClick={() => removeItem(item.key)}
-                        aria-label={`Remove ${item.file.name}`}
-                        className="absolute top-1.5 right-1.5 size-6 rounded-full"
-                      >
-                        <XIcon />
-                      </Button>
-                    )}
-                  </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {item.file.name} · {formatFileSize(item.file.size)}
-                  </p>
-                  {item.error && (
-                    <p className="text-xs text-destructive">{item.error}</p>
-                  )}
-                </div>
-              ))}
-              {items.length < batchCap && !running && (
+              </CardDescription>
+              <CardAction>
+                <Badge variant="secondary" className="tabular-nums">
+                  {items.length}/{batchCap}
+                </Badge>
+              </CardAction>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {items.length === 0 ? (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-24 w-36 flex-col border-dashed"
+                  disabled={running}
+                  className="h-28 w-full flex-col gap-1.5 border-dashed py-4"
                 >
                   <UploadIcon data-icon="inline-start" />
                   Add videos
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Video files, up to {batchCap} per batch
+                  </span>
+                </Button>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {items.map((item) => (
+                    <li
+                      key={item.key}
+                      className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground"
+                      >
+                        <ClapperboardIcon className="size-5" />
+                        {item.status === "done" && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-primary/70">
+                            <CircleCheckIcon className="size-5 text-primary-foreground" />
+                          </span>
+                        )}
+                        {item.status === "error" && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-destructive/60">
+                            <OctagonXIcon className="size-5 text-white" />
+                          </span>
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {item.file.name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground tabular-nums">
+                          {formatFileSize(item.file.size)}
+                          {item.status === "uploading" &&
+                            ` · ${item.progress}%`}
+                          {item.status !== "queued" &&
+                            item.status !== "uploading" &&
+                            ` · ${item.status}`}
+                        </span>
+                        {item.status === "uploading" && (
+                          <Progress
+                            value={item.progress}
+                            aria-label={`Uploading ${item.file.name}`}
+                            className="mt-1.5 w-full max-w-48"
+                          />
+                        )}
+                        {item.error && (
+                          <span className="mt-0.5 block truncate text-xs text-destructive">
+                            {item.error}
+                          </span>
+                        )}
+                      </span>
+                      {item.status === "done" ? (
+                        <Badge variant="secondary" className="shrink-0">
+                          Scheduled
+                        </Badge>
+                      ) : item.status === "error" ? (
+                        <Badge variant="destructive" className="shrink-0">
+                          Failed
+                        </Badge>
+                      ) : running || item.status !== "queued" ? (
+                        <Spinner
+                          data-icon="inline-start"
+                          aria-hidden="true"
+                          className="shrink-0"
+                        />
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => removeItem(item.key)}
+                          aria-label={`Remove ${item.file.name}`}
+                          className="shrink-0"
+                        >
+                          <XIcon />
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {items.length > 0 && items.length < batchCap && !running && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={running}
+                  className="h-14 w-full flex-row gap-1.5 border-dashed"
+                >
+                  <UploadIcon data-icon="inline-start" />
+                  Add more videos
                 </Button>
               )}
-            </div>
-            {pendingDupes.length > 0 && (
-              <Alert>
-                <TriangleAlertIcon />
-                <AlertTitle>Video already in this batch</AlertTitle>
-                <AlertDescription>
-                  {pendingDupes.map((file) => file.name).join(", ")} — add{" "}
-                  {pendingDupes.length === 1 ? "it" : "them"} again as{" "}
-                  {pendingDupes.length === 1 ? "a separate" : "separate"} scheduled{" "}
-                  {pendingDupes.length === 1 ? "post" : "posts"}?
-                  <span className="mt-2 flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={confirmPendingDupes}
-                      disabled={running}
-                    >
-                      Add anyway
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={skipPendingDupes}
-                      disabled={running}
-                    >
-                      Skip
-                    </Button>
-                  </span>
-                </AlertDescription>
-              </Alert>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files) addFiles(Array.from(e.target.files));
-                e.target.value = "";
-              }}
-            />
-          </div>
+              {pendingDupes.length > 0 && (
+                <Alert>
+                  <TriangleAlertIcon />
+                  <AlertTitle>Video already in this batch</AlertTitle>
+                  <AlertDescription>
+                    <span className="block max-w-full truncate">
+                      {pendingDupes.map((file) => file.name).join(", ")}
+                    </span>
+                    Add{" "}
+                    {pendingDupes.length === 1 ? "it" : "them"} again as{" "}
+                    {pendingDupes.length === 1 ? "a separate" : "separate"} scheduled{" "}
+                    {pendingDupes.length === 1 ? "post" : "posts"}?
+                    <span className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={confirmPendingDupes}
+                        disabled={running}
+                      >
+                        Add anyway
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={skipPendingDupes}
+                        disabled={running}
+                      >
+                        Skip
+                      </Button>
+                    </span>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) addFiles(Array.from(e.target.files));
+                  e.target.value = "";
+                }}
+              />
+            </CardContent>
+          </Card>
         </section>
 
         <section aria-labelledby="bulk-content">
-          <h2 id="bulk-content" className="text-lg font-medium">
-            Content
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            The same text is used for every post in the batch.
-          </p>
-          <div>
-            <Field>
-              <FieldLabel htmlFor="bulk-text">Post text</FieldLabel>
-              <Textarea
-                id="bulk-text"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Write something..."
-                rows={3}
-              />
-            </Field>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Content</CardTitle>
+              <CardDescription>
+                The same text is used for every post in the batch.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Field>
+                <FieldLabel htmlFor="bulk-text" className="sr-only">
+                  Post text
+                </FieldLabel>
+                <Textarea
+                  id="bulk-text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Write something worth publishing..."
+                  rows={4}
+                  className="min-h-28 text-[15px] leading-relaxed"
+                />
+              </Field>
+            </CardContent>
+          </Card>
         </section>
 
         <section aria-labelledby="bulk-targets">
-          <h2 id="bulk-targets" className="text-lg font-medium">
-            Publish to
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            Only connected accounts that support video are listed.
-          </p>
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 id="bulk-targets" className="text-lg font-medium">
+                Publish to
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Only connected accounts that support video are listed.
+              </p>
+            </div>
+            <Badge variant="secondary" className="tabular-nums">
+              {selectedAccountIds.length} selected
+            </Badge>
+          </div>
           <div>
             <FieldSet>
               <FieldLegend variant="label" className="sr-only">
                 Publish to
               </FieldLegend>
-              <FieldGroup className="gap-2">
+              <FieldGroup className="gap-2 sm:grid sm:grid-cols-2">
                 {accounts.map((account) => {
                   const selected = selectedAccountIds.includes(account.id);
                   return (
-                    <Field key={account.id} orientation="horizontal">
+                    <Field
+                      key={account.id}
+                      orientation="horizontal"
+                      onClick={(event) => {
+                        if (running) return;
+                        const target = event.target as HTMLElement | null;
+                        if (
+                          target?.closest?.(
+                            'label, [data-slot="checkbox"]'
+                          )
+                        ) {
+                          return;
+                        }
+                        setSelectedAccountIds((current) =>
+                          selected
+                            ? current.filter((id) => id !== account.id)
+                            : [...current, account.id]
+                        );
+                      }}
+                      className={cn(
+                        "rounded-xl border border-border bg-card p-3 transition-colors",
+                        !running &&
+                          "cursor-pointer hover:border-foreground/25 hover:bg-muted/40 has-[:focus-visible]:border-ring has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
+                        selected &&
+                          !running &&
+                          "border-signal/60 bg-signal/[0.05] hover:border-signal/60 hover:bg-signal/[0.05]"
+                      )}
+                    >
                       <Checkbox
                         id={`bulk-account-${account.id}`}
                         checked={selected}
@@ -794,14 +885,27 @@ export function BulkScheduler({
                               : current.filter((id) => id !== account.id)
                           )
                         }
+                        className="sr-only"
                       />
-                      <FieldContent>
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "flex size-9 shrink-0 self-center items-center justify-center rounded-lg",
+                          selected && !running
+                            ? "bg-signal/10 text-signal"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        <PlatformIcon
+                          platform={account.platform}
+                          className="size-5"
+                        />
+                      </span>
+                      <FieldContent className="self-center">
                         <FieldLabel htmlFor={`bulk-account-${account.id}`}>
-                          <span className="flex items-center gap-2">
-                            <span className="flex size-4 items-center justify-center [&_svg]:size-4">
-                              <PlatformIcon platform={account.platform} className="size-4" />
-                            </span>
-                            {account.platform} @{account.username}
+                          {PLATFORM_NAMES[account.platform] ?? account.platform}{" "}
+                          <span className="font-normal text-muted-foreground">
+                            @{account.username}
                           </span>
                         </FieldLabel>
                       </FieldContent>
@@ -814,16 +918,18 @@ export function BulkScheduler({
         </section>
 
         <section aria-labelledby="bulk-schedule">
-          <h2 id="bulk-schedule" className="text-lg font-medium">
-            Schedule
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            First post goes out at the start time, the rest follow spaced
-            by the interval. All times shown in the selected timezone.
-          </p>
-          <div>
-            <FieldGroup>
-              <div className="grid grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Schedule</CardTitle>
+              <CardDescription>
+                First post goes out at the start time, the rest follow
+                spaced by the interval. All times shown in the selected
+                timezone.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="bulk-date">Start date</FieldLabel>
                   <Input
@@ -845,7 +951,7 @@ export function BulkScheduler({
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="bulk-tz">Timezone</FieldLabel>
                   <Select
@@ -880,19 +986,28 @@ export function BulkScheduler({
                     disabled={running}
                   />
                   <FieldDescription>
-                    <span className="flex flex-wrap gap-x-2 gap-y-1">
+                    <span className="flex flex-wrap items-center gap-1.5">
                       <span>Presets:</span>
-                      {BULK_INTERVAL_PRESETS.map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          disabled={running}
-                          onClick={() => setIntervalMinutes(preset)}
-                          className="underline underline-offset-2 hover:text-foreground disabled:opacity-40"
-                        >
-                          {preset >= 60 ? `${preset / 60}h` : `${preset}m`}
-                        </button>
-                      ))}
+                      {BULK_INTERVAL_PRESETS.map((preset) => {
+                        const active = intervalMinutes === preset;
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            disabled={running}
+                            aria-pressed={active}
+                            onClick={() => setIntervalMinutes(preset)}
+                            className={cn(
+                              "h-7 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40",
+                              active
+                                ? "border-signal/60 bg-signal/[0.07] text-signal"
+                                : "border-border bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground"
+                            )}
+                          >
+                            {preset >= 60 ? `${preset / 60}h` : `${preset}m`}
+                          </button>
+                        );
+                      })}
                     </span>
                   </FieldDescription>
                 </Field>
@@ -913,94 +1028,157 @@ export function BulkScheduler({
                   <AlertDescription>{configError}</AlertDescription>
                 </Alert>
               )}
-            </FieldGroup>
-          </div>
+              </FieldGroup>
+            </CardContent>
+          </Card>
         </section>
 
         {items.length > 0 && schedule.length > 0 && (
           <section aria-labelledby="bulk-review">
-            <h2 id="bulk-review" className="text-lg font-medium">
-              Review
-            </h2>
-            <p className="mt-1 mb-4 text-sm text-muted-foreground">
-              One ordinary scheduled post per video. Each stays editable,
-              retryable and deletable on its own.
-            </p>
-            <ul className="flex flex-col gap-2">
-              {items.map((item, index) => (
-                <li
-                  key={item.key}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{item.file.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatInZone(schedule[index] ?? "", timeZone)} ·{" "}
-                      {selectedAccounts.map((a) => a.platform).join(", ") || "no accounts"}
-                    </p>
-                  </div>
-                  {item.status === "done" ? (
-                    <Badge variant="secondary">Scheduled</Badge>
-                  ) : item.status === "error" ? (
-                    <Badge variant="destructive">Failed</Badge>
-                  ) : running ? (
-                    <Spinner data-icon="inline-start" />
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => removeItem(item.key)}
-                      aria-label={`Remove ${item.file.name}`}
+            <Card>
+              <CardHeader>
+                <CardTitle>Review</CardTitle>
+                <CardDescription>
+                  One ordinary scheduled post per video. Each stays
+                  editable, retryable and deletable on its own.
+                </CardDescription>
+                <CardAction>
+                  <Badge variant="secondary" className="tabular-nums">
+                    {items.length} {items.length === 1 ? "post" : "posts"}
+                  </Badge>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-2">
+                  {items.map((item, index) => (
+                    <li
+                      key={item.key}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
                     >
-                      <Trash2Icon />
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {item.file.name}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground tabular-nums">
+                          {formatInZone(schedule[index] ?? "", timeZone)} ·{" "}
+                          {selectedAccounts.map((a) => a.platform).join(", ") ||
+                            "no accounts"}
+                        </p>
+                      </div>
+                      {item.status === "done" ? (
+                        <Badge variant="secondary" className="shrink-0">
+                          Scheduled
+                        </Badge>
+                      ) : item.status === "error" ? (
+                        <Badge variant="destructive" className="shrink-0">
+                          Failed
+                        </Badge>
+                      ) : running ? (
+                        <Spinner
+                          data-icon="inline-start"
+                          aria-hidden="true"
+                          className="shrink-0"
+                        />
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => removeItem(item.key)}
+                          aria-label={`Remove ${item.file.name}`}
+                          className="shrink-0"
+                        >
+                          <Trash2Icon />
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           </section>
         )}
-
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            onClick={() => void handleRun(false)}
-            disabled={running || items.length === 0 || !configValidation.ok || fileProblems.size > 0}
-            className="flex-1"
-          >
-            {running && <Spinner data-icon="inline-start" />}
-            <CalendarClockIcon data-icon="inline-start" />
-            {running
-              ? `Scheduling… ${doneCount + errorCount}/${items.length}`
-              : `Schedule ${items.length} ${items.length === 1 ? "post" : "posts"}`}
-          </Button>
-          {errorCount > 0 && !running && (
-            <Button variant="outline" onClick={() => void handleRun(true)}>
-              <RotateCcwIcon data-icon="inline-start" />
-              Retry {errorCount} failed
-            </Button>
-          )}
         </div>
-        {finished && !allDone && (
-          <Alert variant="destructive">
-            <TriangleAlertIcon />
-            <AlertTitle>Batch partially scheduled</AlertTitle>
-            <AlertDescription>
-              {doneCount} of {items.length} posts scheduled. Failed items kept
-              their errors above — retry them or remove them.
-            </AlertDescription>
-          </Alert>
-        )}
+
+        <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
+          <Card>
+            <CardHeader>
+              <CardTitle>Batch</CardTitle>
+              <CardDescription>
+                {items.length === 0
+                  ? "Add videos to build the schedule."
+                  : startIso
+                    ? `First post ${formatInZone(startIso, timeZone)}.`
+                    : "Choose a start date and time."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <dl className="flex flex-col gap-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Videos</dt>
+                  <dd className="font-medium tabular-nums">
+                    {items.length}/{batchCap}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Accounts</dt>
+                  <dd className="font-medium tabular-nums">
+                    {selectedAccountIds.length}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Interval</dt>
+                  <dd className="font-medium tabular-nums">
+                    {intervalMinutes >= 60
+                      ? `${intervalMinutes / 60}h`
+                      : `${intervalMinutes}m`}
+                  </dd>
+                </div>
+              </dl>
+              <Button
+                size="lg"
+                onClick={() => void handleRun(false)}
+                disabled={running || items.length === 0 || !configValidation.ok || fileProblems.size > 0}
+                className="min-h-11 w-full"
+              >
+                {running && <Spinner data-icon="inline-start" />}
+                {!running && <CalendarClockIcon data-icon="inline-start" />}
+                {running
+                  ? `Scheduling… ${doneCount + errorCount}/${items.length}`
+                  : `Schedule ${items.length} ${items.length === 1 ? "post" : "posts"}`}
+              </Button>
+              {errorCount > 0 && !running && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => void handleRun(true)}
+                  className="min-h-11 w-full"
+                >
+                  <RotateCcwIcon data-icon="inline-start" />
+                  Retry {errorCount} failed
+                </Button>
+              )}
+              {running && activeCount > 0 && (
+                <Progress
+                  value={Math.round(((doneCount + errorCount) / items.length) * 100)}
+                  aria-label="Batch progress"
+                />
+              )}
+              {finished && !allDone && (
+                <Alert variant="destructive">
+                  <TriangleAlertIcon />
+                  <AlertTitle>Batch partially scheduled</AlertTitle>
+                  <AlertDescription>
+                    {doneCount} of {items.length} posts scheduled. Failed
+                    items kept their errors above — retry them or remove them.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {running && activeCount > 0 && (
-        <div className="mt-4">
-          <Progress
-            value={Math.round(((doneCount + errorCount) / items.length) * 100)}
-            aria-label="Batch progress"
-          />
-        </div>
-      )}
-    </div>
+      </PageSections>
+    </PageContainer>
   );
 }

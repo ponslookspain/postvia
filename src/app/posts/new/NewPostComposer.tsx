@@ -45,10 +45,14 @@ import {
   type ScheduleFlowDenial,
 } from "@/lib/composer-media";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { EmptyBlock } from "@/components/StateBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -56,7 +60,6 @@ import {
 } from "@/components/ui/card";
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -75,6 +78,7 @@ import { MediaGrid } from "./_components/MediaGrid";
 import { PreviewCard } from "./_components/PreviewCard";
 import { PlatformSwitcher } from "./_components/PlatformSwitcher";
 import { PublishCard } from "./_components/PublishCard";
+import { ScheduleCard } from "./_components/ScheduleCard";
 import { MobileComposerBar } from "./_components/MobileComposerBar";
 import { ScheduleDialog } from "./_components/ScheduleDialog";
 import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
@@ -946,21 +950,14 @@ export default function NewPostComposer({
   if (publishWatchId) {
     const watchId = publishWatchId;
     return (
-      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-        <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <HourglassIcon />
-            </EmptyMedia>
-            <EmptyTitle>Still publishing</EmptyTitle>
-            <EmptyDescription>
-              Publishing continues on the server. Open the post to watch
-              progress.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <PageContainer size="narrow">
+        <PageHeader title="Create post" />
+        <EmptyBlock
+          icon={<HourglassIcon />}
+          title="Still publishing"
+          description="Publishing continues on the server. Open the post to watch progress."
+          actions={
+            <>
               <Button
                 variant="outline"
                 size="sm"
@@ -974,10 +971,10 @@ export default function NewPostComposer({
               >
                 View post
               </Button>
-            </div>
-          </EmptyContent>
-        </Empty>
-      </div>
+            </>
+          }
+        />
+      </PageContainer>
     );
   }
 
@@ -990,248 +987,234 @@ export default function NewPostComposer({
       ? savedId
       : null;
     return (
-      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-        <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  {publishResult.ok ? (
-                    <CircleCheckIcon />
-                  ) : (
-                    <OctagonXIcon />
-                  )}
-                </EmptyMedia>
-                <EmptyTitle>
-                  {publishResult.ok
-                    ? "Published successfully"
-                    : "Publication failed"}
-                </EmptyTitle>
-                <EmptyDescription>
-                  {publishResult.ok ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
-                        <PlatformIcon platform={resultPlatform} />
-                      </span>
-                      @{publishResult.username} · Published
-                    </span>
-                  ) : (
-                    publishResult.error
-                  )}
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  {publishResult.ok &&
-                    publishResult.externalPostId &&
-                    publishResult.username && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        nativeButton={false}
-                        render={
-                          <a
-                            href={
-                              isThreads
-                                ? threadsPostUrl(
-                                    publishResult.username,
-                                    publishResult.externalPostId
-                                  )
-                                : `https://x.com/i/status/${publishResult.externalPostId}`
-                            }
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          />
+      <PageContainer size="narrow">
+        <PageHeader title="Create post" />
+        <EmptyBlock
+          icon={publishResult.ok ? <CircleCheckIcon /> : <OctagonXIcon />}
+          title={
+            publishResult.ok ? "Published successfully" : "Publication failed"
+          }
+          description={
+            publishResult.ok ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="inline-flex size-4 items-center justify-center [&_svg]:size-4">
+                  <PlatformIcon platform={resultPlatform} />
+                </span>
+                @{publishResult.username} · Published
+              </span>
+            ) : (
+              publishResult.error
+            )
+          }
+          actions={
+            <>
+              {publishResult.ok &&
+                publishResult.externalPostId &&
+                publishResult.username && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    nativeButton={false}
+                    render={
+                      <a
+                        href={
+                          isThreads
+                            ? threadsPostUrl(
+                                publishResult.username,
+                                publishResult.externalPostId
+                              )
+                            : `https://x.com/i/status/${publishResult.externalPostId}`
                         }
-                      >
-                        <span className="flex items-center gap-1.5">
-                          View on {isThreads ? "Threads" : "X"}
-                          <ExternalLinkIcon data-icon="inline-end" />
-                        </span>
-                      </Button>
-                    )}
-                  {!publishResult.ok && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        // Keep savedId: the draft is the recovery path, and
-                        // the "View post" action below must survive.
-                        setPublishResult(null);
-                      }}
-                    >
-                      <RotateCcwIcon data-icon="inline-start" />
-                      Try again
-                    </Button>
-                  )}
-                  {openDraftId && (
-                    <Button
-                      size="sm"
-                      onClick={() => router.push(`/posts/${openDraftId}`)}
-                    >
-                      View post
-                    </Button>
-                  )}
-                </div>
-              </EmptyContent>
-            </Empty>
-      </div>
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      />
+                    }
+                  >
+                    <span className="flex items-center gap-1.5">
+                      View on {isThreads ? "Threads" : "X"}
+                      <ExternalLinkIcon data-icon="inline-end" />
+                    </span>
+                  </Button>
+                )}
+              {!publishResult.ok && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Keep savedId: the draft is the recovery path, and
+                    // the "View post" action below must survive.
+                    setPublishResult(null);
+                  }}
+                >
+                  <RotateCcwIcon data-icon="inline-start" />
+                  Try again
+                </Button>
+              )}
+              {openDraftId && (
+                <Button
+                  size="sm"
+                  onClick={() => router.push(`/posts/${openDraftId}`)}
+                >
+                  View post
+                </Button>
+              )}
+            </>
+          }
+        />
+      </PageContainer>
     );
   }
 
   if (saved && savedId && scheduledAt) {    const scheduledLocal = new Date(scheduledAt);
     return (
-      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-        <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <CalendarClockIcon />
-                </EmptyMedia>
-                <EmptyTitle>Post scheduled</EmptyTitle>
-                <EmptyDescription>
-                  {scheduledLocal.toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}{" "}
-                  ·{" "}
-                  {scheduledLocal.toLocaleTimeString("en-GB", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSaved(false);
-                      setScheduledAt(null);
-                      setText("");
-                      setScheduleDate("");
-                      setScheduleTime("");
-                      setScheduleMode(false);
-                      clearMedia();
-                    }}
-                  >
-                    Create another
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => router.push(`/posts/${savedId}`)}
-                  >
-                    View post
-                  </Button>
-                </div>
-              </EmptyContent>
-            </Empty>
-      </div>
+      <PageContainer size="narrow">
+        <PageHeader title="Create post" />
+        <EmptyBlock
+          icon={<CalendarClockIcon />}
+          title="Post scheduled"
+          description={
+            <>
+              {scheduledLocal.toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}{" "}
+              ·{" "}
+              {scheduledLocal.toLocaleTimeString("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </>
+          }
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSaved(false);
+                  setScheduledAt(null);
+                  setText("");
+                  setScheduleDate("");
+                  setScheduleTime("");
+                  setScheduleMode(false);
+                  clearMedia();
+                }}
+              >
+                Create another
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => router.push(`/posts/${savedId}`)}
+              >
+                View post
+              </Button>
+            </>
+          }
+        />
+      </PageContainer>
     );
   }
 
   if (saved && savedId) {
     return (
-      <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-        <h1 className="mb-6 text-2xl font-semibold">Create post</h1>
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <CircleCheckIcon />
-                </EmptyMedia>
-                <EmptyTitle>Draft saved</EmptyTitle>
-                {mediaUploadNote && (
-                  <EmptyDescription>{mediaUploadNote}</EmptyDescription>
-                )}
-              </EmptyHeader>
-              <EmptyContent>
-                <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      // Back to editing with the draft content intact:
-                      // text and media state are deliberately untouched.
-                      continueEditingFromSaved({ setSaved, setSavedId })
-                    }
-                  >
-                    <PencilIcon data-icon="inline-start" />
-                    Continue editing
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => router.push(`/posts/${savedId}`)}
-                  >
-                    View post
-                  </Button>
-                </div>
-              </EmptyContent>
-            </Empty>
-      </div>
+      <PageContainer size="narrow">
+        <PageHeader title="Create post" />
+        <EmptyBlock
+          icon={<CircleCheckIcon />}
+          title="Draft saved"
+          description={mediaUploadNote ?? undefined}
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  // Back to editing with the draft content intact:
+                  // text and media state are deliberately untouched.
+                  continueEditingFromSaved({ setSaved, setSavedId })
+                }
+              >
+                <PencilIcon data-icon="inline-start" />
+                Continue editing
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => router.push(`/posts/${savedId}`)}
+              >
+                View post
+              </Button>
+            </>
+          }
+        />
+      </PageContainer>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-4 md:p-8">
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Create post</h1>
-        {selectedAccountIds.length > 0 && (
-          <Badge variant="secondary">
-            <UsersIcon data-icon="inline-start" />
-            {selectedAccountIds.length} selected
-          </Badge>
-        )}
-      </div>
+    <PageContainer size="wide">
+      <PageHeader
+        title="Create post"
+        description="Write once, publish to every selected channel."
+        actions={
+          selectedAccountIds.length > 0 ? (
+            <Badge variant="secondary">
+              <UsersIcon data-icon="inline-start" />
+              {selectedAccountIds.length} selected
+            </Badge>
+          ) : undefined
+        }
+      />
 
-      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex min-w-0 flex-col gap-10">
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <section aria-labelledby="composer-content">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 id="composer-content" className="text-lg font-medium">
-                  Post content
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+            <Card>
+              <CardHeader>
+                <CardTitle>Post content</CardTitle>
+                <CardDescription>
                   Used by every selected platform unless customized — except
                   TikTok, which posts its own title instead
-                </p>
-              </div>
-              <Badge variant={hasOverLimit ? "destructive" : "secondary"}>
-                {charCount} chars
-              </Badge>
-            </div>
-            <div>
-              <Field data-invalid={hasOverLimit || undefined}>
-                <FieldLabel htmlFor="composer-text" className="sr-only">
-                  Post content
-                </FieldLabel>
-                <Textarea
-                  id="composer-text"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Write something..."
-                  rows={5}
-                  aria-invalid={hasOverLimit || undefined}
-                />
-                {hasOverLimit ? (
-                  <FieldError>
-                    Too long for{" "}
-                    {previews
-                      .filter((preview) => preview.overLimit)
-                      .map(
-                        (preview) => `${preview.label} (${preview.maxLength})`
-                      )
-                      .join(", ")}
-                    . Shorten the text or use Customize in the preview below.
-                  </FieldError>
-                ) : (
-                  <FieldDescription>
-                    Keep it short — each platform has its own character limit.
-                  </FieldDescription>
-                )}
-              </Field>
-            </div>
+                </CardDescription>
+                <CardAction>
+                  <Badge variant={hasOverLimit ? "destructive" : "secondary"}>
+                    {charCount} chars
+                  </Badge>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <Field data-invalid={hasOverLimit || undefined}>
+                  <FieldLabel htmlFor="composer-text" className="sr-only">
+                    Post content
+                  </FieldLabel>
+                  <Textarea
+                    id="composer-text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Write something worth publishing..."
+                    rows={6}
+                    aria-invalid={hasOverLimit || undefined}
+                    className="min-h-36 text-[15px] leading-relaxed"
+                  />
+                  {hasOverLimit ? (
+                    <FieldError>
+                      Too long for{" "}
+                      {previews
+                        .filter((preview) => preview.overLimit)
+                        .map(
+                          (preview) => `${preview.label} (${preview.maxLength})`
+                        )
+                        .join(", ")}
+                      . Shorten the text or use Customize in the preview below.
+                    </FieldError>
+                  ) : (
+                    <FieldDescription>
+                      Keep it short — each platform has its own character limit.
+                    </FieldDescription>
+                  )}
+                </Field>
+              </CardContent>
+            </Card>
           </section>
 
           <AccountList
@@ -1253,6 +1236,19 @@ export default function NewPostComposer({
             onAddFiles={addFiles}
             onRemove={removeMedia}
             onRetry={(key) => void retryFailedMedia(key)}
+          />
+
+          <ScheduleCard
+            scheduleDate={scheduleDate}
+            scheduleTime={scheduleTime}
+            scheduledIso={scheduledIso}
+            scheduleError={scheduleError}
+            scheduling={scheduling}
+            schedulingForX={schedulingForX}
+            disabled={saving || publishing || scheduling}
+            onDateChange={setScheduleDate}
+            onTimeChange={setScheduleTime}
+            onScheduleClick={handleScheduleClick}
           />
         </div>
 
@@ -1418,6 +1414,6 @@ export default function NewPostComposer({
         onScheduleClick={handleScheduleClick}
         onPublish={handlePublish}
       />
-    </div>
+    </PageContainer>
   );
 }

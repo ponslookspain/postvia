@@ -6,6 +6,14 @@ import { toast } from "@/components/ui/toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/Section";
+import {
   Field,
   FieldGroup,
   FieldLabel,
@@ -137,15 +145,20 @@ export function AdminBillingPanel() {
   if (forbidden) return null;
 
   return (
-    <section aria-labelledby="settings-billing-test">
-      <h2 id="settings-billing-test" className="text-lg font-medium">
-        Developer billing testing
-      </h2>
-      <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        Admin only. Overrides the effective plan without touching the real
-        subscription.
-      </p>
-      <div className="flex max-w-md flex-col gap-4">
+    <Section labelledBy="settings-billing-test">
+      <SectionHeader
+        id="settings-billing-test"
+        title="Developer billing testing"
+        description="Admin only. Overrides the effective plan without touching the real subscription."
+      />
+      <Card className="max-w-md">
+        <CardHeader>
+          <CardTitle>Test override</CardTitle>
+          <CardDescription>
+            Applies immediately and refreshes the page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
         {state && (
           <pre className="overflow-auto rounded-md border border-border bg-muted/50 p-3 text-xs">
             {JSON.stringify(state, null, 2)}
@@ -251,7 +264,8 @@ export function AdminBillingPanel() {
             Clear
           </Button>
         </div>
-      </div>
-    </section>
+        </CardContent>
+      </Card>
+    </Section>
   );
 }

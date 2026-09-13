@@ -178,7 +178,7 @@ export function TiktokTargetSettings({
           <AlertDescription>
             {isTikTokReconnectNeeded(creatorInfoError)
               ? "TikTok access expired or was revoked. Reconnect the account to change privacy and interaction settings."
-              : "Could not load this account's TikTok options. The post will default to private."}
+              : "Could not load this account's TikTok options. Publishing needs live TikTok settings — retry before posting."}
           </AlertDescription>
           <div className="mt-2 flex flex-wrap gap-2">
             {isTikTokReconnectNeeded(creatorInfoError) ? (

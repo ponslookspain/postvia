@@ -160,12 +160,13 @@ describe("capability-driven preview metadata", () => {
   });
 });
 
-describe("tiktok title contract", () => {  test("tiktok preview shows global text until its own title is set", () => {
-    // Known gap, documented here: publishing uses only the TikTok title
-    // override, while the preview falls back to global text. The composer
-    // copy and the empty-title hint warn about exactly this.
+describe("tiktok title contract", () => {
+  test("tiktok preview never uses global text as title", () => {
+    // Production contract: TikTok publishes its own title only. The
+    // legacy preview must render empty (not global text) until a title
+    // override is set, matching buildComposerPreviewModel.
     const previews = buildComposerPreviews([TIKTOK], GLOBAL, []);
-    assert.equal(previews[0].text, GLOBAL);
+    assert.equal(previews[0].text, "");
     assert.equal(previews[0].customized, false);
     assert.equal(previews[0].maxLength, 2200);
   });
@@ -182,8 +183,13 @@ describe("tiktok title contract", () => {  test("tiktok preview shows global tex
     const previews = buildComposerPreviews([TIKTOK], GLOBAL, [
       overrideFor("acc-tiktok", ""),
     ]);
-    assert.equal(previews[0].text, GLOBAL);
+    assert.equal(previews[0].text, "");
     assert.equal(previews[0].customized, false);
+  });
+
+  test("global text change never leaks into the tiktok preview", () => {
+    const previews = buildComposerPreviews([TIKTOK], "totally different global", []);
+    assert.equal(previews[0].text, "");
   });
 });
 

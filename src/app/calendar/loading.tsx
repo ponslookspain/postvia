@@ -1,8 +1,9 @@
+import { PageContainer } from "@/components/layout/PageContainer";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CalendarLoading() {
   return (
-    <div className="mx-auto w-full max-w-6xl p-4 md:p-8" aria-busy="true">
+    <PageContainer size="wide">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <Skeleton className="h-8 w-40" />
@@ -21,7 +22,7 @@ export default function CalendarLoading() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
           {Array.from({ length: 49 }).map((_, index) => (
-            <Skeleton key={index} className="h-16 rounded-none sm:h-24" />
+            <Skeleton key={index} className="h-20 rounded-none sm:h-36" />
           ))}
         </div>
         <div className="flex flex-col gap-2">
@@ -31,6 +32,6 @@ export default function CalendarLoading() {
         </div>
       </div>
       <span className="sr-only">Loading calendar…</span>
-    </div>
+    </PageContainer>
   );
 }

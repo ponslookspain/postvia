@@ -1,5 +1,16 @@
 import Link from "next/link";
-import { FileTextIcon, PlusIcon, UsersIcon } from "lucide-react";
+import {
+  CalendarClockIcon,
+  CalendarIcon,
+  CircleCheckIcon,
+  FileTextIcon,
+  LayersIcon,
+  PencilIcon,
+  PlusIcon,
+  UsersIcon,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "cn";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
@@ -7,17 +18,26 @@ import { getEffectivePlan, getRemainingQuota, getUsage } from "@/lib/entitlement
 import { getPlan } from "@/lib/plans";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import {
+  PageContainer,
+  PageSections,
+} from "@/components/layout/PageContainer";
+import { Section, SectionHeader } from "@/components/Section";
+import { EmptyBlock } from "@/components/StateBlock";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import { PlanBadge } from "@/components/billing/BillingWidgets";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { DashboardPostFilter } from "@/app/dashboard/DashboardPostFilter";
 import { PostRow } from "@/app/dashboard/PostRow";
 
@@ -36,6 +56,52 @@ const postFeedInclude = {
   targets: { include: { socialAccount: { select: { username: true } } } },
   media: { take: 1 as const, select: { id: true, type: true } },
 };
+
+/**
+ * Overview stat tile. Ringless wash slab — deliberately quieter than the
+ * bordered activity cards below, so the big tabular numerals carry the
+ * section. Signal indigo appears only on the Scheduled value.
+ */
+function StatTile({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  accent = false,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  hint: string;
+  accent?: boolean;
+}) {
+  return (
+    <Card size="sm" className="bg-muted/40">
+      <CardContent className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[13px] text-muted-foreground">{label}</p>
+          <p
+            className={cn(
+              "mt-1 text-3xl leading-none font-semibold tracking-tight tabular-nums",
+              accent && "text-signal"
+            )}
+          >
+            {value}
+          </p>
+          <p className="mt-1.5 truncate text-xs text-muted-foreground">
+            {hint}
+          </p>
+        </div>
+        <span
+          aria-hidden="true"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground ring-1 ring-foreground/10"
+        >
+          <Icon className="size-4" />
+        </span>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -59,7 +125,6 @@ export default async function DashboardPage({
     attentionPosts,
     upcomingPosts,
     accounts,
-    platformGroups,
     effective,
     usage,
   ] = await Promise.all([
@@ -98,11 +163,6 @@ export default async function DashboardPage({
       select: { platform: true, username: true, expiresAt: true },
       orderBy: [{ platform: "asc" }, { username: "asc" }],
     }),
-    prisma.postTarget.groupBy({
-      by: ["platform"],
-      where: { post: { userId: user.id } },
-      _count: { _all: true },
-    }),
     getEffectivePlan({ userId: user.id, userEmail: user.email }),
     getUsage(user.id),
   ]);
@@ -117,8 +177,6 @@ export default async function DashboardPage({
   const drafts = countsByStatus.DRAFT ?? 0;
   const scheduled = countsByStatus.SCHEDULED ?? 0;
   const published = countsByStatus.PUBLISHED ?? 0;
-  const publishing = countsByStatus.PUBLISHING ?? 0;
-  const failed = countsByStatus.FAILED ?? 0;
 
   const now = new Date();
   const expiredAccounts = accounts.filter(
@@ -126,36 +184,68 @@ export default async function DashboardPage({
       account.expiresAt && new Date(account.expiresAt).getTime() <= now.getTime()
   );
 
-  const platformCounts = platformGroups
-    .map((group) => ({
-      platform: group.platform,
-      count: group._count._all,
-    }))
-    .sort((a, b) => b.count - a.count);
-
-  const stats = [
-    { label: "Posts", value: totalPosts },
-    { label: "Drafts", value: drafts },
-    { label: "Scheduled", value: scheduled },
-    { label: "Published", value: published },
-  ];
+  const byPlatform = new Map<
+    string,
+    { platform: string; usernames: string[]; expired: boolean }
+  >();
+  for (const account of accounts) {
+    const entry = byPlatform.get(account.platform) ?? {
+      platform: account.platform,
+      usernames: [],
+      expired: false,
+    };
+    entry.usernames.push(account.username);
+    if (
+      account.expiresAt &&
+      new Date(account.expiresAt).getTime() <= now.getTime()
+    ) {
+      entry.expired = true;
+    }
+    byPlatform.set(account.platform, entry);
+  }
 
   const isOnboarding = totalPosts === 0 && accounts.length === 0;
   const isFiltered = q !== "" || statusFilter !== "all";
   const quota = getRemainingQuota(effective, usage);
-  const planLabel =
+  const plan = getPlan(effective.plan);
+  const monthlyLimit = effective.entitlements.monthlyPosts;
+  const usagePercent =
+    monthlyLimit === null
+      ? 0
+      : Math.min(
+          100,
+          Math.round((usage.postsThisMonth / Math.max(1, monthlyLimit)) * 100)
+        );
+  const usageHint =
     quota.postsLeft === null
-      ? `${getPlan(effective.plan).name} · unlimited posts`
-      : `${getPlan(effective.plan).name} · ${usage.postsThisMonth}/${effective.entitlements.monthlyPosts} posts`;
+      ? monthlyLimit === null
+        ? "No monthly limit on your plan"
+        : `${usage.postsThisMonth} used`
+      : `${quota.postsLeft} of ${monthlyLimit} left`;
+  const periodLabel = usage.monthStart.toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  });
+  const resetDate = new Date(usage.monthStart);
+  resetDate.setMonth(resetDate.getMonth() + 1);
+  const resetLabel = resetDate.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 
   return (
     <AppShell user={user}>
-      <div className="mx-auto w-full max-w-5xl p-4 md:p-8">
+      <PageContainer>
         <PageHeader
           title="Dashboard"
-          description="An overview of your publishing activity"
+          description="What is queued, what needs you, and what went out"
           actions={
-            <Button nativeButton={false} render={<Link href="/posts/new" />}>
+            <Button
+              size="lg"
+              nativeButton={false}
+              render={<Link href="/posts/new" />}
+              className="min-h-11"
+            >
               <PlusIcon data-icon="inline-start" />
               Create post
             </Button>
@@ -163,18 +253,12 @@ export default async function DashboardPage({
         />
 
         {isOnboarding ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <UsersIcon />
-              </EmptyMedia>
-              <EmptyTitle>Start publishing in two steps</EmptyTitle>
-              <EmptyDescription>
-                Connect a social profile first, then create your first post.
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <div className="flex flex-col gap-2 sm:flex-row">
+          <EmptyBlock
+            icon={<UsersIcon />}
+            title="Start publishing in two steps"
+            description="Connect a social profile first, then create your first post."
+            actions={
+              <>
                 <Button
                   size="sm"
                   nativeButton={false}
@@ -191,223 +275,347 @@ export default async function DashboardPage({
                   <PlusIcon data-icon="inline-start" />
                   Create post
                 </Button>
-              </div>
-            </EmptyContent>
-          </Empty>
+              </>
+            }
+          />
         ) : (
-          <div className="flex flex-col gap-10">
-            {attentionPosts.length > 0 && (
-              <section aria-labelledby="attention-heading">
-                <div className="mb-2 flex items-center gap-2.5">
-                  <h2 id="attention-heading" className="text-lg font-medium">
-                    Needs attention
-                  </h2>
-                  <Badge variant="destructive" aria-label={`${attentionPosts.length} posts need attention`}>
-                    {attentionPosts.length}
-                  </Badge>
-                </div>
-                <ul className="divide-y divide-border border-t border-border">
-                  {attentionPosts.map((post, index) => (
-                    <PostRow
-                      key={post.id}
-                      post={post}
-                      index={index}
-                      error={
-                        post.errorMessage ??
-                        post.targets.find((t) => t.errorMessage)?.errorMessage
-                      }
+          <PageSections>
+            <Section label="Publishing overview">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile
+                  icon={LayersIcon}
+                  label="Posts this month"
+                  value={usage.postsThisMonth}
+                  hint={usageHint}
+                />
+                <StatTile
+                  icon={PencilIcon}
+                  label="Drafts"
+                  value={drafts}
+                  hint="Saved, not scheduled"
+                />
+                <StatTile
+                  icon={CalendarClockIcon}
+                  label="Scheduled"
+                  value={scheduled}
+                  hint="Will publish automatically"
+                  accent
+                />
+                <StatTile
+                  icon={CircleCheckIcon}
+                  label="Published"
+                  value={published}
+                  hint="Live on platforms"
+                />
+              </div>
+            </Section>
+
+            <div className="grid items-stretch gap-3 lg:grid-cols-3">
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Usage</CardTitle>
+                  <CardDescription>
+                    {periodLabel}, resets {resetLabel}
+                  </CardDescription>
+                  <CardAction>
+                    <Link
+                      href="/billing"
+                      className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
+                      Manage plan
+                    </Link>
+                  </CardAction>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <PlanBadge
+                      plan={effective.plan}
+                      status={effective.status}
                     />
-                  ))}
-                </ul>
-              </section>
+                  </div>
+                  <p className="mt-3 text-2xl leading-none font-semibold tracking-tight tabular-nums">
+                    {monthlyLimit === null ? (
+                      "Unlimited"
+                    ) : (
+                      <>
+                        {usage.postsThisMonth}
+                        <span className="text-base font-normal text-muted-foreground">
+                          {" "}
+                          of {monthlyLimit} posts
+                        </span>
+                      </>
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {plan.name} plan
+                  </p>
+                  {monthlyLimit !== null && (
+                    <Progress
+                      value={usagePercent}
+                      aria-label={`Posts used this month: ${usage.postsThisMonth} of ${monthlyLimit}`}
+                      className="mt-auto pt-3"
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick actions</CardTitle>
+                  <CardDescription>Jump to the next step</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col gap-2">
+                  <Button
+                    nativeButton={false}
+                    render={<Link href="/posts/new" />}
+                    className="min-h-12 flex-1 w-full justify-start"
+                  >
+                    <PlusIcon data-icon="inline-start" />
+                    Create post
+                  </Button>
+                  <Button
+                    variant="outline"
+                    nativeButton={false}
+                    render={<Link href="/calendar" />}
+                    className="min-h-12 flex-1 w-full justify-start"
+                  >
+                    <CalendarIcon data-icon="inline-start" />
+                    Open calendar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    nativeButton={false}
+                    render={<Link href="/accounts" />}
+                    className="min-h-12 flex-1 w-full justify-start"
+                  >
+                    <UsersIcon data-icon="inline-start" />
+                    Manage accounts
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {attentionPosts.length > 0 && (
+              <Section labelledBy="attention-heading">
+                <SectionHeader
+                  id="attention-heading"
+                  title="Needs attention"
+                  description="Publishing failed or is still running"
+                  meta={
+                    <Badge
+                      variant="destructive"
+                      aria-label={`${attentionPosts.length} posts need attention`}
+                    >
+                      {attentionPosts.length}
+                    </Badge>
+                  }
+                />
+                <Card>
+                  <CardContent>
+                    <ul className="divide-y divide-border">
+                      {attentionPosts.map((post, index) => (
+                        <PostRow
+                          key={post.id}
+                          post={post}
+                          index={index}
+                          error={
+                            post.errorMessage ??
+                            post.targets.find((t) => t.errorMessage)
+                              ?.errorMessage
+                          }
+                        />
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </Section>
             )}
 
             {upcomingPosts.length > 0 && (
-              <section aria-labelledby="up-next-heading">
-                <div className="mb-2 flex items-center justify-between gap-4">
-                  <h2 id="up-next-heading" className="text-lg font-medium">
-                    Up next
-                  </h2>
-                  <Link
-                    href="/posts?status=SCHEDULED"
-                    className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                  >
-                    View all scheduled
-                  </Link>
-                </div>
-                <ul className="divide-y divide-border border-t border-border">
-                  {upcomingPosts.map((post, index) => (
-                    <PostRow key={post.id} post={post} index={index} large />
-                  ))}
-                </ul>
-              </section>
+              <Section labelledBy="up-next-heading">
+                <SectionHeader
+                  id="up-next-heading"
+                  title="Up next"
+                  actions={
+                    <Link
+                      href="/posts?status=SCHEDULED"
+                      className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                    >
+                      View all scheduled
+                    </Link>
+                  }
+                />
+                <Card>
+                  <CardContent>
+                    <ul className="divide-y divide-border">
+                      {upcomingPosts.map((post, index) => (
+                        <PostRow
+                          key={post.id}
+                          post={post}
+                          index={index}
+                          large
+                        />
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </Section>
             )}
 
-            <section aria-labelledby="recent-posts-heading">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <h2 id="recent-posts-heading" className="text-lg font-medium">
-                  Recent posts
-                </h2>
-                <Link
-                  href="/posts"
-                  className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                >
-                  View all
-                </Link>
-              </div>
-              <DashboardPostFilter q={q} status={statusFilter} />
+            <Section labelledBy="recent-posts-heading">
+              <SectionHeader
+                id="recent-posts-heading"
+                title="Recent posts"
+                actions={
+                  <Link
+                    href="/posts"
+                    className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    View all
+                  </Link>
+                }
+              />
+              <Card>
+                <CardContent>
+                  <DashboardPostFilter q={q} status={statusFilter} />
+                  {recentPosts.length === 0 ? (
+                    isFiltered ? (
+                      <EmptyBlock
+                        icon={<FileTextIcon />}
+                        title="No matching posts"
+                        description={
+                          q
+                            ? `Nothing matches “${q}”${statusFilter !== "all" ? ` with status ${formatStatusLabel(statusFilter).toLowerCase()}` : ""}.`
+                            : `No ${formatStatusLabel(statusFilter).toLowerCase()} posts yet.`
+                        }
+                        actions={
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            nativeButton={false}
+                            render={<Link href="/dashboard" />}
+                          >
+                            Clear filters
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <EmptyBlock
+                        icon={<FileTextIcon />}
+                        title="No posts yet"
+                        description="Create your first post to get started."
+                        actions={
+                          <Button
+                            size="sm"
+                            nativeButton={false}
+                            render={<Link href="/posts/new" />}
+                          >
+                            <PlusIcon data-icon="inline-start" />
+                            Create post
+                          </Button>
+                        }
+                      />
+                    )
+                  ) : (
+                    <ul className="divide-y divide-border border-t border-border">
+                      {recentPosts.map((post, index) => (
+                        <PostRow key={post.id} post={post} index={index} />
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </Section>
 
-              {recentPosts.length === 0 ? (
-                isFiltered ? (
-                  <Empty>
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <FileTextIcon />
-                      </EmptyMedia>
-                      <EmptyTitle>No matching posts</EmptyTitle>
-                      <EmptyDescription>
-                        {q
-                          ? `Nothing matches “${q}”${statusFilter !== "all" ? ` with status ${formatStatusLabel(statusFilter).toLowerCase()}` : ""}.`
-                          : `No ${formatStatusLabel(statusFilter).toLowerCase()} posts yet.`}
-                      </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
+            <Section labelledBy="accounts-heading">
+              <SectionHeader
+                id="accounts-heading"
+                title="Connected accounts"
+                actions={
+                  <Link
+                    href="/accounts"
+                    className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    Manage
+                  </Link>
+                }
+              />
+              <Card>
+                <CardContent>
+                  {accounts.length === 0 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        Connect a profile to start publishing.
+                      </p>
+                      <Button
+                        size="sm"
+                        nativeButton={false}
+                        render={<Link href="/accounts" />}
+                      >
+                        Connect account
+                      </Button>
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-border">
+                      {[...byPlatform.values()].map((entry) => (
+                        <li
+                          key={entry.platform}
+                          className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                        >
+                          <Avatar className="size-9">
+                            <AvatarFallback aria-label={formatPlatformName(entry.platform)}>
+                              <PlatformIcon
+                                platform={entry.platform}
+                                className="size-4"
+                              />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {formatPlatformName(entry.platform)}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {entry.usernames
+                                .map((name) => `@${name}`)
+                                .join(", ")}
+                            </p>
+                          </div>
+                          {entry.expired ? (
+                            <Badge variant="destructive">Expired</Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              {entry.usernames.length === 1
+                                ? "Connected"
+                                : `${entry.usernames.length} connected`}
+                            </Badge>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {expiredAccounts.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+                      <p className="text-xs text-muted-foreground">
+                        {expiredAccounts.length} connection
+                        {expiredAccounts.length === 1 ? "" : "s"} expired.
+                        Reconnect to keep publishing.
+                      </p>
                       <Button
                         size="sm"
                         variant="outline"
                         nativeButton={false}
-                        render={<Link href="/dashboard" />}
+                        render={<Link href="/accounts" />}
                       >
-                        Clear filters
+                        Reconnect
                       </Button>
-                    </EmptyContent>
-                  </Empty>
-                ) : (
-                  <Empty>
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <FileTextIcon />
-                      </EmptyMedia>
-                      <EmptyTitle>No posts yet</EmptyTitle>
-                      <EmptyDescription>
-                        Create your first post to get started.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                    <EmptyContent>
-                      <Button
-                        size="sm"
-                        nativeButton={false}
-                        render={<Link href="/posts/new" />}
-                      >
-                        <PlusIcon data-icon="inline-start" />
-                        Create post
-                      </Button>
-                    </EmptyContent>
-                  </Empty>
-                )
-              ) : (
-                <ul className="divide-y divide-border border-t border-border">
-                  {recentPosts.map((post, index) => (
-                    <PostRow key={post.id} post={post} index={index} />
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section aria-labelledby="accounts-heading">
-              <div className="mb-2 flex items-center justify-between gap-4">
-                <h2 id="accounts-heading" className="text-lg font-medium">
-                  Accounts
-                </h2>
-                <Link
-                  href="/accounts"
-                  className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                >
-                  Manage
-                </Link>
-              </div>
-              <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
-                <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
-                    {accounts.length === 0
-                      ? "No accounts connected"
-                      : `${accounts.length} connected`}
-                    {expiredAccounts.length > 0 && (
-                      <Badge variant="destructive">
-                        {expiredAccounts.length} expired
-                      </Badge>
-                    )}
-                  </p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {accounts.length === 0
-                      ? "Connect a profile to start publishing"
-                      : accounts.map((a) => `@${a.username}`).join(" · ")}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/accounts" />}
-                  className="shrink-0"
-                >
-                  {expiredAccounts.length > 0
-                    ? "Reconnect"
-                    : accounts.length === 0
-                      ? "Connect account"
-                      : "Manage"}
-                </Button>
-              </div>
-            </section>
-
-            <section
-              aria-label="Publishing stats"
-              className="border-t border-border pt-5"
-            >
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <PlanBadge plan={effective.plan} status={effective.status} />
-                <Link
-                  href="/billing"
-                  className="rounded-sm text-xs text-muted-foreground underline underline-offset-4 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                >
-                  {planLabel} · Manage plan
-                </Link>
-              </div>
-              <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-2">
-                {stats.map((stat) => (
-                  <p key={stat.label} className="text-sm">
-                    <span className="font-semibold tabular-nums">
-                      {stat.value}
-                    </span>{" "}
-                    <span className="text-muted-foreground">{stat.label.toLowerCase()}</span>
-                  </p>
-                ))}
-                {(publishing > 0 || failed > 0) && (
-                  <span className="flex flex-wrap gap-2">
-                    {publishing > 0 && (
-                      <Badge variant="secondary">
-                        Publishing · {publishing}
-                      </Badge>
-                    )}
-                    {failed > 0 && (
-                      <Badge variant="destructive">Failed · {failed}</Badge>
-                    )}
-                  </span>
-                )}
-                {platformCounts.length > 1 && (
-                  <span className="flex flex-wrap gap-2">
-                    {platformCounts.map((entry) => (
-                      <Badge key={entry.platform} variant="outline">
-                        {formatPlatformName(entry.platform)} · {entry.count}
-                      </Badge>
-                    ))}
-                  </span>
-                )}
-              </div>
-            </section>
-          </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </Section>
+          </PageSections>
         )}
-      </div>
+      </PageContainer>
     </AppShell>
   );
 }

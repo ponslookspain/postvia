@@ -3,7 +3,13 @@ import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
 
 const TIKTOK_AUTHORIZE_URL = "https://www.tiktok.com/v2/auth/authorize/";
 const TIKTOK_API_BASE = "https://open.tiktokapis.com";
-const TIKTOK_SCOPES = ["user.info.basic", "video.publish"];
+/**
+ * The only scopes Postvia requests. Do not claim broader scopes
+ * (e.g. video.list, user.info.stats) anywhere in code or UI — TikTok
+ * Login Kit grants exactly what is requested here.
+ */
+export const TIKTOK_SCOPES = ["user.info.basic", "video.publish"] as const;
+export const TIKTOK_CAPTION_MAX_LENGTH = 2200;
 
 const DEFAULT_REDIRECT_URI = "https://postvia.online/api/auth/tiktok/callback";
 
@@ -140,6 +146,9 @@ function normalizeTokens(data: Record<string, unknown>): TiktokTokens {
   if (!tokens.access_token || !tokens.refresh_token || !tokens.open_id) {
     throw new TiktokApiError("token_exchange_failed", "Incomplete TikTok token response", 502);
   }
+  if (!Number.isFinite(tokens.expires_in) || tokens.expires_in <= 0) {
+    tokens.expires_in = 86400;
+  }
   return tokens;
 }
 
@@ -205,39 +214,71 @@ export async function queryTiktokCreatorInfo(
     `${TIKTOK_API_BASE}/v2/post/publish/creator_info/query/`,
     accessToken
   );
+  const rawOptions = Array.isArray(data.privacy_level_options)
+    ? data.privacy_level_options.map(String).map((option) => option.trim()).filter((option) => option.length > 0)
+    : [];
+  const maxDuration = Number(data.max_video_post_duration_sec ?? 0);
   return {
     creatorUsername: String(data.creator_username ?? ""),
     creatorNickname: String(data.creator_nickname ?? ""),
-    privacyLevelOptions: Array.isArray(data.privacy_level_options)
-      ? data.privacy_level_options.map(String)
-      : [],
+    // The live TikTok response is the only source of truth for privacy
+    // options — capabilities.ts keeps a fallback whitelist for validation
+    // only, never for the UI.
+    privacyLevelOptions: [...new Set(rawOptions)],
     commentDisabled: Boolean(data.comment_disabled),
     duetDisabled: Boolean(data.duet_disabled),
     stitchDisabled: Boolean(data.stitch_disabled),
-    maxVideoPostDurationSec: Number(data.max_video_post_duration_sec ?? 0),
+    maxVideoPostDurationSec: Number.isFinite(maxDuration) && maxDuration > 0 ? maxDuration : 0,
   };
 }
+
+type TiktokTokenStore = {
+  findUnique: (args: {
+    where: { id: string };
+    select: { accessToken: boolean; refreshToken: boolean; expiresAt: boolean };
+  }) => Promise<{
+    accessToken: string;
+    refreshToken: string | null;
+    expiresAt: Date | null;
+  } | null>;
+  updateMany: (args: {
+    where: { id: string; accessToken: string };
+    data: { accessToken: string; refreshToken: string; expiresAt: Date };
+  }) => Promise<{ count: number }>;
+  update: (args: {
+    where: { id: string };
+    data: { accessToken: string; refreshToken: string; expiresAt: Date };
+  }) => Promise<unknown>;
+};
 
 /**
  * Returns a fresh access token for a stored TikTok account, refreshing and
  * persisting rotated tokens when close to expiry. Never logs secrets.
  *
  * TikTok rotates the refresh token on every refresh, so parallel targets of
- * the same account must not refresh twice with the same token. The stored
- * row is re-read first: if a concurrent worker already rotated the tokens
- * (different access token, still valid), its result is reused.
+ * the same account must not refresh twice with the same token:
+ * 1. the stored row is re-read first — if a concurrent worker already
+ *    rotated the tokens (different access token, still valid), its result
+ *    is reused without a second refresh;
+ * 2. the rotated tokens are persisted with a conditional update keyed on
+ *    the previously seen access token — if another worker won the race,
+ *    the loser re-reads and reuses the winner instead of overwriting it.
  */
-export async function ensureFreshTiktokToken(account: {
-  id: string;
-  accessToken: string;
-  refreshToken: string | null;
-  expiresAt: Date | null;
-}): Promise<string> {
+export async function ensureFreshTiktokToken(
+  account: {
+    id: string;
+    accessToken: string;
+    refreshToken: string | null;
+    expiresAt: Date | null;
+  },
+  store?: TiktokTokenStore
+): Promise<string> {
+  const db: TiktokTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
   if (account.expiresAt && account.expiresAt.getTime() > now + 5 * 60_000) {
     return account.accessToken;
   }
-  const stored = await prisma.socialAccount.findUnique({
+  const stored = await db.findUnique({
     where: { id: account.id },
     select: { accessToken: true, refreshToken: true, expiresAt: true },
   });
@@ -258,16 +299,43 @@ export async function ensureFreshTiktokToken(account: {
       401
     );
   }
-  const tokens = await refreshTiktokToken(refreshToken);
-  await prisma.socialAccount.update({
-    where: { id: account.id },
-    data: {
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
-    },
-  });
-  return tokens.access_token;
+  let tokens: TiktokTokens;
+  try {
+    tokens = await refreshTiktokToken(refreshToken);
+  } catch (error) {
+    // Preserve TikTok's terminal refresh codes so callers can map them
+    // to "reconnect" without parsing messages. Never attach tokens.
+    if (error instanceof TiktokApiError && isTiktokAuthErrorCode(error.code)) {
+      throw error;
+    }
+    throw error;
+  }
+  const next = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+  };
+  try {
+    const claimed = await db.updateMany({
+      where: { id: account.id, accessToken: current.accessToken },
+      data: next,
+    });
+    if (claimed.count === 0) {
+      // Lost the rotation race: re-read the winner's tokens.
+      const winner = await db.findUnique({
+        where: { id: account.id },
+        select: { accessToken: true, refreshToken: true, expiresAt: true },
+      });
+      if (winner && winner.accessToken !== current.accessToken) {
+        return winner.accessToken;
+      }
+    }
+  } catch {
+    // Conditional update unsupported (or transient DB error): fall back
+    // to a plain update so tokens still rotate, then return them.
+    await db.update({ where: { id: account.id }, data: next });
+  }
+  return next.accessToken;
 }
 
 /* ------------------------------ direct post ------------------------------ */
@@ -295,11 +363,26 @@ export function planTiktokChunks(videoSize: number): TiktokChunkPlan {
 export type ByteRange = { start: number; end: number; length: number; last: boolean };
 
 export function tiktokChunkRanges(videoSize: number, plan: TiktokChunkPlan): ByteRange[] {
+  if (!Number.isFinite(videoSize) || videoSize <= 0) {
+    throw new Error("Invalid video size");
+  }
+  if (!Number.isInteger(plan.totalChunkCount) || plan.totalChunkCount < 1) {
+    throw new Error("Invalid chunk plan");
+  }
+  if (!Number.isFinite(plan.chunkSize) || plan.chunkSize <= 0) {
+    throw new Error("Invalid chunk plan");
+  }
   const ranges: ByteRange[] = [];
   for (let index = 0; index < plan.totalChunkCount; index++) {
     const start = index * plan.chunkSize;
+    if (start >= videoSize) {
+      throw new Error("Chunk plan exceeds video size");
+    }
     // The final chunk absorbs all remaining bytes.
     const end = index === plan.totalChunkCount - 1 ? videoSize - 1 : start + plan.chunkSize - 1;
+    if (end < start) {
+      throw new Error("Invalid chunk range");
+    }
     ranges.push({ start, end, length: end - start + 1, last: index === plan.totalChunkCount - 1 });
   }
   return ranges;
@@ -355,13 +438,33 @@ export async function fetchTiktokPublishStatus(
   };
 }
 
+export function tiktokErrorCode(error: unknown): string {
+  if (error instanceof TiktokApiError) return error.code;
+  if (typeof error === "object" && error && "code" in error) {
+    return String((error as { code: unknown }).code);
+  }
+  return "";
+}
+
+/**
+ * Auth/token failures that always mean the user must reconnect —
+ * shared by publish, resume, and creator-info so the contract stays
+ * in one place.
+ */
+export function isTiktokAuthErrorCode(code: string): boolean {
+  return (
+    code === "scope_not_authorized" ||
+    code === "token_expired" ||
+    code === "invalid_refresh_token" ||
+    code === "refresh_token_expired" ||
+    code === "access_token_invalid" ||
+    code === "access_token_expired" ||
+    code === "invalid_token"
+  );
+}
+
 export function tiktokErrorMessage(error: unknown): string {
-  const code =
-    error instanceof TiktokApiError
-      ? error.code
-      : typeof error === "object" && error && "code" in error
-        ? String((error as { code: unknown }).code)
-        : "";
+  const code = tiktokErrorCode(error);
   switch (code) {
     case "privacy_level_option_mismatch":
       return "TikTok rejected the privacy setting for this account. Pick a different option in the post's TikTok settings.";
@@ -377,6 +480,9 @@ export function tiktokErrorMessage(error: unknown): string {
     case "token_expired":
     case "invalid_refresh_token":
     case "refresh_token_expired":
+    case "access_token_invalid":
+    case "access_token_expired":
+    case "invalid_token":
       return "TikTok access expired or was revoked. Reconnect your TikTok account.";
     case "url_ownership_unverified":
       return "TikTok could not verify the media source. Please retry the post.";
@@ -391,6 +497,19 @@ export function tiktokErrorMessage(error: unknown): string {
   }
 }
 
+/**
+ * status/fetch terminal FAILED carries a raw `fail_reason` code
+ * (e.g. "video_duration_exceeds_limit"). Map it through the same
+ * user-facing dictionary; unknown reasons keep the code for support.
+ */
+export function tiktokFailReasonMessage(failReason?: string): string {
+  if (!failReason) return "TikTok rejected the video post. Please review the media and retry.";
+  const friendly = tiktokErrorMessage({ code: failReason });
+  return friendly === "TikTok publishing failed. Please try again."
+    ? `TikTok could not publish the video: ${failReason}`
+    : friendly;
+}
+
 /** Settings are validated against fresh creator info; unavailable options are enforced off. */
 export function resolveTiktokPostInfo(input: {
   title: string;
@@ -400,15 +519,22 @@ export function resolveTiktokPostInfo(input: {
   const { settings, creatorInfo } = input;
   const title = input.title.trim();
   if (!title) {
-    return { error: "TikTok posts require a caption. Add text for TikTok." };
+    return { error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback." };
   }
-  if (Array.from(title).length > 2200) {
-    return { error: "TikTok caption exceeds the 2200 character limit." };
+  if (Array.from(title).length > TIKTOK_CAPTION_MAX_LENGTH) {
+    return { error: `TikTok title exceeds the ${TIKTOK_CAPTION_MAX_LENGTH} character limit.` };
   }
   if (creatorInfo.privacyLevelOptions.length === 0) {
     return { error: "TikTok did not return privacy options for this account. Reconnect or retry." };
   }
-  const privacyLevel = settings.privacyLevel ?? "SELF_ONLY";
+  // No hardcoded default: when the caller passes no privacy level, prefer
+  // SELF_ONLY only if the account actually offers it, otherwise fall back
+  // to the first live option from creator info.
+  const privacyLevel =
+    settings.privacyLevel ??
+    (creatorInfo.privacyLevelOptions.includes("SELF_ONLY")
+      ? "SELF_ONLY"
+      : creatorInfo.privacyLevelOptions[0]);
   if (!creatorInfo.privacyLevelOptions.includes(privacyLevel)) {
     return {
       error: `This TikTok account cannot use the "${privacyLevel}" privacy setting. Choose another option.`,
@@ -470,6 +596,19 @@ export async function publishTiktokDirectVideo(
     return monitorPublish(accessToken, input.existingPublishId, sleep, pollIntervalMs, pollBudgetMs, now);
   }
 
+  if (!Number.isFinite(input.videoSize) || input.videoSize <= 0) {
+    return { state: "invalid", error: "TikTok publishing requires a valid video file." };
+  }
+  if (typeof input.videoContentType !== "string" || input.videoContentType.trim().length === 0) {
+    return { state: "invalid", error: "TikTok publishing requires a video content type." };
+  }
+  if (!input.title || input.title.trim().length === 0) {
+    return {
+      state: "invalid",
+      error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback.",
+    };
+  }
+
   let creatorInfo: TiktokCreatorInfo;
   try {
     creatorInfo = await queryTiktokCreatorInfo(accessToken);
@@ -486,7 +625,12 @@ export async function publishTiktokDirectVideo(
     return { state: "invalid", error: resolved.error };
   }
 
-  const plan = planTiktokChunks(input.videoSize);
+  let plan: TiktokChunkPlan;
+  try {
+    plan = planTiktokChunks(input.videoSize);
+  } catch {
+    return { state: "invalid", error: "TikTok publishing requires a valid video file." };
+  }
   let publishId: string;
   let uploadUrl: string;
   try {
@@ -515,6 +659,12 @@ export async function publishTiktokDirectVideo(
   try {
     for (const range of tiktokChunkRanges(input.videoSize, plan)) {
       const body = await deps.readChunk(range);
+      if (body.byteLength !== range.length) {
+        return {
+          state: "failed",
+          error: "TikTok video upload read an incomplete chunk. Please retry the post.",
+        };
+      }
       const res = await globalThis.fetch(uploadUrl, {
         method: "PUT",
         headers: {
@@ -556,12 +706,7 @@ async function monitorPublish(
         return { state: "published", externalPostId: status.postIds[0] };
       }
       if (status.status === FAILED_STATUS) {
-        return {
-          state: "failed",
-          error: status.failReason
-            ? `TikTok could not publish the video: ${status.failReason}`
-            : "TikTok rejected the video post. Please review the media and retry.",
-        };
+        return { state: "failed", error: tiktokFailReasonMessage(status.failReason) };
       }
       if (KNOWN_PROCESSING_STATUSES.has(status.status) || status.status.length === 0) {
         sawKnownProcessing = true;

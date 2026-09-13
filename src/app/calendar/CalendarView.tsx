@@ -3,20 +3,27 @@
 import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeftIcon, ChevronRightIcon, ClapperboardIcon, PlusIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, GripVerticalIcon, PlusIcon } from "lucide-react";
 import { cn } from "cn";
 import { PageHeader } from "@/components/PageHeader";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { StatusDot } from "@/components/StatusBadge";
+import { EmptyBlock } from "@/components/StateBlock";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import { Separator } from "@/components/ui/separator";
+  Card,
+  CardAction,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "@/components/ui/toast";
 import {
   addMonths,
@@ -30,6 +37,14 @@ import {
 } from "@/lib/calendar";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/**
+ * Fixed grid geometry: every day cell is the same height on every row,
+ * so a busy day can never stretch the timetable. Desktop shows at most
+ * three compact chips; the rest live behind "+N more", which opens an
+ * overlay Popover — the grid never reflows.
+ */
+const MAX_VISIBLE_CHIPS = 3;
 
 function subscribeViewerTimeZone(): () => void {
   return () => {};
@@ -48,53 +63,115 @@ function useViewerTimeZone(): string {
   );
 }
 
-function StatusDot({ status }: { status: string }) {
+/** HH:MM of the post's reference instant (scheduled, published, created). */
+function postTime(post: CalendarPost): string {
+  const iso = post.scheduledAt ?? post.publishedAt ?? post.createdAt;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function ChipPlatforms({ post }: { post: CalendarPost }) {
+  if (post.targets.length === 0) return null;
   return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "size-2 shrink-0 rounded-full",
-        status === "FAILED" && "bg-destructive",
-        status === "DRAFT" && "bg-muted-foreground",
-        status === "SCHEDULED" && "bg-primary",
-        status === "PUBLISHING" && "animate-pulse bg-primary",
-        status === "PUBLISHED" && "border border-primary bg-transparent",
-        status === "PARTIALLY_PUBLISHED" && "border border-destructive bg-transparent"
-      )}
-    />
+    <span className="flex shrink-0 items-center" aria-hidden="true">
+      {post.targets.slice(0, 2).map((target) => (
+        <span
+          key={`${target.platform}-${target.username ?? ""}`}
+          title={
+            target.username
+              ? `${target.platform} @${target.username}`
+              : target.platform
+          }
+          className="flex size-3 items-center justify-center [&_svg]:size-3"
+        >
+          <PlatformIcon platform={target.platform} className="size-3" />
+        </span>
+      ))}
+    </span>
   );
 }
 
-function ChipMeta({ post }: { post: CalendarPost }) {
+/**
+ * One-line day chip: status dot, time, truncated title, platform marks.
+ * Fixed h-6 everywhere — long text truncates instead of growing the cell.
+ */
+function DayPostChip({
+  post,
+  draggable,
+  dimmed,
+  onDragStart,
+}: {
+  post: CalendarPost;
+  draggable: boolean;
+  dimmed: boolean;
+  onDragStart: (event: React.DragEvent) => void;
+}) {
   return (
-    <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
-      {post.previewMedia?.type === "IMAGE" ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`/api/media/${post.previewMedia.id}`}
-          alt=""
-          loading="lazy"
-          className="size-6 shrink-0 rounded object-cover"
-        />
-      ) : post.previewMedia?.type === "VIDEO" ? (
-        <ClapperboardIcon className="size-3 shrink-0" aria-hidden="true" />
-      ) : null}
-      <span className="flex shrink-0 items-center">
-        {post.targets.slice(0, 3).map((target) => (
-          <span
-            key={`${target.platform}-${target.username ?? ""}`}
-            title={
-              target.username
-                ? `${target.platform} @${target.username}`
-                : target.platform
-            }
-            className="flex size-3 items-center justify-center [&_svg]:size-3"
-          >
-            <PlatformIcon platform={target.platform} className="size-3" />
-          </span>
-        ))}
+    <Link
+      href={`/posts/${post.id}`}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      aria-label={`${post.text || "Untitled post"} (${post.status.toLowerCase()})`}
+      className={cn(
+        "flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-1.5 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+        dimmed && "opacity-50"
+      )}
+    >
+      <StatusDot status={post.status} />
+      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+        {postTime(post)}
       </span>
-    </span>
+      <span className="min-w-0 flex-1 truncate text-xs">
+        {post.text || "Untitled post"}
+      </span>
+      <ChipPlatforms post={post} />
+    </Link>
+  );
+}
+
+/** Overflow posts behind "+N more": overlay list, grid stays untouched. */
+function DayOverflow({
+  label,
+  posts,
+}: {
+  label: string;
+  posts: CalendarPost[];
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger className="flex h-5 shrink-0 items-center rounded-sm px-0.5 text-left text-[11px] font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+        +{posts.length} more
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        aria-label={`More posts on ${label}`}
+        className="max-h-72 overflow-y-auto"
+      >
+        <ul className="flex min-w-0 flex-col gap-1">
+          {posts.map((post) => (
+            <li key={post.id} className="min-w-0">
+              <Link
+                href={`/posts/${post.id}`}
+                className="flex h-6 min-w-0 items-center gap-1.5 rounded-md px-1 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                <StatusDot status={post.status} />
+                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                  {postTime(post)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs">
+                  {post.text || "Untitled post"}
+                </span>
+                <ChipPlatforms post={post} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -217,15 +294,20 @@ export function CalendarView({
         title="Calendar"
         description={`Publishing schedule for ${userName}`}
         actions={
-          <Button nativeButton={false} render={<Link href="/posts/new" />}>
+          <Button
+            size="lg"
+            nativeButton={false}
+            render={<Link href="/posts/new" />}
+            className="min-h-11"
+          >
             <PlusIcon data-icon="inline-start" />
             Create post
           </Button>
         }
       />
 
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-medium">{title}</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-medium tracking-tight">{title}</h2>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -260,7 +342,7 @@ export function CalendarView({
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section aria-label={`Posts in ${title}`}>
           <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border animate-[post-in_.4s_ease_both] motion-reduce:animate-none">
             {WEEKDAYS.map((day) => (
@@ -277,10 +359,13 @@ export function CalendarView({
               const dayPosts = buckets.get(key) ?? [];
               const isToday = key === todayKey;
               const isOver = dropKey === key;
+              const visible = dayPosts.slice(0, MAX_VISIBLE_CHIPS);
+              const overflow = dayPosts.slice(MAX_VISIBLE_CHIPS);
+              const dayLabel = `${Number(key.slice(8))} ${title}`;
               return (
                 <div
                   key={key}
-                  aria-label={`${Number(key.slice(8))} ${title}, ${dayPosts.length} posts`}
+                  aria-label={`${dayLabel}, ${dayPosts.length} posts`}
                   onDragOver={(event) => {
                     event.preventDefault();
                     event.dataTransfer.dropEffect = "move";
@@ -289,7 +374,7 @@ export function CalendarView({
                   onDragLeave={() => setDropKey((current) => (current === key ? null : current))}
                   onDrop={(event) => void dropOnDay(key, event)}
                   className={cn(
-                    "flex min-h-16 flex-col gap-1 bg-background p-1 sm:min-h-24 sm:p-1.5",
+                    "flex h-20 flex-col gap-1 overflow-hidden bg-background p-1 sm:h-36 sm:p-1.5",
                     !inMonth && "bg-muted/30 text-muted-foreground",
                     isToday && "bg-muted/50",
                     isOver && "bg-muted ring-2 ring-inset ring-ring/50"
@@ -297,7 +382,7 @@ export function CalendarView({
                 >
                   <span
                     className={cn(
-                      "flex size-6 items-center justify-center rounded-full text-xs tabular-nums",
+                      "flex size-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums",
                       isToday && "bg-primary font-medium text-primary-foreground"
                     )}
                   >
@@ -311,29 +396,22 @@ export function CalendarView({
                         ))}
                       </div>
                       <ul className="hidden min-w-0 flex-col gap-1 sm:flex">
-                        {dayPosts.map((post) => (
+                        {visible.map((post) => (
                           <li key={post.id} className="min-w-0">
-                            <Link
-                              href={`/posts/${post.id}`}
+                            <DayPostChip
+                              post={post}
                               draggable={isMovableStatus(post.status)}
+                              dimmed={droppingId === post.id}
                               onDragStart={startDrag(post.id)}
-                              aria-label={`${post.text || "Untitled post"} (${post.status.toLowerCase()})`}
-                              className={cn(
-                                "flex min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-1.5 py-1 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
-                                droppingId === post.id && "opacity-50"
-                              )}
-                            >
-                              <StatusDot status={post.status} />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-xs">
-                                  {post.text || "Untitled post"}
-                                </span>
-                                <ChipMeta post={post} />
-                              </span>
-                            </Link>
+                            />
                           </li>
                         ))}
                       </ul>
+                      {overflow.length > 0 && (
+                        <div className="hidden sm:block">
+                          <DayOverflow label={dayLabel} posts={overflow} />
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -355,17 +433,12 @@ export function CalendarView({
             ))}
           </div>
           {posts.length === 0 && (
-            <Empty className="mt-4">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <PlusIcon />
-                </EmptyMedia>
-                <EmptyTitle>Nothing scheduled this month</EmptyTitle>
-                <EmptyDescription>
-                  Create a post or schedule a draft to see it here.
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
+            <EmptyBlock
+              className="mt-4"
+              icon={<PlusIcon />}
+              title="Nothing scheduled this month"
+              description="Create a post or schedule a draft to see it here."
+              actions={
                 <Button
                   size="sm"
                   nativeButton={false}
@@ -374,58 +447,72 @@ export function CalendarView({
                   <PlusIcon data-icon="inline-start" />
                   Create post
                 </Button>
-              </EmptyContent>
-            </Empty>
+              }
+            />
           )}
         </section>
 
         <aside aria-labelledby="drafts-heading" className="min-w-0">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 id="drafts-heading" className="text-lg font-medium">
-              Unscheduled drafts
-            </h2>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {drafts.length}
-            </span>
-          </div>
-          {drafts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No unscheduled drafts. Drag a scheduled post between days to
-              move it, or create a new one.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {drafts.map((post) => (
-                <li key={post.id} className="min-w-0">
-                  <Link
-                    href={`/posts/${post.id}`}
-                    draggable
-                    onDragStart={startDrag(post.id)}
-                    className={cn(
-                      "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background p-3 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
-                      droppingId === post.id && "opacity-50"
-                    )}
-                  >
-                    <StatusDot status={post.status} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">
-                        {post.text || "Untitled post"}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        Drag onto a day to schedule for 09:00
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Separator className="my-4" />
-          <p className="text-xs leading-5 text-muted-foreground">
-            Only scheduled posts and drafts can be moved. Publishing,
-            published and failed posts stay put. Times shown in your local
-            timezone.
-          </p>
+          <Card>
+            <CardHeader>
+              <CardTitle>Unscheduled drafts</CardTitle>
+              <CardAction>
+                <Badge
+                  variant="secondary"
+                  className="tabular-nums"
+                  aria-label={`${drafts.length} unscheduled drafts`}
+                >
+                  {drafts.length}
+                </Badge>
+              </CardAction>
+            </CardHeader>
+            <CardContent>
+              {drafts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No unscheduled drafts. Drag a scheduled post between days
+                  to move it, or create a new one.
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {drafts.map((post) => (
+                    <li key={post.id} className="min-w-0">
+                      <Link
+                        href={`/posts/${post.id}`}
+                        draggable
+                        onDragStart={startDrag(post.id)}
+                        title="Drag onto a day to schedule"
+                        className={cn(
+                          "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background p-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+                          droppingId === post.id && "opacity-50"
+                        )}
+                      >
+                        <GripVerticalIcon
+                          aria-hidden="true"
+                          className="size-4 shrink-0 cursor-grab text-muted-foreground"
+                        />
+                        <StatusDot status={post.status} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm">
+                            {post.text || "Untitled post"}
+                          </span>
+                          <span className="mt-0.5 flex items-center gap-1">
+                            <ChipPlatforms post={post} />
+                          </span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+            <CardFooter>
+              <p className="text-xs leading-5 text-muted-foreground">
+                Only scheduled posts and drafts can be moved. Publishing,
+                published and failed posts stay put. Times shown in your
+                local timezone.
+              </p>
+            </CardFooter>
+          </Card>
         </aside>
       </div>
     </div>

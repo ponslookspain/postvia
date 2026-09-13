@@ -73,10 +73,7 @@ export function PreviewCard({
     " for " +
     model.label;
   return (
-    <div
-      key={model.accountId}
-      className="flex flex-col gap-3 rounded-lg border p-4"
-    >
+    <div key={model.accountId} className="flex min-w-0 flex-col gap-3">
       {(model.customized || model.hasSettingsOverride || model.inheritsGlobal) && (
         <div className="flex items-center justify-end gap-2">
           {model.customized && <Badge variant="secondary">Custom</Badge>}
@@ -91,7 +88,8 @@ export function PreviewCard({
         </div>
       )}
       {isCustomizing ? (
-        <FieldGroup className="gap-3">
+        <div className="rounded-lg border border-border bg-muted/40 p-3">
+          <FieldGroup className="gap-3">
           <Field data-invalid={model.overLimit || undefined}>
             <FieldLabel htmlFor={`custom-${model.accountId}`}>
               {model.platform === "TIKTOK"
@@ -149,6 +147,7 @@ export function PreviewCard({
             </Button>
           </div>
         </FieldGroup>
+        </div>
       ) : (
         <div className="flex flex-col gap-2">
           <PlatformPost model={model} userName={userName} media={media} />

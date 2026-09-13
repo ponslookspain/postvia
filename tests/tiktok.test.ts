@@ -362,7 +362,7 @@ describe("TikTok social layer", () => {
       assert.ok(!calls.some((call) => call.url.includes("video/init")));
     });
 
-    test("FAILED status surfaces the TikTok fail_reason", async () => {
+    test("FAILED status maps fail_reason to a user-readable message", async () => {
       route("creator_info", () => creatorResponse());
       route("video/init", () =>
         json(200, { data: { publish_id: "PUB-3", upload_url: UPLOAD_URL }, error: { code: "ok" } })
@@ -382,8 +382,55 @@ describe("TikTok social layer", () => {
       );
       assert.equal(result.state, "failed");
       if (result.state === "failed") {
-        assert.match(result.error, /video_duration_exceeds_limit/);
+        assert.match(result.error, /longer than/i);
       }
+    });
+
+    test("unknown fail_reason keeps the raw code for support", async () => {
+      route("creator_info", () => creatorResponse());
+      route("video/init", () =>
+        json(200, { data: { publish_id: "PUB-3b", upload_url: UPLOAD_URL }, error: { code: "ok" } })
+      );
+      route("upload.example", () => json(201, {}));
+      route("status/fetch", () =>
+        json(200, {
+          data: { status: "FAILED", fail_reason: "mystery_code_zzz" },
+          error: { code: "ok" },
+        })
+      );
+      const d = deps();
+      const result = await tiktok.publishTiktokDirectVideo(
+        "AT-1",
+        { title: "hi", settings: {}, videoSize: 1024, videoContentType: "video/mp4" },
+        d.deps
+      );
+      assert.equal(result.state, "failed");
+      if (result.state === "failed") {
+        assert.match(result.error, /mystery_code_zzz/);
+      }
+    });
+
+    test("missing title fails BEFORE creator-info (no global fallback)", async () => {
+      const d = deps();
+      const result = await tiktok.publishTiktokDirectVideo(
+        "AT-1",
+        { title: "   ", settings: {}, videoSize: 1024, videoContentType: "video/mp4" },
+        d.deps
+      );
+      assert.equal(result.state, "invalid");
+      assert.ok(!calls.some((call) => call.url.includes("creator_info")));
+      assert.ok(!calls.some((call) => call.url.includes("video/init")));
+    });
+
+    test("invalid video size fails without init", async () => {
+      const d = deps();
+      const result = await tiktok.publishTiktokDirectVideo(
+        "AT-1",
+        { title: "hi", settings: {}, videoSize: 0, videoContentType: "video/mp4" },
+        d.deps
+      );
+      assert.equal(result.state, "invalid");
+      assert.ok(!calls.some((call) => call.url.includes("video/init")));
     });
 
     test("existing publish_id only fetches status — a second init can never happen", async () => {
@@ -498,6 +545,293 @@ describe("TikTok social layer", () => {
           )
         ),
         /not audited yet/
+      );
+    });
+
+    test("all ten required codes map to user-facing messages", () => {
+      const cases: Array<[string, RegExp]> = [
+        ["unaudited_client_can_only_post_to_private_accounts", /not audited yet/i],
+        ["privacy_level_option_mismatch", /privacy setting/i],
+        ["rate_limit_exceeded", /rate limit/i],
+        ["spam_risk_too_many_posts", /daily publishing limit/i],
+        ["reached_active_user_cap", /active publishing cap/i],
+        ["url_ownership_unverified", /verify the media source/i],
+        ["access_token_invalid", /Reconnect your TikTok account/],
+        ["scope_not_authorized", /Reconnect your TikTok account/],
+        ["video_size_exceeds_limit", /too large/i],
+        ["video_duration_exceeds_limit", /longer than/i],
+      ];
+      for (const [code, pattern] of cases) {
+        assert.match(
+          tiktok.tiktokErrorMessage(new tiktok.TiktokApiError(code, "", 400)),
+          pattern,
+          `code ${code} must map`
+        );
+      }
+    });
+
+    test("refresh-token terminal codes mean reconnect", () => {
+      for (const code of ["invalid_refresh_token", "refresh_token_expired", "token_expired"]) {
+        assert.equal(tiktok.isTiktokAuthErrorCode(code), true);
+        assert.match(
+          tiktok.tiktokErrorMessage(new tiktok.TiktokApiError(code, "", 401)),
+          /Reconnect your TikTok account/
+        );
+      }
+      assert.equal(tiktok.isTiktokAuthErrorCode("rate_limit_exceeded"), false);
+    });
+
+    test("fail_reason maps through the same dictionary", () => {
+      assert.match(tiktok.tiktokFailReasonMessage("video_size_exceeds_limit"), /too large/i);
+      assert.match(tiktok.tiktokFailReasonMessage(undefined), /review the media/i);
+      assert.match(tiktok.tiktokFailReasonMessage("mystery_xyz"), /mystery_xyz/);
+    });
+
+    test("only the two documented scopes are requested", () => {
+      assert.deepEqual([...tiktok.TIKTOK_SCOPES], ["user.info.basic", "video.publish"]);
+    });
+  });
+
+  describe("terminal status", () => {
+    test("PUBLISH_COMPLETE and FAILED are terminal, processing is not", () => {
+      assert.equal(tiktok.isTiktokTerminalStatus("PUBLISH_COMPLETE"), true);
+      assert.equal(tiktok.isTiktokTerminalStatus("FAILED"), true);
+      for (const status of [
+        "PROCESSING_UPLOAD",
+        "PROCESSING_DOWNLOAD",
+        "PROCESSING_TRANSCODING",
+        "PROCESSING_PUBLISH",
+        "",
+        "SOMETHING_NEW",
+      ]) {
+        assert.equal(tiktok.isTiktokTerminalStatus(status), false);
+      }
+    });
+  });
+
+  describe("privacy validation", () => {
+    const baseCreator = {
+      creatorUsername: "ponslookspain",
+      creatorNickname: "Pons Look",
+      privacyLevelOptions: ["SELF_ONLY", "MUTUAL_FOLLOW_FRIENDS"],
+      commentDisabled: false,
+      duetDisabled: false,
+      stitchDisabled: false,
+      maxVideoPostDurationSec: 300,
+    };
+
+    test("missing title is invalid and never falls back", () => {
+      const result = tiktok.resolveTiktokPostInfo({
+        title: "   ",
+        settings: {},
+        creatorInfo: baseCreator,
+      });
+      assert.ok("error" in result);
+    });
+
+    test("caption over 2200 code points is invalid (emoji count once)", () => {
+      const result = tiktok.resolveTiktokPostInfo({
+        title: "🚀".repeat(2201),
+        settings: {},
+        creatorInfo: baseCreator,
+      });
+      assert.ok("error" in result && /2200/.test(result.error));
+      const ok = tiktok.resolveTiktokPostInfo({
+        title: "🚀".repeat(2200),
+        settings: {},
+        creatorInfo: baseCreator,
+      });
+      assert.ok(!("error" in ok));
+    });
+
+    test("empty creator options are invalid", () => {
+      const result = tiktok.resolveTiktokPostInfo({
+        title: "hi",
+        settings: {},
+        creatorInfo: { ...baseCreator, privacyLevelOptions: [] },
+      });
+      assert.ok("error" in result);
+    });
+
+    test("default privacy prefers SELF_ONLY, else first live option", () => {
+      const withSelf = tiktok.resolveTiktokPostInfo({
+        title: "hi",
+        settings: {},
+        creatorInfo: baseCreator,
+      });
+      assert.ok(!("error" in withSelf));
+      if (!("error" in withSelf)) {
+        assert.equal(withSelf.postInfo["privacy_level"], "SELF_ONLY");
+      }
+      const publicOnly = tiktok.resolveTiktokPostInfo({
+        title: "hi",
+        settings: {},
+        creatorInfo: { ...baseCreator, privacyLevelOptions: ["PUBLIC_TO_EVERYONE"] },
+      });
+      assert.ok(!("error" in publicOnly));
+      if (!("error" in publicOnly)) {
+        assert.equal(publicOnly.postInfo["privacy_level"], "PUBLIC_TO_EVERYONE");
+      }
+    });
+
+    test("creator info parsing drops blank privacy options", async () => {
+      route(
+        "creator_info",
+        () =>
+          creatorResponse({ privacy_level_options: ["SELF_ONLY", "  ", "", "SELF_ONLY"] })
+      );
+      const info = await tiktok.queryTiktokCreatorInfo("AT-1");
+      assert.deepEqual(info.privacyLevelOptions, ["SELF_ONLY"]);
+    });
+  });
+
+  describe("chunk edge cases", () => {
+    const MB = 1024 * 1024;
+
+    test("64 MB + 1 byte splits with exact coverage", () => {
+      const size = 64 * MB + 1;
+      const plan = tiktok.planTiktokChunks(size);
+      assert.ok(plan.totalChunkCount >= 2);
+      const ranges = tiktok.tiktokChunkRanges(size, plan);
+      assert.equal(ranges.at(-1)!.end, size - 1);
+      assert.equal(
+        ranges.reduce((sum, range) => sum + range.length, 0),
+        size
+      );
+      for (const range of ranges.slice(0, -1)) {
+        assert.equal(range.length, plan.chunkSize);
+      }
+    });
+
+    test("invalid sizes and plans throw", () => {
+      assert.throws(() => tiktok.planTiktokChunks(0));
+      assert.throws(() => tiktok.planTiktokChunks(-5));
+      assert.throws(() => tiktok.planTiktokChunks(Number.NaN));
+      assert.throws(() =>
+        tiktok.tiktokChunkRanges(1024, { chunkSize: 512, totalChunkCount: 0 })
+      );
+      assert.throws(() =>
+        tiktok.tiktokChunkRanges(512, { chunkSize: 1024, totalChunkCount: 2 })
+      );
+    });
+
+    test("single-chunk range carries the whole file as final", () => {
+      const size = 1024;
+      const plan = tiktok.planTiktokChunks(size);
+      const [only] = tiktok.tiktokChunkRanges(size, plan);
+      assert.deepEqual(only, { start: 0, end: 1023, length: 1024, last: true });
+    });
+  });
+
+  describe("ensureFreshTiktokToken", () => {
+    function memoryStore(state: {
+      accessToken: string;
+      refreshToken: string | null;
+      expiresAt: Date | null;
+    }) {
+      const backing = { ...state };
+      return {
+        backing,
+        updateManyCalls: 0,
+        store: {
+          findUnique: async () => ({ ...backing }),
+          updateMany: async (args: {
+            where: { id: string; accessToken: string };
+            data: { accessToken: string; refreshToken: string; expiresAt: Date };
+          }) => {
+            // Conditional write: only the holder of the current token wins.
+            if (args.where.accessToken !== backing.accessToken) return { count: 0 };
+            backing.accessToken = args.data.accessToken;
+            backing.refreshToken = args.data.refreshToken;
+            backing.expiresAt = args.data.expiresAt;
+            return { count: 1 };
+          },
+          update: async () => ({}),
+        },
+      };
+    }
+
+    test("fresh token returns without network", async () => {
+      const account = {
+        id: "acc-1",
+        accessToken: "AT-fresh",
+        refreshToken: "RT-1",
+        expiresAt: new Date(Date.now() + 3600_000),
+      };
+      const token = await tiktok.ensureFreshTiktokToken(account);
+      assert.equal(token, "AT-fresh");
+      assert.equal(
+        calls.filter((call) => call.url.includes("oauth/token")).length,
+        0
+      );
+    });
+
+    test("expired token refreshes and persists rotation", async () => {
+      route("oauth/token", () => tokenResponse());
+      const mem = memoryStore({
+        accessToken: "AT-old",
+        refreshToken: "RT-old",
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      const token = await tiktok.ensureFreshTiktokToken(
+        { id: "acc-1", accessToken: "AT-old", refreshToken: "RT-old", expiresAt: new Date(Date.now() - 1000) },
+        mem.store
+      );
+      assert.equal(token, "AT-1");
+      assert.equal(mem.backing.accessToken, "AT-1");
+      assert.equal(mem.backing.refreshToken, "RT-2");
+    });
+
+    test("concurrent rotation winner is reused without second refresh", async () => {
+      const mem = memoryStore({
+        accessToken: "AT-winner",
+        refreshToken: "RT-winner",
+        expiresAt: new Date(Date.now() + 3600_000),
+      });
+      const token = await tiktok.ensureFreshTiktokToken(
+        { id: "acc-1", accessToken: "AT-stale", refreshToken: "RT-stale", expiresAt: new Date(Date.now() - 1000) },
+        mem.store
+      );
+      assert.equal(token, "AT-winner");
+      assert.equal(
+        calls.filter((call) => call.url.includes("oauth/token")).length,
+        0
+      );
+    });
+
+    test("missing refresh token fails with reconnect code", async () => {
+      const mem = memoryStore({
+        accessToken: "AT-old",
+        refreshToken: null,
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      await assert.rejects(
+        tiktok.ensureFreshTiktokToken(
+          { id: "acc-1", accessToken: "AT-old", refreshToken: null, expiresAt: new Date(Date.now() - 1000) },
+          mem.store
+        ),
+        (error: unknown) =>
+          error instanceof tiktok.TiktokApiError && error.code === "token_expired"
+      );
+    });
+
+    test("terminal refresh failure preserves the TikTok code", async () => {
+      route(
+        "oauth/token",
+        () => json(401, { error: { code: "invalid_refresh_token", message: "revoked" } })
+      );
+      const mem = memoryStore({
+        accessToken: "AT-old",
+        refreshToken: "RT-dead",
+        expiresAt: new Date(Date.now() - 1000),
+      });
+      await assert.rejects(
+        tiktok.ensureFreshTiktokToken(
+          { id: "acc-1", accessToken: "AT-old", refreshToken: "RT-dead", expiresAt: new Date(Date.now() - 1000) },
+          mem.store
+        ),
+        (error: unknown) =>
+          error instanceof tiktok.TiktokApiError && error.code === "invalid_refresh_token"
       );
     });
   });

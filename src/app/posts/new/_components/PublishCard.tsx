@@ -127,20 +127,21 @@ export function PublishCard({
             Scheduling is available for Threads. Publish to X is available now.
           </FieldDescription>
         )}
-        {/* Desktop action row; on mobile the fixed bottom bar owns these actions. */}
-        <div className="hidden flex-col gap-2 sm:flex-row lg:flex lg:flex-col xl:flex-row">
+        {/* Rail action stack; on mobile the fixed bottom bar owns these actions. */}
+        <div className="hidden flex-col gap-2 lg:flex">
           <Button
-            variant="outline"
-            onClick={onSaveDraft}
-            disabled={!canSave}
-            className="flex-1"
+            size="lg"
+            onClick={onPublish}
+            disabled={!canPublish}
+            className="w-full"
           >
-            {saving && <Spinner data-icon="inline-start" />}
-            <SaveIcon data-icon="inline-start" />
-            {saving ? "Saving..." : "Save draft"}
+            {publishing && <Spinner data-icon="inline-start" />}
+            {!publishing && <SendIcon data-icon="inline-start" />}
+            {publishing ? "Publishing..." : "Publish now"}
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
+            size="lg"
             onClick={onScheduleClick}
             disabled={scheduling}
             title={
@@ -148,19 +149,21 @@ export function PublishCard({
                 ? "Scheduling for X is not available yet. Use Threads."
                 : "Schedule this post"
             }
-            className="flex-1"
+            className="w-full"
           >
             <CalendarClockIcon data-icon="inline-start" />
             {scheduling ? "Scheduling..." : "Schedule"}
           </Button>
           <Button
-            onClick={onPublish}
-            disabled={!canPublish}
-            className="flex-1"
+            variant="outline"
+            size="lg"
+            onClick={onSaveDraft}
+            disabled={!canSave}
+            className="w-full"
           >
-            {publishing && <Spinner data-icon="inline-start" />}
-            {!publishing && <SendIcon data-icon="inline-start" />}
-            {publishing ? "Publishing..." : "Publish now"}
+            {saving && <Spinner data-icon="inline-start" />}
+            <SaveIcon data-icon="inline-start" />
+            {saving ? "Saving..." : "Save draft"}
           </Button>
         </div>
         {publishing && (

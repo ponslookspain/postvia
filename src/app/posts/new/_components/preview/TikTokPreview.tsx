@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, MessageCircle, Share } from "lucide-react";
+import { ClapperboardIcon, Heart, MessageCircle, Share } from "lucide-react";
 import type { DraftMedia } from "../types";
 import type { PlatformPostProps } from "./XPreview";
 import { PostMedia } from "./primitives";
@@ -33,9 +33,15 @@ export function TikTokPreview({
             className="aspect-[9/16] max-h-96 w-full object-cover"
           />
         ) : (
-          <div className="flex aspect-[9/16] max-h-96 w-full flex-col items-center justify-center gap-1 p-4 text-center">
+          <div className="flex aspect-[9/16] max-h-96 w-full flex-col items-center justify-center gap-2.5 p-6 text-center">
+            <span
+              aria-hidden="true"
+              className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+            >
+              <ClapperboardIcon className="size-5" />
+            </span>
             <p className="text-sm font-medium">No video yet</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="max-w-36 text-xs leading-relaxed text-muted-foreground">
               Attach a video to preview it here
             </p>
           </div>

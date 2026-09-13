@@ -119,7 +119,10 @@ export function buildComposerPreviews(
   return accounts.map((account) => {
     const caps = getPlatformCapabilities(account.platform);
     const override = overrideByAccount.get(account.id);
-    const text = override ?? globalText;
+    // TikTok publishes its own title only: global text must never leak
+    // into the TikTok preview as a title. Missing title renders empty so
+    // the title-missing validation stays visible.
+    const text = account.platform === "TIKTOK" ? (override ?? "") : (override ?? globalText);
     const maxLength = textLimit(account.platform);
     return {
       accountId: account.id,

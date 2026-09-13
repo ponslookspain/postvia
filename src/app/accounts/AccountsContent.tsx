@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { TriangleAlertIcon } from "lucide-react";
 import { parsePlanParam } from "@/lib/plans";
 import { PageHeader } from "@/components/PageHeader";
+import { PageContainer } from "@/components/layout/PageContainer";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { StatusDot } from "@/components/StatusBadge";
+import { ErrorBlock } from "@/components/StateBlock";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -40,44 +42,49 @@ interface PlatformAccount {
 interface PlatformConfig {
   platform: string;
   name: string;
+  blurb: string;
   connectLabel: string;
   connectEndpoint: string;
   disconnectEndpoint: string;
+  multi: boolean;
 }
 
-const SINGLE_PLATFORMS: PlatformConfig[] = [
+const PLATFORMS: PlatformConfig[] = [
   {
     platform: "THREADS",
     name: "Threads",
+    blurb: "Text posts and replies on Threads",
     connectLabel: "Connect Threads",
     connectEndpoint: "/api/auth/threads/connect",
     disconnectEndpoint: "/api/accounts/threads",
+    multi: false,
   },
-];
-
-// Multi-account platforms (a user may connect several handles, up to the
-// plan's maxAccountsPerPlatform: Free 1, Growth 5, Scale unlimited).
-const MULTI_PLATFORMS: PlatformConfig[] = [
   {
     platform: "X",
     name: "X (Twitter)",
+    blurb: "Short posts on X",
     connectLabel: "Connect X",
     connectEndpoint: "/api/auth/x/connect",
     disconnectEndpoint: "/api/accounts/x",
+    multi: true,
   },
   {
     platform: "TIKTOK",
     name: "TikTok",
+    blurb: "Vertical video on TikTok",
     connectLabel: "Connect TikTok",
     connectEndpoint: "/api/auth/tiktok/connect",
     disconnectEndpoint: "/api/accounts/tiktok",
+    multi: true,
   },
   {
     platform: "INSTAGRAM",
     name: "Instagram",
+    blurb: "Photos and reels on Instagram",
     connectLabel: "Connect Instagram",
     connectEndpoint: "/api/auth/instagram/connect",
     disconnectEndpoint: "/api/accounts/instagram",
+    multi: true,
   },
 ];
 
@@ -109,7 +116,7 @@ function getSearchParamMessage(searchParams: URLSearchParams): {
       instagram_callback_failed: "Instagram connection failed. Please try again.",
       tiktok_callback_failed: "TikTok connection failed. Please try again.",
     };
-    return { text: errors[error] || `Error: ${error}`, error: true };
+    return { text: errors[error] || "Connection failed. Please try again.", error: true };
   }
   return null;
 }
@@ -124,16 +131,23 @@ function isExpired(account: PlatformAccount | null | undefined): boolean {
   return new Date(account.expiresAt).getTime() <= Date.now();
 }
 
+function accountInitial(username: string): string {
+  return username.trim().charAt(0).toUpperCase() || "?";
+}
+
 export default function AccountsContent({
   xAccounts: initialXAccounts,
   threadsAccount: initialThreadsAccount,
   tiktokAccounts: initialTiktokAccounts,
   instagramAccounts: initialInstagramAccounts,
+  accountsLimit,
 }: {
   xAccounts: PlatformAccount[];
   threadsAccount: PlatformAccount | null;
   tiktokAccounts: PlatformAccount[];
   instagramAccounts: PlatformAccount[];
+  /** Max accounts per platform on the current plan (null = unlimited). */
+  accountsLimit: number | null;
 }) {
   const searchParams = useSearchParams();
   const [threadsAccount, setThreadsAccount] =
@@ -161,6 +175,14 @@ export default function AccountsContent({
   > = {
     THREADS: { account: threadsAccount, setAccount: setThreadsAccount },
   };
+
+  function accountsFor(config: PlatformConfig): PlatformAccount[] {
+    if (!config.multi) {
+      const single = byPlatform[config.platform]?.account;
+      return single ? [single] : [];
+    }
+    return multiAccounts[config.platform] ?? [];
+  }
 
   async function handleConnect(config: PlatformConfig) {
     setConnecting(config.platform);
@@ -240,116 +262,163 @@ export default function AccountsContent({
     }
   }
 
+  function limitLabel(count: number): string {
+    return accountsLimit === null
+      ? `${count} of unlimited accounts`
+      : `${count} of ${accountsLimit} accounts`;
+  }
+
   return (
-    <div className="mx-auto w-full max-w-5xl p-4 md:p-8">
+    <PageContainer>
       <PageHeader
-        title="Accounts"
-        description="Connect the social profiles you publish to"
+        title="Connected accounts"
+        description="Choose where your posts go. Connect a profile on each channel to publish to it."
       />
 
-      {message && (
-        <Alert
-          variant={message.error ? "destructive" : "default"}
+      {message?.error ? (
+        <ErrorBlock
+          title="Connection issue"
+          description={message.text}
+          action={
+            message.upgradeTo ? (
+              <UpgradeCta
+                reason="Upgrade to connect more accounts on this platform."
+                upgradeTo={parsePlanParam(message.upgradeTo)}
+                compact
+              />
+            ) : undefined
+          }
           className="mb-6"
-        >
-          <TriangleAlertIcon />
-          <AlertTitle>{message.error ? "Connection issue" : "Accounts"}</AlertTitle>
-          <AlertDescription>
-            {message.text}
-            {message.upgradeTo && (
-              <span className="mt-2 block">
-                <UpgradeCta
-                  reason="Upgrade to connect more accounts on this platform."
-                  upgradeTo={parsePlanParam(message.upgradeTo)}
-                  compact
-                />
-              </span>
-            )}
-          </AlertDescription>
+        />
+      ) : message ? (
+        <Alert className="mb-6">
+          <AlertTitle>Accounts</AlertTitle>
+          <AlertDescription>{message.text}</AlertDescription>
         </Alert>
-      )}
+      ) : null}
 
-      <ul className="grid gap-4 sm:grid-cols-2">
-        {SINGLE_PLATFORMS.map((config) => {
-          const { account } = byPlatform[config.platform];
-          const connected = Boolean(account);
-          const expired = isExpired(account);
+      <ul className="grid items-stretch gap-4 sm:grid-cols-2">
+        {PLATFORMS.map((config) => {
+          const accounts = accountsFor(config);
+          const connected = accounts.length > 0;
+          const hasExpired = accounts.some((account) => isExpired(account));
+          const busy =
+            connecting === config.platform || disconnecting !== null;
           return (
             <li key={config.platform} className="min-w-0">
-              <Card className="h-full">
-                <CardHeader className="items-center text-center">
-                  <Avatar className="size-12">
-                    <AvatarFallback
-                      aria-label={config.name}
-                      className={
-                        connected
-                          ? "bg-foreground text-primary-foreground"
-                          : undefined
-                      }
+              <Card className="flex h-full flex-col">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
                     >
-                      <span className="flex size-6 items-center justify-center [&_svg]:size-6">
-                        <PlatformIcon platform={config.platform} className="size-6" />
-                      </span>
-                    </AvatarFallback>
-                  </Avatar>
-                  <CardTitle>{config.name}</CardTitle>
-                  {connected ? (
-                    expired ? (
-                      <Badge variant="destructive">Expired</Badge>
-                    ) : (
-                      <Badge variant="secondary">Connected</Badge>
-                    )
-                  ) : (
-                    <Badge variant="outline">Not connected</Badge>
-                  )}
-                  <CardDescription>
-                    {account ? (
-                      <>
-                        @{account.username}
-                        {expired &&
-                          " · Token expired, reconnect to keep publishing"}
-                      </>
-                    ) : (
-                      `Connect to publish to ${config.name}`
-                    )}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-col gap-2">
+                      <PlatformIcon
+                        platform={config.platform}
+                        className="size-6"
+                      />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <CardTitle>{config.name}</CardTitle>
+                      <CardDescription>{config.blurb}</CardDescription>
+                    </div>
                     {connected ? (
-                      <>
-                        {expired && (
-                          <Button
-                            onClick={() => void handleConnect(config)}
-                            disabled={connecting === config.platform}
-                          >
-                            {connecting === config.platform && (
-                              <Spinner data-icon="inline-start" />
-                            )}
-                            {connecting === config.platform
-                              ? "Connecting..."
-                              : "Reconnect"}
-                          </Button>
-                        )}
-                        <Button
-                          variant={expired ? "outline" : "destructive"}
-                          onClick={() =>
-                            setPendingDisconnect({ config, account: null })
-                          }
-                          disabled={disconnecting === config.platform}
-                        >
-                          {disconnecting === config.platform && (
-                            <Spinner data-icon="inline-start" />
-                          )}
-                          {disconnecting === config.platform
-                            ? "Disconnecting..."
-                            : "Disconnect"}
-                        </Button>
-                      </>
+                      hasExpired ? (
+                        <Badge variant="destructive" className="shrink-0">
+                          <StatusDot status="FAILED" />
+                          Expired
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="shrink-0">
+                          <StatusDot status="PUBLISHED" />
+                          Connected
+                        </Badge>
+                      )
                     ) : (
+                      <Badge variant="outline" className="shrink-0">
+                        <StatusDot status="DRAFT" />
+                        Not connected
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col gap-3">
+                  {config.multi && connected && (
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {limitLabel(accounts.length)}
+                    </p>
+                  )}
+                  {connected ? (
+                    <ul className="flex flex-col gap-2">
+                      {accounts.map((account) => {
+                        const expired = isExpired(account);
+                        return (
+                          <li
+                            key={account.id}
+                            className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+                          >
+                            <Avatar className="size-8 shrink-0">
+                              <AvatarFallback>
+                                {accountInitial(account.username)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">
+                                @{account.username}
+                              </p>
+                              {expired && (
+                                <p className="truncate text-xs text-destructive">
+                                  Token expired, reconnect to keep publishing
+                                </p>
+                              )}
+                            </div>
+                            {expired && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleConnect(config)}
+                                disabled={
+                                  connecting === config.platform ||
+                                  disconnecting === account.id
+                                }
+                              >
+                                {connecting === config.platform && (
+                                  <Spinner data-icon="inline-start" />
+                                )}
+                                Reconnect
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant={expired ? "ghost" : "destructive"}
+                              onClick={() =>
+                                setPendingDisconnect({ config, account })
+                              }
+                              disabled={disconnecting === account.id}
+                              aria-label={`Disconnect @${account.username}`}
+                            >
+                              {disconnecting === account.id && (
+                                <Spinner data-icon="inline-start" />
+                              )}
+                              {disconnecting === account.id
+                                ? "Disconnecting..."
+                                : "Disconnect"}
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {`Connect to publish to ${config.name}.`}
+                    </p>
+                  )}
+                  <div className="mt-auto pt-1">
+                    {!connected ? (
                       <Button
                         onClick={() => void handleConnect(config)}
                         disabled={connecting === config.platform}
+                        className="w-full sm:w-auto"
                       >
                         {connecting === config.platform && (
                           <Spinner data-icon="inline-start" />
@@ -358,115 +427,66 @@ export default function AccountsContent({
                           ? "Connecting..."
                           : config.connectLabel}
                       </Button>
+                    ) : config.multi ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => void handleConnect(config)}
+                        disabled={connecting === config.platform}
+                        className="w-full sm:w-auto"
+                      >
+                        {connecting === config.platform && (
+                          <Spinner data-icon="inline-start" />
+                        )}
+                        {connecting === config.platform
+                          ? "Connecting..."
+                          : "Connect another"}
+                      </Button>
+                    ) : hasExpired ? (
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          onClick={() => void handleConnect(config)}
+                          disabled={connecting === config.platform}
+                        >
+                          {connecting === config.platform && (
+                            <Spinner data-icon="inline-start" />
+                          )}
+                          {connecting === config.platform
+                            ? "Connecting..."
+                            : "Reconnect"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            setPendingDisconnect({ config, account: null })
+                          }
+                          disabled={disconnecting === config.platform || busy}
+                        >
+                          {disconnecting === config.platform && (
+                            <Spinner data-icon="inline-start" />
+                          )}
+                          {disconnecting === config.platform
+                            ? "Disconnecting..."
+                            : "Disconnect"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="destructive"
+                        onClick={() =>
+                          setPendingDisconnect({ config, account: null })
+                        }
+                        disabled={disconnecting === config.platform}
+                      >
+                        {disconnecting === config.platform && (
+                          <Spinner data-icon="inline-start" />
+                        )}
+                        {disconnecting === config.platform
+                          ? "Disconnecting..."
+                          : "Disconnect"}
+                      </Button>
                     )}
                   </div>
                 </CardContent>
-              </Card>
-            </li>
-          );
-        })}
-
-        {MULTI_PLATFORMS.map((config) => {
-          const accounts = multiAccounts[config.platform] ?? [];
-          return (
-            <li key={config.platform} className="min-w-0">
-              <Card className="h-full">
-                <CardHeader className="items-center text-center">
-                  <Avatar className="size-12">
-                    <AvatarFallback
-                      aria-label={config.name}
-                      className={
-                        accounts.length > 0
-                          ? "bg-foreground text-primary-foreground"
-                          : undefined
-                      }
-                    >
-                      <span className="flex size-6 items-center justify-center [&_svg]:size-6">
-                        <PlatformIcon platform={config.platform} className="size-6" />
-                      </span>
-                    </AvatarFallback>
-                  </Avatar>
-                  <CardTitle>{config.name}</CardTitle>
-                  {accounts.length > 0 ? (
-                    <Badge variant="secondary">
-                      {accounts.length} connected
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">Not connected</Badge>
-                  )}
-                  <CardDescription>
-                    {accounts.length === 0
-                      ? `Connect to publish to ${config.name}`
-                      : "Multiple accounts supported"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <Button
-                    onClick={() => void handleConnect(config)}
-                    disabled={connecting === config.platform}
-                  >
-                    {connecting === config.platform && (
-                      <Spinner data-icon="inline-start" />
-                    )}
-                    {connecting === config.platform
-                      ? "Connecting..."
-                      : config.connectLabel}
-                  </Button>
-                  {accounts.length > 0 && (
-                    <ul className="flex flex-col gap-2">
-                      {accounts.map((account) => {
-                        const expired = isExpired(account);
-                        return (
-                          <li
-                            key={account.id}
-                            className="flex flex-col gap-3 rounded-md border border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                          >
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="truncate text-sm">
-                                @{account.username}
-                              </span>
-                              {expired && (
-                                <Badge variant="destructive">Expired</Badge>
-                              )}
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                              {expired && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => void handleConnect(config)}
-                                  disabled={
-                                    connecting === config.platform ||
-                                    disconnecting === account.id
-                                  }
-                                >
-                                  {connecting === config.platform && (
-                                    <Spinner data-icon="inline-start" />
-                                  )}
-                                  Reconnect
-                                </Button>
-                              )}
-                              <Button
-                                variant={expired ? "outline" : "destructive"}
-                                size="sm"
-                                onClick={() =>
-                                  setPendingDisconnect({ config, account })
-                                }
-                                disabled={disconnecting === account.id}
-                              >
-                                {disconnecting === account.id && (
-                                  <Spinner data-icon="inline-start" />
-                                )}
-                                {disconnecting === account.id
-                                  ? "Disconnecting..."
-                                  : "Disconnect"}
-                              </Button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  </CardContent>
               </Card>
             </li>
           );
@@ -506,6 +526,6 @@ export default function AccountsContent({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

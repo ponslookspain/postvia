@@ -1,16 +1,11 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/AppShell";
+import { PageContainer } from "@/components/layout/PageContainer";
+import { EmptyBlock } from "@/components/StateBlock";
 import { canUseCalendar, getEffectivePlan } from "@/lib/entitlements";
 import { parseMonthParam, type CalendarPost } from "@/lib/calendar";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { CalendarClockIcon } from "lucide-react";
 import { CalendarView } from "./CalendarView";
 
@@ -35,22 +30,18 @@ export default async function CalendarPage({
   if (!calendarGate.ok) {
     return (
       <AppShell user={user}>
-        <div className="mx-auto w-full max-w-6xl p-4 md:p-8">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <CalendarClockIcon />
-              </EmptyMedia>
-              <EmptyTitle>Calendar needs a bigger plan</EmptyTitle>
-              <EmptyDescription>
-                <UpgradeCta
-                  reason="The visual content calendar is not included in your current plan."
-                  upgradeTo={calendarGate.upgradeTo}
-                />
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        </div>
+        <PageContainer size="wide">
+          <EmptyBlock
+            icon={<CalendarClockIcon />}
+            title="Calendar needs a bigger plan"
+            actions={
+              <UpgradeCta
+                reason="The visual content calendar is not included in your current plan."
+                upgradeTo={calendarGate.upgradeTo}
+              />
+            }
+          />
+        </PageContainer>
       </AppShell>
     );
   }
@@ -99,14 +90,14 @@ export default async function CalendarPage({
 
   return (
     <AppShell user={user}>
-      <div className="mx-auto w-full max-w-6xl p-4 md:p-8">
+      <PageContainer size="wide">
         <CalendarView
           posts={posts}
           year={year}
           monthIndex={monthIndex}
           userName={user.name}
         />
-      </div>
+      </PageContainer>
     </AppShell>
   );
 }

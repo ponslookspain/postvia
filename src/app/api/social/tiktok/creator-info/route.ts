@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import {
+  TiktokApiError,
   ensureFreshTiktokToken,
+  isTiktokAuthErrorCode,
   queryTiktokCreatorInfo,
+  tiktokErrorCode,
   tiktokErrorMessage,
 } from "@/lib/social/tiktok";
 
@@ -49,6 +52,14 @@ export async function GET(request: NextRequest) {
       maxVideoPostDurationSec: info.maxVideoPostDurationSec,
     });
   } catch (error) {
+    // Auth failures mean "reconnect", not a transient upstream error.
+    const code = error instanceof TiktokApiError ? error.code : tiktokErrorCode(error);
+    if (isTiktokAuthErrorCode(code)) {
+      return NextResponse.json(
+        { error: tiktokErrorMessage(error), code: "reconnect_required" },
+        { status: 401 }
+      );
+    }
     return NextResponse.json(
       { error: tiktokErrorMessage(error) },
       { status: 502 }

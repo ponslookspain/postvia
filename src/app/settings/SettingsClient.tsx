@@ -4,9 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AtSignIcon, KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { PageHeader } from "@/components/PageHeader";
+import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -320,257 +329,314 @@ export function SettingsClient({
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl p-4 md:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage your profile, security and preferences
-        </p>
-      </div>
+    <PageContainer size="narrow">
+      <PageHeader
+        title="Settings"
+        description="Manage your profile, security and preferences"
+      />
 
-      <div className="flex flex-col gap-10">
+      <PageSections>
         <section aria-labelledby="settings-profile">
-          <h2 id="settings-profile" className="text-lg font-medium">
-            Profile
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            Update the name shown in your account
-          </p>
-          <div>
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="settings-name">Name</FieldLabel>
-                <Input
-                  id="settings-name"
-                  type="text"
-                  autoComplete="name"
-                  value={name}
-                  maxLength={50}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </Field>
-              <Field data-disabled>
-                <FieldLabel htmlFor="settings-email">Email</FieldLabel>
-                <Input
-                  id="settings-email"
-                  type="email"
-                  value={email}
-                  readOnly
-                  disabled
-                />
-                <FieldDescription>
-                  {emailVerified
-                    ? "Verified"
-                    : "Email change is currently not supported"}
-                </FieldDescription>
-              </Field>
-              {nameMessage && <FormAlert message={nameMessage} />}
-              <div>
-                <Button onClick={() => void handleSaveName()} disabled={savingName}>
-                  {savingName && <Spinner data-icon="inline-start" />}
-                  {savingName ? "Saving..." : "Save changes"}
-                </Button>
-              </div>
-            </FieldGroup>
-          </div>
-        </section>
-
-        <section aria-labelledby="settings-signin">
-          <h2 id="settings-signin" className="text-lg font-medium">
-            Sign-in methods
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            How you can sign in to your account
-          </p>
-          <div className="flex max-w-md flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-sm">
-                <AtSignIcon className="size-4 shrink-0" aria-hidden="true" />
-                Email and password
-              </span>
-              <Badge variant={hasPassword ? "secondary" : "outline"}>
-                {hasPassword ? "Connected" : "Not set"}
-              </Badge>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-sm">
-                <GoogleGlyph className="size-4 shrink-0" /> Google
-              </span>
-              <Badge variant={hasGoogle ? "secondary" : "outline"}>
-                {hasGoogle ? "Connected" : "Not connected"}
-              </Badge>
-            </div>
-          </div>
-        </section>
-
-        <section aria-labelledby="settings-security">
-          <h2 id="settings-security" className="text-lg font-medium">
-            Security
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            {hasPassword
-              ? "Change your account password"
-              : "Set a password so you can sign in with email and password"}
-          </p>
-          <div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (hasPassword) void handleChangePassword();
-                else void handleSetPassword();
-              }}
-            >
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile</CardTitle>
+              <CardDescription>
+                Update the name shown in your account
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <FieldGroup>
-                {hasPassword && (
-                  <Field data-invalid={Boolean(passwordErrors.current) || undefined}>
-                    <FieldLabel htmlFor="settings-current-password">
-                      Current password
-                    </FieldLabel>
-                    <Input
-                      id="settings-current-password"
-                      type="password"
-                      autoComplete="current-password"
-                      value={password.current}
-                      onChange={(e) =>
-                        setPassword((p) => ({ ...p, current: e.target.value }))
-                      }
-                      aria-invalid={Boolean(passwordErrors.current) || undefined}
-                    />
-                    {passwordErrors.current && (
-                      <FieldError>{passwordErrors.current}</FieldError>
-                    )}
-                  </Field>
-                )}
-                <Field data-invalid={Boolean(passwordErrors.next) || undefined}>
-                  <FieldLabel htmlFor="settings-new-password">
-                    New password
+                <Field>
+                  <FieldLabel htmlFor="settings-name">Name</FieldLabel>
+                  <Input
+                    id="settings-name"
+                    type="text"
+                    autoComplete="name"
+                    value={name}
+                    maxLength={50}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </Field>
+                <Field data-disabled>
+                  <FieldLabel htmlFor="settings-email">
+                    <span className="flex items-center gap-2">
+                      Email
+                      {emailVerified && (
+                        <Badge variant="secondary">Verified</Badge>
+                      )}
+                    </span>
                   </FieldLabel>
                   <Input
-                    id="settings-new-password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={password.next}
-                    onChange={(e) =>
-                      setPassword((p) => ({ ...p, next: e.target.value }))
-                    }
-                    aria-invalid={Boolean(passwordErrors.next) || undefined}
+                    id="settings-email"
+                    type="email"
+                    value={email}
+                    readOnly
+                    disabled
                   />
-                  {passwordErrors.next ? (
-                    <FieldError>{passwordErrors.next}</FieldError>
-                  ) : (
+                  {!emailVerified && (
                     <FieldDescription>
-                      Must be at least 8 characters long.
+                      Email change is currently not supported
                     </FieldDescription>
                   )}
                 </Field>
-                <Field data-invalid={Boolean(passwordErrors.confirm) || undefined}>
-                  <FieldLabel htmlFor="settings-confirm-password">
-                    Confirm new password
-                  </FieldLabel>
-                  <Input
-                    id="settings-confirm-password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={password.confirm}
-                    onChange={(e) =>
-                      setPassword((p) => ({ ...p, confirm: e.target.value }))
-                    }
-                    aria-invalid={Boolean(passwordErrors.confirm) || undefined}
-                  />
-                  {passwordErrors.confirm && (
-                    <FieldError>{passwordErrors.confirm}</FieldError>
-                  )}
-                </Field>
-                {passwordMessage && <FormAlert message={passwordMessage} />}
+                {nameMessage && <FormAlert message={nameMessage} />}
                 <div>
-                  <Button type="submit" disabled={savingPassword}>
-                    {savingPassword && <Spinner data-icon="inline-start" />}
-                    <KeyRoundIcon data-icon="inline-start" />
-                    {savingPassword
-                      ? "Saving..."
-                      : hasPassword
-                        ? "Change password"
-                        : "Set password"}
+                  <Button
+                    size="lg"
+                    onClick={() => void handleSaveName()}
+                    disabled={savingName}
+                    className="min-h-11 w-full sm:w-auto"
+                  >
+                    {savingName && <Spinner data-icon="inline-start" />}
+                    {savingName ? "Saving..." : "Save changes"}
                   </Button>
                 </div>
               </FieldGroup>
-            </form>
-          </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section aria-labelledby="settings-signin">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sign-in methods</CardTitle>
+              <CardDescription>
+                How you can sign in to your account
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              <div className="flex min-h-11 items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+                >
+                  <AtSignIcon className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    Email and password
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {hasPassword
+                      ? "Password is set"
+                      : "No password set yet"}
+                  </span>
+                </span>
+                <Badge
+                  variant={hasPassword ? "secondary" : "outline"}
+                  className="shrink-0"
+                >
+                  {hasPassword ? "Connected" : "Not set"}
+                </Badge>
+              </div>
+              <Separator />
+              <div className="flex min-h-11 items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+                >
+                  <GoogleGlyph className="size-4 shrink-0" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    Google
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    Sign in with your Google account
+                  </span>
+                </span>
+                <Badge
+                  variant={hasGoogle ? "secondary" : "outline"}
+                  className="shrink-0"
+                >
+                  {hasGoogle ? "Connected" : "Not connected"}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section aria-labelledby="settings-security">
+          <Card>
+            <CardHeader>
+              <CardTitle>Security</CardTitle>
+              <CardDescription>
+                {hasPassword
+                  ? "Change your account password"
+                  : "Set a password so you can sign in with email and password"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (hasPassword) void handleChangePassword();
+                  else void handleSetPassword();
+                }}
+              >
+                <FieldGroup>
+                  {hasPassword && (
+                    <Field data-invalid={Boolean(passwordErrors.current) || undefined}>
+                      <FieldLabel htmlFor="settings-current-password">
+                        Current password
+                      </FieldLabel>
+                      <Input
+                        id="settings-current-password"
+                        type="password"
+                        autoComplete="current-password"
+                        value={password.current}
+                        onChange={(e) =>
+                          setPassword((p) => ({ ...p, current: e.target.value }))
+                        }
+                        aria-invalid={Boolean(passwordErrors.current) || undefined}
+                      />
+                      {passwordErrors.current && (
+                        <FieldError>{passwordErrors.current}</FieldError>
+                      )}
+                    </Field>
+                  )}
+                  <Field data-invalid={Boolean(passwordErrors.next) || undefined}>
+                    <FieldLabel htmlFor="settings-new-password">
+                      New password
+                    </FieldLabel>
+                    <Input
+                      id="settings-new-password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={password.next}
+                      onChange={(e) =>
+                        setPassword((p) => ({ ...p, next: e.target.value }))
+                      }
+                      aria-invalid={Boolean(passwordErrors.next) || undefined}
+                    />
+                    {passwordErrors.next ? (
+                      <FieldError>{passwordErrors.next}</FieldError>
+                    ) : (
+                      <FieldDescription>
+                        Must be at least 8 characters long.
+                      </FieldDescription>
+                    )}
+                  </Field>
+                  <Field data-invalid={Boolean(passwordErrors.confirm) || undefined}>
+                    <FieldLabel htmlFor="settings-confirm-password">
+                      Confirm new password
+                    </FieldLabel>
+                    <Input
+                      id="settings-confirm-password"
+                      type="password"
+                      autoComplete="new-password"
+                      value={password.confirm}
+                      onChange={(e) =>
+                        setPassword((p) => ({ ...p, confirm: e.target.value }))
+                      }
+                      aria-invalid={Boolean(passwordErrors.confirm) || undefined}
+                    />
+                    {passwordErrors.confirm && (
+                      <FieldError>{passwordErrors.confirm}</FieldError>
+                    )}
+                  </Field>
+                  {passwordMessage && <FormAlert message={passwordMessage} />}
+                  <div>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={savingPassword}
+                      className="min-h-11 w-full sm:w-auto"
+                    >
+                      {savingPassword && <Spinner data-icon="inline-start" />}
+                      <KeyRoundIcon data-icon="inline-start" />
+                      {savingPassword
+                        ? "Saving..."
+                        : hasPassword
+                          ? "Change password"
+                          : "Set password"}
+                    </Button>
+                  </div>
+                </FieldGroup>
+              </form>
+            </CardContent>
+          </Card>
         </section>
 
         <section aria-labelledby="settings-preferences">
-          <h2 id="settings-preferences" className="text-lg font-medium">
-            Preferences
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            Choose how you want to hear from us
-          </p>
-          <div>
-            <FieldGroup>
-              {prefsMessage && <FormAlert message={prefsMessage} />}
-              <Field orientation="horizontal">
-                <FieldDescription className="flex-1">
-                  <span className="block text-sm font-medium text-foreground">
-                    Email notifications
-                  </span>
-                  Receive updates about your posts
-                </FieldDescription>
-                <Switch
-                  id="prefs-email"
-                  aria-label="Email notifications"
-                  checked={prefs.emailNotifications}
-                  disabled={savingPref === "emailNotifications"}
-                  onCheckedChange={() =>
-                    void handleTogglePref("emailNotifications")
-                  }
-                />
-              </Field>
-              <Separator />
-              <Field orientation="horizontal">
-                <FieldDescription className="flex-1">
-                  <span className="block text-sm font-medium text-foreground">
-                    Product updates
-                  </span>
-                  News about new features and improvements
-                </FieldDescription>
-                <Switch
-                  id="prefs-product"
-                  aria-label="Product updates"
-                  checked={prefs.productUpdates}
-                  disabled={savingPref === "productUpdates"}
-                  onCheckedChange={() =>
-                    void handleTogglePref("productUpdates")
-                  }
-                />
-              </Field>
-            </FieldGroup>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Preferences</CardTitle>
+              <CardDescription>
+                Choose how you want to hear from us
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup>
+                {prefsMessage && <FormAlert message={prefsMessage} />}
+                <Field orientation="horizontal" className="min-h-11">
+                  <FieldDescription className="flex-1">
+                    <span className="block text-sm font-medium text-foreground">
+                      Email notifications
+                    </span>
+                    Receive updates about your posts
+                  </FieldDescription>
+                  <Switch
+                    id="prefs-email"
+                    aria-label="Email notifications"
+                    checked={prefs.emailNotifications}
+                    disabled={savingPref === "emailNotifications"}
+                    onCheckedChange={() =>
+                      void handleTogglePref("emailNotifications")
+                    }
+                  />
+                </Field>
+                <Separator />
+                <Field orientation="horizontal" className="min-h-11">
+                  <FieldDescription className="flex-1">
+                    <span className="block text-sm font-medium text-foreground">
+                      Product updates
+                    </span>
+                    News about new features and improvements
+                  </FieldDescription>
+                  <Switch
+                    id="prefs-product"
+                    aria-label="Product updates"
+                    checked={prefs.productUpdates}
+                    disabled={savingPref === "productUpdates"}
+                    onCheckedChange={() =>
+                      void handleTogglePref("productUpdates")
+                    }
+                  />
+                </Field>
+              </FieldGroup>
+            </CardContent>
+          </Card>
         </section>
 
         <section aria-labelledby="settings-danger">
-          <Separator className="mb-10" />
-          <h2 id="settings-danger" className="text-lg font-medium text-destructive">
-            Danger zone
-          </h2>
-          <p className="mt-1 mb-4 text-sm text-muted-foreground">
-            Permanently delete your account and all associated data
-          </p>
-          <div>
-            <p className="mb-4 max-w-prose text-sm text-muted-foreground">
-              Once you delete your account there is no going back. All your
-              posts, connected social accounts, sessions and account data will
-              be permanently removed.
-            </p>
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteModalOpen(true)}
-            >
-              Delete account
-            </Button>
-          </div>
+          <Card className="border-destructive/30">
+            <CardHeader>
+              <CardTitle className="text-destructive">Danger zone</CardTitle>
+              <CardDescription>
+                Permanently delete your account and all associated data
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
+                Once you delete your account there is no going back. All your
+                posts, connected social accounts, sessions and account data
+                will be permanently removed.
+              </p>
+              <div>
+                <Button
+                  variant="destructive"
+                  size="lg"
+                  onClick={() => setDeleteModalOpen(true)}
+                  className="min-h-11 w-full sm:w-auto"
+                >
+                  Delete account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </section>
-      </div>
+      </PageSections>
 
       <Dialog
         open={isDeleteModalOpen}
@@ -618,6 +684,6 @@ export function SettingsClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }
