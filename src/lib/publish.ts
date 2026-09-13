@@ -181,16 +181,47 @@ function failedOutcome(
   return { ok: false, error, platform: target.platform };
 }
 
+export type PublishTargetRef = {
+  socialAccountId: string | null;
+  platform: string;
+};
+
+export type PublishAccountRef = {
+  id: string;
+  userId: string;
+  platform: string;
+};
+
+/**
+ * Pure ownership/binding check for publishing. Fails closed: a target
+ * without a bound socialAccountId, a missing row, a cross-user row, an
+ * id mismatch or a platform mismatch all resolve to null — the publisher
+ * must never fall back to "the first account of the platform".
+ */
+export function matchTargetAccount(
+  postUserId: string,
+  target: PublishTargetRef,
+  account: PublishAccountRef | null
+): PublishAccountRef | null {
+  if (!target.socialAccountId) return null;
+  if (!account) return null;
+  if (account.id !== target.socialAccountId) return null;
+  if (account.userId !== postUserId) return null;
+  if (account.platform !== target.platform) return null;
+  return account;
+}
+
 async function resolveTargetAccount(
   postUserId: string,
   target: PublishTarget
 ): Promise<PublishAccount | null> {
-  const account = target.socialAccountId
-    ? await prisma.socialAccount.findUnique({ where: { id: target.socialAccountId } })
-    : await prisma.socialAccount.findFirst({
-        where: { userId: postUserId, platform: target.platform as never },
-      });
-  if (!account || account.userId !== postUserId || account.platform !== target.platform) {
+  if (!target.socialAccountId) {
+    return null;
+  }
+  const account = await prisma.socialAccount.findFirst({
+    where: { id: target.socialAccountId, userId: postUserId },
+  });
+  if (!matchTargetAccount(postUserId, target, account)) {
     return null;
   }
   return account;

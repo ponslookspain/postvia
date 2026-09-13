@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { XProvider } from "@/lib/social/x";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
-import { assertCanConnectAccount, getEffectivePlan } from "@/lib/entitlements";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   isPaidActivePlan,
@@ -96,22 +97,26 @@ export async function GET(request: NextRequest) {
           new URL(`/accounts?error=${abuseGate.errorParam}`, request.url)
         );
       }
-      const gate = await assertCanConnectAccount({
+      const linked = await createSocialAccountRaceSafe({
         userId: user.id,
-        userEmail: user.email,
         platform: "X",
+        externalId: xUser.externalId,
+        data: accountData,
+        effective: effectiveForAbuse,
       });
-      if (!gate.ok) {
+      if (!linked.ok) {
+        if (linked.code === "account_in_use") {
+          return NextResponse.redirect(
+            new URL("/accounts?error=account_in_use", request.url)
+          );
+        }
         return NextResponse.redirect(
           new URL(
-            `/accounts?error=account_limit_reached${gate.upgradeTo ? `&upgradeTo=${gate.upgradeTo}` : ""}`,
+            `/accounts?error=account_limit_reached${linked.upgradeTo ? `&upgradeTo=${linked.upgradeTo}` : ""}`,
             request.url
           )
         );
       }
-      await prisma.socialAccount.create({
-        data: { userId: user.id, platform: "X", ...accountData },
-      });
     }
 
     const response = NextResponse.redirect(

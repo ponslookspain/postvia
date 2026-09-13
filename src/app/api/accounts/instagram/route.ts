@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { findDisconnectTarget } from "@/lib/social-accounts";
 import { revokeInstagramToken } from "@/lib/social/instagram";
 import { recordDisconnect } from "@/lib/abuse";
 
@@ -10,20 +11,23 @@ export async function DELETE(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    const accountId = request.nextUrl.searchParams.get("accountId");
-    const account = await prisma.socialAccount.findFirst({
-      where: {
-        userId: user.id,
-        platform: "INSTAGRAM",
-        ...(accountId ? { id: accountId } : {}),
-      },
+    const lookup = await findDisconnectTarget({
+      userId: user.id,
+      platform: "INSTAGRAM",
+      accountId: request.nextUrl.searchParams.get("accountId"),
     });
-    if (!account) {
+    if (!lookup.ok) {
       return NextResponse.json(
-        { error: "Instagram account not connected" },
-        { status: 404 }
+        {
+          error:
+            lookup.code === "accountId_required"
+              ? "accountId is required"
+              : "Instagram account not connected",
+        },
+        { status: lookup.code === "accountId_required" ? 400 : 404 }
       );
     }
+    const account = lookup;
     try {
       await revokeInstagramToken(account.externalId, account.accessToken);
     } catch {

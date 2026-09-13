@@ -41,6 +41,8 @@ export type StoredPostTarget = {
   id: string;
   status: string;
   platform: string;
+  /** Bound account for this target; resolution is always by this id. */
+  socialAccountId?: string | null;
   externalPostId: string | null;
   publishedAt: Date | null;
   externalJobId?: string | null;
@@ -93,11 +95,6 @@ export type SchedulingDb = {
       where: { id: string };
       data: Record<string, unknown>;
     }): Promise<unknown>;
-  };
-  socialAccount?: {
-    findFirst(args: {
-      where: { userId: string; platform: string };
-    }): Promise<SocialAccountRow | null>;
   };
 };
 

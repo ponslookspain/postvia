@@ -237,13 +237,6 @@ describe("cron due-selection works on absolute instants (timezone end-to-end)", 
         updateMany: async () => ({ count: 0 }),
         update: async () => null,
       },
-      socialAccount: {
-        findFirst: async () => ({
-          accessToken: "token",
-          externalId: "123",
-          username: "alice",
-        }),
-      },
     };
     return db;
   }

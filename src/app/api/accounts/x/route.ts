@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { findDisconnectTarget } from "@/lib/social-accounts";
 import { XProvider } from "@/lib/social/x";
 import { recordDisconnect } from "@/lib/abuse";
 
@@ -10,21 +11,23 @@ export async function DELETE(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    const accountId = request.nextUrl.searchParams.get("accountId");
-    const account = await prisma.socialAccount.findFirst({
-      where: {
-        userId: user.id,
-        platform: "X",
-        ...(accountId ? { id: accountId } : {}),
-      },
+    const lookup = await findDisconnectTarget({
+      userId: user.id,
+      platform: "X",
+      accountId: request.nextUrl.searchParams.get("accountId"),
     });
-
-    if (!account) {
+    if (!lookup.ok) {
       return NextResponse.json(
-        { error: "X account not connected" },
-        { status: 404 }
+        {
+          error:
+            lookup.code === "accountId_required"
+              ? "accountId is required"
+              : "X account not connected",
+        },
+        { status: lookup.code === "accountId_required" ? 400 : 404 }
       );
     }
+    const account = lookup;
 
     try {
       const xProvider = new XProvider();

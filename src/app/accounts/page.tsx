@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
   const user = await requireUser();
-  const [xAccounts, threadsAccount, tiktokAccounts, instagramAccounts, effective] =
+  const [xAccounts, threadsAccounts, tiktokAccounts, instagramAccounts, effective] =
     await Promise.all([
       prisma.socialAccount.findMany({
         where: { userId: user.id, platform: "X" },
@@ -25,7 +25,7 @@ export default async function AccountsPage() {
         },
         orderBy: { username: "asc" },
       }),
-      prisma.socialAccount.findFirst({
+      prisma.socialAccount.findMany({
         where: { userId: user.id, platform: "THREADS" },
         select: {
           id: true,
@@ -35,6 +35,7 @@ export default async function AccountsPage() {
           expiresAt: true,
           createdAt: true,
         },
+        orderBy: { username: "asc" },
       }),
       prisma.socialAccount.findMany({
         where: { userId: user.id, platform: "TIKTOK" },
@@ -63,14 +64,11 @@ export default async function AccountsPage() {
       getEffectivePlan({ userId: user.id, userEmail: user.email }),
     ]);
 
-  const serialize = (account: typeof threadsAccount) =>
-    account
-      ? {
-          ...account,
-          createdAt: account.createdAt.toISOString(),
-          expiresAt: account.expiresAt ? account.expiresAt.toISOString() : null,
-        }
-      : null;
+  const serialize = (account: (typeof threadsAccounts)[number]) => ({
+    ...account,
+    createdAt: account.createdAt.toISOString(),
+    expiresAt: account.expiresAt ? account.expiresAt.toISOString() : null,
+  });
 
   return (
     <AppShell user={user}>
@@ -92,7 +90,7 @@ export default async function AccountsPage() {
             createdAt: account.createdAt.toISOString(),
             expiresAt: account.expiresAt ? account.expiresAt.toISOString() : null,
           }))}
-          threadsAccount={serialize(threadsAccount)}
+          threadsAccounts={threadsAccounts.map(serialize)}
           tiktokAccounts={tiktokAccounts.map((account) => ({
             ...account,
             createdAt: account.createdAt.toISOString(),

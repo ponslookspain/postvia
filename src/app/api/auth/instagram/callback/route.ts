@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { assertCanConnectAccount, getEffectivePlan } from "@/lib/entitlements";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   isPaidActivePlan,
@@ -116,29 +117,30 @@ export async function GET(request: NextRequest) {
           )
         );
       }
-      const gate = await assertCanConnectAccount({
+      const linked = await createSocialAccountRaceSafe({
         userId: user.id,
-        userEmail: user.email,
         platform: "INSTAGRAM",
+        externalId: profile.id,
+        data: { externalId: profile.id, ...accountData },
+        effective: effectiveForAbuse,
       });
-      if (!gate.ok) {
+      if (!linked.ok) {
+        if (linked.code === "account_in_use") {
+          return clearState(
+            NextResponse.redirect(
+              new URL("/accounts?error=account_in_use", request.url)
+            )
+          );
+        }
         return clearState(
           NextResponse.redirect(
             new URL(
-              `/accounts?error=account_limit_reached${gate.upgradeTo ? `&upgradeTo=${gate.upgradeTo}` : ""}`,
+              `/accounts?error=account_limit_reached${linked.upgradeTo ? `&upgradeTo=${linked.upgradeTo}` : ""}`,
               request.url
             )
           )
         );
       }
-      await prisma.socialAccount.create({
-        data: {
-          userId: user.id,
-          platform: "INSTAGRAM",
-          externalId: profile.id,
-          ...accountData,
-        },
-      });
     }
 
     return clearState(

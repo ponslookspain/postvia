@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
-import { assertCanConnectAccount, getEffectivePlan } from "@/lib/entitlements";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   isPaidActivePlan,
@@ -67,7 +68,13 @@ export async function GET(request: NextRequest) {
 
   const cookieStore = await cookies();
   const storedState = cookieStore.get("tiktok_oauth_state")?.value;
-  const response = (path: string) => NextResponse.redirect(new URL(path, request.url));
+  // Every exit clears the single-use state cookie (same hygiene as the
+  // Instagram callback): a stale state must never survive a failed attempt.
+  const response = (path: string) => {
+    const redirect = NextResponse.redirect(new URL(path, request.url));
+    redirect.cookies.delete("tiktok_oauth_state");
+    return redirect;
+  };
 
   if (!storedState) {
     return redirectWith("/accounts?error=invalid_session");
@@ -133,29 +140,24 @@ export async function GET(request: NextRequest) {
       if (!abuseGate.ok) {
         return response(`/accounts?error=${abuseGate.errorParam}`);
       }
-      const gate = await assertCanConnectAccount({
+      const linked = await createSocialAccountRaceSafe({
         userId: user.id,
-        userEmail: user.email,
         platform: "TIKTOK",
+        externalId: tokens.open_id,
+        data: { externalId: tokens.open_id, ...accountData },
+        effective: effectiveForAbuse,
       });
-      if (!gate.ok) {
+      if (!linked.ok) {
+        if (linked.code === "account_in_use") {
+          return response("/accounts?error=account_in_use");
+        }
         return response(
-          `/accounts?error=account_limit_reached${gate.upgradeTo ? `&upgradeTo=${gate.upgradeTo}` : ""}`
+          `/accounts?error=account_limit_reached${linked.upgradeTo ? `&upgradeTo=${linked.upgradeTo}` : ""}`
         );
       }
-      await prisma.socialAccount.create({
-        data: {
-          userId: user.id,
-          platform: "TIKTOK",
-          externalId: tokens.open_id,
-          ...accountData,
-        },
-      });
     }
 
-    const redirect = response("/accounts?connected=true");
-    redirect.cookies.delete("tiktok_oauth_state");
-    return redirect;
+    return response("/accounts?connected=true");
   } catch (error) {
     // Presence flags only: the code/state values themselves are secrets.
     // Raw TikTok/token errors never reach the query string.

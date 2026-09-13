@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
-import { assertCanConnectAccount, getEffectivePlan } from "@/lib/entitlements";
+import { getEffectivePlan } from "@/lib/entitlements";
+import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   isPaidActivePlan,
@@ -98,23 +99,29 @@ export async function GET(request: NextRequest) {
           new URL(`/accounts?error=${abuseGate.errorParam}`, request.url)
         );
       }
-      // New connections consume plan quota; reconnects (above) never do.
-      const gate = await assertCanConnectAccount({
+      // New connections consume plan quota (race-safe: concurrent
+      // callbacks for one externalId converge, and only one winner keeps
+      // the last free slot); reconnects (above) never do.
+      const linked = await createSocialAccountRaceSafe({
         userId: user.id,
-        userEmail: user.email,
         platform: "THREADS",
+        externalId: threadsUser.externalId,
+        data: accountData,
+        effective: effectiveForAbuse,
       });
-      if (!gate.ok) {
+      if (!linked.ok) {
+        if (linked.code === "account_in_use") {
+          return NextResponse.redirect(
+            new URL("/accounts?error=account_in_use", request.url)
+          );
+        }
         return NextResponse.redirect(
           new URL(
-            `/accounts?error=account_limit_reached${gate.upgradeTo ? `&upgradeTo=${gate.upgradeTo}` : ""}`,
+            `/accounts?error=account_limit_reached${linked.upgradeTo ? `&upgradeTo=${linked.upgradeTo}` : ""}`,
             request.url
           )
         );
       }
-      await prisma.socialAccount.create({
-        data: { userId: user.id, platform: "THREADS", ...accountData },
-      });
     }
 
     const response = NextResponse.redirect(

@@ -39,12 +39,6 @@ type PostRow = {
   targets: TargetRow[];
 };
 
-type AccountRow = {
-  accessToken: string;
-  externalId: string;
-  username: string;
-};
-
 function dateValue(value: unknown): Date | null {
   if (value instanceof Date) return value;
   return null;
@@ -65,9 +59,8 @@ function matchesWhere(row: Record<string, unknown>, where: Record<string, unknow
   });
 }
 
-function createFakeDb(seed: { posts: PostRow[]; accounts?: Record<string, AccountRow> }) {
+function createFakeDb(seed: { posts: PostRow[] }) {
   const posts = seed.posts;
-  const accounts = seed.accounts ?? {};
 
   const allTargets = () => posts.flatMap((p) => p.targets);
   const clonePost = (p: PostRow): StoredPost => structuredClone(p) as StoredPost;
@@ -111,10 +104,6 @@ function createFakeDb(seed: { posts: PostRow[]; accounts?: Record<string, Accoun
         return t;
       },
     },
-    socialAccount: {
-      findFirst: async ({ where }) =>
-        accounts[`${where.userId}:${where.platform}`] ?? null,
-    },
   };
 
   return { db, posts };
@@ -143,12 +132,6 @@ function scheduledPost(overrides: Partial<PostRow> = {}): PostRow {
     ...overrides,
   };
 }
-
-const THREADS_ACCOUNT: AccountRow = {
-  accessToken: "token",
-  externalId: "12345",
-  username: "alice",
-};
 
 const NOW = new Date("2026-09-11T12:00:00Z");
 
@@ -214,10 +197,7 @@ describe("cron route authorization (GET and POST)", () => {
 describe("runScheduledPublishTick (due-post processing)", () => {
   test("publishes a due scheduled post and flips it to PUBLISHED", async () => {
     const post = scheduledPost();
-    const { db, posts } = createFakeDb({
-      posts: [post],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
-    });
+    const { db, posts } = createFakeDb({ posts: [post] });
     const { fn, published } = okPublish();
 
     const stats = await runScheduledPublishTick({ db, publish: fn, now: NOW });
@@ -241,10 +221,7 @@ describe("runScheduledPublishTick (due-post processing)", () => {
 
   test("atomic claim: two overlapping ticks publish the same post only once", async () => {
     const post = scheduledPost();
-    const { db } = createFakeDb({
-      posts: [post],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
-    });
+    const { db } = createFakeDb({ posts: [post] });
     const shared = okPublish();
     const fake = { db, publish: shared.fn };
 
@@ -265,10 +242,6 @@ describe("runScheduledPublishTick (due-post processing)", () => {
         scheduledPost({ id: "p2" }),
         scheduledPost({ id: "p3", userId: "bob" }),
       ],
-      accounts: {
-        "alice:THREADS": THREADS_ACCOUNT,
-        "bob:THREADS": THREADS_ACCOUNT,
-      },
     });
     const { fn, published } = okPublish();
 
@@ -281,7 +254,6 @@ describe("runScheduledPublishTick (due-post processing)", () => {
   test("tick budget stops claiming further posts", async () => {
     const { db, posts } = createFakeDb({
       posts: [scheduledPost({ id: "p1" }), scheduledPost({ id: "p2" })],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
     let clockValue = 0;
     const { fn } = okPublish();
@@ -307,7 +279,6 @@ describe("runScheduledPublishTick (due-post processing)", () => {
   test("a throwing publish marks the post and target FAILED", async () => {
     const { db, posts } = createFakeDb({
       posts: [scheduledPost()],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
 
     const stats = await runScheduledPublishTick({
@@ -337,7 +308,7 @@ describe("runScheduledPublishTick (due-post processing)", () => {
   });
 
   test("account resolution is delegated to multi-target orchestration", async () => {
-    const { db } = createFakeDb({ posts: [scheduledPost()], accounts: {} });
+    const { db } = createFakeDb({ posts: [scheduledPost()] });
     const { fn, published } = okPublish();
 
     const stats = await runScheduledPublishTick({ db, publish: fn, now: NOW });
@@ -390,7 +361,6 @@ describe("stale PUBLISHING recovery", () => {
           ],
         }),
       ],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
     const { fn, published } = okPublish();
 
@@ -405,7 +375,6 @@ describe("stale PUBLISHING recovery", () => {
   test("stale post scheduled < 24h is reverted to SCHEDULED and re-published in the same tick", async () => {
     const { db, posts } = createFakeDb({
       posts: [stalePost({ targets: [{ id: "t1", postId: "p1", status: "PUBLISHING", platform: "THREADS", externalPostId: null, publishedAt: null }] })],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
     const { fn, published } = okPublish();
 
@@ -426,7 +395,6 @@ describe("stale PUBLISHING recovery", () => {
           targets: [{ id: "t1", postId: "p1", status: "PUBLISHING", platform: "THREADS", externalPostId: null, publishedAt: null }],
         }),
       ],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
     const { fn, published } = okPublish();
 
@@ -442,7 +410,6 @@ describe("stale PUBLISHING recovery", () => {
   test("FAILED meta posts are never auto-retried by the tick", async () => {
     const { db, posts } = createFakeDb({
       posts: [scheduledPost({ status: "FAILED", errorMessage: "meta 500" })],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
     const { fn, published } = okPublish();
 
@@ -622,7 +589,6 @@ describe("tick unexpected-throw recompute", () => {
           ],
         }),
       ],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
     const stats = await runScheduledPublishTick({
       db,
@@ -646,7 +612,6 @@ describe("tick unexpected-throw recompute", () => {
           ],
         }),
       ],
-      accounts: { "alice:THREADS": THREADS_ACCOUNT },
     });
     const stats = await runScheduledPublishTick({
       db,

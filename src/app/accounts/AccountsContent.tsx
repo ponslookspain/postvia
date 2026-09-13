@@ -57,7 +57,7 @@ const PLATFORMS: PlatformConfig[] = [
     connectLabel: "Connect Threads",
     connectEndpoint: "/api/auth/threads/connect",
     disconnectEndpoint: "/api/accounts/threads",
-    multi: false,
+    multi: true,
   },
   {
     platform: "X",
@@ -123,7 +123,7 @@ function getSearchParamMessage(searchParams: URLSearchParams): {
 
 type PendingDisconnect = {
   config: PlatformConfig;
-  account: PlatformAccount | null;
+  account: PlatformAccount;
 } | null;
 
 function isExpired(account: PlatformAccount | null | undefined): boolean {
@@ -137,25 +137,24 @@ function accountInitial(username: string): string {
 
 export default function AccountsContent({
   xAccounts: initialXAccounts,
-  threadsAccount: initialThreadsAccount,
+  threadsAccounts: initialThreadsAccounts,
   tiktokAccounts: initialTiktokAccounts,
   instagramAccounts: initialInstagramAccounts,
   accountsLimit,
 }: {
   xAccounts: PlatformAccount[];
-  threadsAccount: PlatformAccount | null;
+  threadsAccounts: PlatformAccount[];
   tiktokAccounts: PlatformAccount[];
   instagramAccounts: PlatformAccount[];
   /** Max accounts per platform on the current plan (null = unlimited). */
   accountsLimit: number | null;
 }) {
   const searchParams = useSearchParams();
-  const [threadsAccount, setThreadsAccount] =
-    useState<PlatformAccount | null>(initialThreadsAccount);
   const [multiAccounts, setMultiAccounts] = useState<
     Record<string, PlatformAccount[]>
   >({
     X: initialXAccounts,
+    THREADS: initialThreadsAccounts,
     TIKTOK: initialTiktokAccounts,
     INSTAGRAM: initialInstagramAccounts,
   });
@@ -169,17 +168,9 @@ export default function AccountsContent({
   const [pendingDisconnect, setPendingDisconnect] =
     useState<PendingDisconnect>(null);
 
-  const byPlatform: Record<
-    string,
-    { account: PlatformAccount | null; setAccount: (a: PlatformAccount | null) => void }
-  > = {
-    THREADS: { account: threadsAccount, setAccount: setThreadsAccount },
-  };
-
   function accountsFor(config: PlatformConfig): PlatformAccount[] {
     if (!config.multi) {
-      const single = byPlatform[config.platform]?.account;
-      return single ? [single] : [];
+      return multiAccounts[config.platform] ?? [];
     }
     return multiAccounts[config.platform] ?? [];
   }
@@ -201,24 +192,6 @@ export default function AccountsContent({
     } catch {
       setMessage({ text: "Failed to connect. Please try again.", error: true });
       setConnecting(null);
-    }
-  }
-
-  async function runDisconnect(config: PlatformConfig) {
-    setDisconnecting(config.platform);
-    try {
-      const res = await fetch(config.disconnectEndpoint, { method: "DELETE" });
-      if (res.ok) {
-        byPlatform[config.platform].setAccount(null);
-        setMessage({ text: `${config.name} account disconnected`, error: false });
-      } else {
-        const data = await res.json();
-        setMessage({ text: data.error || "Failed to disconnect", error: true });
-      }
-    } catch {
-      setMessage({ text: "Failed to disconnect. Please try again.", error: true });
-    } finally {
-      setDisconnecting(null);
     }
   }
 
@@ -253,13 +226,9 @@ export default function AccountsContent({
 
   async function confirmPendingDisconnect() {
     const pending = pendingDisconnect;
-    if (!pending || disconnecting) return;
+    if (!pending || !pending.account || disconnecting) return;
     setPendingDisconnect(null);
-    if (pending.account) {
-      await runDisconnectMulti(pending.config, pending.account);
-    } else {
-      await runDisconnect(pending.config);
-    }
+    await runDisconnectMulti(pending.config, pending.account);
   }
 
   function limitLabel(count: number): string {
@@ -302,8 +271,6 @@ export default function AccountsContent({
           const accounts = accountsFor(config);
           const connected = accounts.length > 0;
           const hasExpired = accounts.some((account) => isExpired(account));
-          const busy =
-            connecting === config.platform || disconnecting !== null;
           return (
             <li key={config.platform} className="min-w-0">
               <Card className="flex h-full flex-col">
@@ -427,7 +394,7 @@ export default function AccountsContent({
                           ? "Connecting..."
                           : config.connectLabel}
                       </Button>
-                    ) : config.multi ? (
+                    ) : (
                       <Button
                         variant="outline"
                         onClick={() => void handleConnect(config)}
@@ -440,49 +407,6 @@ export default function AccountsContent({
                         {connecting === config.platform
                           ? "Connecting..."
                           : "Connect another"}
-                      </Button>
-                    ) : hasExpired ? (
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Button
-                          onClick={() => void handleConnect(config)}
-                          disabled={connecting === config.platform}
-                        >
-                          {connecting === config.platform && (
-                            <Spinner data-icon="inline-start" />
-                          )}
-                          {connecting === config.platform
-                            ? "Connecting..."
-                            : "Reconnect"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() =>
-                            setPendingDisconnect({ config, account: null })
-                          }
-                          disabled={disconnecting === config.platform || busy}
-                        >
-                          {disconnecting === config.platform && (
-                            <Spinner data-icon="inline-start" />
-                          )}
-                          {disconnecting === config.platform
-                            ? "Disconnecting..."
-                            : "Disconnect"}
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="destructive"
-                        onClick={() =>
-                          setPendingDisconnect({ config, account: null })
-                        }
-                        disabled={disconnecting === config.platform}
-                      >
-                        {disconnecting === config.platform && (
-                          <Spinner data-icon="inline-start" />
-                        )}
-                        {disconnecting === config.platform
-                          ? "Disconnecting..."
-                          : "Disconnect"}
                       </Button>
                     )}
                   </div>
@@ -503,9 +427,9 @@ export default function AccountsContent({
           <DialogHeader>
             <DialogTitle>Disconnect account?</DialogTitle>
             <DialogDescription>
-              {pendingDisconnect?.account
+              {pendingDisconnect
                 ? `Disconnect ${pendingDisconnect.config.name} @${pendingDisconnect.account.username}? You can reconnect it at any time.`
-                : `Disconnect your ${pendingDisconnect?.config.name} account? You can reconnect it at any time.`}
+                : null}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

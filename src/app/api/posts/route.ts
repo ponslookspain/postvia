@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
 
     const {
       text,
-      platform: rawPlatform,
       scheduledAt,
       accountIds,
       targets: requestedTargets,
@@ -130,16 +129,20 @@ export async function POST(request: NextRequest) {
           )
           .map((target) => target.accountId);
 
-    const legacyPlatform = rawPlatform === "THREADS" ? "THREADS" : "X";
-    const accounts = selectedIds.length
-      ? await prisma.socialAccount.findMany({
-          where: { id: { in: selectedIds }, userId: user.id },
-        })
-      : await prisma.socialAccount.findMany({
-          where: { userId: user.id, platform: legacyPlatform },
-        });
+    // Every PostTarget must bind a concrete socialAccountId. The legacy
+    // platform-string fallback ("post to my THREADS/X account") cannot
+    // choose between several accounts on one platform, so it fails closed.
+    if (selectedIds.length === 0) {
+      return NextResponse.json(
+        { error: "Select at least one connected social account" },
+        { status: 400 }
+      );
+    }
+    const accounts = await prisma.socialAccount.findMany({
+      where: { id: { in: selectedIds }, userId: user.id },
+    });
 
-    if (selectedIds.length !== accounts.length && selectedIds.length > 0) {
+    if (selectedIds.length !== accounts.length) {
       return NextResponse.json(
         { error: "One or more selected social accounts are unavailable" },
         { status: 400 }
@@ -148,7 +151,7 @@ export async function POST(request: NextRequest) {
 
     const selected = validateTargetAccountSelection(
       accounts,
-      selectedIds.length ? selectedIds : accounts.map((account) => account.id),
+      selectedIds,
       user.id,
       Boolean(hasMedia)
     );
