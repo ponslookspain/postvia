@@ -86,73 +86,335 @@ function logMetaError(scope: string, status: number, body: unknown): void {
   });
 }
 
-async function waitForContainerReady(
-  containerId: string,
+export class ThreadsApiError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly httpStatus: number
+  ) {
+    super(message);
+    this.name = "ThreadsApiError";
+  }
+}
+
+function threadsAuthSignal(status: number, code: string, message: string): boolean {
+  if (status === 401 || status === 403) return true;
+  if (code === "190") return true;
+  return (
+    /http 40[13]\b/i.test(message) ||
+    /invalid.*token|token.*invalid|token.*expired|session.*expired|revoked/i.test(
+      message
+    )
+  );
+}
+
+/**
+ * Human-readable mapping. Auth/token failures always mean the user must
+ * reconnect; every other error keeps the raw Meta diagnostic so support
+ * retains code/subcode/fbtrace_id.
+ */
+export function threadsErrorMessage(error: unknown): string {
+  const message =
+    error instanceof Error && error.message
+      ? error.message
+      : "Threads publishing failed. Please try again.";
+  const status = error instanceof ThreadsApiError ? error.httpStatus : 0;
+  const code = error instanceof ThreadsApiError ? error.code : "";
+  if (threadsAuthSignal(status, code, message)) {
+    return "Threads access expired or was revoked. Reconnect your Threads account.";
+  }
+  return message;
+}
+
+function timeoutError(budget: PollBudget, lastStatus: string): string {
+  return `Threads API error: media container not ready (last status ${JSON.stringify(
+    lastStatus
+  )}) after ${budget.maxAttempts} attempts / ${budget.timeoutMs}ms`;
+}
+
+function threadsErrorCode(data: unknown, httpStatus: number): string {
+  const code = (data as { error?: { code?: unknown } } | null)?.error?.code;
+  return code !== undefined && code !== null ? String(code) : `http_${httpStatus}`;
+}
+
+/**
+ * Create a media container. Throws ThreadsApiError (never returns a
+ * half-state) so the caller persists the id exactly once, immediately.
+ */
+export async function createThreadsContainer(
   accessToken: string,
-  budget: PollBudget
-): Promise<PublishResult> {
-  const startedAt = Date.now();
+  threadsUserId: string,
+  text: string,
+  media?: PublishMedia
+): Promise<string> {
+  const containerParams: Record<string, string> = {
+    text,
+    access_token: accessToken,
+  };
+  if (media?.kind === "IMAGE") {
+    containerParams.media_type = "IMAGE";
+    containerParams.image_url = media.url;
+  } else if (media?.kind === "VIDEO") {
+    containerParams.media_type = "VIDEO";
+    containerParams.video_url = media.url;
+  } else {
+    containerParams.media_type = "TEXT";
+  }
+
+  const containerRes = await fetch(
+    `${THREADS_API_BASE}/v1.0/${threadsUserId}/threads`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(containerParams).toString(),
+    }
+  );
+
+  const errorData = containerRes.ok
+    ? null
+    : await containerRes.json().catch(() => null);
+  if (!containerRes.ok) {
+    logMetaError("container create", containerRes.status, errorData);
+    throw new ThreadsApiError(
+      threadsErrorCode(errorData, containerRes.status),
+      formatMetaError(containerRes.status, errorData),
+      containerRes.status
+    );
+  }
+
+  const container = await containerRes.json();
+  if (!container?.id) {
+    throw new ThreadsApiError(
+      "container_failed",
+      `Threads API error: create response missing container id (HTTP ${containerRes.status})`,
+      containerRes.status
+    );
+  }
+  return String(container.id);
+}
+
+export type ThreadsContainerStatus = {
+  status: string;
+  errorMessage?: string;
+};
+
+/** Single status read. Throws ThreadsApiError on transport/API failure. */
+export async function fetchThreadsContainerStatus(
+  accessToken: string,
+  containerId: string
+): Promise<ThreadsContainerStatus> {
+  const res = await fetch(
+    `${THREADS_API_BASE}/v1.0/${containerId}?fields=status,error_message&access_token=${encodeURIComponent(
+      accessToken
+    )}`
+  );
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    logMetaError("container poll", res.status, data);
+    throw new ThreadsApiError(
+      threadsErrorCode(data, res.status),
+      formatMetaError(res.status, data),
+      res.status
+    );
+  }
+  if (!data || typeof data !== "object") {
+    throw new ThreadsApiError(
+      `http_${res.status}`,
+      `Threads API error: HTTP ${res.status} invalid container status response`,
+      res.status
+    );
+  }
+  const status = String((data as { status?: unknown }).status ?? "");
+  const errorMessage = (data as { error_message?: unknown }).error_message;
+  return {
+    status,
+    errorMessage: typeof errorMessage === "string" ? errorMessage : undefined,
+  };
+}
+
+/** Publish a READY container. Throws ThreadsApiError on failure. */
+export async function publishThreadsContainer(
+  accessToken: string,
+  threadsUserId: string,
+  containerId: string
+): Promise<string | null> {
+  const publishRes = await fetch(
+    `${THREADS_API_BASE}/v1.0/${threadsUserId}/threads_publish?creation_id=${containerId}&access_token=${accessToken}`,
+    { method: "POST" }
+  );
+  const errorData = publishRes.ok
+    ? null
+    : await publishRes.json().catch(() => null);
+  if (!publishRes.ok) {
+    logMetaError("threads_publish", publishRes.status, errorData);
+    throw new ThreadsApiError(
+      threadsErrorCode(errorData, publishRes.status),
+      formatMetaError(publishRes.status, errorData),
+      publishRes.status
+    );
+  }
+  const published = await publishRes.json();
+  logDiagnostic("threads", "published", {
+    status: "PUBLISHED",
+    errorMessage: null,
+  });
+  const id = (published as { id?: unknown } | null)?.id;
+  return id === undefined || id === null ? null : String(id);
+}
+
+export type ThreadsContainerOutcome =
+  | { state: "published"; externalPostId: string | null }
+  | { state: "failed"; error: string }
+  | { state: "processing"; containerId: string; detail: string };
+
+export type ThreadsContainerDeps = {
+  onContainerId: (containerId: string) => Promise<void>;
+  sleep?: (ms: number) => Promise<void>;
+  pollIntervalMs?: number;
+  pollBudgetMs?: number;
+  maxAttempts?: number;
+  now?: () => number;
+};
+
+function resolveThreadsPollBudget(
+  video: boolean,
+  deps: Pick<ThreadsContainerDeps, "pollIntervalMs" | "pollBudgetMs" | "maxAttempts">
+): PollBudget {
+  const fallback = video ? VIDEO_POLL_BUDGET : IMAGE_POLL_BUDGET;
+  return {
+    delayMs: deps.pollIntervalMs ?? fallback.delayMs,
+    maxAttempts: deps.maxAttempts ?? fallback.maxAttempts,
+    timeoutMs: deps.pollBudgetMs ?? fallback.timeoutMs,
+  };
+}
+
+/**
+ * Poll a container and publish it once FINISHED. Transient status-fetch
+ * errors keep polling until the budget runs out (reported as processing,
+ * never as failure) so a network blip can never trigger a second
+ * container or a second publish call.
+ */
+export async function monitorThreadsContainer(
+  accessToken: string,
+  input: { threadsUserId: string; containerId: string; video: boolean },
+  deps: Omit<ThreadsContainerDeps, "onContainerId"> = {}
+): Promise<ThreadsContainerOutcome> {
+  const budget = resolveThreadsPollBudget(input.video, deps);
+  const sleepFn = deps.sleep ?? sleep;
+  const now = deps.now ?? Date.now;
+  const startedAt = now();
   let attempts = 0;
   let lastStatus = "IN_PROGRESS";
 
-  while (attempts < budget.maxAttempts && Date.now() - startedAt <= budget.timeoutMs) {
+  for (;;) {
+    if (attempts >= budget.maxAttempts || now() - startedAt > budget.timeoutMs) {
+      return {
+        state: "processing",
+        containerId: input.containerId,
+        detail: timeoutError(budget, lastStatus),
+      };
+    }
     attempts++;
-    const res = await fetch(
-      `${THREADS_API_BASE}/v1.0/${containerId}?fields=status,error_message&access_token=${encodeURIComponent(
-        accessToken
-      )}`
-    );
-    const data = await res.json().catch(() => null);
 
-    if (!res.ok) {
-      logMetaError("container poll", res.status, data);
-      return { success: false, error: formatMetaError(res.status, data) };
+    let status: ThreadsContainerStatus | null = null;
+    try {
+      status = await fetchThreadsContainerStatus(accessToken, input.containerId);
+    } catch {
+      // Transient transport/API failure: keep polling until the budget
+      // runs out (reported as processing, never as failure) so a network
+      // blip can never trigger a second container or a second publish.
+      status = null;
     }
-    if (!data || typeof data !== "object") {
-      return {
-        success: false,
-        error: `Threads API error: HTTP ${res.status} invalid container status response`,
-      };
+    if (status === null) {
+      if (attempts < budget.maxAttempts && now() - startedAt <= budget.timeoutMs) {
+        await sleepFn(budget.delayMs);
+      }
+      continue;
     }
 
-    const status = (data as { status?: string }).status;
-    if (status === "FINISHED") {
+    lastStatus = status.status;
+    if (status.status === "FINISHED") {
       logDiagnostic("threads", "container finished", { status: "FINISHED" });
-      return { success: true };
+      try {
+        const externalPostId = await publishThreadsContainer(
+          accessToken,
+          input.threadsUserId,
+          input.containerId
+        );
+        return { state: "published", externalPostId };
+      } catch (error) {
+        return { state: "failed", error: threadsErrorMessage(error) };
+      }
     }
-    if (status === "ERROR") {
-      const reason = (data as { error_message?: string }).error_message;
+    if (status.status === "ERROR") {
       return {
-        success: false,
-        error: `Threads API error: media container failed to process${reason ? `: ${reason}` : ""}`,
+        state: "failed",
+        error: `Threads API error: media container failed to process${status.errorMessage ? `: ${status.errorMessage}` : ""}`,
       };
     }
-    if (status === "EXPIRED") {
+    if (status.status === "EXPIRED") {
       return {
-        success: false,
+        state: "failed",
         error:
           "Threads API error: media container expired before publishing. Please try publishing again.",
       };
     }
-    if (status !== "IN_PROGRESS") {
+    if (status.status !== "IN_PROGRESS") {
       return {
-        success: false,
-        error: `Threads API error: unexpected container status ${JSON.stringify(status)}`,
+        state: "failed",
+        error: `Threads API error: unexpected container status ${JSON.stringify(status.status)}`,
       };
     }
+    if (attempts < budget.maxAttempts && now() - startedAt <= budget.timeoutMs) {
+      await sleepFn(budget.delayMs);
+    }
+  }
+}
 
-    lastStatus = status;
-    if (attempts < budget.maxAttempts && Date.now() - startedAt <= budget.timeoutMs) {
-      await sleep(budget.delayMs);
+/**
+ * Full Threads publish. If existingContainerId is provided we NEVER create
+ * a second container; we only poll + publish that same container (or report
+ * its terminal state) — this is the duplicate protection for resume/retry.
+ */
+export async function publishThreadsMedia(
+  accessToken: string,
+  input: {
+    threadsUserId: string;
+    text: string;
+    media?: PublishMedia;
+    existingContainerId?: string | null;
+  },
+  deps: ThreadsContainerDeps
+): Promise<ThreadsContainerOutcome> {
+  let containerId = input.existingContainerId ?? null;
+
+  if (!containerId) {
+    try {
+      containerId = await createThreadsContainer(
+        accessToken,
+        input.threadsUserId,
+        input.text,
+        input.media
+      );
+      // Persist IMMEDIATELY: from here on every failure path resumes against
+      // this same container instead of re-creating one.
+      await deps.onContainerId(containerId);
+    } catch (error) {
+      return { state: "failed", error: threadsErrorMessage(error) };
     }
   }
 
-  return {
-    success: false,
-    error: `Threads API error: media container not ready (last status ${JSON.stringify(
-      lastStatus
-    )}) after ${budget.maxAttempts} attempts / ${budget.timeoutMs}ms`,
-  };
+  return monitorThreadsContainer(
+    accessToken,
+    {
+      threadsUserId: input.threadsUserId,
+      containerId,
+      video: input.media?.kind === "VIDEO",
+    },
+    deps
+  );
 }
 
 function getAppId(): string {
@@ -256,78 +518,37 @@ export class ThreadsProvider implements SocialProvider {
     externalId: string,
     media?: PublishMedia
   ): Promise<PublishResult> {
-    const containerParams: Record<string, string> = {
-      text,
-      access_token: accessToken,
-    };
-    if (media?.kind === "IMAGE") {
-      containerParams.media_type = "IMAGE";
-      containerParams.image_url = media.url;
-    } else if (media?.kind === "VIDEO") {
-      containerParams.media_type = "VIDEO";
-      containerParams.video_url = media.url;
-    } else {
-      containerParams.media_type = "TEXT";
-    }
-
-    const containerRes = await fetch(
-      `${THREADS_API_BASE}/v1.0/${externalId}/threads`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams(containerParams).toString(),
-      }
-    );
-
-    if (!containerRes.ok) {
-      const errorData = await containerRes.json().catch(() => null);
-      logMetaError("container create", containerRes.status, errorData);
-      return { success: false, error: formatMetaError(containerRes.status, errorData) };
-    }
-
-    const container = await containerRes.json();
-    if (!container?.id) {
-      return {
-        success: false,
-        error: `Threads API error: create response missing container id (HTTP ${containerRes.status})`,
-      };
-    }
-
-    const ready = await waitForContainerReady(
-      container.id,
+    const outcome = await publishThreadsMedia(
       accessToken,
-      media?.kind === "VIDEO" ? VIDEO_POLL_BUDGET : IMAGE_POLL_BUDGET
+      { threadsUserId: externalId, text, media },
+      { onContainerId: async () => {} }
     );
-    if (!ready.success) {
-      return { success: false, error: ready.error };
+    switch (outcome.state) {
+      case "published":
+        logDiagnostic("threads", "published", {
+          status: "PUBLISHED",
+          mediaType: media?.kind ?? "TEXT",
+          errorMessage: null,
+        });
+        return {
+          success: true,
+          externalPostId: outcome.externalPostId ?? undefined,
+        };
+      case "failed":
+        return { success: false, error: outcome.error };
+      case "processing":
+        return { success: false, error: outcome.detail };
     }
-
-    const publishRes = await fetch(
-      `${THREADS_API_BASE}/v1.0/${externalId}/threads_publish?creation_id=${container.id}&access_token=${accessToken}`,
-      { method: "POST" }
-    );
-
-    if (!publishRes.ok) {
-      const errorData = await publishRes.json().catch(() => null);
-      logMetaError("threads_publish", publishRes.status, errorData);
-      return { success: false, error: formatMetaError(publishRes.status, errorData) };
-    }
-
-    const published = await publishRes.json();
-    logDiagnostic("threads", "published", {
-      status: "PUBLISHED",
-      mediaType: media?.kind ?? "TEXT",
-      errorMessage: null,
-    });
-    return {
-      success: true,
-      externalPostId: published?.id,
-    };
   }
 
-  async revokeToken(): Promise<boolean> {
-    return true;
+  async revokeToken(_accessToken?: string): Promise<boolean> {
+    // The Threads API exposes no token revocation endpoint: a Threads
+    // connection ends when the user removes the app in their Threads
+    // settings. Disconnect in Postvia is therefore local-only (row delete
+    // + abuse tombstone, see /api/accounts/threads). Return false so no
+    // caller mistakes this best-effort no-op for a confirmed remote
+    // revoke — local disconnect always proceeds regardless.
+    void _accessToken;
+    return false;
   }
 }

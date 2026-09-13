@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
   const user = await requireUser();
-  const [xAccount, threadsAccount, tiktokAccounts, instagramAccounts] =
+  const [xAccounts, threadsAccount, tiktokAccounts, instagramAccounts] =
     await Promise.all([
-      prisma.socialAccount.findFirst({
+      prisma.socialAccount.findMany({
         where: { userId: user.id, platform: "X" },
         select: {
           id: true,
@@ -21,6 +21,7 @@ export default async function AccountsPage() {
           expiresAt: true,
           createdAt: true,
         },
+        orderBy: { username: "asc" },
       }),
       prisma.socialAccount.findFirst({
         where: { userId: user.id, platform: "THREADS" },
@@ -59,7 +60,7 @@ export default async function AccountsPage() {
       }),
     ]);
 
-  const serialize = (account: typeof xAccount) =>
+  const serialize = (account: typeof threadsAccount) =>
     account
       ? {
           ...account,
@@ -86,7 +87,11 @@ export default async function AccountsPage() {
         }
       >
         <AccountsContent
-          xAccount={serialize(xAccount)}
+          xAccounts={xAccounts.map((account) => ({
+            ...account,
+            createdAt: account.createdAt.toISOString(),
+            expiresAt: account.expiresAt ? account.expiresAt.toISOString() : null,
+          }))}
           threadsAccount={serialize(threadsAccount)}
           tiktokAccounts={tiktokAccounts.map((account) => ({
             ...account,

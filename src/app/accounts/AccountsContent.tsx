@@ -47,13 +47,6 @@ interface PlatformConfig {
 
 const SINGLE_PLATFORMS: PlatformConfig[] = [
   {
-    platform: "X",
-    name: "X (Twitter)",
-    connectLabel: "Connect X",
-    connectEndpoint: "/api/auth/x/connect",
-    disconnectEndpoint: "/api/accounts/x",
-  },
-  {
     platform: "THREADS",
     name: "Threads",
     connectLabel: "Connect Threads",
@@ -62,8 +55,16 @@ const SINGLE_PLATFORMS: PlatformConfig[] = [
   },
 ];
 
-// Multi-account platforms (a user may connect several handles).
+// Multi-account platforms (a user may connect several handles, up to the
+// plan's maxAccountsPerPlatform: Free 1, Growth 5, Scale unlimited).
 const MULTI_PLATFORMS: PlatformConfig[] = [
+  {
+    platform: "X",
+    name: "X (Twitter)",
+    connectLabel: "Connect X",
+    connectEndpoint: "/api/auth/x/connect",
+    disconnectEndpoint: "/api/accounts/x",
+  },
   {
     platform: "TIKTOK",
     name: "TikTok",
@@ -124,25 +125,23 @@ function isExpired(account: PlatformAccount | null | undefined): boolean {
 }
 
 export default function AccountsContent({
-  xAccount: initialXAccount,
+  xAccounts: initialXAccounts,
   threadsAccount: initialThreadsAccount,
   tiktokAccounts: initialTiktokAccounts,
   instagramAccounts: initialInstagramAccounts,
 }: {
-  xAccount: PlatformAccount | null;
+  xAccounts: PlatformAccount[];
   threadsAccount: PlatformAccount | null;
   tiktokAccounts: PlatformAccount[];
   instagramAccounts: PlatformAccount[];
 }) {
   const searchParams = useSearchParams();
-  const [xAccount, setXAccount] = useState<PlatformAccount | null>(
-    initialXAccount
-  );
   const [threadsAccount, setThreadsAccount] =
     useState<PlatformAccount | null>(initialThreadsAccount);
   const [multiAccounts, setMultiAccounts] = useState<
     Record<string, PlatformAccount[]>
   >({
+    X: initialXAccounts,
     TIKTOK: initialTiktokAccounts,
     INSTAGRAM: initialInstagramAccounts,
   });
@@ -160,7 +159,6 @@ export default function AccountsContent({
     string,
     { account: PlatformAccount | null; setAccount: (a: PlatformAccount | null) => void }
   > = {
-    X: { account: xAccount, setAccount: setXAccount },
     THREADS: { account: threadsAccount, setAccount: setThreadsAccount },
   };
 

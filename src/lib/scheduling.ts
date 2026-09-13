@@ -136,8 +136,9 @@ export async function recoverStalePublishing(
   });
 
   for (const post of stale) {
-    // Resume-first for targets with an external job id (TikTok): their publish
-    // may already be running platform-side. Never blind-reset such a target.
+    // Resume-first for targets with an external job id (TikTok publish id,
+    // Instagram/Threads container id): their publish may already be running
+    // platform-side. Never blind-reset such a target.
     let pendingJob = false;
     let jobsResolved = false;
     for (const target of post.targets) {

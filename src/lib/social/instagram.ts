@@ -226,25 +226,84 @@ export async function fetchInstagramProfile(
   };
 }
 
+type InstagramTokenStore = {
+  findUnique: (args: {
+    where: { id: string };
+    select: { accessToken: boolean; expiresAt: boolean };
+  }) => Promise<{ accessToken: string; expiresAt: Date | null } | null>;
+  updateMany: (args: {
+    where: { id: string; accessToken: string };
+    data: { accessToken: string; expiresAt: Date };
+  }) => Promise<{ count: number }>;
+  update: (args: {
+    where: { id: string };
+    data: { accessToken: string; expiresAt: Date };
+  }) => Promise<unknown>;
+};
+
 /**
- * Returns a valid long-lived token, refreshing + persisting rotated tokens
- * when within 5 minutes of expiry. Never logs secrets.
+ * Returns a valid long-lived token, refreshing + persisting the rotated
+ * token when within 5 minutes of expiry. Never logs secrets.
+ *
+ * Race-safe (same contract as TikTok): the stored row is re-read first so
+ * a concurrent worker's refresh is reused, and the rotated token is
+ * persisted with a conditional update keyed on the previously seen access
+ * token — the loser of the race re-reads the winner instead of
+ * overwriting a fresh token (a stale loser token may already be
+ * invalidated by Meta's rotation).
  */
-export async function ensureFreshInstagramToken(account: {
-  id: string;
-  accessToken: string;
-  expiresAt: Date | null;
-}): Promise<string> {
+export async function ensureFreshInstagramToken(
+  account: {
+    id: string;
+    accessToken: string;
+    expiresAt: Date | null;
+  },
+  store?: InstagramTokenStore
+): Promise<string> {
+  const db: InstagramTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
   if (account.expiresAt && account.expiresAt.getTime() > now + 5 * 60_000) {
     return account.accessToken;
   }
-  const refreshed = await refreshInstagramToken(account.accessToken);
-  await prisma.socialAccount.update({
+  const stored = await db.findUnique({
     where: { id: account.id },
-    data: { accessToken: refreshed.accessToken, expiresAt: refreshed.expiresAt },
+    select: { accessToken: true, expiresAt: true },
   });
-  return refreshed.accessToken;
+  const current = stored ?? account;
+  if (
+    current.expiresAt &&
+    current.expiresAt.getTime() > Date.now() + 5 * 60_000 &&
+    current.accessToken !== account.accessToken
+  ) {
+    // Another worker refreshed concurrently; reuse its rotated token.
+    return current.accessToken;
+  }
+  const refreshed = await refreshInstagramToken(current.accessToken);
+  const next = {
+    accessToken: refreshed.accessToken,
+    expiresAt: refreshed.expiresAt,
+  };
+  try {
+    const claimed = await db.updateMany({
+      where: { id: account.id, accessToken: current.accessToken },
+      data: next,
+    });
+    if (claimed.count === 0) {
+      // Lost the rotation race: re-read the winner's token.
+      const winner = await db.findUnique({
+        where: { id: account.id },
+        select: { accessToken: true, expiresAt: true },
+      });
+      if (winner && winner.accessToken !== current.accessToken) {
+        return winner.accessToken;
+      }
+    }
+  } catch {
+    // Conditional update unsupported (or transient DB error): fall back
+    // to a plain update so the token still rotates, then return it.
+    await db.update({ where: { id: account.id }, data: next });
+  }
+  return next.accessToken;
 }
 
 /* ------------------------------ container flow ------------------------------ */

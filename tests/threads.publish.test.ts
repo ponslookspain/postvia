@@ -153,7 +153,7 @@ describe("ThreadsProvider.publishPost", () => {
   test("returns diagnostic error on container creation failure", async () => {
     createHandler = () =>
       json(400, {
-        error: { message: "Invalid OAuth 2.0 Access Token", code: 190 },
+        error: { message: "Invalid parameter", code: 100 },
       });
 
     const provider = new ThreadsProviderClass();
@@ -161,8 +161,26 @@ describe("ThreadsProvider.publishPost", () => {
 
     assert.equal(res.success, false);
     assert.match(res.error ?? "", /HTTP 400/);
-    assert.match(res.error ?? "", /code=190/);
-    assert.match(res.error ?? "", /Invalid OAuth 2.0 Access Token/);
+    assert.match(res.error ?? "", /code=100/);
+    assert.match(res.error ?? "", /Invalid parameter/);
+    assert.equal(statusFetches, 0);
+    assert.equal(publishFetches, 0);
+  });
+
+  test("code 190 on container creation maps to reconnect", async () => {
+    createHandler = () =>
+      json(400, {
+        error: { message: "Invalid OAuth 2.0 Access Token", code: 190 },
+      });
+
+    const provider = new ThreadsProviderClass();
+    const res = await provider.publishPost("token", "hello", "12345");
+
+    assert.equal(res.success, false);
+    assert.equal(
+      res.error,
+      "Threads access expired or was revoked. Reconnect your Threads account."
+    );
     assert.equal(statusFetches, 0);
     assert.equal(publishFetches, 0);
   });

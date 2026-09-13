@@ -62,8 +62,8 @@ export async function POST(
     const staleCutoff = new Date(Date.now() - STALE_PUBLISHING_MS);
     // A post stuck in PUBLISHING past the stale threshold has no running
     // function behind it (maxDuration 300s < STALE_PUBLISHING_MS): its
-    // jobless sync targets (X/Threads) are safe to re-queue, while targets
-    // holding a platform job id stay with the cron resume path.
+    // jobless sync targets (X) are safe to re-queue, while targets
+    // holding a platform job/container id stay with the cron resume path.
     const isStalePublishing =
       post.status === "PUBLISHING" && post.updatedAt < staleCutoff;
 

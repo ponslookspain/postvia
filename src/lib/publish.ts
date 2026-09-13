@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { XProvider } from "@/lib/social/x";
+import { XProvider, ensureFreshXToken, xErrorMessage } from "@/lib/social/x";
 import {
+  ThreadsApiError,
   ThreadsProvider,
+  monitorThreadsContainer,
+  publishThreadsMedia,
+  threadsErrorMessage,
   THREADS_PUBLISH_IMAGE_TTL_MS,
   THREADS_PUBLISH_VIDEO_TTL_MS,
 } from "@/lib/social/threads";
@@ -258,6 +262,12 @@ async function executeTargetPublish(
   if (target.platform === "INSTAGRAM") {
     return executeInstagramTarget(post, target, account, effective);
   }
+  if (target.platform === "THREADS") {
+    return executeThreadsTarget(post, target, account, effective);
+  }
+  if (target.platform === "X") {
+    return executeXTarget(post, target, account, effective.text);
+  }
 
   const resolvedMedia = await resolveTargetMedia(post, target, caps);
   if (resolvedMedia.error) {
@@ -293,6 +303,164 @@ async function executeTargetPublish(
     username: account.username,
     platform: target.platform,
   };
+}
+
+/**
+ * Threads publishes by pointing Meta at a short-lived signed GET URL of the
+ * PRIVATE blob (same fetch model as Instagram). The container id is
+ * persisted to PostTarget.externalJobId IMMEDIATELY after creation: every
+ * later attempt resumes the SAME container instead of creating a second
+ * one (duplicate protection).
+ */
+/**
+ * X publishes synchronously (no platform job id): refresh the token first,
+ * then post. Expired/revoked tokens map to a reconnect message instead of
+ * a raw 401 so the UI can offer Reconnect.
+ */
+async function executeXTarget(
+  post: PublishPost,
+  target: PublishTarget,
+  account: PublishAccount,
+  text: string
+): Promise<PublishOutcome> {
+  let accessToken: string;
+  try {
+    accessToken = await ensureFreshXToken({
+      id: account.id,
+      accessToken: account.accessToken,
+      refreshToken: account.refreshToken,
+      expiresAt: account.expiresAt,
+    });
+  } catch (error) {
+    const message = xErrorMessage(error);
+    await updateTargetFailure(post.id, target.id, message);
+    return failedOutcome(target, message);
+  }
+
+  const provider = new XProvider();
+  let result: { success: boolean; externalPostId?: string; error?: string };
+  try {
+    result = await provider.publishPost(accessToken, text);
+  } catch (error) {
+    const message = xErrorMessage(error);
+    await updateTargetFailure(post.id, target.id, message);
+    return failedOutcome(target, message);
+  }
+  if (!result.success) {
+    const error = xErrorMessage(new Error(result.error || "Publication failed"));
+    await updateTargetFailure(post.id, target.id, error);
+    return failedOutcome(target, error);
+  }
+
+  await prisma.postTarget.update({
+    where: { id: target.id },
+    data: {
+      status: "PUBLISHED",
+      externalPostId: result.externalPostId,
+      publishedAt: new Date(),
+      errorMessage: null,
+    },
+  });
+  return {
+    ok: true,
+    externalPostId: result.externalPostId,
+    username: account.username,
+    platform: target.platform,
+  };
+}
+
+async function executeThreadsTarget(
+  post: PublishPost,
+  target: PublishTarget,
+  account: PublishAccount,
+  effective: { text: string; content: Record<string, unknown>; settings: Record<string, unknown> }
+): Promise<PublishOutcome> {
+  const caps = getPlatformCapabilities("THREADS");
+  const mediaValidation = validateTargetMedia(caps, post.media);
+  if (!mediaValidation.ok) {
+    // A stale container id from an earlier attempt must not survive a
+    // validation failure: the next retry would otherwise poll a dead
+    // container instead of creating a fresh one.
+    await updateTargetFailure(post.id, target.id, mediaValidation.error, {
+      clearJobId: true,
+    });
+    return failedOutcome(target, mediaValidation.error);
+  }
+
+  let threadsMedia: PublishMedia | undefined;
+  try {
+    const resolvedMedia = await chooseThreadsMedia(post.media, (pathname, ttlMs) =>
+      createSignedGetUrl({ pathname, ttlMs })
+    );
+    if (resolvedMedia.error) {
+      await updateTargetFailure(post.id, target.id, resolvedMedia.error, {
+        clearJobId: true,
+      });
+      return failedOutcome(target, resolvedMedia.error);
+    }
+    if (resolvedMedia.media) {
+      threadsMedia = { url: resolvedMedia.media.url, kind: resolvedMedia.media.kind };
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to generate media URL for Threads";
+    await updateTargetFailure(post.id, target.id, message, { clearJobId: true });
+    return failedOutcome(target, message);
+  }
+
+  const outcome = await publishThreadsMedia(
+    account.accessToken,
+    {
+      threadsUserId: account.externalId,
+      text: effective.text,
+      media: threadsMedia,
+      existingContainerId: target.externalJobId,
+    },
+    {
+      onContainerId: async (containerId) => {
+        await prisma.postTarget.update({
+          where: { id: target.id },
+          data: { externalJobId: containerId },
+        });
+      },
+    }
+  );
+
+  switch (outcome.state) {
+    case "published": {
+      await prisma.postTarget.update({
+        where: { id: target.id },
+        data: {
+          status: "PUBLISHED",
+          externalPostId: outcome.externalPostId ?? null,
+          publishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      return {
+        ok: true,
+        externalPostId: outcome.externalPostId ?? undefined,
+        username: account.username,
+        platform: "THREADS",
+      };
+    }
+    case "failed": {
+      // ERROR/EXPIRED/transport failures are terminal on Meta's side for
+      // this container: clear the id so the next manual retry starts a
+      // fresh container.
+      await updateTargetFailure(post.id, target.id, outcome.error, {
+        clearJobId: true,
+      });
+      return failedOutcome(target, outcome.error);
+    }
+    case "processing": {
+      return {
+        ok: false,
+        error: "Threads is still processing this media. Publishing continues automatically — do not retry yet.",
+        platform: "THREADS",
+      };
+    }
+  }
 }
 
 const TIKTOK_MEDIA_READ_TTL_MS = 30 * 60_000;
@@ -664,6 +832,92 @@ export async function resumeInstagramTarget(
 }
 
 /**
+ * Threads stale-recovery: poll the SAME container, never re-create it.
+ * Terminal container states fail the target (and drop the container id);
+ * anything else keeps the id so the next tick resumes polling it.
+ */
+export async function resumeThreadsTarget(
+  targetId: string
+): Promise<"complete" | "failed" | "pending" | "skip"> {
+  const target = await prisma.postTarget.findUnique({
+    where: { id: targetId },
+    include: {
+      socialAccount: true,
+      post: { select: { media: { select: { type: true } } } },
+    },
+  });
+  if (
+    !target ||
+    target.platform !== "THREADS" ||
+    !target.externalJobId ||
+    target.status !== "PUBLISHING" ||
+    !target.socialAccount
+  ) {
+    return "skip";
+  }
+  const account = target.socialAccount;
+  // Video containers transcode server-side for minutes: resume with the
+  // video budget when the post carries video so polling is not cut short
+  // (a short budget only reports "processing" and retries next tick —
+  // never a duplicate — but the generous budget settles faster).
+  const video = target.post.media.some((item) => item.type === "VIDEO");
+  try {
+    const outcome = await monitorThreadsContainer(
+      account.accessToken,
+      {
+        threadsUserId: account.externalId,
+        containerId: target.externalJobId,
+        video,
+      }
+    );
+    if (outcome.state === "published") {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "PUBLISHED",
+          externalPostId: outcome.externalPostId,
+          publishedAt: new Date(),
+          errorMessage: null,
+        },
+      });
+      return "complete";
+    }
+    if (outcome.state === "failed") {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "FAILED",
+          externalJobId: null,
+          errorMessage: outcome.error,
+        },
+      });
+      return "failed";
+    }
+    return "pending";
+  } catch (error) {
+    // Mirror the TikTok/Instagram resume: only terminal auth failures fail
+    // the target (and drop the container id). Transient blips keep the id
+    // so the next tick resumes polling the same container.
+    const message = error instanceof Error ? error.message : "";
+    if (
+      error instanceof ThreadsApiError ||
+      /token|session|revoked|http 40[13]\b/i.test(message)
+    ) {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "FAILED",
+          externalJobId: null,
+          errorMessage: threadsErrorMessage(error),
+        },
+      });
+      return "failed";
+    }
+    return "pending";
+  }
+}
+
+/**
  * Scheduler dispatch: resolve a stale PUBLISHING target by its own job,
  * routing to the right platform resume. Non-job targets return "skip" so
  * the standard stale-recovery resets them as before.
@@ -677,6 +931,9 @@ export async function resumeJobTarget(
   });
   if (platform?.platform === "INSTAGRAM") {
     return resumeInstagramTarget(targetId);
+  }
+  if (platform?.platform === "THREADS") {
+    return resumeThreadsTarget(targetId);
   }
   return resumeTiktokTarget(targetId);
 }
