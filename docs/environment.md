@@ -26,9 +26,14 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | no | CI | Sourcemap upload | **yes** |
 | `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src) | no |
+| `OTP_E2E_DEBUG` / `OTP_DEBUG_TOKEN` | no | local test only | Plaintext-OTP + gated code reader for local automated E2E (`src/lib/auth.ts`, `/api/auth/otp/debug`). Never set outside local testing; production/preview always hash | **yes** |
 | `THREADS_POLL_DELAY_MS` (+ `MAX_ATTEMPTS`, `TIMEOUT_MS`, `VIDEO_*`) | no | all | Threads publish polling tuning (src) | no |
 
 Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
 `VERCEL_PROJECT_PRODUCTION_URL`. `NODE_ENV` switches dev/prod defaults.
 `NEXT_RUNTIME` is branched in Blob code. Local-only: `DATABASE_URL`
 (example), `CRON_SECRET` dev value, `VERCEL_OIDC_TOKEN` (CLI auth).
+
+Adding/changing a Vercel Environment Variable normally needs a new
+deployment (or Redeploy) before it applies. Full Local → Preview →
+Production process: [`docs/workflow.md`](workflow.md).

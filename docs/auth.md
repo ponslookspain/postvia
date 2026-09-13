@@ -5,6 +5,23 @@ Better Auth with the Prisma adapter (`src/lib/auth.ts`), mounted at
 
 ## Methods
 
+- **Email OTP (current signup/login)**: 6-digit code, 10-minute expiry,
+  hashed at rest (`Verification` table via the Better Auth `emailOTP`
+  plugin, `storeOTP: "hashed"`), 5 attempts per code (single-use, replay
+  rejected), resend cooldown 60s + 5/hour (`AbuseRateBucket`, fail-open).
+  Signup (`email-verification` OTP) creates the `User` first
+  (`onboardingCompleted: false`), then sends the code; login (`sign-in`
+  OTP) only ever authenticates an existing `User` — `disableSignUp: true`
+  makes creation through the sign-in path impossible. Unknown emails get
+  the same neutral success (no enumeration oracle). Password stays
+  optional: password users sign in with password or code, passwordless
+  users with code; `Settings` gains/loses the credential row via the
+  existing set/change-password endpoints.
+- **Onboarding gate**: new users complete name + plan
+  (`POST /api/onboarding`, server-side `User.selectedPlan` intent) before
+  `/dashboard` / `/billing` / `/settings`; unfinished sessions resume
+  there via `/post-auth`. Pre-existing verified users (incl. the admin)
+  were backfilled to `onboardingCompleted: true`.
 - **Email/password**: enabled, 8–128 chars, `requireEmailVerification: true`.
   Verification mail via Resend (`sendVerificationEmail`), 1h expiry,
   `sendOnSignUp` + `sendOnSignIn`, auto sign-in after verification.

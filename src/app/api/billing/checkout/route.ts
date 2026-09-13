@@ -293,6 +293,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
     const plan = (body as { plan?: unknown })?.plan;
+    // Authoritative intent follows this server action (never ?plan= or
+    // localStorage): record which paid plan the user started checking out.
+    // Entitlements still come only from the Subscription row (webhook).
+    if (user && (plan === "growth" || plan === "scale")) {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { selectedPlan: plan === "growth" ? "GROWTH" : "SCALE" },
+        });
+      } catch (error) {
+        reportError("billing", "checkout plan intent persist failed", error, {
+          userId: user.id,
+        });
+      }
+    }
     return await handleCheckout({
       user,
       plan,

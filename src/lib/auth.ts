@@ -1,10 +1,11 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { emailOTP } from "better-auth/plugins/email-otp";
 import { waitUntil } from "@vercel/functions";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendOtpEmail, sendVerificationEmail } from "@/lib/email";
 import { resolveBaseURL } from "@/lib/base-url";
 import {
   canonicalizeEmail,
@@ -17,6 +18,12 @@ import {
   resolveAbuseIdentity,
 } from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
+import {
+  OTP_EXPIRES_MINUTES,
+  OTP_EXPIRES_SECONDS,
+  OTP_LENGTH,
+  OTP_MAX_ATTEMPTS,
+} from "@/lib/otp-config";
 
 /**
  * Best-effort abuse bookkeeping for auth lifecycle events. Hooks must never
@@ -99,8 +106,39 @@ async function releaseOldEmail(
   }
 }
 
+// Plaintext OTP storage ONLY for local automated E2E (explicit flag and
+// never any production env): lets the gated debug endpoint read the code
+// back. Production and previews always hash.
+const otpE2EDebug =
+  process.env.OTP_E2E_DEBUG === "1" &&
+  process.env.VERCEL_ENV !== "production" &&
+  process.env.NODE_ENV !== "production";
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+  plugins: [
+    emailOTP({
+      expiresIn: OTP_EXPIRES_SECONDS,
+      otpLength: OTP_LENGTH,
+      allowedAttempts: OTP_MAX_ATTEMPTS,
+      // Hashed at rest: the raw 6-digit code only exists in the outbound
+      // email, never in the Verification table (replay/brute-force guard).
+      storeOTP: otpE2EDebug ? "plain" : "hashed",
+      // CRITICAL: sign-in OTP must never mint a new User. New accounts are
+      // created explicitly by /api/auth/otp/request (Variant A) before the
+      // email-verification OTP is sent; login for unknown emails stays a
+      // neutral no-send (see src/lib/otp.ts).
+      disableSignUp: true,
+      // The legacy verification-link flow stays enabled in parallel
+      // (emailVerification below) until the OTP flow is fully tested.
+      sendVerificationOTP: async ({ email, otp, type }) => {
+        await sendOtpEmail(
+          { email, otp, type },
+          { expiresInMinutes: OTP_EXPIRES_MINUTES }
+        );
+      },
+    }),
+  ],
   databaseHooks: {
     user: {
       create: {
