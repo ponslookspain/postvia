@@ -29,6 +29,7 @@ import type { TiktokCreatorInfo } from "./types";
  */
 export function TiktokTargetSettings({
   accountId,
+  mode,
   creatorInfo,
   creatorInfoError,
   settings,
@@ -37,6 +38,8 @@ export function TiktokTargetSettings({
   onOpenAccounts,
 }: {
   accountId: string;
+  /** Photo posts accept no duet/stitch/cover controls — hide them. */
+  mode: "video" | "photo" | "unknown";
   creatorInfo: TiktokCreatorInfo | null | undefined;
   creatorInfoError: string | undefined;
   settings: Record<string, unknown>;
@@ -127,8 +130,15 @@ export function TiktokTargetSettings({
             info.commentDisabled,
             "Allow comments"
           )}
-          {allowToggle("disable_duet", info.duetDisabled, "Allow Duet")}
-          {allowToggle("disable_stitch", info.stitchDisabled, "Allow Stitch")}
+          {mode !== "photo" &&
+            allowToggle("disable_duet", info.duetDisabled, "Allow Duet")}
+          {mode !== "photo" &&
+            allowToggle(
+              "disable_stitch",
+              info.stitchDisabled,
+              "Allow Stitch"
+            )}
+          {mode !== "photo" && (
           <Field>
             <FieldLabel htmlFor={`${accountId}-cover`}>
               Cover timestamp (ms, optional)
@@ -160,7 +170,8 @@ export function TiktokTargetSettings({
               1.5 seconds in. Leave empty for the default cover.
             </FieldDescription>
           </Field>
-          {info.maxVideoPostDurationSec > 0 && (
+          )}
+          {mode !== "photo" && info.maxVideoPostDurationSec > 0 && (
             <FieldDescription>
               Max video length for this account:{" "}
               {info.maxVideoPostDurationSec}s

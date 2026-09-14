@@ -94,6 +94,7 @@ export function AccountList({
                   overrideEntry &&
                     (overrideEntry.text ||
                       overrideEntry.title ||
+                      overrideEntry.description ||
                       (overrideEntry.settings &&
                         Object.keys(overrideEntry.settings).length > 0))
                 );

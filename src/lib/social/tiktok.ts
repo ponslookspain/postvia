@@ -10,7 +10,17 @@ const TIKTOK_API_BASE = "https://open.tiktokapis.com";
  * Login Kit grants exactly what is requested here.
  */
 export const TIKTOK_SCOPES = ["user.info.basic", "video.publish"] as const;
+/** Video caption (`post_info.title` on the video init endpoint). */
 export const TIKTOK_CAPTION_MAX_LENGTH = 2200;
+/**
+ * Photo post limits from the TikTok Content Posting API reference
+ * (`/v2/post/publish/content/init/` Post Info Object, photo flow):
+ * title is a short photo title, description carries the caption body.
+ * Both are optional per TikTok — Postvia requires at least one of them
+ * so an empty photo post can never be published by accident.
+ */
+export const TIKTOK_PHOTO_TITLE_MAX_LENGTH = 90;
+export const TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH = 4000;
 
 const DEFAULT_REDIRECT_URI = "https://postvia.online/api/auth/tiktok/callback";
 
@@ -692,23 +702,30 @@ export function resolveTiktokPostInfo(input: {
 }
 
 /**
- * Photo Direct Post info: same title/privacy contract as video, but only
- * the fields the PHOTO content/init endpoint accepts (title,
- * privacy_level, disable_comment). Duet/stitch and video cover timestamp
- * are video-only and must never be sent for PHOTO (invalid_param risk).
+ * Photo Direct Post info: only the fields the PHOTO content/init endpoint
+ * accepts (title, description, privacy_level, disable_comment).
+ * Duet/stitch and video cover timestamp are video-only and must never
+ * be sent for PHOTO (invalid_param risk). Unlike video, the photo
+ * endpoint splits text into a short title (<=90) and a description
+ * (<=4000); at least one of them must be present.
  */
 export function resolveTiktokPhotoPostInfo(input: {
   title: string;
+  description?: string;
   settings: TiktokPublishSettings;
   creatorInfo: TiktokCreatorInfo;
 }): { postInfo: Record<string, unknown> } | { error: string } {
   const { settings, creatorInfo } = input;
   const title = input.title.trim();
-  if (!title) {
-    return { error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback." };
+  const description = (input.description ?? "").trim();
+  if (!title && !description) {
+    return { error: "TikTok photo posts need a title or a description. Add one — the global post text is never used as a fallback." };
   }
-  if (Array.from(title).length > TIKTOK_CAPTION_MAX_LENGTH) {
-    return { error: `TikTok title exceeds the ${TIKTOK_CAPTION_MAX_LENGTH} character limit.` };
+  if (Array.from(title).length > TIKTOK_PHOTO_TITLE_MAX_LENGTH) {
+    return { error: `TikTok photo title exceeds the ${TIKTOK_PHOTO_TITLE_MAX_LENGTH} character limit.` };
+  }
+  if (Array.from(description).length > TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH) {
+    return { error: `TikTok photo description exceeds the ${TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH} character limit.` };
   }
   if (creatorInfo.privacyLevelOptions.length === 0) {
     return { error: "TikTok did not return privacy options for this account. Reconnect or retry." };
@@ -725,7 +742,11 @@ export function resolveTiktokPhotoPostInfo(input: {
   }
   return {
     postInfo: {
-      title,
+      // TikTok treats missing title/description as empty; sending an
+      // empty title alongside a description-only post is accepted, but
+      // omitting empty values keeps the payload minimal and honest.
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
       privacy_level: privacyLevel,
       disable_comment: settings.disableComment === true || creatorInfo.commentDisabled,
     },
@@ -750,6 +771,7 @@ export type TiktokPhotoInitPayload = {
  */
 export function buildTiktokPhotoInitPayload(input: {
   title: string;
+  description?: string;
   settings: TiktokPublishSettings;
   creatorInfo: TiktokCreatorInfo;
   photoUrls: string[];
@@ -777,6 +799,7 @@ export function buildTiktokPhotoInitPayload(input: {
   }
   const resolved = resolveTiktokPhotoPostInfo({
     title: input.title,
+    description: input.description,
     settings: input.settings,
     creatorInfo: input.creatorInfo,
   });
@@ -948,6 +971,7 @@ export async function publishTiktokDirectPhoto(
   accessToken: string,
   input: {
     title: string;
+    description?: string;
     settings: TiktokPublishSettings;
     photoUrls: string[];
     coverIndex: number;
@@ -964,10 +988,13 @@ export async function publishTiktokDirectPhoto(
     return monitorPublish(accessToken, input.existingPublishId, sleep, pollIntervalMs, pollBudgetMs, now);
   }
 
-  if (!input.title || input.title.trim().length === 0) {
+  if (
+    (!input.title || input.title.trim().length === 0) &&
+    (!input.description || input.description.trim().length === 0)
+  ) {
     return {
       state: "invalid",
-      error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback.",
+      error: "TikTok photo posts need a title or a description. Add one — the global post text is never used as a fallback.",
     };
   }
 
@@ -980,6 +1007,7 @@ export async function publishTiktokDirectPhoto(
 
   const built = buildTiktokPhotoInitPayload({
     title: input.title,
+    description: input.description,
     settings: input.settings,
     creatorInfo,
     photoUrls: input.photoUrls,

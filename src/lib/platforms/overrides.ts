@@ -130,6 +130,33 @@ export function validateTargetOverrides(
   };
 }
 
+export type NormalizedTiktokContent = {
+  title: string;
+  description: string;
+};
+
+/**
+ * Backward-compatible reader for TikTok override content. Historical
+ * drafts store only `{ title }`; newer ones store `{ title, description }`.
+ * Unknown shapes degrade to empty strings — user text is never dropped,
+ * only absent values default. A legacy `text` key (never written by the
+ * composer, but tolerated) falls back into `title` so no caption is lost.
+ */
+export function normalizeTiktokContent(content: unknown): NormalizedTiktokContent {
+  if (!isRecord(content)) return { title: "", description: "" };
+  const rawTitle = content.title;
+  const rawDescription = content.description;
+  const rawText = content.text;
+  const title =
+    typeof rawTitle === "string"
+      ? rawTitle
+      : typeof rawText === "string"
+        ? rawText
+        : "";
+  const description = typeof rawDescription === "string" ? rawDescription : "";
+  return { title, description };
+}
+
 export function resolveEffectiveTargetContent(
   globalText: string,
   overrides: unknown

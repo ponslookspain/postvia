@@ -282,6 +282,8 @@ export default function NewPostComposer({
       return {
         accountId,
         text: account?.platform === "TIKTOK" ? override?.title : override?.text,
+        description:
+          account?.platform === "TIKTOK" ? override?.description : undefined,
       };
     }),
     overrideSettings: Object.fromEntries(
@@ -399,11 +401,17 @@ export default function NewPostComposer({
         const account = accounts.find((item) => item.id === accountId);
         const override = targetOverrides[accountId];
         if (!override) return { accountId, overrides: null };
+        // TikTok video publishes the title as its caption; TikTok photo
+        // publishes title + description as separate post_info fields.
+        // The description is never sent for video (unsupported parameter).
         const content =
           account?.platform === "TIKTOK"
-            ? override.title
-              ? { title: override.title }
-              : {}
+            ? {
+                ...(override.title ? { title: override.title } : {}),
+                ...(override.description
+                  ? { description: override.description }
+                  : {}),
+              }
             : override.text
               ? { text: override.text }
               : {};
@@ -425,6 +433,7 @@ export default function NewPostComposer({
     patch: {
       text?: string;
       title?: string;
+      description?: string;
       settings?: Record<string, unknown>;
     }
   ) {
@@ -433,10 +442,11 @@ export default function NewPostComposer({
       const merged = { ...(next[accountId] ?? {}), ...patch };
       const hasText = Boolean(merged.text);
       const hasTitle = Boolean(merged.title);
+      const hasDescription = Boolean(merged.description);
       const hasSettings = Boolean(
         merged.settings && Object.keys(merged.settings).length > 0
       );
-      if (!hasText && !hasTitle && !hasSettings) {
+      if (!hasText && !hasTitle && !hasDescription && !hasSettings) {
         delete next[accountId];
       } else {
         next[accountId] = merged;
@@ -1269,6 +1279,12 @@ export default function NewPostComposer({
                         ? targetOverrides[activePreviewModel.accountId]?.title
                         : targetOverrides[activePreviewModel.accountId]?.text
                     }
+                    customDescription={
+                      activePreviewModel.platform === "TIKTOK"
+                        ? targetOverrides[activePreviewModel.accountId]
+                            ?.description
+                        : undefined
+                    }
                     hasOverride={Boolean(
                       targetOverrides[activePreviewModel.accountId]
                     )}
@@ -1287,7 +1303,10 @@ export default function NewPostComposer({
                     }
                     showTikTokTitleHint={
                       activePreviewModel.platform === "TIKTOK" &&
-                      !targetOverrides[activePreviewModel.accountId]?.title
+                      !targetOverrides[activePreviewModel.accountId]?.title &&
+                      (activePreviewModel.tiktokMode !== "photo" ||
+                        !targetOverrides[activePreviewModel.accountId]
+                          ?.description)
                     }
                     disabled={saving || publishing || scheduling}
                     onCustomTextChange={(value) =>
@@ -1297,6 +1316,11 @@ export default function NewPostComposer({
                           ? { title: value }
                           : { text: value }
                       )
+                    }
+                    onCustomDescriptionChange={(value) =>
+                      updateOverride(activePreviewModel.accountId, {
+                        description: value,
+                      })
                     }
                     onSettings={(patch) =>
                       updateOverride(activePreviewModel.accountId, {

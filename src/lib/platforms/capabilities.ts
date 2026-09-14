@@ -97,7 +97,18 @@ const TIKTOK: PlatformCapabilities = {
     ],
   },
   fields: [
+    // The `title` capability is the superset gate (video caption, 2200):
+    // the photo flow narrows it to 90 downstream in
+    // resolveTiktokPhotoPostInfo, because capabilities are platform-level
+    // while the title limit is media-flow-specific. `description` is
+    // photo-only — the video endpoint has no such parameter.
     { key: "title", label: "Title", type: "text", maxLength: 2200 },
+    {
+      key: "description",
+      label: "Description",
+      type: "text",
+      maxLength: 4000,
+    },
     {
       key: "privacy_level",
       label: "Privacy",

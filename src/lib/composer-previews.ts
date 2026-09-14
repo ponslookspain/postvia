@@ -13,7 +13,19 @@ export type PreviewAccount = {
 export type PreviewOverride = {
   accountId: string;
   text?: string | null;
+  /** TikTok photo description override (photo flow only). */
+  description?: string | null;
 };
+
+/**
+ * TikTok photo-flow limits. Mirror of TIKTOK_PHOTO_TITLE_MAX_LENGTH /
+ * TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH in `@/lib/social/tiktok` — kept
+ * local (not imported) so this client-consumed module never pulls the
+ * server-side provider (prisma) into the browser bundle. A unit test
+ * asserts the mirrors stay in sync.
+ */
+export const TIKTOK_PHOTO_TITLE_LIMIT = 90;
+export const TIKTOK_PHOTO_DESCRIPTION_LIMIT = 4000;
 
 export type ComposerPreview = {
   accountId: string;
@@ -174,6 +186,7 @@ export type PreviewContentSource = "global" | "override";
 export type PreviewIssueCode =
   | "text-over-limit"
   | "tiktok-title-missing"
+  | "tiktok-description-over-limit"
   | "content-empty"
   | "platform-unimplemented"
   | "media-not-supported"
@@ -206,6 +219,9 @@ export type PreviewMediaItem = {
   issues: PreviewIssue[];
 };
 
+/** Which TikTok publish flow the current media selects. */
+export type TiktokPostMode = "video" | "photo" | "unknown";
+
 export type ComposerPreviewModel = ComposerPreview & {
   /** Override present for this target's content key, else global. */
   source: PreviewContentSource;
@@ -223,6 +239,19 @@ export type ComposerPreviewModel = ComposerPreview & {
   /** Override settings (e.g. TikTok privacy) for this account. */
   settings: Record<string, unknown>;
   hasSettingsOverride: boolean;
+  /**
+   * TikTok photo description override (effective value or ""). Always ""
+   * for non-TikTok platforms; unused by the TikTok video flow, which
+   * publishes its title as the caption.
+   */
+  description: string;
+  descriptionMaxLength: number;
+  /**
+   * TikTok media flow derived from the composer media snapshot ("photo"
+   * when images without video are attached, "video" when a video is
+   * attached, "unknown" otherwise). "unknown" for non-TikTok platforms.
+   */
+  tiktokMode: TiktokPostMode;
   /**
    * Effective content truly inherits the global value. False when a
    * content override exists — and for TikTok without a title, where
@@ -321,7 +350,10 @@ function toIssue(message: string): PreviewIssue {
 export type PreviewModelInput = {
   accounts: readonly PreviewAccount[];
   globalText: string;
-  /** Per-account text/title override (TikTok title travels as text). */
+  /**
+   * Per-account text/title override (TikTok title travels as text,
+   * TikTok photo description as description).
+   */
   overrides: readonly PreviewOverride[];
   overrideSettings?: Readonly<Record<string, Record<string, unknown>>>;
   media?: readonly {
@@ -343,14 +375,14 @@ export function buildComposerPreviewModel(
   input: PreviewModelInput
 ): ComposerPreviewModel[] {
   const overrideByAccount = new Map<string, string>();
+  const descriptionByAccount = new Map<string, string>();
   for (const entry of input.overrides) {
-    if (
-      entry &&
-      typeof entry.accountId === "string" &&
-      typeof entry.text === "string" &&
-      entry.text.length > 0
-    ) {
+    if (!entry || typeof entry.accountId !== "string") continue;
+    if (typeof entry.text === "string" && entry.text.length > 0) {
       overrideByAccount.set(entry.accountId, entry.text);
+    }
+    if (typeof entry.description === "string" && entry.description.length > 0) {
+      descriptionByAccount.set(entry.accountId, entry.description);
     }
   }
   const mediaInput = input.media ?? [];
@@ -367,21 +399,50 @@ export function buildComposerPreviewModel(
     const contentKey = textField?.key ?? "text";
     const contentLabel = textField?.label ?? "Text";
     const override = overrideByAccount.get(account.id);
+    const descriptionOverride = descriptionByAccount.get(account.id);
     const source: PreviewContentSource =
-      override !== undefined ? "override" : "global";
+      override !== undefined || descriptionOverride !== undefined
+        ? "override"
+        : "global";
+    // The attached media selects the TikTok publish flow: images without
+    // video take the photo flow (title + description), a video takes the
+    // video flow (title as caption). No media yet means unknown.
+    const hasVideo = mediaInput.some((item) => item.type === "VIDEO");
+    const hasImage = mediaInput.some((item) => item.type === "IMAGE");
+    const tiktokMode: TiktokPostMode =
+      account.platform !== "TIKTOK"
+        ? "unknown"
+        : hasVideo
+          ? "video"
+          : hasImage
+            ? "photo"
+            : "unknown";
     // Platform rule: TikTok publishes its title only — global text must
     // never leak into the TikTok preview as a title.
     const text =
       account.platform === "TIKTOK"
         ? (override ?? "")
         : (base?.text ?? input.globalText);
-    const maxLength = base?.maxLength ?? textLimit(account.platform);
+    // Photo titles are short (90); the video caption keeps the 2200 gate.
+    const maxLength =
+      account.platform === "TIKTOK" && tiktokMode === "photo"
+        ? TIKTOK_PHOTO_TITLE_LIMIT
+        : (base?.maxLength ?? textLimit(account.platform));
     const characterCount = countCharacters(text);
     const remaining = remainingCharacters(text, maxLength);
     const overLimit = characterCount > maxLength;
+    const description =
+      account.platform === "TIKTOK" ? (descriptionOverride ?? "") : "";
+    const descriptionMaxLength =
+      account.platform === "TIKTOK" ? TIKTOK_PHOTO_DESCRIPTION_LIMIT : 0;
+    const descriptionOverLimit =
+      account.platform === "TIKTOK" &&
+      tiktokMode === "photo" &&
+      countCharacters(description) > descriptionMaxLength;
     const settings = input.overrideSettings?.[account.id] ?? {};
     const hasSettingsOverride = Object.keys(settings).length > 0;
-    const customized = override !== undefined;
+    const customized =
+      override !== undefined || descriptionOverride !== undefined;
 
     const media: PreviewMediaItem[] = mediaInput.map((item) => {
       const issues: PreviewIssue[] = [];
@@ -416,7 +477,21 @@ export function buildComposerPreviewModel(
         message: `Exceeds the ${maxLength} character limit for ${caps.label}`,
       });
     }
-    if (account.platform === "TIKTOK" && text.length === 0) {
+    if (account.platform === "TIKTOK" && tiktokMode === "photo") {
+      if (text.length === 0 && description.length === 0) {
+        errors.push({
+          code: "tiktok-title-missing",
+          message:
+            "TikTok photo posts need a title or a description — customize it for TikTok",
+        });
+      }
+      if (descriptionOverLimit) {
+        errors.push({
+          code: "tiktok-description-over-limit",
+          message: `Exceeds the ${descriptionMaxLength} character limit for the TikTok description`,
+        });
+      }
+    } else if (account.platform === "TIKTOK" && text.length === 0) {
       errors.push({
         code: "tiktok-title-missing",
         message: "TikTok posts require a title — customize it for TikTok",
@@ -450,6 +525,9 @@ export function buildComposerPreviewModel(
       validation: { valid: errors.length === 0, errors, warnings },
       settings,
       hasSettingsOverride,
+      description,
+      descriptionMaxLength,
+      tiktokMode,
       inheritsGlobal: !customized && account.platform !== "TIKTOK",
     };
   });

@@ -94,7 +94,7 @@ device cookie (`applyDeviceCookie`).
 | --- | --- | --- | --- | --- | --- | --- |
 | Threads | ✅ | ✅ JPEG/PNG/WebP | ✅ (image) | ✅ MP4 only | 1 | No carousel in Postvia (API supports it) |
 | X | ✅ 280 | ✅ JPG/PNG/WebP ≤5 MB | ✅ single ≤15 MB | ✅ MP4/MOV | 4 photos / 1 GIF / 1 video | No mixing; duration enforced server-side by X |
-| TikTok | ❌ (own title) | ✅ JPEG/WebP ≤20 MB | ❌ | ✅ MP4/WebM/MOV | 4 (API allows 35) | No mixing; title ≤2200 required, never global-text fallback |
+| TikTok | ❌ (own title) | ✅ JPEG/WebP ≤20 MB | ❌ | ✅ MP4/WebM/MOV | 4 (API allows 35) | No mixing; video: title ≤2200 required; photo: title ≤90 + description ≤4000, at least one required; never global-text fallback |
 | Instagram | ❌ (caption+media) | ✅ JPEG only | ❌ | ✅ MP4 Reel | 1 | No carousel/stories/alt_text in Postvia (API supports them) |
 
 ## Retry / duplicate protection (`externalJobId` semantics per platform)
