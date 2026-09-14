@@ -6,8 +6,12 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
+  // Verified Sentry organization/project slugs. The auth token always
+  // comes from the SENTRY_AUTH_TOKEN environment variable (Vercel Secret
+  // in deployed builds) — never hardcoded, never logged.
+  org: "postvia",
+  project: "javascript-nextjs",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
   // Sourcemap upload needs SENTRY_AUTH_TOKEN; skip it when absent so
   // local and CI builds without Sentry credentials stay green.
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },

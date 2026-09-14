@@ -24,7 +24,7 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src) | **yes** |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | all | Error reporting; missing ⇒ console-only (src) | no |
 | `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |
-| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | no | CI | Sourcemap upload | **yes** |
+| `SENTRY_AUTH_TOKEN` | no | Vercel (Secret) | Sourcemap upload + release creation (org `postvia` / project `javascript-nextjs` are pinned in `next.config.ts`); missing ⇒ upload skipped, build stays green | **yes** |
 | `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src) | no |
 | `OTP_E2E_DEBUG` / `OTP_DEBUG_TOKEN` | no | local test only | Plaintext-OTP + gated code reader for local automated E2E (`src/lib/auth.ts`, `/api/auth/otp/debug`). Never set outside local testing; production/preview always hash | **yes** |
 | `THREADS_POLL_DELAY_MS` / `THREADS_MAX_ATTEMPTS` / `THREADS_TIMEOUT_MS` | no | all | Threads publish polling tuning (src) | no |
