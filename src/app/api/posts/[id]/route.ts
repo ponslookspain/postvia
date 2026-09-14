@@ -143,7 +143,7 @@ export async function PATCH(
           if (!verdict.ok) {
             return NextResponse.json(
               {
-                error: `Cannot schedule: ${verdict.error} The post was kept as a draft.`,
+                error: `Cannot schedule: ${verdict.error} ${existing.status === "SCHEDULED" ? "The existing schedule was left unchanged." : "The post was kept as a draft."}`,
               },
               { status: 400 }
             );
