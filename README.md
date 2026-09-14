@@ -177,8 +177,10 @@ npm install
 npx prisma db push   # empty/dev databases only — never production
 npm run dev
 ```
+cd C:\Users\Ponslookspain\postvia
+npm run dev:tunnel
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). or https://lavish-passion-dipped.ngrok-free.dev
 
 ## Scripts
 
