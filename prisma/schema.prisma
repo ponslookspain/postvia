@@ -379,6 +379,16 @@ model Post {
   scheduledAt  DateTime?
   publishedAt  DateTime?
   errorMessage String?
+  /**
+   * Client-generated idempotency key for post creation (one user action =
+   * one key). The composer mints a UUID per editing session, bulk mints one
+   * per batch item; retries and double-submits reuse the same key so the
+   * server collapses them into a single row (unique index + P2002 catch in
+   * POST /api/posts). NULL for legacy rows; Postgres treats NULLs as
+   * distinct, so no backfill is needed. NEVER derived from post content:
+   * two genuinely identical posts are allowed with different keys.
+   */
+  clientOperationId String? @unique
   user         User         @relation(fields: [userId], references: [id])
   targets      PostTarget[]
   media        Media[]

@@ -45,6 +45,7 @@ import {
   selectMediaForUpload,
   type ScheduleFlowDenial,
 } from "@/lib/composer-media";
+import { createSingleFlight, newOperationId } from "@/lib/idempotency";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -228,6 +229,30 @@ export default function NewPostComposer({
     upgradeTo: PlanId | null;
   } | null>(null);
 
+  // Idempotency key for this editing session: minted once, reused by every
+  // retry / double-submit of the same user action so POST /api/posts
+  // collapses repeats into one row. Rotated after each terminal success —
+  // the next explicit action is a new operation with a new key.
+  const operationIdRef = useRef<string | null>(null);
+  function getOperationId(): string {
+    if (!operationIdRef.current) {
+      operationIdRef.current = newOperationId();
+    }
+    return operationIdRef.current;
+  }
+  function rotateOperationId(): void {
+    operationIdRef.current = newOperationId();
+  }
+  // Synchronous single-flight guards. React state (`scheduling`, …) flips
+  // only on the next render, so two clicks in the same tick would both
+  // pass a state check and fire two POSTs; a ref read + set is
+  // synchronous, so the second entrant always loses. One guard per action.
+  const flightRefs = useRef({
+    schedule: createSingleFlight(),
+    save: createSingleFlight(),
+    publish: createSingleFlight(),
+  });
+
   const quotaBlocked = quota.postsLeft !== null && quota.postsLeft <= 0;
 
   const selectedAccounts = accounts.filter((account) =>
@@ -380,6 +405,7 @@ export default function NewPostComposer({
       platform,
       hasMedia: media.length > 0,
       mediaCount: media.length,
+      clientOperationId: getOperationId(),
       accountIds: selectedAccountIds,
       targets: selectedAccountIds.map((accountId) => {
         const account = accounts.find((item) => item.id === accountId);
@@ -629,6 +655,9 @@ export default function NewPostComposer({
 
   async function handleSaveDraft() {
     if (!canSave) return;
+    // Single-flight FIRST, before any await: a second click in the same
+    // tick must not reach the POST below.
+    if (!flightRefs.current.save.tryAcquire()) return;
     setSaving(true);
     setQuotaError(null);
 
@@ -657,6 +686,9 @@ export default function NewPostComposer({
       }
       setSavedId(data.id);
       setSaved(true);
+      // Terminal success: the next explicit save is a new operation.
+      // Failures keep the key so a retry replays onto the same draft.
+      rotateOperationId();
     } catch {
       toast.add({
         title: "Failed to save draft",
@@ -666,6 +698,7 @@ export default function NewPostComposer({
       });
     } finally {
       setSaving(false);
+      flightRefs.current.save.release();
     }
   }
 
@@ -696,6 +729,10 @@ export default function NewPostComposer({
       return;
     }
 
+    // Single-flight AFTER sync validation, BEFORE any await: two clicks
+    // (dialog Confirm + card button, desktop + mobile bar) in the same
+    // tick must yield one POST, not two.
+    if (!flightRefs.current.schedule.tryAcquire()) return;
     setScheduling(true);
     try {
       // Safe order: create a DRAFT first, upload + register media, and only
@@ -785,15 +822,21 @@ export default function NewPostComposer({
       setSavedId(result.postId);
       setScheduledAt(scheduledIso);
       setScheduleMode(false);
+      // Terminal success: the next explicit schedule is a new operation.
+      // Every failure path above keeps the key, so confirming again
+      // replays onto the same draft instead of creating a second post.
+      rotateOperationId();
     } catch {
       setScheduleError("Failed to schedule post. Please try again.");
     } finally {
       setScheduling(false);
+      flightRefs.current.schedule.release();
     }
   }
 
   async function handlePublish() {
     if (!canPublish) return;
+    if (!flightRefs.current.publish.tryAcquire()) return;
     setPublishing(true);
     setPublishResult(null);
     setPublishWatchId(null);
@@ -907,6 +950,9 @@ export default function NewPostComposer({
         });
       }
       setSavedId(postData.id);
+      // The post now exists server-side regardless of the publish outcome;
+      // the next explicit publish is a new operation with a new key.
+      rotateOperationId();
     } catch {
       setPublishResult({
         ok: false,
@@ -916,6 +962,7 @@ export default function NewPostComposer({
     } finally {
       publishAbortRef.current = null;
       setPublishing(false);
+      flightRefs.current.publish.release();
     }
   }
 
