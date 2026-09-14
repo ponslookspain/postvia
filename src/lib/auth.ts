@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sendOtpEmail, sendVerificationEmail } from "@/lib/email";
-import { resolveBaseURL } from "@/lib/base-url";
+import { PRODUCTION_URL, resolveBaseURL } from "@/lib/base-url";
 import {
   canonicalizeEmail,
   emailSignal,
@@ -200,7 +200,24 @@ export const auth = betterAuth({
   },
   secret: process.env.BETTER_AUTH_SECRET!,
   basePath: "/api/auth",
-  baseURL: resolveBaseURL(),
+  // Dynamic per-request base URL (Better Auth `allowedHosts`): the host is
+  // taken from the incoming request and must match the allowlist, so
+  // Production stays on postvia.online while Preview stays on its own
+  // hostname (hash URL or branch alias). A static string here would pin
+  // every environment to one host: with the shared BETTER_AUTH_URL env
+  // (Production+Preview scope) Preview auth escapes to postvia.online and
+  // dies with state_mismatch (OAuth state/session cookies are host-bound).
+  // `fallback` only applies when no request host can be resolved; it keeps
+  // today's production resolution untouched.
+  baseURL: {
+    allowedHosts: [
+      "postvia.online",
+      "www.postvia.online",
+      "*.vercel.app",
+      "localhost:3000",
+    ],
+    fallback: resolveBaseURL() ?? PRODUCTION_URL,
+  },
   trustedOrigins: [
     "http://localhost:3000",
     "https://postvia.online",
