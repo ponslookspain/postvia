@@ -183,7 +183,10 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Scripts
 
 ```bash
-npm run dev        # start dev server
+npm run dev        # start dev server (http://localhost:3000)
+npm run dev:local  # same, explicit local-only dev server
+npm run dev:tunnel # Cloudflare Quick Tunnel → localhost:3000 (temporary
+                   # public HTTPS for OAuth callbacks; needs `cloudflared`)
 npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
@@ -193,13 +196,29 @@ npm run test:pg    # real-PostgreSQL concurrency suite (18 tests) —
                    # needs PG_INTEGRATION=1 + isolated test DB, never prod
 ```
 
-## Deploy
+## Development & release (local-first)
 
-Connected Vercel project `postvia` (see `.vercel/project.json`).
-Development happens on staging/feature branches → automatic Preview;
-`main` → automatic Production (`postvia.online`). Full process, stop-rule
-and release discipline: [`docs/workflow.md`](docs/workflow.md). Scheduled
-publishing runs on the cron defined in
-`vercel.json` (daily at 03:00 UTC — the maximum frequency on the current
-Hobby plan, so scheduled posts can go out up to ~24h late; a paid plan
-unlocks sub-daily schedules).
+Development is local-first: edit and verify on your own machine, then ship
+through GitHub. Vercel is the release platform, not a mandatory preview
+environment.
+
+- Local dev server: `npm run dev` → [http://localhost:3000](http://localhost:3000).
+- Public HTTPS for OAuth callbacks / integration testing only:
+  `npm run dev:tunnel` (`cloudflared tunnel --url http://localhost:3000`).
+  The Quick Tunnel URL is temporary and changes on restart — it never
+  replaces Production. Real social testing guide:
+  [`docs/local-social-dev.md`](docs/local-social-dev.md).
+- Flow: feature/staging branch → local verification → commit → push →
+  GitHub Pull Request → review → merge to `main` → **separate, explicit
+  manual Production release** (`postvia.online`).
+- Vercel Preview is NOT a required step of daily development and must NOT
+  be built for every feature-branch push; Production must NOT release
+  automatically from merges/pushes. Vercel Git deployment triggers live in
+  the Vercel Project settings (dashboard, outside this repository) — the
+  repo and docs cannot switch them off by themselves.
+
+Full process contract: [`docs/workflow.md`](docs/workflow.md). Release
+details: [`docs/deployment.md`](docs/deployment.md). Scheduled publishing
+runs on the cron defined in `vercel.json` (daily at 03:00 UTC — the
+maximum frequency on the current Hobby plan, so scheduled posts can go
+out up to ~24h late; a paid plan unlocks sub-daily schedules).

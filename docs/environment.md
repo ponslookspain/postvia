@@ -25,7 +25,8 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | all | Error reporting; missing ⇒ console-only (src) | no |
 | `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |
 | `SENTRY_AUTH_TOKEN` | no | Vercel (Secret) | Sourcemap upload + release creation (org `postvia` / project `javascript-nextjs` are pinned in `next.config.ts`); missing ⇒ upload skipped, build stays green | **yes** |
-| `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src) | no |
+| `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src). Local social-dev: set to the tunnel origin (src fallback + email links + TikTok bridge host) | no |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | no | local only | CSV of extra Better Auth origins appended to `allowedHosts`/`trustedOrigins` (src). Never set in Vercel Preview/Production | no |
 | `OTP_E2E_DEBUG` / `OTP_DEBUG_TOKEN` | no | local test only | Plaintext-OTP + gated code reader for local automated E2E (`src/lib/auth.ts`, `/api/auth/otp/debug`). Never set outside local testing; production/preview always hash | **yes** |
 | `THREADS_POLL_DELAY_MS` / `THREADS_MAX_ATTEMPTS` / `THREADS_TIMEOUT_MS` | no | all | Threads publish polling tuning (src) | no |
 | `THREADS_VIDEO_POLL_DELAY_MS` / `THREADS_VIDEO_MAX_ATTEMPTS` / `THREADS_VIDEO_TIMEOUT_MS` | no | all | Threads video publish polling tuning (src) | no |
@@ -41,5 +42,5 @@ Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
 Template with safe placeholders: [`.env.example`](../.env.example).
 
 Adding/changing a Vercel Environment Variable normally needs a new
-deployment (or Redeploy) before it applies. Full Local → Preview →
-Production process: [`docs/workflow.md`](workflow.md).
+deployment (or Redeploy) before it applies. Full Local → PR →
+manual Production process: [`docs/workflow.md`](workflow.md).

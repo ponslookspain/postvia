@@ -6,7 +6,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sendOtpEmail, sendVerificationEmail } from "@/lib/email";
-import { PRODUCTION_URL, resolveBaseURL } from "@/lib/base-url";
+import {
+  PRODUCTION_URL,
+  originToAllowedHost,
+  resolveBaseURL,
+  resolveExtraTrustedOrigins,
+} from "@/lib/base-url";
 import {
   canonicalizeEmail,
   emailSignal,
@@ -209,12 +214,20 @@ export const auth = betterAuth({
   // dies with state_mismatch (OAuth state/session cookies are host-bound).
   // `fallback` only applies when no request host can be resolved; it keeps
   // today's production resolution untouched.
+  //
+  // Local social-OAuth development (see docs/local-social-dev.md) adds the
+  // stable HTTPS tunnel origin via `BETTER_AUTH_TRUSTED_ORIGINS` (CSV, e.g.
+  // `https://dev.postvia.online`). Unset by default, so Production/Preview
+  // see exactly the historical allowlist — extras only ever append.
   baseURL: {
     allowedHosts: [
       "postvia.online",
       "www.postvia.online",
       "*.vercel.app",
       "localhost:3000",
+      ...resolveExtraTrustedOrigins()
+        .map(originToAllowedHost)
+        .filter((host): host is string => host !== null),
     ],
     fallback: resolveBaseURL() ?? PRODUCTION_URL,
   },
@@ -223,6 +236,7 @@ export const auth = betterAuth({
     "https://postvia.online",
     "https://www.postvia.online",
     "https://*.vercel.app",
+    ...resolveExtraTrustedOrigins(),
   ],
   emailAndPassword: {
     enabled: true,
