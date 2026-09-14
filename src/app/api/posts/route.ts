@@ -20,6 +20,7 @@ import {
 } from "@/lib/abuse";
 import { createFreePostAtomic, makeTxQuotaStore } from "@/lib/free-post-kernel";
 import { createPostIdempotent } from "@/lib/post-create";
+import { reportError } from "@/lib/diagnostics";
 import {
   validateCreatePostContent,
   validateTargetAccountSelection,
@@ -455,7 +456,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(outcome.post, { status: 201 });
-  } catch {
+  } catch (error) {
+    // Server-side diagnosis only: the client keeps the generic message
+    // (no tokens, no post text, no operation ids — presence flags only).
+    // A silent catch here once hid a P2022 schema-drift failure behind a
+    // bare 500 with zero server info.
+    reportError("posts", "create post failed", error, {});
     return NextResponse.json(
       { error: "Failed to create post" },
       { status: 500 }
