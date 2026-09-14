@@ -4,14 +4,6 @@ import { useRef } from "react";
 import { ImagePlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ErrorBlock } from "@/components/StateBlock";
 import { formatFileSize } from "./media-utils";
@@ -39,20 +31,24 @@ export function MediaGrid({
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <section aria-labelledby="composer-media">
-      <Card>
-        <CardHeader>
-          <CardTitle>Media</CardTitle>
-          <CardDescription>
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div>
+          <h2
+            id="composer-media"
+            className="text-lg font-medium tracking-tight"
+          >
+            Media
+          </h2>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">
             JPG, PNG, WebP or GIF images up to 10 MB; MP4, WebM or MOV
             videos up to 100 MB.
-          </CardDescription>
-          <CardAction>
-            <Badge variant="secondary" className="tabular-nums">
-              {media.length}/{maxMedia}
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+          </p>
+        </div>
+        <Badge variant="secondary" className="shrink-0 tabular-nums">
+          {media.length}/{maxMedia}
+        </Badge>
+      </div>
+      <div className="flex flex-col gap-3">
           {media.length === 0 ? (
             <Button
               type="button"
@@ -174,8 +170,7 @@ export function MediaGrid({
               e.target.value = "";
             }}
           />
-        </CardContent>
-      </Card>
+      </div>
     </section>
   );
 }

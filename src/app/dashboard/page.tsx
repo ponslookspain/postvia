@@ -1,16 +1,9 @@
 import Link from "next/link";
 import {
-  CalendarClockIcon,
   CalendarIcon,
-  CircleCheckIcon,
-  FileTextIcon,
-  LayersIcon,
-  PencilIcon,
   PlusIcon,
   UsersIcon,
-  type LucideIcon,
 } from "lucide-react";
-import { cn } from "cn";
 import { prisma } from "@/lib/prisma";
 import { requireOnboardedUser } from "@/lib/onboarding";
 import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
@@ -57,50 +50,12 @@ const postFeedInclude = {
   media: { take: 1 as const, select: { id: true, type: true } },
 };
 
-/**
- * Overview stat tile. Ringless wash slab — deliberately quieter than the
- * bordered activity cards below, so the big tabular numerals carry the
- * section. Signal indigo appears only on the Scheduled value.
- */
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  accent = false,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: number;
-  hint: string;
-  accent?: boolean;
-}) {
-  return (
-    <Card size="sm" className="bg-muted/40">
-      <CardContent className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[13px] text-muted-foreground">{label}</p>
-          <p
-            className={cn(
-              "mt-1 text-3xl leading-none font-semibold tracking-tight tabular-nums",
-              accent && "text-signal"
-            )}
-          >
-            {value}
-          </p>
-          <p className="mt-1.5 truncate text-xs text-muted-foreground">
-            {hint}
-          </p>
-        </div>
-        <span
-          aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground ring-1 ring-foreground/10"
-        >
-          <Icon className="size-4" />
-        </span>
-      </CardContent>
-    </Card>
-  );
+/** Daypart greeting from server time. Single primary CTA lives in the header. */
+function greetingFor(name: string): string {
+  const hour = new Date().getHours();
+  const daypart = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = name.trim().split(/\s+/)[0] ?? "";
+  return firstName ? `${daypart}, ${firstName}` : daypart;
 }
 
 export default async function DashboardPage({
@@ -237,18 +192,23 @@ export default async function DashboardPage({
     month: "short",
   });
 
+  const stats = [
+    { label: "Posts this month", value: displayPostsUsed, hint: usageHint, accent: false },
+    { label: "Drafts", value: drafts, hint: "Saved, not scheduled", accent: false },
+    { label: "Scheduled", value: scheduled, hint: "Will publish automatically", accent: true },
+    { label: "Published", value: published, hint: "Live on platforms", accent: false },
+  ];
+
   return (
     <AppShell user={user}>
       <PageContainer>
         <PageHeader
-          title="Dashboard"
-          description="What is queued, what needs you, and what went out"
+          title={greetingFor(user.name)}
+          description="Your publishing activity at a glance."
           actions={
             <Button
-              size="lg"
               nativeButton={false}
               render={<Link href="/posts/new" />}
-              className="min-h-11"
             >
               <PlusIcon data-icon="inline-start" />
               Create post
@@ -264,14 +224,12 @@ export default async function DashboardPage({
             actions={
               <>
                 <Button
-                  size="sm"
                   nativeButton={false}
                   render={<Link href="/accounts" />}
                 >
                   Connect account
                 </Button>
                 <Button
-                  size="sm"
                   variant="outline"
                   nativeButton={false}
                   render={<Link href="/posts/new" />}
@@ -285,36 +243,33 @@ export default async function DashboardPage({
         ) : (
           <PageSections>
             <Section label="Publishing overview">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <StatTile
-                  icon={LayersIcon}
-                  label="Posts this month"
-                  value={displayPostsUsed}
-                  hint={usageHint}
-                />
-                <StatTile
-                  icon={PencilIcon}
-                  label="Drafts"
-                  value={drafts}
-                  hint="Saved, not scheduled"
-                />
-                <StatTile
-                  icon={CalendarClockIcon}
-                  label="Scheduled"
-                  value={scheduled}
-                  hint="Will publish automatically"
-                  accent
-                />
-                <StatTile
-                  icon={CircleCheckIcon}
-                  label="Published"
-                  value={published}
-                  hint="Live on platforms"
-                />
-              </div>
+              <dl
+                aria-label="Publishing overview"
+                className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 sm:gap-x-6"
+              >
+                {stats.map((stat) => (
+                  <div key={stat.label} className="min-w-0">
+                    <dd
+                      className={
+                        stat.accent
+                          ? "text-3xl leading-none font-semibold tracking-tight text-primary tabular-nums"
+                          : "text-3xl leading-none font-semibold tracking-tight tabular-nums"
+                      }
+                    >
+                      {stat.value}
+                    </dd>
+                    <dt className="mt-1.5 truncate text-[13px] leading-5 text-muted-foreground">
+                      {stat.label}
+                    </dt>
+                    <dd className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {stat.hint}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </Section>
 
-            <div className="grid items-stretch gap-3 lg:grid-cols-3">
+            <div className="grid items-start gap-10 lg:grid-cols-3">
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle>Usage</CardTitle>
@@ -374,40 +329,37 @@ export default async function DashboardPage({
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick actions</CardTitle>
-                  <CardDescription>Jump to the next step</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col gap-2">
-                  <Button
-                    nativeButton={false}
-                    render={<Link href="/posts/new" />}
-                    className="min-h-12 flex-1 w-full justify-start"
-                  >
-                    <PlusIcon data-icon="inline-start" />
-                    Create post
-                  </Button>
-                  <Button
-                    variant="outline"
-                    nativeButton={false}
-                    render={<Link href="/calendar" />}
-                    className="min-h-12 flex-1 w-full justify-start"
-                  >
-                    <CalendarIcon data-icon="inline-start" />
-                    Open calendar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    nativeButton={false}
-                    render={<Link href="/accounts" />}
-                    className="min-h-12 flex-1 w-full justify-start"
-                  >
-                    <UsersIcon data-icon="inline-start" />
-                    Manage accounts
-                  </Button>
-                </CardContent>
-              </Card>
+              <nav aria-label="Quick actions" className="flex min-w-0 flex-col gap-1">
+                <p className="px-1 pb-1 text-[13px] font-medium text-muted-foreground">
+                  Quick actions
+                </p>
+                <Button
+                  nativeButton={false}
+                  render={<Link href="/posts/new" />}
+                  className="w-full justify-start"
+                >
+                  <PlusIcon data-icon="inline-start" />
+                  Create post
+                </Button>
+                <Button
+                  variant="ghost"
+                  nativeButton={false}
+                  render={<Link href="/calendar" />}
+                  className="w-full justify-start"
+                >
+                  <CalendarIcon data-icon="inline-start" />
+                  Open calendar
+                </Button>
+                <Button
+                  variant="ghost"
+                  nativeButton={false}
+                  render={<Link href="/accounts" />}
+                  className="w-full justify-start"
+                >
+                  <UsersIcon data-icon="inline-start" />
+                  Manage accounts
+                </Button>
+              </nav>
             </div>
 
             {attentionPosts.length > 0 && (
@@ -496,7 +448,7 @@ export default async function DashboardPage({
                   {recentPosts.length === 0 ? (
                     isFiltered ? (
                       <EmptyBlock
-                        icon={<FileTextIcon />}
+                        icon={<PlusIcon />}
                         title="No matching posts"
                         description={
                           q
@@ -505,7 +457,6 @@ export default async function DashboardPage({
                         }
                         actions={
                           <Button
-                            size="sm"
                             variant="outline"
                             nativeButton={false}
                             render={<Link href="/dashboard" />}
@@ -516,12 +467,11 @@ export default async function DashboardPage({
                       />
                     ) : (
                       <EmptyBlock
-                        icon={<FileTextIcon />}
+                        icon={<PlusIcon />}
                         title="No posts yet"
                         description="Create your first post to get started."
                         actions={
                           <Button
-                            size="sm"
                             nativeButton={false}
                             render={<Link href="/posts/new" />}
                           >
@@ -563,7 +513,6 @@ export default async function DashboardPage({
                         Connect a profile to start publishing.
                       </p>
                       <Button
-                        size="sm"
                         nativeButton={false}
                         render={<Link href="/accounts" />}
                       >
@@ -616,7 +565,6 @@ export default async function DashboardPage({
                         Reconnect to keep publishing.
                       </p>
                       <Button
-                        size="sm"
                         variant="outline"
                         nativeButton={false}
                         render={<Link href="/accounts" />}

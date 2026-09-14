@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOutIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SparklesIcon } from "lucide-react";
+import { LogOutIcon, SparklesIcon } from "lucide-react";
 import { cn } from "cn";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
@@ -12,6 +11,21 @@ import { isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Sidebar as SidebarPrimitive,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
 
 export function Sidebar({
   userName,
@@ -24,9 +38,29 @@ export function Sidebar({
   plan: PlanId;
   className?: string;
 }) {
+  // Provider lives here (not in AppShell) so the shell layout and the
+  // mobile experience stay untouched. The wrapper carries AppShell's
+  // responsive visibility; md:w-auto keeps it from claiming row width.
+  return (
+    <SidebarProvider className={cn("hidden w-auto md:flex", className)}>
+      <SidebarShell userName={userName} userEmail={userEmail} plan={plan} />
+    </SidebarProvider>
+  );
+}
+
+function SidebarShell({
+  userName,
+  userEmail,
+  plan,
+}: {
+  userName: string;
+  userEmail: string;
+  plan: PlanId;
+}) {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
   const initial = userName.trim().charAt(0).toUpperCase() || "U";
 
   async function handleSignOut() {
@@ -52,19 +86,8 @@ export function Sidebar({
   }
 
   return (
-    <aside
-      className={cn(
-        "h-screen shrink-0 flex-col border-r border-border bg-background sticky top-0 transition-[width] duration-200 motion-reduce:transition-none",
-        collapsed ? "w-16" : "w-60",
-        className
-      )}
-    >
-      <div
-        className={cn(
-          "flex border-b border-border",
-          collapsed ? "flex-col items-center gap-1 p-3" : "items-center justify-between p-6"
-        )}
-      >
+    <SidebarPrimitive collapsible="icon">
+      <SidebarHeader className="flex-row items-center justify-between border-b border-border p-4">
         {collapsed ? (
           <p aria-hidden="true" className="text-lg font-semibold tracking-tight">
             p
@@ -72,75 +95,62 @@ export function Sidebar({
         ) : (
           <p className="text-lg font-semibold tracking-tight">postvia</p>
         )}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setCollapsed((value) => !value)}
-          aria-expanded={!collapsed}
+        <SidebarTrigger
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-        </Button>
-      </div>
-      <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 p-3">
-        {navItems.map((item) => {
-          const isActive = isActivePath(pathname, item.href);
-          const Icon = item.icon;
-          return (
+        />
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map((item) => {
+                const isActive = isActivePath(pathname, item.href);
+                const Icon = item.icon;
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      tooltip={item.label}
+                      render={
+                        <Link
+                          href={item.href}
+                          aria-current={isActive ? "page" : undefined}
+                        />
+                      }
+                    >
+                      <Icon aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {plan === "free" && !collapsed && (
+          <div className="px-3 pb-1">
             <Link
-              key={item.href}
-              href={item.href}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                collapsed && "justify-center px-0",
-                isActive
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
+              href="/billing"
+              className="block rounded-lg border border-border bg-muted/40 p-3 outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50"
             >
-              <Icon className="size-4 shrink-0" aria-hidden="true" />
-              <span
-                className={cn(
-                  "min-w-0 flex-1 truncate transition-opacity duration-200 motion-reduce:transition-none",
-                  collapsed && "sr-only"
-                )}
-              >
-                {item.label}
-              </span>
-              {collapsed && (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-full z-50 ml-2 rounded-md border border-border bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
-                >
-                  {item.label}
-                </span>
-              )}
+              <p className="flex items-center gap-1.5 text-sm font-medium">
+                <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
+                Unlock more with Postvia
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                More posts, more accounts and Bulk scheduling.
+              </p>
+              <p className="mt-2 text-xs font-medium underline underline-offset-4">
+                View plans
+              </p>
             </Link>
-          );
-        })}
-      </nav>
-      {plan === "free" && !collapsed && (
-        <div className="px-3 pb-1">
-          <Link
-            href="/billing"
-            className="block rounded-lg border border-border bg-muted/40 p-3 outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            <p className="flex items-center gap-1.5 text-sm font-medium">
-              <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
-              Unlock more with Postvia
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              More posts, more accounts and Bulk scheduling.
-            </p>
-            <p className="mt-2 text-xs font-medium underline underline-offset-4">
-              View plans
-            </p>
-          </Link>
-        </div>
-      )}
-      <div className={cn("border-t border-border", collapsed ? "p-3" : "p-4")}>
+          </div>
+        )}
+      </SidebarContent>
+      <SidebarFooter
+        className={cn("border-t border-border", collapsed ? "p-3" : "p-4")}
+      >
         <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
           <Avatar>
             <AvatarFallback>{initial}</AvatarFallback>
@@ -168,7 +178,6 @@ export function Sidebar({
         ) : (
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => void handleSignOut()}
             className="mt-3 w-full justify-start"
           >
@@ -178,7 +187,7 @@ export function Sidebar({
         {!collapsed && (
           <>
             <Separator className="my-3" />
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
               <Link
                 href="/terms"
                 className="transition-colors hover:text-foreground"
@@ -195,7 +204,8 @@ export function Sidebar({
             </div>
           </>
         )}
-      </div>
-    </aside>
+      </SidebarFooter>
+      <SidebarRail />
+    </SidebarPrimitive>
   );
 }

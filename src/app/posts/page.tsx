@@ -63,19 +63,15 @@ export default async function PostsPage({
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                size="lg"
                 nativeButton={false}
                 render={<Link href="/posts/bulk" />}
-                className="min-h-11"
               >
                 <ClapperboardIcon data-icon="inline-start" />
                 Bulk video
               </Button>
               <Button
-                size="lg"
                 nativeButton={false}
                 render={<Link href="/posts/new" />}
-                className="min-h-11"
               >
                 <PlusIcon data-icon="inline-start" />
                 Create post
@@ -86,15 +82,15 @@ export default async function PostsPage({
 
         <nav
           aria-label="Filter posts by status"
-          className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2"
+          className="mb-6 flex gap-5 overflow-x-auto border-b border-border"
         >
           <Link
             href="/posts"
             aria-current={statusFilter === "all" ? "page" : undefined}
             className={
               statusFilter === "all"
-                ? "text-sm font-medium text-foreground"
-                : "rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                ? "-mb-px shrink-0 border-b-2 border-primary px-0.5 py-2 text-[13px] font-medium whitespace-nowrap text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                : "-mb-px shrink-0 border-b-2 border-transparent px-0.5 py-2 text-[13px] whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
             }
           >
             All
@@ -106,8 +102,8 @@ export default async function PostsPage({
               aria-current={statusFilter === option ? "page" : undefined}
               className={
                 statusFilter === option
-                  ? "text-sm font-medium text-foreground"
-                  : "rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  ? "-mb-px shrink-0 border-b-2 border-primary px-0.5 py-2 text-[13px] font-medium whitespace-nowrap text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  : "-mb-px shrink-0 border-b-2 border-transparent px-0.5 py-2 text-[13px] whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
               }
             >
               {formatStatusLabel(option)}

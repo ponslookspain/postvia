@@ -9,16 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusDot } from "@/components/StatusBadge";
 import { EmptyBlock } from "@/components/StateBlock";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Popover,
   PopoverContent,
@@ -117,7 +108,7 @@ function DayPostChip({
       onDragStart={onDragStart}
       aria-label={`${post.text || "Untitled post"} (${post.status.toLowerCase()})`}
       className={cn(
-        "flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-border bg-background px-1.5 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+        "flex h-6 min-w-0 items-center gap-1.5 rounded-md bg-muted/70 px-1.5 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50",
         dimmed && "opacity-50"
       )}
     >
@@ -156,7 +147,7 @@ function DayOverflow({
             <li key={post.id} className="min-w-0">
               <Link
                 href={`/posts/${post.id}`}
-                className="flex h-6 min-w-0 items-center gap-1.5 rounded-md px-1 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="flex h-6 min-w-0 items-center gap-1.5 rounded-md px-1 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <StatusDot status={post.status} />
                 <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
@@ -296,10 +287,8 @@ export function CalendarView({
         description={`Publishing schedule for ${userName}`}
         actions={
           <Button
-            size="lg"
             nativeButton={false}
             render={<Link href="/posts/new" />}
-            className="min-h-11"
           >
             <PlusIcon data-icon="inline-start" />
             Create post
@@ -307,49 +296,48 @@ export function CalendarView({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-medium tracking-tight">{title}</h2>
-        <div className="flex items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="flex min-w-0 items-center gap-1">
           <Button
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="icon-sm"
             nativeButton={false}
             render={
               <Link href={`/calendar?month=${monthKey(prev.year, prev.monthIndex)}`} aria-label="Previous month" />
             }
           >
-            <ChevronLeftIcon data-icon="inline-start" />
-            Prev
+            <ChevronLeftIcon />
           </Button>
+          <h2 className="min-w-0 truncate px-1 text-lg leading-7 font-semibold tracking-tight tabular-nums">
+            {title}
+          </h2>
           <Button
-            variant="outline"
-            size="sm"
-            nativeButton={false}
-            render={<Link href="/calendar" />}
-          >
-            Today
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="icon-sm"
             nativeButton={false}
             render={
               <Link href={`/calendar?month=${monthKey(next.year, next.monthIndex)}`} aria-label="Next month" />
             }
           >
-            Next
-            <ChevronRightIcon data-icon="inline-end" />
+            <ChevronRightIcon />
           </Button>
         </div>
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/calendar" />}
+        >
+          Today
+        </Button>
       </div>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section aria-label={`Posts in ${title}`}>
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border animate-[post-in_.4s_ease_both] motion-reduce:animate-none">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border">
             {WEEKDAYS.map((day) => (
               <div
                 key={day}
-                className="bg-muted/50 px-2 py-1.5 text-center text-xs font-medium text-muted-foreground"
+                className="bg-background px-2 py-2 text-center text-xs font-medium text-muted-foreground"
               >
                 <span className="hidden sm:inline">{day}</span>
                 <span className="sm:hidden">{day.slice(0, 1)}</span>
@@ -376,8 +364,8 @@ export function CalendarView({
                   onDrop={(event) => void dropOnDay(key, event)}
                   className={cn(
                     "flex h-20 flex-col gap-1 overflow-hidden bg-background p-1 sm:h-36 sm:p-1.5",
-                    !inMonth && "bg-muted/30 text-muted-foreground",
-                    isToday && "bg-muted/50",
+                    !inMonth && "bg-muted/40 text-muted-foreground",
+                    isToday && "bg-primary/[0.05]",
                     isOver && "bg-muted ring-2 ring-inset ring-ring/50"
                   )}
                 >
@@ -441,7 +429,6 @@ export function CalendarView({
               description="Create a post or schedule a draft to see it here."
               actions={
                 <Button
-                  size="sm"
                   nativeButton={false}
                   render={<Link href="/posts/new" />}
                 >
@@ -454,66 +441,64 @@ export function CalendarView({
         </section>
 
         <aside aria-labelledby="drafts-heading" className="min-w-0">
-          <Card>
-            <CardHeader>
-              <CardTitle>Unscheduled drafts</CardTitle>
-              <CardAction>
-                <Badge
-                  variant="secondary"
-                  className="tabular-nums"
-                  aria-label={`${drafts.length} unscheduled drafts`}
-                >
-                  {drafts.length}
-                </Badge>
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              {drafts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No unscheduled drafts. Drag a scheduled post between days
-                  to move it, or create a new one.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {drafts.map((post) => (
-                    <li key={post.id} className="min-w-0">
-                      <Link
-                        href={`/posts/${post.id}`}
-                        draggable
-                        onDragStart={startDrag(post.id)}
-                        title="Drag onto a day to schedule"
-                        className={cn(
-                          "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background p-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
-                          droppingId === post.id && "opacity-50"
-                        )}
-                      >
-                        <GripVerticalIcon
-                          aria-hidden="true"
-                          className="size-4 shrink-0 cursor-grab text-muted-foreground"
-                        />
-                        <StatusDot status={post.status} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">
-                            {post.text || "Untitled post"}
-                          </span>
-                          <span className="mt-0.5 flex items-center gap-1">
-                            <ChipPlatforms post={post} />
-                          </span>
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-            <CardFooter>
-              <p className="text-xs leading-5 text-muted-foreground">
-                Only scheduled posts and drafts can be moved. Publishing,
-                published and failed posts stay put. Times shown in your
-                local timezone.
+          <div className="flex items-baseline justify-between gap-3">
+            <h2
+              id="drafts-heading"
+              className="text-[15px] leading-6 font-medium tracking-tight"
+            >
+              Unscheduled drafts
+            </h2>
+            <p
+              className="shrink-0 text-xs text-muted-foreground tabular-nums"
+              aria-label={`${drafts.length} unscheduled drafts`}
+            >
+              {drafts.length}
+            </p>
+          </div>
+          <div className="mt-3">
+            {drafts.length === 0 ? (
+              <p className="text-sm leading-5 text-muted-foreground">
+                No unscheduled drafts. Drag a scheduled post between days
+                to move it, or create a new one.
               </p>
-            </CardFooter>
-          </Card>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {drafts.map((post) => (
+                  <li key={post.id} className="min-w-0">
+                    <Link
+                      href={`/posts/${post.id}`}
+                      draggable
+                      onDragStart={startDrag(post.id)}
+                      title="Drag onto a day to schedule"
+                      className={cn(
+                        "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background p-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+                        droppingId === post.id && "opacity-50"
+                      )}
+                    >
+                      <GripVerticalIcon
+                        aria-hidden="true"
+                        className="size-4 shrink-0 cursor-grab text-muted-foreground"
+                      />
+                      <StatusDot status={post.status} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">
+                          {post.text || "Untitled post"}
+                        </span>
+                        <span className="mt-0.5 flex items-center gap-1">
+                          <ChipPlatforms post={post} />
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            Only scheduled posts and drafts can be moved. Publishing,
+            published and failed posts stay put. Times shown in your
+            local timezone.
+          </p>
         </aside>
       </div>
     </div>

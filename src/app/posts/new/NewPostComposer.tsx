@@ -52,14 +52,6 @@ import { EmptyBlock } from "@/components/StateBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -79,7 +71,6 @@ import { MediaGrid } from "./_components/MediaGrid";
 import { PreviewCard } from "./_components/PreviewCard";
 import { PlatformSwitcher } from "./_components/PlatformSwitcher";
 import { PublishCard } from "./_components/PublishCard";
-import { ScheduleCard } from "./_components/ScheduleCard";
 import { MobileComposerBar } from "./_components/MobileComposerBar";
 import { ScheduleDialog } from "./_components/ScheduleDialog";
 import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
@@ -176,13 +167,6 @@ function uploadFileToPost(
       }
     })();
   });
-}
-
-function toLocalInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate()
-  )}`;
 }
 
 function parseScheduleDenial(data: {
@@ -1154,36 +1138,43 @@ export default function NewPostComposer({
         }
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+      <div className="grid items-start gap-8 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-8 lg:col-span-2">
           <section aria-labelledby="composer-content">
-            <Card>
-              <CardHeader>
-                <CardTitle>Post content</CardTitle>
-                <CardDescription>
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  id="composer-content"
+                  className="text-lg font-medium tracking-tight"
+                >
+                  Post content
+                </h2>
+                <p className="mt-1 max-w-[60ch] text-sm leading-5 text-muted-foreground">
                   Used by every selected platform unless customized — except
                   TikTok, which posts its own title instead
-                </CardDescription>
-                <CardAction>
-                  <Badge variant={hasOverLimit ? "destructive" : "secondary"}>
-                    {charCount} chars
-                  </Badge>
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <Field data-invalid={hasOverLimit || undefined}>
-                  <FieldLabel htmlFor="composer-text" className="sr-only">
-                    Post content
-                  </FieldLabel>
-                  <Textarea
-                    id="composer-text"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="Write something worth publishing..."
-                    rows={6}
-                    aria-invalid={hasOverLimit || undefined}
-                    className="min-h-36 text-[15px] leading-relaxed"
-                  />
+                </p>
+              </div>
+              <Badge
+                variant={hasOverLimit ? "destructive" : "secondary"}
+                className="shrink-0 tabular-nums"
+              >
+                {charCount} chars
+              </Badge>
+            </div>
+            <div>
+              <Field data-invalid={hasOverLimit || undefined}>
+                <FieldLabel htmlFor="composer-text" className="sr-only">
+                  Post content
+                </FieldLabel>
+                <Textarea
+                  id="composer-text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Write something worth publishing..."
+                  rows={8}
+                  aria-invalid={hasOverLimit || undefined}
+                  className="min-h-48 text-[15px] leading-relaxed"
+                />
                   {hasOverLimit ? (
                     <FieldError>
                       Too long for{" "}
@@ -1201,8 +1192,7 @@ export default function NewPostComposer({
                     </FieldDescription>
                   )}
                 </Field>
-              </CardContent>
-            </Card>
+              </div>
           </section>
 
           <AccountList
@@ -1225,31 +1215,19 @@ export default function NewPostComposer({
             onRetry={(key) => void retryFailedMedia(key)}
           />
 
-          <ScheduleCard
-            scheduleDate={scheduleDate}
-            scheduleTime={scheduleTime}
-            scheduledIso={scheduledIso}
-            scheduleError={scheduleError}
-            scheduling={scheduling}
-            schedulingForX={schedulingForX}
-            disabled={saving || publishing || scheduling}
-            onDateChange={setScheduleDate}
-            onTimeChange={setScheduleTime}
-            onScheduleClick={handleScheduleClick}
-          />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
-          <Card>
-            <CardHeader>
-              <CardTitle>Previews</CardTitle>
-              <CardDescription>
-                {previews.length === 0
-                  ? "Select a platform above to see its preview"
-                  : `${previews.length} selected`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <div className="flex min-w-0 flex-col gap-8 lg:sticky lg:top-6 lg:self-start">
+          <section aria-label="Preview" className="order-2 lg:order-1">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-medium tracking-tight">Preview</h2>
+              {previews.length > 0 && (
+                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {previews.length} selected
+                </p>
+              )}
+            </div>
+            <div>
               {previews.length === 0 || !activePreviewModel || !previewTarget ? (
                 <Empty>
                   <EmptyHeader>
@@ -1350,15 +1328,18 @@ export default function NewPostComposer({
                   />
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
+          <div className="order-1 lg:order-2">
           <PublishCard
             quotaBlocked={quotaBlocked}
             quotaError={quotaError}
             quotaUpgradeTo={quota.upgradeTo}
             schedulingForX={schedulingForX}
             scheduleMode={scheduleMode}
+            scheduleDate={scheduleDate}
+            scheduleTime={scheduleTime}
             xScheduleHint={xScheduleHint}
             publishing={publishing}
             publishProgress={publishProgress}
@@ -1372,6 +1353,7 @@ export default function NewPostComposer({
             onAbort={() => publishAbortRef.current?.abort()}
             onDismissXHint={() => setXScheduleHint(false)}
           />
+          </div>
         </div>
       </div>
 
@@ -1379,12 +1361,17 @@ export default function NewPostComposer({
         open={scheduleMode && !schedulingForX}
         scheduleDate={scheduleDate}
         scheduleTime={scheduleTime}
-        minDate={toLocalInputValue(new Date())}
         scheduledIso={scheduledIso}
         scheduleError={scheduleError}
         savedId={savedId}
         scheduling={scheduling}
         canSave={canSave}
+        textPresent={text.trim().length > 0}
+        overLimit={hasOverLimit}
+        mediaError={hasMediaError || hasBlockingFileIssue}
+        hasSelection={selectedAccountIds.length > 0}
+        quotaBlocked={quotaBlocked}
+        quotaReason={quotaError?.reason ?? null}
         onDateChange={setScheduleDate}
         onTimeChange={setScheduleTime}
         onOpenChange={(open) => {

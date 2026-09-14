@@ -155,6 +155,7 @@ export function VerifyOtpForm({
                 placeholder="123456"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
+                className="text-center tracking-widest"
               />
             </Field>
             <Button type="submit" disabled={verifying} className="w-full">
