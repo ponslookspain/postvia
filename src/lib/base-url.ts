@@ -15,12 +15,13 @@ export function resolveBaseURL(
 
 /**
  * Extra Better Auth origins for LOCAL development only (stable HTTPS tunnel
- * host used for OAuth callbacks + session origin, e.g. a Cloudflare Tunnel
+ * host used for OAuth callbacks + session origin, e.g. an ngrok tunnel
  * hostname in front of `http://localhost:3000`).
  *
  * Read from `BETTER_AUTH_TRUSTED_ORIGINS` (comma-separated full origins,
- * e.g. `https://dev.postvia.online`). Empty/unset by default, so
- * Production and Preview resolution is untouched: this only ever ADDS
+ * e.g. `https://lavish-passion-dipped.ngrok-free.dev`). Empty/unset by
+ * default, so Production and Preview resolution is untouched: this only
+ * ever ADDS
  * entries, never replaces the built-in allowlist in `src/lib/auth.ts`.
  * The dev hostname itself is never hardcoded here — it lives in
  * `.env.local` / `.env.example` / `docs/local-social-dev.md`.

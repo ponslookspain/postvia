@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
-  // Local development only: allow the current Cloudflare Quick Tunnel
+  // Local development only: allow the permanent ngrok development
   // hostname to fetch Next.js dev resources (/_next/hmr, React Refresh).
   // Dev-server-only setting — production behavior is unchanged.
-  allowedDevOrigins: ["advert-elections-charging-randy.trycloudflare.com"],
+  allowedDevOrigins: ["lavish-passion-dipped.ngrok-free.dev"],
 };
 
 export default withSentryConfig(nextConfig, {

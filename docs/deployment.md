@@ -7,7 +7,7 @@ Primary loop — no Vercel involved:
 ```bash
 npm install
 npm run dev          # http://localhost:3000 (main dev server)
-npm run dev:tunnel   # Cloudflare Quick Tunnel → localhost:3000, only when a
+npm run dev:tunnel   # ngrok http 3000 → permanent dev HTTPS, only when a
                      # public HTTPS origin is needed (OAuth/integration tests)
 ```
 
@@ -20,32 +20,44 @@ Social/OAuth integration testing through the tunnel:
 ## GitHub / PR flow
 
 ```
-feature/staging branch → local verification → commit → push
-→ GitHub Pull Request → review → merge to main
+feature/fix/chore/staging branch → local verification → commit → push
+(no Vercel Preview) → GitHub Pull Request → review → merge to main
+→ AUTOMATIC Vercel Production
 ```
 
-- Development happens on `staging/*` / feature branches, never directly
-  on `main`.
-- A push does NOT have to produce any Vercel deployment. Preview builds
-  are optional and off the default path.
-- Merging to `main` does NOT release Production. It only makes the code
-  eligible for a manual release.
+- Development happens on `staging/*` / feature / fix / chore branches,
+  never directly on `main`.
+- A push to a non-production branch must NOT produce any Vercel
+  deployment. Preview builds are off by policy, not just optional.
+- Merging to `main` IS the release: Vercel automatically builds and
+  deploys `main` to Production.
 
-## Production release (manual)
+## Production release (automatic from `main`)
 
-Production (`postvia.online`) is released by an explicit manual action
-taken after a PR is merged — never automatically from a merge or push.
-`vercel --prod` is not part of the normal cycle and is only ever run as
-that explicitly approved manual step; never force-push, never change the
-remote, never create a second production project, never change the
-production domain. Production env vars live in Vercel (per-environment
-Stripe keys); `ADMIN_EMAILS` must contain the operator address there.
+Production (`postvia.online`) deploys automatically on every merge to
+`main` — no manual step. `vercel --prod` is not part of the normal cycle;
+never force-push, never change the remote, never create a second
+production project, never change the production domain. Production env
+vars live in Vercel (per-environment Stripe keys); `ADMIN_EMAILS` must
+contain the operator address there.
 
 **Vercel Git deployment triggers are configured in the Vercel Project
 settings, outside the repository.** This repo contains no setting that
 enables or disables them (`vercel.json` below holds only the cron
-schedule), so the no-automatic-Preview / no-automatic-Production policy
-must be enforced in the Vercel dashboard. Do not claim otherwise.
+schedule). Required dashboard policy, to be set manually (one time):
+
+1. Settings → Git → **Production Branch = `main`** — merges to `main`
+   build and release Production automatically. Verified 2026-09-15 via
+   Vercel MCP: the live Production deployment was built from `main`.
+2. Settings → Git → **Ignored Build Step** — skip every non-production
+   branch so pushes never create Preview deployments. Example command
+   (exit 0 = skip the build, exit 1 = build it):
+   `bash -c 'test "$VERCEL_GIT_COMMIT_REF" != main'`
+   — `main` builds, everything else is skipped. This touches only build
+   triggering: Production env vars, domains, cron, and the database are
+   unaffected.
+
+Do not claim the repo or docs switch these triggers off by themselves.
 
 Cron: `vercel.json` → `0 3 * * *` → `/api/cron/publish-scheduled`
 (once daily — Hobby-plan maximum; scheduled posts can go out up to ~24h
@@ -85,7 +97,7 @@ Vercel: instant rollback to a previous deployment in the dashboard.
 Database: schema changes are additive-only by policy; data fixes use
 targeted statements, never resets.
 
-## Post-release smoke (after a manual production release, no permanent test data)
+## Post-release smoke (after each automatic production deployment, no permanent test data)
 
 `GET /api/health` (200 + `{ok:true,db:"ok"}`) → Homepage → login
 (Google) → admin surfaces → DB connectivity (dashboard loads usage) →

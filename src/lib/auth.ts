@@ -217,7 +217,7 @@ export const auth = betterAuth({
   //
   // Local social-OAuth development (see docs/local-social-dev.md) adds the
   // stable HTTPS tunnel origin via `BETTER_AUTH_TRUSTED_ORIGINS` (CSV, e.g.
-  // `https://dev.postvia.online`). Unset by default, so Production/Preview
+  // `https://lavish-passion-dipped.ngrok-free.dev`). Unset by default, so
   // see exactly the historical allowlist — extras only ever append.
   baseURL: {
     allowedHosts: [

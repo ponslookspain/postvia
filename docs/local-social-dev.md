@@ -11,18 +11,21 @@ replaces Production, and its URL can never be treated as a stable address.
 ## Architecture
 
 ```
-browser ──https──> DEV_ORIGIN (stable public HTTPS, e.g. https://dev.postvia.online)
-                       │ tunnel (Cloudflare Tunnel / cloudflared)
+browser ──https──> https://lavish-passion-dipped.ngrok-free.dev
+                       │ ngrok agent (must be running: `npm run dev:tunnel`)
                        ▼
-               http://localhost:3000  (npm run dev)
+               http://localhost:3000  (npm run dev — the actual app/server)
 ```
 
-- **Local:** Next.js on `http://localhost:3000`.
-- **Public dev HTTPS:** one stable hostname (preferred:
-  `https://dev.postvia.online`) that tunnels to your localhost. Providers
-  only ever see this origin (OAuth callbacks, session origin).
+- **Local:** Next.js on `http://localhost:3000` — this is where the app
+  actually runs.
+- **Public dev HTTPS:** the permanent development hostname
+  `https://lavish-passion-dipped.ngrok-free.dev`, proxied by ngrok to
+  your localhost. Providers only ever see this origin (OAuth callbacks,
+  session origin).
 - **Production:** `https://postvia.online` on Vercel — completely separate
-  env vars, DB usage discipline (below), and redirect URIs.
+  env vars, DB usage discipline (below), and redirect URIs. The dev URL
+  is NOT Production and never replaces it.
 
 Why a public HTTPS origin is required at all: X / Threads / TikTok /
 Meta only accept public `https` redirect URIs (no `http://localhost`
@@ -34,10 +37,9 @@ ownership of.
 ## Prerequisites
 
 - `npm install` (repo root).
-- A tunnel tool. Preferred: `cloudflared` (Cloudflare Tunnel) with a
-  persistent hostname `dev.postvia.online`. `cloudflared` was NOT installed
-  on this machine at the time of writing — install it first
-  (`https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/`).
+- The `ngrok` CLI with the agent able to serve the reserved development
+  domain `lavish-passion-dipped.ngrok-free.dev`. No ngrok npm dependency
+  is used — the CLI runs beside the dev server (see §1).
 - Real secrets for the providers you want to test. **Never commit them.**
   They live only in `.env.local` (git-ignored). `.env.example` contains
   names + safe placeholders only.
@@ -46,63 +48,44 @@ ownership of.
   database before any destructive testing** (see "Database" below). Never
   run `scripts/reset-data.ts` / `cleanup-test-users` against production.
 
-## 1. Tunnel setup (one manual action)
+## 1. Tunnel setup (ngrok, permanent hostname)
 
-**Option A — preferred (stable hostname `dev.postvia.online`):**
-`dev.postvia.online` DNS currently resolves (observed `216.198.79.1` /
-`216.198.79.65`), but no tunnel for it is configured from this machine —
-do not assume it already points at you. One manual action is required,
-either in the Cloudflare dashboard (Zero Trust → Tunnels → create tunnel
-→ public hostname `dev.postvia.online` → service `http://localhost:3000`)
-or on any machine that owns the zone:
+The development hostname is permanent:
 
-```dns
-dev.postvia.online.  CNAME  <your-tunnel-id>.cfargotunnels.com.
+```
+https://lavish-passion-dipped.ngrok-free.dev
 ```
 
-then run:
+Run in its own terminal for the whole session (ngrok agent MUST be
+running, otherwise the dev URL answers with ngrok edge errors instead of
+your app):
 
 ```bash
-cloudflared tunnel --url http://localhost:3000
-# or, with a named tunnel: cloudflared tunnel run <tunnel-name>
+npm run dev:tunnel   # = ngrok http 3000
 ```
 
-**Option B — portable fallback (no DNS needed):** any HTTPS tunnel
-works because the dev hostname is never hardcoded — it comes from env vars:
+This proxies `https://lavish-passion-dipped.ngrok-free.dev` →
+`http://localhost:3000` on this machine. If the URL does not reach your
+app, the ngrok agent is not serving this machine — start it with the
+command above (it needs the reserved domain on your ngrok account).
 
-```bash
-cloudflared tunnel --url http://localhost:3000
-# → you get https://<random>.trycloudflare.com — use THAT as DEV_ORIGIN below
-```
-
-> The Quick Tunnel URL is **temporary and must NOT be considered
-> stable**: it changes on every `cloudflared` restart. After each restart,
-> update `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, the four
-> `*_REDIRECT_URI` values in `.env.local`, and the redirect URIs in the
-> provider portals (§2–§3). A named Cloudflare Tunnel (Option A) is the
-> only setup with a persistent hostname.
-
-From here on, `DEV_ORIGIN` means your actual public origin
-(`https://dev.postvia.online` for Option A, the `trycloudflare` URL for
-Option B). Every place below that shows `dev.postvia.online`, substitute
-your `DEV_ORIGIN` host when on Option B.
-
-Keep the tunnel running in its own terminal for the whole session.
+From here on, `DEV_ORIGIN` means exactly
+`https://lavish-passion-dipped.ngrok-free.dev`.
 
 ## 2. `.env.local` for local social dev
 
 ```bash
 # Auth base: fallback base URL + email links + TikTok bridge host.
-BETTER_AUTH_URL=https://dev.postvia.online
+BETTER_AUTH_URL=https://lavish-passion-dipped.ngrok-free.dev
 # Extra Better Auth origins (appended to allowedHosts/trustedOrigins;
 # production allowlist itself is untouched in code).
-BETTER_AUTH_TRUSTED_ORIGINS=https://dev.postvia.online
+BETTER_AUTH_TRUSTED_ORIGINS=https://lavish-passion-dipped.ngrok-free.dev
 
 # Exact redirect URIs — must match the provider portals character-for-character.
-X_REDIRECT_URI=https://dev.postvia.online/api/auth/x/callback
-THREADS_REDIRECT_URI=https://dev.postvia.online/api/auth/threads/callback
-TIKTOK_REDIRECT_URI=https://dev.postvia.online/api/auth/tiktok/callback
-INSTAGRAM_REDIRECT_URI=https://dev.postvia.online/api/auth/instagram/callback
+X_REDIRECT_URI=https://lavish-passion-dipped.ngrok-free.dev/api/auth/x/callback
+THREADS_REDIRECT_URI=https://lavish-passion-dipped.ngrok-free.dev/api/auth/threads/callback
+TIKTOK_REDIRECT_URI=https://lavish-passion-dipped.ngrok-free.dev/api/auth/tiktok/callback
+INSTAGRAM_REDIRECT_URI=https://lavish-passion-dipped.ngrok-free.dev/api/auth/instagram/callback
 
 # Real provider credentials (from your own dev apps — never commit):
 X_CLIENT_ID= / X_CLIENT_SECRET=
@@ -132,15 +115,15 @@ entries:
 
 | Provider | Portal | Exact DEV redirect URI to add |
 |---|---|---|
-| X | X Developer Portal → app → OAuth 2.0 settings | `https://dev.postvia.online/api/auth/x/callback` |
-| Threads | Meta Developer → Threads app → OAuth redirect | `https://dev.postvia.online/api/auth/threads/callback` |
-| TikTok | TikTok Developer Portal → Login Kit → Redirect URIs | `https://dev.postvia.online/api/auth/tiktok/callback` |
-| Instagram | Meta Developer → Instagram app → OAuth redirect | `https://dev.postvia.online/api/auth/instagram/callback` |
+| X | X Developer Portal → app → OAuth 2.0 settings | `https://lavish-passion-dipped.ngrok-free.dev/api/auth/x/callback` |
+| Threads | Meta Developer → Threads app → OAuth redirect | `https://lavish-passion-dipped.ngrok-free.dev/api/auth/threads/callback` |
+| TikTok | TikTok Developer Portal → Login Kit → Redirect URIs | `https://lavish-passion-dipped.ngrok-free.dev/api/auth/tiktok/callback` |
+| Instagram | Meta Developer → Instagram app → OAuth redirect | `https://lavish-passion-dipped.ngrok-free.dev/api/auth/instagram/callback` |
 
 TikTok extras: the Login Kit app must list the redirect URI exactly; for
 **photo** posts the app additionally needs URL-prefix/domain ownership
-verification for `https://dev.postvia.online/api/tiktok/media/` (same
-requirement production has for `https://postvia.online/api/tiktok/media/`).
+verification for `https://lavish-passion-dipped.ngrok-free.dev/api/tiktok/media/`
+(same requirement production has for `https://postvia.online/api/tiktok/media/`).
 **Video** posts use `FILE_UPLOAD` and need no public URL verification.
 
 Instagram extras: the test account must be **Business/Creator**
@@ -161,7 +144,7 @@ npm run dev          # http://localhost:3000 (own terminal)
 2. Open `http://localhost:3000/accounts` — you must be logged in, not
    bounced to `/login`.
 3. Better: do steps 1–2 again **through the tunnel origin**
-   (`https://dev.postvia.online/login` → `/accounts`). Session must
+    (`https://lavish-passion-dipped.ngrok-free.dev/login` → `/accounts`). Session must
    survive there — that proves `BETTER_AUTH_TRUSTED_ORIGINS` + `BETTER_AUTH_URL`
    work over HTTPS.
 4. On `/accounts`, connect each provider in turn:
@@ -211,8 +194,9 @@ npm run dev          # http://localhost:3000 (own terminal)
 
 ## 6. What NOT to do (production safety)
 
-- Never `vercel deploy` / `vercel --prod`; never create Preview deployments
-  for this; never pull Vercel env over `.env.local`.
+- Never `vercel deploy` / `vercel --prod`; pushing a branch must not
+  create Preview deployments either (dashboard policy, see
+  `docs/deployment.md`); never pull Vercel env over `.env.local`.
 - Never change Production Environment Variables or the production domain.
 - Never delete deployments.
 - Never point local env at the production DB for destructive testing;

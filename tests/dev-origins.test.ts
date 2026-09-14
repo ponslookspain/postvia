@@ -28,9 +28,10 @@ describe("resolveExtraTrustedOrigins", () => {
   test("parses a single dev origin", () => {
     assert.deepEqual(
       resolveExtraTrustedOrigins({
-        BETTER_AUTH_TRUSTED_ORIGINS: "https://dev.postvia.online",
+        BETTER_AUTH_TRUSTED_ORIGINS:
+          "https://lavish-passion-dipped.ngrok-free.dev",
       }),
-      ["https://dev.postvia.online"]
+      ["https://lavish-passion-dipped.ngrok-free.dev"]
     );
   });
 
@@ -38,9 +39,9 @@ describe("resolveExtraTrustedOrigins", () => {
     assert.deepEqual(
       resolveExtraTrustedOrigins({
         BETTER_AUTH_TRUSTED_ORIGINS:
-          " https://dev.postvia.online/,https://dev.postvia.online , ftp://x, not-a-url, http://localhost:3000 ",
+          " https://lavish-passion-dipped.ngrok-free.dev/,https://lavish-passion-dipped.ngrok-free.dev , ftp://x, not-a-url, http://localhost:3000 ",
       }),
-      ["https://dev.postvia.online", "http://localhost:3000"]
+      ["https://lavish-passion-dipped.ngrok-free.dev", "http://localhost:3000"]
     );
   });
 });
@@ -48,8 +49,8 @@ describe("resolveExtraTrustedOrigins", () => {
 describe("originToAllowedHost", () => {
   test("maps https origin to host", () => {
     assert.equal(
-      originToAllowedHost("https://dev.postvia.online"),
-      "dev.postvia.online"
+      originToAllowedHost("https://lavish-passion-dipped.ngrok-free.dev"),
+      "lavish-passion-dipped.ngrok-free.dev"
     );
   });
 

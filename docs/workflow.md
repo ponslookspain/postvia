@@ -10,27 +10,28 @@ security).
 ```
 LOCAL EDIT
 → LOCAL TEST
-→ optional Cloudflare HTTPS/OAuth TEST
+→ optional ngrok HTTPS/OAuth TEST
 → COMMIT
-→ PUSH FEATURE/STAGING
+→ PUSH FEATURE/FIX/CHORE/STAGING (no Vercel Preview)
 → GITHUB PR
 → REVIEW
 → MERGE MAIN
-→ MANUAL PRODUCTION RELEASE
+→ AUTOMATIC VERCEL PRODUCTION (`postvia.online`)
 ```
 
 - **Local development is the primary loop.** Edit, run checks, and verify
   in the browser locally. A Vercel Preview deployment is NOT a required
-  step of daily development and must NOT be built for every push.
-- **Vercel is the release platform, not a mandatory preview
-  environment.** Production is NEVER released automatically from a merge
-  or push — it requires a separate, explicit manual release action after
-  an accepted PR.
+  step of daily development and must NOT be built for feature-branch
+  pushes.
+- **Merging to `main` automatically deploys Production.** `main` is the
+  Vercel Production Branch: every merge to `main` builds and releases
+  `postvia.online` with no manual step.
 - **Vercel Git deployment triggers are configured in the Vercel Project
   settings, outside the repository.** Neither the code nor these docs can
-  disable automatic deployments by themselves. The required dashboard
-  policy: no automatic Preview builds for feature/staging branches, no
-  automatic Production releases from `main`.
+  change them by themselves. The required dashboard policy:
+  Production Branch = `main` (automatic Production on merge) +
+  non-production branches skipped (no Preview builds) — see
+  `docs/deployment.md`.
 
 ## Levels
 
@@ -40,11 +41,12 @@ LOCAL EDIT
 - **Local dev server** — `npm run dev` (`http://localhost:3000`). The main
   dev server. Never run it as a long-lived foreground process inside an
   automated OpenCode task; use short-lived checks.
-- **Cloudflare Quick Tunnel** — `npm run dev:tunnel`
-  (`cloudflared tunnel --url http://localhost:3000`). Used ONLY when an
-  external public HTTPS origin is needed (OAuth callbacks, social
-  integration testing — see `docs/local-social-dev.md`). The tunnel URL is
-  temporary and changes on restart; it never replaces Production.
+- **ngrok tunnel** — `npm run dev:tunnel` (`ngrok http 3000`). Used ONLY
+  when an external public HTTPS origin is needed (OAuth callbacks, social
+  integration testing — see `docs/local-social-dev.md`). The permanent
+  development URL `https://lavish-passion-dipped.ngrok-free.dev` proxies
+  to `localhost:3000`; the ngrok agent must be running. It never replaces
+  Production.
 - **Git** — versions the project. Development happens on `staging/*` /
   feature branches, never directly on `main`.
 - **GitHub PR** — the review gate. No code reaches `main` without an
@@ -61,12 +63,13 @@ LOCAL EDIT
    `build`), fixing failures.
 4. Verify locally in a browser: `http://localhost:3000`, plus the tunnel
    origin when the task needs external HTTPS/OAuth.
-5. OpenCode commits and pushes the staging/feature branch.
+5. OpenCode commits and pushes the feature/fix/chore/staging branch.
+   The push builds NOTHING on Vercel (no Preview by policy).
 6. **OpenCode stops after the push and hands you a report.**
 7. You open the GitHub Pull Request, it gets reviewed, then merged to
    `main`.
-8. Production release happens separately, as an explicit manual action —
-   never as a side effect of the merge.
+8. The merge to `main` automatically deploys Production
+   (`postvia.online`) — no manual release step.
 9. Bug found → back to OpenCode → fix → checks → commit → push → new PR
    review cycle.
 
@@ -79,21 +82,23 @@ Without your explicit approval OpenCode must NOT:
 
 - merge to `main`, push to `main`;
 - open or merge Pull Requests by itself;
-- release to Production, `vercel --prod`, `vercel deploy`;
+- run `vercel --prod` / `vercel deploy` (Production deploys itself from
+  `main`; manual CLI deploys are outside the normal cycle);
 - change Production Environment Variables or the Production DB;
 - run destructive production actions.
 
 ## Production release
 
-Recommended (keeps GitHub `main` in sync with Production):
+Automatic, keeps GitHub `main` in sync with Production by construction:
 
 ```
-staging/feature → local verification → PR → review → merge to main
-→ explicit MANUAL production deployment → postvia.online
+feature/fix/chore/staging → local verification → PR → review
+→ merge to main → AUTOMATIC Vercel Production → postvia.online
 ```
 
-The exact release action (Vercel dashboard deploy / promote) is performed
-by you, deliberately, after the merge — it is not triggered by Git.
+No manual release action is needed or expected. If an automatic
+Production deployment ever fails, the fix goes through the same loop
+(branch → PR → merge), never through a manual CLI deploy.
 
 ## The "ship it" command
 
@@ -101,11 +106,12 @@ When you say "готово, выпускай в production" / "отправля�
 "можно в production", OpenCode must first:
 
 - report current branch, HEAD, clean working tree;
-- confirm local checks are green and the PR is merged;
-- state which explicit manual release action will be used.
+- confirm local checks are green and the PR is reviewed;
+- confirm the merge to `main` is what will release (automatic).
 
-Production release needs your explicit confirmation **after** that
-summary. OpenCode never ships silently.
+Merging to `main` needs your explicit confirmation **after** that
+summary, because the merge itself is the release. OpenCode never merges
+silently.
 
 ## Environments (presence only — never values)
 
@@ -127,12 +133,13 @@ blindly over local files, and never print secret values.
 
 ## Vercel workflow
 
-- Feature/staging work is verified locally (+ tunnel when needed), then
-  pushed for PR review. No `vercel deploy` in the normal cycle; no
-  `vercel --prod` outside an explicitly approved manual release.
-- Preview deployments are optional and off the default path. If one ever
-  exists, it may sit behind Vercel Authentication (SSO): that is expected
-  and does not mean the app is broken.
+- Feature/fix/chore/staging work is verified locally (+ tunnel when
+  needed), then pushed for PR review. A push builds NOTHING on Vercel by
+  policy (no Preview). No `vercel deploy` in the normal cycle; no
+  `vercel --prod` — Production comes from `main` automatically.
+- If a Preview deployment ever exists (e.g. created before this policy),
+  it may sit behind Vercel Authentication (SSO): that is expected and
+  does not mean the app is broken.
 
 ## Database safety
 

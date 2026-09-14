@@ -180,13 +180,38 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Local development
+
+Two terminals. The app itself always runs locally — ngrok only proxies a
+public HTTPS hostname to it for OAuth callbacks and social testing.
+
+First terminal:
+```bash
+npm run dev
+```
+
+Second terminal (only when social/OAuth testing is needed):
+```bash
+npm run dev:tunnel   # ngrok http 3000 — needs the `ngrok` CLI + agent running
+```
+
+- Local app: [http://localhost:3000](http://localhost:3000)
+- Social/OAuth test URL:
+  [https://lavish-passion-dipped.ngrok-free.dev](https://lavish-passion-dipped.ngrok-free.dev)
+  (permanent development hostname → ngrok → `localhost:3000`; this is NOT
+  Production)
+- The development hostname is used for OAuth callbacks with real X /
+  Threads / TikTok / Instagram accounts. Google OAuth is not part of the
+  current social smoke flow. Full guide:
+  [`docs/local-social-dev.md`](docs/local-social-dev.md).
+
 ## Scripts
 
 ```bash
 npm run dev        # start dev server (http://localhost:3000)
 npm run dev:local  # same, explicit local-only dev server
-npm run dev:tunnel # Cloudflare Quick Tunnel → localhost:3000 (temporary
-                   # public HTTPS for OAuth callbacks; needs `cloudflared`)
+npm run dev:tunnel # ngrok http 3000 (permanent dev HTTPS for OAuth
+                   # callbacks; needs the `ngrok` CLI)
 npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
@@ -204,18 +229,20 @@ environment.
 
 - Local dev server: `npm run dev` → [http://localhost:3000](http://localhost:3000).
 - Public HTTPS for OAuth callbacks / integration testing only:
-  `npm run dev:tunnel` (`cloudflared tunnel --url http://localhost:3000`).
-  The Quick Tunnel URL is temporary and changes on restart — it never
-  replaces Production. Real social testing guide:
-  [`docs/local-social-dev.md`](docs/local-social-dev.md).
-- Flow: feature/staging branch → local verification → commit → push →
-  GitHub Pull Request → review → merge to `main` → **separate, explicit
-  manual Production release** (`postvia.online`).
+  `npm run dev:tunnel` (`ngrok http 3000`) → permanent development URL
+  `https://lavish-passion-dipped.ngrok-free.dev`, which proxies to
+  `localhost:3000`. It never replaces Production. Real social testing
+  guide: [`docs/local-social-dev.md`](docs/local-social-dev.md).
+- Flow: feature/fix/chore/staging branch → local testing → commit →
+  push (**no Vercel Preview is built**) → GitHub Pull Request → review →
+  merge to `main` → **automatic Vercel Production deployment** of `main`
+  (`postvia.online`). Vercel Preview is not part of daily development.
 - Vercel Preview is NOT a required step of daily development and must NOT
-  be built for every feature-branch push; Production must NOT release
-  automatically from merges/pushes. Vercel Git deployment triggers live in
-  the Vercel Project settings (dashboard, outside this repository) — the
-  repo and docs cannot switch them off by themselves.
+  be built for feature-branch pushes. Vercel Git deployment triggers live
+  in the Vercel Project settings (dashboard, outside this repository) —
+  the repo and docs cannot switch them off by themselves. Required
+  dashboard policy: Production Branch = `main` (auto-deploys on merge),
+  non-production branches skipped (no Preview builds).
 
 Full process contract: [`docs/workflow.md`](docs/workflow.md). Release
 details: [`docs/deployment.md`](docs/deployment.md). Scheduled publishing

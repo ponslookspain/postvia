@@ -42,5 +42,5 @@ Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
 Template with safe placeholders: [`.env.example`](../.env.example).
 
 Adding/changing a Vercel Environment Variable normally needs a new
-deployment (or Redeploy) before it applies. Full Local → PR →
-manual Production process: [`docs/workflow.md`](workflow.md).
+deployment (or Redeploy) before it applies. Full Local → PR → automatic
+Production-from-`main` process: [`docs/workflow.md`](workflow.md).
