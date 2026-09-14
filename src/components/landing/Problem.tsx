@@ -1,19 +1,19 @@
 const pains = [
   {
-    title: "Copy-pasting into different apps",
-    text: "The same post retyped four times, drifting out of sync.",
+    title: "Copy-paste work",
+    text: "Rewrite the same post and upload the same media across multiple apps.",
   },
   {
-    title: "Switching between platforms",
-    text: "Four inboxes, four drafts, four upload flows.",
+    title: "Four separate workflows",
+    text: "Different editors, limits, previews, and publishing flows for every network.",
   },
   {
-    title: "Losing track of schedules",
-    text: "No single view of what goes out, and when.",
+    title: "Scattered schedules",
+    text: "Without a shared calendar, it is easy to miss a slot or lose track of what comes next.",
   },
   {
-    title: "Uncertainty about what published",
-    text: "One network fails silently and nobody notices until Monday.",
+    title: "Unclear publishing status",
+    text: "One network can fail while the others succeed. You only find out by checking each app.",
   },
 ] as const;
 
@@ -29,11 +29,12 @@ export function Problem() {
             id="problem-heading"
             className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
           >
-            Posting one app at a time does not scale.
+            Publishing across networks gets messy fast.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-            Postvia replaces the manual loop with one workflow for writing,
-            scheduling, and verifying every post.
+            Copying the same post between apps creates extra work — and makes
+            it harder to know what is scheduled, what failed, and what
+            actually went live.
           </p>
         </div>
         <ul className="mt-10 grid gap-3 sm:grid-cols-2">

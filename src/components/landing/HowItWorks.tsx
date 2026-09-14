@@ -9,43 +9,43 @@ const steps = [
   {
     id: "connect",
     title: "Connect",
-    heading: "Connect your accounts",
-    text: "Link Instagram, Threads, TikTok, and X with secure OAuth. No social passwords stored — disconnect any account anytime.",
+    heading: "Connect your social accounts",
+    text: "Connect Instagram, Threads, TikTok, and X with official OAuth. Postvia never stores your social passwords.",
     shot: "/landing/accounts.svg" as const,
     shotAlt:
       "Postvia accounts screen showing connected Instagram, Threads, TikTok, and X profiles",
     bullets: [
-      "Official OAuth for all four networks",
-      "Several handles on the same platform where supported",
-      "Tokens refresh automatically; reconnect on expiry",
+      "Connect multiple accounts where your plan allows it.",
+      "Reconnect accounts when access needs attention.",
+      "Disconnect any account independently.",
     ],
   },
   {
     id: "write",
     title: "Write",
-    heading: "Write once, tailor per network",
-    text: "Start from one global caption, then give any account its own version — including TikTok titles and posting options.",
+    heading: "Create once. Tailor each network.",
+    text: "Start with one caption, then customize individual accounts when the platform needs a different version.",
     shot: "/landing/composer.svg" as const,
     shotAlt:
       "Postvia composer showing a global caption with per-platform versions and character counts",
     bullets: [
-      "Live per-platform previews with character counts",
-      "Threads 500, X 280, Instagram caption 2200",
-      "TikTok title, privacy, comments, duet, stitch, and cover",
+      "See platform-specific previews before publishing.",
+      "Keep character limits visible while you write.",
+      "Set TikTok-specific title and posting options.",
     ],
   },
   {
     id: "schedule",
     title: "Schedule / Publish",
-    heading: "Schedule or publish, then verify",
-    text: "Pick a date and time for Threads, TikTok, and Instagram — or publish now. X publishes immediately. Every target reports its own status.",
+    heading: "Schedule or publish, then see the result.",
+    text: "Schedule Instagram, Threads, and TikTok, or publish now. X publishes immediately. Every connected account reports its own status.",
     shot: "/landing/calendar.svg" as const,
     shotAlt:
       "Postvia content calendar showing scheduled posts across a month grid",
     bullets: [
-      "Month calendar with drag-to-reschedule",
-      "Bulk video batches up to 10 posts (Growth and Scale)",
-      "Per-target Published, Partial, and Failed states",
+      "Plan upcoming posts on the visual calendar.",
+      "Bulk schedule up to 10 videos on Growth and Scale.",
+      "See which accounts published, are still publishing, or failed.",
     ],
   },
 ] as const;
@@ -88,10 +88,11 @@ export function HowItWorks() {
           id="how-heading"
           className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
         >
-          From account to published in three steps.
+          From connected accounts to published posts.
         </h2>
         <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-          No timers, no autoplay — pick a step and read at your own pace.
+          Three steps. One place to create, schedule, publish, and check the
+          result.
         </p>
       </div>
       <div className="mt-10 grid items-start gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">

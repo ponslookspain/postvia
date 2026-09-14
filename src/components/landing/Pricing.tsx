@@ -6,9 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { PLANS } from "@/lib/plans";
 
 const quotaLine: Record<string, string> = {
-  free: "15 posts per month · 1 connected account",
-  growth: "300 posts per month · up to 5 connected accounts",
+  free: "15 posts/month · 1 connected account",
+  growth: "300 posts/month · up to 5 connected accounts",
   scale: "Unlimited posts · unlimited connected accounts",
+};
+
+const descriptionOverride: Record<string, string> = {
+  free: "Start publishing without a card.",
+  growth: "For creators and small teams publishing every week.",
+  scale: "For higher-volume publishing across more accounts.",
 };
 
 export function Pricing() {
@@ -23,10 +29,11 @@ export function Pricing() {
           id="pricing-heading"
           className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
         >
-          Simple pricing, per month.
+          Start free. Upgrade when you need more.
         </h2>
         <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-          Start free. Upgrade when you publish more or connect more accounts.
+          Use Postvia on the Free plan, then add more accounts, posts, and
+          bulk scheduling as your publishing volume grows.
         </p>
       </div>
       <div className="mt-10 grid items-stretch gap-4 md:grid-cols-3">
@@ -52,7 +59,7 @@ export function Pricing() {
             </p>
             <p className="mt-2 text-sm font-medium">{quotaLine[plan.id]}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {plan.description}
+              {descriptionOverride[plan.id] ?? plan.description}
             </p>
             <ul className="mt-5 flex flex-col gap-2.5">
               {plan.features.map((feature) => (
@@ -83,9 +90,8 @@ export function Pricing() {
         ))}
       </div>
       <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted-foreground">
-        Bulk video scheduling (up to 10 videos per batch) is included in
-        Growth and Scale. Account limits are totals across all connected
-        profiles.
+        Bulk video scheduling supports up to 10 videos per batch on Growth
+        and Scale.
       </p>
     </section>
   );

@@ -13,19 +13,19 @@ const week = [
 const bulkSteps = [
   {
     title: "Upload",
-    text: "Drop up to 10 videos in one batch.",
+    text: "Add up to 10 videos in one batch.",
   },
   {
     title: "Configure",
-    text: "Pick a start date, timezone, and interval between posts.",
+    text: "Choose the start date, timezone, and interval between posts.",
   },
   {
     title: "Review",
-    text: "Check each video with its own scheduled slot and progress.",
+    text: "Check every video and its scheduled time before confirming.",
   },
   {
     title: "Schedule",
-    text: "Confirm once — each video becomes its own scheduled post on the calendar.",
+    text: "Create the batch once. Each video becomes its own scheduled post.",
   },
 ] as const;
 
@@ -41,18 +41,18 @@ export function CalendarBulk() {
           id="calendar-heading"
           className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
         >
-          See the month. Queue the week.
+          Plan the month. Fill the week in minutes.
         </h2>
         <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-          A visual calendar for everything scheduled, plus bulk video
-          scheduling when one post at a time is too slow.
+          See your upcoming posts on one calendar, then use bulk scheduling
+          when you have a batch of videos ready to go.
         </p>
       </div>
       <div className="mt-10 grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-4 md:p-6">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-medium">Content calendar</h3>
-            <Badge variant="secondary">Included on all plans</Badge>
+            <Badge variant="secondary">All plans</Badge>
           </div>
           <ul className="mt-4 flex flex-col gap-2">
             {week.map((entry) => (
@@ -73,6 +73,10 @@ export function CalendarBulk() {
             ))}
           </ul>
           <p className="mt-3 text-sm text-muted-foreground">
+            See scheduled posts in context and drag them to another day when
+            plans change.
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
             Drag a draft or scheduled post to another day to reschedule it.
           </p>
           <div className="mt-4">
@@ -108,17 +112,16 @@ export function CalendarBulk() {
             ))}
           </ol>
           <p className="mt-4 text-sm text-muted-foreground">
-            Up to 10 videos per batch. The Free plan does not include bulk —
-            scheduling one post at a time is unlimited within its monthly
-            quota.
+            Bulk scheduling is available on Growth and Scale. Free keeps the
+            same calendar workflow for individual posts.
           </p>
           <Button
             variant="outline"
             nativeButton={false}
-            render={<Link href="/signup?plan=growth" />}
+            render={<Link href="#pricing" />}
             className="mt-4"
           >
-            Compare Growth and Scale
+            Compare plans
           </Button>
         </div>
       </div>

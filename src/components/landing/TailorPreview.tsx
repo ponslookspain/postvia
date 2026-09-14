@@ -6,26 +6,26 @@ const versions = [
   {
     platform: "THREADS",
     label: "Threads",
-    text: "Morning launch is live on Threads — the full story, up to 500 characters.",
-    note: "500 characters · 1 image or video",
+    text: "Keep the full story where longer text fits.",
+    note: "Up to 500 characters · 1 image or video",
   },
   {
     platform: "X",
     label: "X",
-    text: "Morning launch is live.",
-    note: "280 characters · up to 4 photos, 1 GIF, or 1 video · publishes immediately",
+    text: "Keep it concise and ready for immediate publishing.",
+    note: "Up to 280 characters · up to 4 photos, 1 GIF, or 1 video · publishes immediately",
   },
   {
     platform: "TIKTOK",
     label: "TikTok",
-    text: "Launch day vlog",
-    note: "Title up to 2200 (photo flow 90) · privacy, comments, duet, stitch, cover",
+    text: "Turn the same idea into a video or photo post.",
+    note: "Title and publishing settings supported",
   },
   {
     platform: "INSTAGRAM",
     label: "Instagram",
-    text: "Morning launch is live on Instagram.",
-    note: "Caption up to 2200 · 1 JPEG photo or 1 MP4 reel · no text-only posts",
+    text: "Publish the visual version with its caption.",
+    note: "Caption up to 2,200 characters · photo or Reel required",
   },
 ] as const;
 
@@ -42,17 +42,17 @@ export function TailorPreview() {
             id="preview-heading"
             className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
           >
-            One caption, four native-feeling posts.
+            One idea. A better fit for every network.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-            Global composition with per-account overrides and live previews —
-            so nothing gets truncated or rejected after you hit schedule.
+            Start with a shared message, then adjust each account for its
+            format, limits, and audience before anything goes live.
           </p>
         </div>
         <div className="mt-10 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <Card>
             <CardHeader>
-              <CardTitle>Global caption</CardTitle>
+              <CardTitle>Start with one caption</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-xl leading-relaxed md:text-2xl">
@@ -60,9 +60,12 @@ export function TailorPreview() {
                 everything that changed and why it matters for your week.
               </p>
               <p className="mt-3 text-sm text-muted-foreground">
-                Attach up to 4 files: JPG, PNG, WebP, or GIF images up to
-                10&nbsp;MB each, MP4, WebM, or MOV video up to 100&nbsp;MB.
-                Each network enforces its own media rules before publishing.
+                Postvia checks each connected network against its own
+                publishing rules before you schedule or publish.
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Add images or video once. Postvia applies each network&apos;s
+                media rules before publishing.
               </p>
             </CardContent>
           </Card>

@@ -8,44 +8,44 @@ import { Button } from "@/components/ui/button";
 
 const faqs = [
   {
-    question: "Which platforms are supported?",
+    question: "Which platforms does Postvia support?",
     answer:
-      "Instagram, Threads, TikTok, and X. Connect any combination of them. Instagram publishes a single JPEG photo or MP4 reel with a caption; TikTok publishes video or up to 4 photos with titles and posting options.",
+      "Postvia supports Instagram, Threads, TikTok, and X. You can connect any combination of them, subject to your plan's account limit.",
   },
   {
     question: "Can I schedule posts?",
     answer:
-      "Yes — pick a date and time and the post goes out automatically. X publishes immediately; scheduling is available for Threads, TikTok, and Instagram.",
+      "Yes. Instagram, Threads, and TikTok can be scheduled for a future date and time. X publishes immediately.",
   },
   {
-    question: "Can I customize content per platform?",
+    question: "Can I customize a post for each platform?",
     answer:
-      "Yes. Every post starts from one global caption, and each connected account can carry its own version — including TikTok titles, descriptions, privacy level, comment, duet and stitch settings, and cover selection.",
+      "Yes. Start with one global caption, then customize individual accounts when needed. TikTok also supports its own title and publishing settings.",
   },
   {
-    question: "Can I connect multiple accounts?",
+    question: "How many accounts can I connect?",
     answer:
-      "Yes, up to your plan's total limit (Free: 1, Growth: 5, Scale: unlimited), including several handles on the same platform where supported. Each account reconnects or disconnects independently.",
+      "Free includes 1 connected account, Growth includes up to 5, and Scale is unlimited.",
   },
   {
     question: "How does bulk video scheduling work?",
     answer:
-      "Drop up to 10 videos, choose a start date, a timezone, and an interval. Each video becomes its own scheduled post on the calendar. Bulk is included in Growth and Scale; the Free plan schedules one post at a time.",
+      "Growth and Scale let you add up to 10 videos to a batch, choose the starting time and interval, review the schedule, and create the posts at once.",
   },
   {
     question: "What can I upload?",
     answer:
-      "MP4, WebM, and MOV video up to 100 MB, and JPG, PNG, WebP, or GIF images up to 10 MB, with per-file upload progress. Each network enforces its own media rules — for example, Threads accepts one image or MP4 video, and Instagram requires media on every post.",
+      "Postvia supports common image formats plus MP4, WebM, and MOV video, with per-file upload progress. Each network applies its own media requirements before publishing.",
   },
   {
-    question: "Is my social password stored?",
+    question: "Does Postvia store my social media password?",
     answer:
-      "No. Connections use official OAuth, so Postvia only ever holds access tokens — never your social passwords. Uploads live in a private store, and disconnecting removes access.",
+      "No. Social connections use OAuth. Postvia stores access tokens rather than your social passwords.",
   },
   {
-    question: "What happens when a scheduled post fails?",
+    question: "What happens if publishing fails?",
     answer:
-      "The post keeps its error message and every failed target can be retried individually from the post page. Partially published posts show exactly which networks succeeded, and retries never repost what already published.",
+      "Failed accounts keep their status and error information so you can retry them individually. If some accounts already published, those successful targets are left untouched.",
   },
 ];
 
@@ -145,11 +145,11 @@ export function FinalCta() {
           id="final-cta-heading"
           className="text-4xl font-semibold tracking-tight text-balance md:text-5xl"
         >
-          Publish everywhere from one calm workspace.
+          Publish with less busywork.
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
-          Free plan: 15 posts per month, 1 connected account, no credit card
-          required.
+          Create once, tailor where needed, schedule ahead, and keep every
+          publishing result visible.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button
@@ -168,6 +168,10 @@ export function FinalCta() {
             See pricing
           </Button>
         </div>
+        <p className="mt-4 text-sm text-muted-foreground">
+          15 posts/month on Free · 1 connected account · no credit card
+          required
+        </p>
       </div>
     </section>
   );
@@ -181,8 +185,7 @@ export function Footer() {
           <div>
             <p className="text-lg font-semibold tracking-tight">postvia</p>
             <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-              Write once. Tailor for every network. Know exactly what
-              published.
+              Create once. Tailor for every network. Know what published.
             </p>
           </div>
           <nav
@@ -209,7 +212,7 @@ export function Footer() {
           </nav>
         </div>
         <p className="mt-8 text-xs text-muted-foreground">
-          Postvia — one workspace for social publishing.
+          Postvia — social publishing without the tab-hopping.
         </p>
       </div>
     </footer>

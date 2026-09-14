@@ -27,20 +27,20 @@ const targets = [
 
 const guarantees = [
   {
-    title: "Individual retry",
-    text: "Failed targets retry on their own — published ones are never reposted.",
+    title: "Retry only what failed",
+    text: "Retry a failed account without reposting targets that already succeeded.",
   },
   {
-    title: "Partial-publish transparency",
-    text: "Partially published posts show exactly which networks succeeded.",
+    title: "See partial publishing clearly",
+    text: "Know exactly which accounts published and which still need attention.",
   },
   {
-    title: "No-double-post protection",
-    text: "Retries resume the same publish job instead of creating a duplicate.",
+    title: "Protect against duplicate posts",
+    text: "Publishing retries resume safely instead of blindly creating the same post twice.",
   },
   {
-    title: "Scheduling recovery",
-    text: "Interrupted scheduled posts are recovered automatically — never lost, never posted twice.",
+    title: "Recover interrupted schedules",
+    text: "Scheduled work can recover after interruptions without silently disappearing.",
   },
 ] as const;
 
@@ -57,17 +57,18 @@ export function Reliability() {
             id="reliability-heading"
             className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
           >
-            Know exactly what happened.
+            Know what published. Not just what you clicked.
           </h2>
           <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-            Every connected account reports its own status. Failures get a
-            retry — not a mystery.
+            Every account has its own status, so a partial failure stays
+            visible and recoverable instead of disappearing into the
+            background.
           </p>
         </div>
         <div className="mt-10 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <div className="rounded-xl border border-border bg-card p-4 md:p-6">
             <h3 className="text-base font-medium">
-              One post, four honest outcomes
+              One post. Every outcome visible.
             </h3>
             <ul className="mt-4 flex flex-col gap-2">
               {targets.map((target) => (
@@ -89,8 +90,8 @@ export function Reliability() {
               ))}
             </ul>
             <p className="mt-3 text-sm text-muted-foreground">
-              The X target failed here; Instagram and Threads are already
-              published and stay untouched while X retries.
+              If Instagram and Threads publish while X fails, you see that
+              exact state — and can retry only what failed.
             </p>
           </div>
           <ul className="flex flex-col gap-3">
