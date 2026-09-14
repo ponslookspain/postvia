@@ -22,6 +22,7 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `STRIPE_PRICE_GROWTH` / `STRIPE_PRICE_SCALE` | yes (billing) | per-env | Test prices required for test mode (src) | no |
 | `CRON_SECRET` | prod yes | prod | Cron Bearer auth; missing ⇒ always 401 (src) | **yes** |
 | `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src) | **yes** |
+| `BLOB_READ_WRITE_TOKEN` | yes (media) | local only | Blob credential for local uploads (src). Production gets its store binding from the platform; locally a missing token fails every upload ("No blob credentials found"). Create a Read-Write token in Vercel Dashboard → Storage (prefer a separate dev store) | **yes** |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | all | Error reporting; missing ⇒ console-only (src) | no |
 | `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |
 | `SENTRY_AUTH_TOKEN` | no | Vercel (Secret) | Sourcemap upload + release creation (org `postvia` / project `javascript-nextjs` are pinned in `next.config.ts`); missing ⇒ upload skipped, build stays green | **yes** |

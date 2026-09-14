@@ -92,6 +92,15 @@ X_CLIENT_ID= / X_CLIENT_SECRET=
 THREADS_APP_ID= / THREADS_APP_SECRET=
 TIKTOK_CLIENT_KEY= / TIKTOK_CLIENT_SECRET=
 INSTAGRAM_APP_ID= / INSTAGRAM_APP_SECRET=
+
+# Media storage (Vercel Blob). Production gets its store binding from the
+# platform; locally you MUST provide a read-write token, otherwise every
+# upload fails with "Failed to retrieve the presigned URL" (server log:
+# "No blob credentials found"). A short-lived VERCEL_OIDC_TOKEN alone is
+# NOT sufficient (it expires and carries no store binding).
+# Obtain: Vercel Dashboard → Storage → Blob store → create a Read-Write
+# token (prefer a separate dev store; never commit the value):
+BLOB_READ_WRITE_TOKEN=
 ```
 
 Notes:
@@ -177,8 +186,10 @@ npm run dev          # http://localhost:3000 (own terminal)
      in the TikTok portal (photo posts only).
    - Instagram `instagram_personal_account` → use a Business/Creator
      test account.
-   - Blob/media errors → local Blob access needs valid Vercel OIDC/blob
-     credentials; video upload failures surface per provider.
+    - Blob/media errors → local Blob access needs `BLOB_READ_WRITE_TOKEN`
+      in `.env.local` (see "Media storage" below). A short-lived
+      `VERCEL_OIDC_TOKEN` alone is NOT enough (it expires and carries no
+      store binding); video upload failures surface per provider.
 
 ## 5. Database discipline
 

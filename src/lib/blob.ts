@@ -23,6 +23,39 @@ export type BlobHead = {
   contentType: string;
 };
 
+export type BlobAuthStatus =
+  | { mode: "read-write-token" }
+  | { mode: "oidc" }
+  | { mode: "unconfigured"; missing: string[] };
+
+/**
+ * Pure credential preflight mirroring @vercel/blob's `resolveBlobAuth`
+ * (token option is never used by this codebase — every call relies on
+ * ambient env, exactly like production where Vercel injects the store
+ * binding). Returns presence flags only, never secret values.
+ *
+ * Why this exists: local development has no injected store binding, so a
+ * missing `BLOB_READ_WRITE_TOKEN` (and no OIDC `BLOB_STORE_ID`) fails
+ * every Blob call with "No blob credentials found" — surfacing in the
+ * browser as the opaque SDK error "Failed to retrieve the presigned URL".
+ * Callers use this to fail fast with an actionable message instead.
+ */
+export function describeBlobAuth(
+  env: Record<string, string | undefined> = process.env
+): BlobAuthStatus {
+  if (env.BLOB_READ_WRITE_TOKEN?.trim()) {
+    return { mode: "read-write-token" };
+  }
+  if (env.VERCEL_OIDC_TOKEN?.trim() && env.BLOB_STORE_ID?.trim()) {
+    return { mode: "oidc" };
+  }
+  const missing =
+    env.VERCEL_OIDC_TOKEN?.trim() && !env.BLOB_STORE_ID?.trim()
+      ? ["BLOB_STORE_ID"]
+      : ["BLOB_READ_WRITE_TOKEN"];
+  return { mode: "unconfigured", missing };
+}
+
 export type GetPresignRequest = {
   access: "private";
   operation: "get";
