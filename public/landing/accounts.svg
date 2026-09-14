@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img">
+  <title>Postvia connected accounts placeholder</title>
+  <rect width="1200" height="800" fill="#FFFFFF"/>
+  <rect x="48" y="48" width="1104" height="704" rx="16" fill="#FFFFFF" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="96" y="104" width="260" height="28" rx="6" fill="#1A1B1E"/>
+  <rect x="96" y="152" width="480" height="20" rx="6" fill="#E6E6E1"/>
+  <rect x="96" y="200" width="1008" height="96" rx="12" fill="#FFFFFF" stroke="#E6E6E1" stroke-width="2"/>
+  <circle cx="152" cy="248" r="24" fill="#F5F5F3" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="192" y="232" width="200" height="18" rx="6" fill="#1A1B1E" opacity="0.7"/>
+  <rect x="192" y="256" width="140" height="14" rx="6" fill="#1A1B1E" opacity="0.18"/>
+  <rect x="920" y="228" width="160" height="40" rx="20" fill="#F5F5F3" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="96" y="312" width="1008" height="96" rx="12" fill="#FFFFFF" stroke="#E6E6E1" stroke-width="2"/>
+  <circle cx="152" cy="360" r="24" fill="#F5F5F3" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="192" y="344" width="200" height="18" rx="6" fill="#1A1B1E" opacity="0.7"/>
+  <rect x="192" y="368" width="140" height="14" rx="6" fill="#1A1B1E" opacity="0.18"/>
+  <rect x="920" y="340" width="160" height="40" rx="20" fill="#F5F5F3" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="96" y="424" width="1008" height="96" rx="12" fill="#FFFFFF" stroke="#E6E6E1" stroke-width="2"/>
+  <circle cx="152" cy="472" r="24" fill="#F5F5F3" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="192" y="456" width="200" height="18" rx="6" fill="#1A1B1E" opacity="0.7"/>
+  <rect x="192" y="480" width="140" height="14" rx="6" fill="#1A1B1E" opacity="0.18"/>
+  <rect x="920" y="452" width="160" height="40" rx="20" fill="#F5F5F3" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="96" y="536" width="1008" height="96" rx="12" fill="#FFFFFF" stroke="#E6E6E1" stroke-width="2"/>
+  <circle cx="152" cy="584" r="24" fill="#F5F5F3" stroke="#E6E6E1" stroke-width="2"/>
+  <rect x="192" y="568" width="200" height="18" rx="6" fill="#1A1B1E" opacity="0.7"/>
+  <rect x="192" y="592" width="140" height="14" rx="6" fill="#1A1B1E" opacity="0.18"/>
+  <rect x="920" y="564" width="160" height="40" rx="20" fill="#2E3BEB"/>
+</svg>

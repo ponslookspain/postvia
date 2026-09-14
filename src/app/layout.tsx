@@ -19,8 +19,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Postvia",
+  metadataBase: new URL("https://postvia.online"),
+  title: {
+    default: "Postvia",
+    template: "%s — Postvia",
+  },
   description: "Create and publish content to social media",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    siteName: "Postvia",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary",
+  },
 };
 
 export default function RootLayout({

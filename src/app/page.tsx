@@ -1,24 +1,28 @@
 import type { Metadata } from "next";
-import { getSessionUser } from "@/lib/auth";
-import { Navbar } from "@/components/landing/Navbar";
+import { NavbarState } from "@/components/landing/NavbarState";
 import { Hero } from "@/components/landing/Hero";
-import { Benefits } from "@/components/landing/Benefits";
+import { Problem } from "@/components/landing/Problem";
 import { HowItWorks } from "@/components/landing/HowItWorks";
-import { Stories } from "@/components/landing/Stories";
-import { Comparison, Platforms, Pricing } from "@/components/landing/Sections";
+import { TailorPreview } from "@/components/landing/TailorPreview";
+import { CalendarBulk } from "@/components/landing/CalendarBulk";
+import { Reliability } from "@/components/landing/Reliability";
+import { Pricing } from "@/components/landing/Pricing";
 import { Faq, FinalCta, Footer } from "@/components/landing/Faq";
-
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Postvia — Publish everywhere. Stay in one place.",
   description:
-    "Write once, customize for every platform, and schedule your content from one workspace. Instagram, Threads, TikTok and X.",
+    "Write once, customize for every platform, and schedule your content from one workspace. Instagram, Threads, TikTok and X. Free plan with 15 posts per month, no credit card required.",
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     title: "Postvia — Publish everywhere. Stay in one place.",
     description:
-      "Write once, customize for every platform, and schedule your content from one workspace.",
+      "Write once, customize for every platform, and schedule your content from one workspace. Instagram, Threads, TikTok and X.",
+    url: "/",
     type: "website",
+    siteName: "Postvia",
   },
   twitter: {
     card: "summary",
@@ -28,21 +32,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function HomePage() {
-  // The root route always renders the public landing — including for
-  // signed-in visitors. /dashboard stays a separate route.
-  const user = await getSessionUser();
-
+export default function HomePage() {
+  // Static landing shell. Only NavbarState reads the session (inside a
+  // Suspense boundary); /dashboard stays a separate route.
   return (
     <div className="min-h-screen overflow-x-clip bg-background text-foreground antialiased">
-      <Navbar isLoggedIn={user !== null} />
+      <NavbarState />
       <main>
         <Hero />
-        <Benefits />
+        <Problem />
         <HowItWorks />
-        <Stories />
-        <Platforms />
-        <Comparison />
+        <TailorPreview />
+        <CalendarBulk />
+        <Reliability />
         <Pricing />
         <Faq />
         <FinalCta />
