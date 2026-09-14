@@ -9,6 +9,53 @@ posting, billing, [abuse protection](docs/abuse-protection.md), environment,
 deployment, [workflow](docs/workflow.md), security, development). The code
 is the source of truth; docs mirror it.
 
+## Local development
+
+### One-time setup
+
+```bash
+npm install
+# configure .env.local (DATABASE_URL_POSTGRES_PRISMA_URL, BETTER_AUTH_SECRET,
+# provider keys, RESEND_API_KEY, ABUSE_HASH_PEPPER, ADMIN_EMAILS) —
+# template: .env.example, details: docs/environment.md. Never commit secrets.
+npx prisma db push   # empty/dev databases only — never production
+```
+
+### Daily run
+
+First terminal:
+```bash
+npm run dev
+```
+
+Second terminal (only when social/OAuth testing is needed):
+```bash
+npm run dev:tunnel   # ngrok http 3000 — the ngrok agent must be running
+```
+
+- Local app: [http://localhost:3000](http://localhost:3000) — the app
+  always runs here.
+- Social/OAuth test URL:
+  [https://lavish-passion-dipped.ngrok-free.dev](https://lavish-passion-dipped.ngrok-free.dev)
+  — permanent development hostname proxied by ngrok to your localhost.
+  This is NOT Production.
+- Log in locally with email OTP / password, connect real X / Threads /
+  TikTok / Instagram accounts on `/accounts`, publish a test video.
+  Google OAuth is not part of this flow. Full guide:
+  [`docs/local-social-dev.md`](docs/local-social-dev.md).
+
+### Ship it
+
+```
+feature/fix/chore/staging → local testing → commit → push (no Preview)
+→ GitHub Pull Request → review → merge main
+→ automatic Vercel Production (postvia.online)
+```
+
+Vercel Preview is not part of daily development. Checks before commit:
+`npx prisma validate` → `npx prisma generate` → `npm run typecheck` →
+`npm run lint` → `npm test` → `npm run build`.
+
 ## Stack
 
 - **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
@@ -179,31 +226,6 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
-
-## Local development
-
-Two terminals. The app itself always runs locally — ngrok only proxies a
-public HTTPS hostname to it for OAuth callbacks and social testing.
-
-First terminal:
-```bash
-npm run dev
-```
-
-Second terminal (only when social/OAuth testing is needed):
-```bash
-npm run dev:tunnel   # ngrok http 3000 — needs the `ngrok` CLI + agent running
-```
-
-- Local app: [http://localhost:3000](http://localhost:3000)
-- Social/OAuth test URL:
-  [https://lavish-passion-dipped.ngrok-free.dev](https://lavish-passion-dipped.ngrok-free.dev)
-  (permanent development hostname → ngrok → `localhost:3000`; this is NOT
-  Production)
-- The development hostname is used for OAuth callbacks with real X /
-  Threads / TikTok / Instagram accounts. Google OAuth is not part of the
-  current social smoke flow. Full guide:
-  [`docs/local-social-dev.md`](docs/local-social-dev.md).
 
 ## Scripts
 
