@@ -59,7 +59,12 @@ targeted statements, never resets.
 
 ## Post-deploy smoke (no permanent test data)
 
-Homepage → login (Google) → admin surfaces → DB connectivity (dashboard
-loads usage) → `POST /api/posts` draft → OAuth initiation URL per
-provider → billing page → delete any probe data. Health endpoint: none
-exists — smoke via the surfaces above.
+`GET /api/health` (200 + `{ok:true,db:"ok"}`) → Homepage → login
+(Google) → admin surfaces → DB connectivity (dashboard loads usage) →
+`POST /api/posts` draft → OAuth initiation URL per provider → billing
+page → delete any probe data.
+
+Cron note (paid-plan requirement): the Hobby plan allows a single daily
+cron (`0 3 * * *`), so scheduled posts can publish up to ~24h after the
+selected time. Sub-daily scheduling needs a paid Vercel plan — no code
+workaround is attempted. The composer and Terms state this honestly.

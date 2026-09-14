@@ -141,7 +141,6 @@ export default function AccountsContent({
   tiktokAccounts: initialTiktokAccounts,
   instagramAccounts: initialInstagramAccounts,
   accountsLimit,
-  totalAccounts: initialTotalAccounts,
 }: {
   xAccounts: PlatformAccount[];
   threadsAccounts: PlatformAccount[];
@@ -149,8 +148,6 @@ export default function AccountsContent({
   instagramAccounts: PlatformAccount[];
   /** Max connected social accounts in total on the current plan (null = unlimited). */
   accountsLimit: number | null;
-  /** Connected accounts in total across all platforms (server-rendered). */
-  totalAccounts: number;
 }) {
   const searchParams = useSearchParams();
   const [multiAccounts, setMultiAccounts] = useState<
@@ -179,22 +176,42 @@ export default function AccountsContent({
   }
 
   async function handleConnect(config: PlatformConfig) {
+    if (connecting) return;
     setConnecting(config.platform);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
     try {
-      const res = await fetch(config.connectEndpoint);
-      const data = await res.json();
-      if (data.url) {
-        window.location.assign(data.url);
-      } else {
-        setMessage({
-          text: data.error || "Failed to initiate connection",
-          error: true,
-        });
-        setConnecting(null);
+      const res = await fetch(config.connectEndpoint, {
+        signal: controller.signal,
+      });
+      const data = (await res.json().catch(() => null)) as {
+        url?: unknown;
+        error?: unknown;
+      } | null;
+      const url = typeof data?.url === "string" ? data.url : null;
+      if (res.ok && url) {
+        window.location.assign(url);
+        return;
       }
-    } catch {
-      setMessage({ text: "Failed to connect. Please try again.", error: true });
+      setMessage({
+        text:
+          typeof data?.error === "string"
+            ? data.error
+            : "Failed to initiate connection",
+        error: true,
+      });
       setConnecting(null);
+    } catch (error) {
+      setMessage({
+        text:
+          error instanceof DOMException && error.name === "AbortError"
+            ? "Connection timed out. Please try again."
+            : "Failed to connect. Please try again.",
+        error: true,
+      });
+      setConnecting(null);
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -235,11 +252,10 @@ export default function AccountsContent({
   }
 
   function totalLabel(): string {
-    const liveTotal = Object.values(multiAccounts).reduce(
+    const total = Object.values(multiAccounts).reduce(
       (sum, list) => sum + list.length,
       0
     );
-    const total = Math.max(initialTotalAccounts, liveTotal);
     return accountsLimit === null
       ? `${total} connected accounts (unlimited)`
       : `${total} of ${accountsLimit} connected accounts`;

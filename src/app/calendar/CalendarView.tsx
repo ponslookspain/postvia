@@ -227,6 +227,7 @@ export function CalendarView({
   async function dropOnDay(dayKey: string, event: React.DragEvent) {
     event.preventDefault();
     setDropKey(null);
+    if (droppingId) return;
     const postId =
       dragId.current ?? event.dataTransfer.getData("text/plain") ?? "";
     dragId.current = null;

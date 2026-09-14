@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import { validateMediaInput } from "@/lib/media";
+import { waitForMediaRegistration } from "@/lib/media-registration";
 import {
   BULK_INTERVAL_PRESETS,
   BULK_MAX_VIDEOS,
@@ -88,10 +89,6 @@ type BulkItem = {
   scheduledIso?: string;
 };
 
-// Upload/status polling windows mirror the manual composer (same pipeline).
-const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
-const MEDIA_REGISTER_POLL_MS = 500;
-
 let itemKeyCounter = 0;
 
 function nextItemKey(): string {
@@ -138,26 +135,6 @@ function formatInZone(iso: string, timeZone: string): string {
   });
 }
 
-async function waitForMediaRegistration(
-  postId: string,
-  pathname: string
-): Promise<string | null> {
-  const deadline = Date.now() + MEDIA_REGISTER_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const res = await fetch(
-      `/api/media/status?postId=${encodeURIComponent(postId)}&pathname=${encodeURIComponent(pathname)}`
-    );
-    if (res.ok) {
-      const data = (await res.json().catch(() => null)) as {
-        exists?: boolean;
-      } | null;
-      if (data?.exists) return null;
-    }
-    await new Promise((r) => setTimeout(r, MEDIA_REGISTER_POLL_MS));
-  }
-  return "Upload did not finish registering in time. Please try again.";
-}
-
 export function BulkScheduler({
   accounts,
   billing,
@@ -185,6 +162,11 @@ export function BulkScheduler({
   const [intervalMinutes, setIntervalMinutes] = useState(1440);
   const [running, setRunning] = useState(false);
   const runningRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
   const [configError, setConfigError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
   const [pendingDupes, setPendingDupes] = useState<File[]>([]);
@@ -333,7 +315,8 @@ export function BulkScheduler({
   async function uploadOneVideo(
     postId: string,
     file: File,
-    onProgress: (percent: number) => void
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal
   ): Promise<string | null> {
     onProgress(0);
     const prepRes = await fetch("/api/media/prepare", {
@@ -367,7 +350,11 @@ export function BulkScheduler({
           onProgress(Math.min(100, Math.round(percentage))),
       });
       onProgress(100);
-      return await waitForMediaRegistration(postId, uploaded.pathname || pathname);
+      return await waitForMediaRegistration({
+        postId,
+        pathname: uploaded.pathname || pathname,
+        signal,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown upload error";
       return `Upload failed: ${message}`;
@@ -377,8 +364,13 @@ export function BulkScheduler({
   async function processItem(
     item: BulkItem,
     scheduledIso: string,
-    batchSize: number
+    batchSize: number,
+    signal?: AbortSignal
   ): Promise<boolean> {
+    if (signal?.aborted) {
+      patchItem(item.key, { status: "error", error: "Batch cancelled." });
+      return false;
+    }
     // 1. Draft first: an aborted batch leaves harmless drafts, never
     //    half-broken scheduled posts.
     patchItem(item.key, { status: "creating", error: undefined });
@@ -414,8 +406,11 @@ export function BulkScheduler({
 
     // 2. Upload the video through the standard secure pipeline.
     patchItem(item.key, { status: "uploading", progress: 0 });
-    const uploadError = await uploadOneVideo(postId, item.file, (percent) =>
-      patchItem(item.key, { progress: percent })
+    const uploadError = await uploadOneVideo(
+      postId,
+      item.file,
+      (percent) => patchItem(item.key, { progress: percent }),
+      signal
     );
     if (uploadError) {
       // No half-broken scheduled post: remove the draft (and its blob).
@@ -489,24 +484,28 @@ export function BulkScheduler({
       intervalMinutes,
       items.length
     );
+    const controller = new AbortController();
+    abortRef.current = controller;
     setRunning(true);
     runningRef.current = true;
     setFinished(false);
     let succeeded = 0;
     try {
       for (const item of queue) {
+        if (controller.signal.aborted) break;
         const index = items.findIndex((entry) => entry.key === item.key);
         const iso = isos[index];
         if (!iso) {
           patchItem(item.key, { status: "error", error: "Could not compute schedule." });
           continue;
         }
-        if (await processItem(item, iso, queue.length)) succeeded++;
+        if (await processItem(item, iso, queue.length, controller.signal)) succeeded++;
       }
     } finally {
       runningRef.current = false;
       setRunning(false);
       setFinished(true);
+      abortRef.current = null;
     }
     if (succeeded === queue.length && queue.length > 0) {
       const firstIso = isos[items.findIndex((entry) => entry.key === queue[0].key)];
@@ -1207,6 +1206,16 @@ export function BulkScheduler({
                   value={Math.round(((doneCount + errorCount) / items.length) * 100)}
                   aria-label="Batch progress"
                 />
+              )}
+              {running && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => abortRef.current?.abort()}
+                  className="min-h-11 w-full"
+                >
+                  Cancel batch
+                </Button>
               )}
               {finished && !allDone && (
                 <Alert variant="destructive">

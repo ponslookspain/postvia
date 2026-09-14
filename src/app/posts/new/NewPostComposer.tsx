@@ -30,6 +30,7 @@ import {
   type PollProgress,
   type SettledPost,
 } from "@/lib/publish-poll";
+import { waitForMediaRegistration } from "@/lib/media-registration";
 import {
   canSubmitComposer,
   continueEditingFromSaved,
@@ -104,29 +105,6 @@ type PrepareResponse = {
   pathname: string;
 };
 
-const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
-const MEDIA_REGISTER_POLL_MS = 500;
-
-async function waitForMediaRegistration(
-  postId: string,
-  pathname: string
-): Promise<string | null> {
-  const deadline = Date.now() + MEDIA_REGISTER_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const res = await fetch(
-      `/api/media/status?postId=${encodeURIComponent(postId)}&pathname=${encodeURIComponent(pathname)}`
-    );
-    if (res.ok) {
-      const data = (await res.json().catch(() => null)) as {
-        exists?: boolean;
-      } | null;
-      if (data?.exists) return null;
-    }
-    await new Promise((r) => setTimeout(r, MEDIA_REGISTER_POLL_MS));
-  }
-  return "Upload did not finish registering in time. Please try again.";
-}
-
 function uploadFileToPost(
   postId: string,
   file: File,
@@ -190,7 +168,9 @@ function uploadFileToPost(
 
         // Step 3: the server registers the Media row from the verified
         // blob.upload-completed webhook; wait for it before publishing.
-        resolve(await waitForMediaRegistration(postId, storedPathname));
+        resolve(
+          await waitForMediaRegistration({ postId, pathname: storedPathname })
+        );
       } catch {
         resolve("Network error. Please try again.");
       }

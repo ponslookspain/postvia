@@ -61,6 +61,8 @@ export function ScheduleCard({
           <CardTitle>Schedule</CardTitle>
           <CardDescription>
             One time for every selected platform. Times use {timeZone}.
+            Scheduled posts publish on the next daily run and may arrive
+            later the same day.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

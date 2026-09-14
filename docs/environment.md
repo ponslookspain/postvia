@@ -27,12 +27,18 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | no | CI | Sourcemap upload | **yes** |
 | `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src) | no |
 | `OTP_E2E_DEBUG` / `OTP_DEBUG_TOKEN` | no | local test only | Plaintext-OTP + gated code reader for local automated E2E (`src/lib/auth.ts`, `/api/auth/otp/debug`). Never set outside local testing; production/preview always hash | **yes** |
-| `THREADS_POLL_DELAY_MS` (+ `MAX_ATTEMPTS`, `TIMEOUT_MS`, `VIDEO_*`) | no | all | Threads publish polling tuning (src) | no |
+| `THREADS_POLL_DELAY_MS` / `THREADS_MAX_ATTEMPTS` / `THREADS_TIMEOUT_MS` | no | all | Threads publish polling tuning (src) | no |
+| `THREADS_VIDEO_POLL_DELAY_MS` / `THREADS_VIDEO_MAX_ATTEMPTS` / `THREADS_VIDEO_TIMEOUT_MS` | no | all | Threads video publish polling tuning (src) | no |
+| `ALLOW_TEST_CLEANUP` | no | local test only | Gate for `scripts/cleanup-test-users.ts` | no |
+| `PG_INTEGRATION` | no | local test only | `1` enables `npm run test:pg` against an isolated DB (never production) | no |
+| `E2E_BASE` | no | local test only | Base URL for `scripts/e2e-otp-check.ts` | no |
+| `BLOB_STORE_ID` | no | local scripts | Vercel Blob store used by `scripts/reset-data.ts` | **yes** |
 
 Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
 `VERCEL_PROJECT_PRODUCTION_URL`. `NODE_ENV` switches dev/prod defaults.
 `NEXT_RUNTIME` is branched in Blob code. Local-only: `DATABASE_URL`
 (example), `CRON_SECRET` dev value, `VERCEL_OIDC_TOKEN` (CLI auth).
+Template with safe placeholders: [`.env.example`](../.env.example).
 
 Adding/changing a Vercel Environment Variable normally needs a new
 deployment (or Redeploy) before it applies. Full Local → Preview →

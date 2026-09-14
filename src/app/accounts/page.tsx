@@ -64,12 +64,6 @@ export default async function AccountsPage() {
       getEffectivePlan({ userId: user.id, userEmail: user.email }),
     ]);
 
-  const totalAccounts =
-    xAccounts.length +
-    threadsAccounts.length +
-    tiktokAccounts.length +
-    instagramAccounts.length;
-
   const serialize = (account: (typeof threadsAccounts)[number]) => ({
     ...account,
     createdAt: account.createdAt.toISOString(),
@@ -91,7 +85,6 @@ export default async function AccountsPage() {
       >
         <AccountsContent
           accountsLimit={effective.entitlements.maxTotalAccounts}
-          totalAccounts={totalAccounts}
           xAccounts={xAccounts.map((account) => ({
             ...account,
             createdAt: account.createdAt.toISOString(),
