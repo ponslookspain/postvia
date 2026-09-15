@@ -1,11 +1,12 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   isCronAuthorized,
   recoverStalePublishing,
   runScheduledPublishTick,
   STALE_PUBLISHING_MS,
+  withCron,
   type SchedulingDb,
   type StoredPost,
 } from "../src/lib/scheduling";
@@ -192,6 +193,37 @@ describe("cron route authorization (GET and POST)", () => {
       assert.equal(res.status, 401);
     });
   }
+});
+
+describe("withCron shared wrapper (E5)", () => {
+  const authed = () => cronRequest("GET", "Bearer test-cron-secret-123");
+
+  test("GET and POST share one authorized handler", async () => {
+    const handlers = withCron(async () => NextResponse.json({ ok: true }));
+    assert.equal((await handlers.GET(authed())).status, 200);
+    assert.equal((await handlers.POST(authed())).status, 200);
+  });
+
+  test("unauthorized requests never reach the handler", async () => {
+    let called = 0;
+    const handlers = withCron(async () => {
+      called++;
+      return NextResponse.json({ ok: true });
+    });
+    const res = await handlers.GET(cronRequest("GET"));
+    assert.equal(res.status, 401);
+    assert.equal(called, 0);
+  });
+
+  test("handler throws become a generic 500 without internals", async () => {
+    const handlers = withCron(async () => {
+      throw new Error("postgres://secret-internal-detail");
+    });
+    const res = await handlers.POST(authed());
+    assert.equal(res.status, 500);
+    const body = (await res.json()) as { error?: unknown };
+    assert.equal(body.error, "Cron run failed");
+  });
 });
 
 describe("runScheduledPublishTick (due-post processing)", () => {
