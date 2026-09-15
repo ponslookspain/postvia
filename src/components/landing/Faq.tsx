@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDownIcon } from "lucide-react";
+import { ArrowRightIcon, ChevronDownIcon } from "lucide-react";
 import { cn } from "cn";
 import { Button } from "@/components/ui/button";
+import { Reveal } from "@/components/landing/Reveal";
 
 const faqs = [
   {
@@ -109,12 +110,15 @@ export function Faq() {
       className="scroll-mt-20 border-t border-border"
     >
       <div className="mx-auto w-full max-w-3xl px-4 py-14 md:px-8 md:py-20">
-        <h2
-          id="faq-heading"
-          className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
-        >
-          Questions, answered.
-        </h2>
+        <Reveal>
+          <p className="text-sm font-medium text-muted-foreground">FAQ</p>
+          <h2
+            id="faq-heading"
+            className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance md:text-4xl"
+          >
+            Questions, answered.
+          </h2>
+        </Reveal>
         <div className="mt-8">
           {faqs.map((faq, index) => (
             <FaqItem
@@ -138,12 +142,15 @@ export function FinalCta() {
   return (
     <section
       aria-labelledby="final-cta-heading"
-      className="border-t border-border"
+      className="border-t border-border bg-muted/30"
     >
-      <div className="mx-auto w-full max-w-3xl px-4 py-16 text-center md:px-8 md:py-24">
+      <Reveal className="mx-auto w-full max-w-3xl px-4 py-16 text-center md:px-8 md:py-24">
+        <p className="text-sm font-medium text-muted-foreground">
+          Free plan · No credit card
+        </p>
         <h2
           id="final-cta-heading"
-          className="text-4xl font-semibold tracking-tight text-balance md:text-5xl"
+          className="mt-3 font-heading text-4xl font-semibold tracking-tight text-balance md:text-5xl"
         >
           Publish with less busywork.
         </h2>
@@ -158,6 +165,7 @@ export function FinalCta() {
             render={<Link href="/signup" />}
           >
             Get started free
+            <ArrowRightIcon data-icon="inline-end" />
           </Button>
           <Button
             size="lg"
@@ -172,7 +180,7 @@ export function FinalCta() {
           15 posts/month on Free · 1 connected account · no credit card
           required
         </p>
-      </div>
+      </Reveal>
     </section>
   );
 }
@@ -183,7 +191,7 @@ export function Footer() {
       <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8">
         <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-lg font-semibold tracking-tight">postvia</p>
+            <p className="font-heading text-lg font-semibold tracking-tight">postvia</p>
             <p className="mt-2 max-w-xs text-sm text-muted-foreground">
               Create once. Tailor for every network. Know what published.
             </p>

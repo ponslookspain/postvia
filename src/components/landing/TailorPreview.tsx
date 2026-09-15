@@ -1,6 +1,7 @@
-import { PlatformIcon } from "@/components/PlatformIcon";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { PlatformIcon } from "@/components/PlatformIcon";
+import { Reveal } from "@/components/landing/Reveal";
 
 const versions = [
   {
@@ -12,35 +13,43 @@ const versions = [
   {
     platform: "X",
     label: "X",
-    text: "Keep it concise and ready for immediate publishing.",
-    note: "Up to 280 characters · up to 4 photos, 1 GIF, or 1 video · publishes immediately",
+    text: "Trimmed and ready for immediate publishing.",
+    note: "Up to 280 characters · up to 4 photos, 1 GIF, or 1 video",
   },
   {
     platform: "TIKTOK",
     label: "TikTok",
-    text: "Turn the same idea into a video or photo post.",
+    text: "The same idea as a video or photo post.",
     note: "Title and publishing settings supported",
   },
   {
     platform: "INSTAGRAM",
     label: "Instagram",
-    text: "Publish the visual version with its caption.",
+    text: "The visual version with its caption.",
     note: "Caption up to 2,200 characters · photo or Reel required",
   },
 ] as const;
 
+/**
+ * CREATE chapter of the product story: one caption, per-network
+ * adaptations. Editorial split — long-form source on the left,
+ * adapted versions as a quiet delivery list on the right.
+ */
 export function TailorPreview() {
   return (
     <section
-      id="preview"
+      id="product"
       aria-labelledby="preview-heading"
-      className="border-y border-border bg-muted/30"
+      className="scroll-mt-20 border-y border-border bg-muted/30"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-8 md:py-20">
-        <div className="max-w-2xl">
+      <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-8 md:py-24">
+        <Reveal className="max-w-2xl">
+          <p className="text-sm font-medium text-muted-foreground">
+            In detail · Create
+          </p>
           <h2
             id="preview-heading"
-            className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
+            className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance md:text-4xl"
           >
             One idea. A better fit for every network.
           </h2>
@@ -48,41 +57,39 @@ export function TailorPreview() {
             Start with a shared message, then adjust each account for its
             format, limits, and audience before anything goes live.
           </p>
-        </div>
-        <div className="mt-10 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Start with one caption</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xl leading-relaxed md:text-2xl">
-                Morning launch is live — our biggest update yet. Here is
-                everything that changed and why it matters for your week.
-              </p>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Postvia checks each connected network against its own
-                publishing rules before you schedule or publish.
-              </p>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Add images or video once. Postvia applies each network&apos;s
-                media rules before publishing.
-              </p>
-            </CardContent>
-          </Card>
-          <ul className="flex flex-col gap-2.5">
+        </Reveal>
+        <div className="mt-10 grid items-start gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] lg:gap-6">
+          <Reveal>
+            <Card>
+              <CardContent className="p-6 md:p-8">
+                <Badge variant="secondary">Shared caption</Badge>
+                <p className="mt-4 font-heading text-xl leading-relaxed text-pretty md:text-2xl">
+                  “Morning launch is live — our biggest update yet. Here is
+                  everything that changed and why it matters for your week.”
+                </p>
+                <p className="mt-4 border-t border-border pt-4 text-sm leading-relaxed text-muted-foreground">
+                  Postvia checks each connected network against its own
+                  publishing rules before you schedule or publish. Add images
+                  or video once; each network&apos;s media rules apply
+                  automatically.
+                </p>
+              </CardContent>
+            </Card>
+          </Reveal>
+          <Reveal as="ul" delay={150} className="flex flex-col gap-2.5">
             {versions.map((version) => (
               <li
                 key={version.platform}
-                className="rounded-xl border border-border bg-card p-3.5"
+                className="rounded-xl border border-border bg-card p-3.5 transition-colors duration-200 hover:border-foreground/20 motion-reduce:transition-none"
               >
                 <span className="flex items-center gap-2">
                   <PlatformIcon platform={version.platform} />
                   <span className="text-sm font-medium">{version.label}</span>
                   <Badge variant="secondary" className="ml-auto">
-                    Preview
+                    Adapted
                   </Badge>
                 </span>
-                <span className="mt-1.5 block truncate text-sm text-muted-foreground">
+                <span className="mt-1.5 block text-sm text-muted-foreground">
                   {version.text}
                 </span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -90,7 +97,7 @@ export function TailorPreview() {
                 </span>
               </li>
             ))}
-          </ul>
+          </Reveal>
         </div>
       </div>
     </section>

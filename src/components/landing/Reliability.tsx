@@ -1,29 +1,6 @@
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { StatusBadge } from "@/components/StatusBadge";
-import { Badge } from "@/components/ui/badge";
-
-const targets = [
-  {
-    platform: "INSTAGRAM",
-    user: "@studio",
-    status: "PUBLISHED",
-  },
-  {
-    platform: "THREADS",
-    user: "@studio",
-    status: "PUBLISHED",
-  },
-  {
-    platform: "TIKTOK",
-    user: "@studio.clips",
-    status: "PUBLISHING",
-  },
-  {
-    platform: "X",
-    user: "@studio",
-    status: "FAILED",
-  },
-] as const;
+import { PublishStatusCard } from "@/components/landing/ProductVisuals";
+import { Reveal } from "@/components/landing/Reveal";
 
 const guarantees = [
   {
@@ -44,18 +21,26 @@ const guarantees = [
   },
 ] as const;
 
+/**
+ * PUBLISH chapter: per-account outcomes. Editorial split with a sticky
+ * heading on desktop — the outcome list is the visual, guarantees read
+ * as hairline rows rather than another card grid.
+ */
 export function Reliability() {
   return (
     <section
       id="reliability"
       aria-labelledby="reliability-heading"
-      className="border-y border-border bg-muted/30"
+      className="scroll-mt-20 border-y border-border bg-muted/30"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-8 md:py-20">
-        <div className="max-w-2xl">
+      <div className="mx-auto grid w-full max-w-6xl items-start gap-10 px-4 py-16 md:px-8 md:py-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
+        <Reveal className="lg:sticky lg:top-24">
+          <p className="text-sm font-medium text-muted-foreground">
+            In detail · Publish
+          </p>
           <h2
             id="reliability-heading"
-            className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
+            className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance md:text-4xl"
           >
             Know what published. Not just what you clicked.
           </h2>
@@ -64,49 +49,41 @@ export function Reliability() {
             visible and recoverable instead of disappearing into the
             background.
           </p>
-        </div>
-        <div className="mt-10 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-          <div className="rounded-xl border border-border bg-card p-4 md:p-6">
-            <h3 className="text-base font-medium">
-              One post. Every outcome visible.
-            </h3>
-            <ul className="mt-4 flex flex-col gap-2">
-              {targets.map((target) => (
-                <li
-                  key={target.platform}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5"
-                >
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    <PlatformIcon platform={target.platform} />
-                    <span className="truncate text-sm">{target.user}</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    <StatusBadge status={target.status} />
-                    {target.status === "FAILED" && (
-                      <Badge variant="outline">Retry</Badge>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-sm text-muted-foreground">
-              If Instagram and Threads publish while X fails, you see that
-              exact state — and can retry only what failed.
-            </p>
+          <div
+            aria-hidden="true"
+            className="mt-6 hidden items-center gap-1.5 lg:flex"
+          >
+            {(["INSTAGRAM", "THREADS", "TIKTOK", "X"] as const).map((platform) => (
+              <span
+                key={platform}
+                className="flex size-9 items-center justify-center rounded-full border border-border bg-card"
+              >
+                <PlatformIcon platform={platform} />
+              </span>
+            ))}
+            <span className="ml-2 text-xs text-muted-foreground">
+              One post · four independent outcomes
+            </span>
           </div>
-          <ul className="flex flex-col gap-3">
+        </Reveal>
+
+        <div>
+          <Reveal>
+            <PublishStatusCard />
+          </Reveal>
+          <Reveal as="ul" delay={150} className="mt-2 border-b border-border">
             {guarantees.map((guarantee) => (
               <li
                 key={guarantee.title}
-                className="rounded-xl border border-border bg-card p-4"
+                className="grid gap-1 border-t border-border py-4 sm:grid-cols-[220px_minmax(0,1fr)] sm:gap-6"
               >
-                <h3 className="text-base font-medium">{guarantee.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                <h3 className="text-[15px] font-medium">{guarantee.title}</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   {guarantee.text}
                 </p>
               </li>
             ))}
-          </ul>
+          </Reveal>
         </div>
       </div>
     </section>

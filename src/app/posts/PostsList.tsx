@@ -135,6 +135,26 @@ function normalizeListItem(row: unknown): PostListItem | null {
   };
 }
 
+/**
+ * Pure merge for a successful post deletion in the current
+ * status-filtered view. Removes the row from the loaded items and
+ * decrements the total only when the row was present, so a repeated
+ * or stray callback can never drive the count negative or out of sync.
+ */
+export function applyPostDeleted(
+  current: PostListItem[],
+  totalCount: number,
+  id: string
+): { items: PostListItem[]; total: number } {
+  if (!current.some((post) => post.id === id)) {
+    return { items: current, total: totalCount };
+  }
+  return {
+    items: current.filter((post) => post.id !== id),
+    total: Math.max(0, totalCount - 1),
+  };
+}
+
 export function PostsList({
   posts: initialPosts,
   statusFilter,
@@ -152,8 +172,18 @@ export function PostsList({
   // Accumulated pages (keyed remount per statusFilter keeps this fresh).
   const [items, setItems] = useState<PostListItem[]>(initialPosts);
   const [cursor, setCursor] = useState<string | null>(initialNextCursor);
+  const [totalCount, setTotalCount] = useState(total);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Immediate removal after a successful DELETE: router.refresh()
+  // revalidates the server props, but this client state was seeded once
+  // from initialPosts and would otherwise stay stale until reload.
+  function handleDeleted(id: string) {
+    const next = applyPostDeleted(items, totalCount, id);
+    setItems(next.items);
+    setTotalCount(next.total);
+  }
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -423,15 +453,19 @@ export function PostsList({
                   })}
                 </span>
                 <span className="flex justify-end">
-                  <PostRowMenu id={post.id} status={post.status} />
+                  <PostRowMenu
+                    id={post.id}
+                    status={post.status}
+                    onDeleted={handleDeleted}
+                  />
                 </span>
               </li>
             ))}
           </ul>
-          {cursor || items.length < total ? (
+          {cursor || items.length < totalCount ? (
             <div className="flex flex-col items-center gap-2 py-6">
               <p className="text-sm text-muted-foreground tabular-nums">
-                Showing {items.length} of {total} posts
+                Showing {items.length} of {totalCount} posts
               </p>
               {cursor ? (
                 <>

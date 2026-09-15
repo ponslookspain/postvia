@@ -3,7 +3,12 @@
 import { useId, useRef, useState } from "react";
 import { cn } from "cn";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { ProductShot } from "@/components/landing/ProductShot";
+import {
+  AccountsVisual,
+  CalendarVisual,
+  ComposerVisual,
+} from "@/components/landing/ProductVisuals";
+import { Reveal } from "@/components/landing/Reveal";
 
 const steps = [
   {
@@ -11,9 +16,7 @@ const steps = [
     title: "Connect",
     heading: "Connect your social accounts",
     text: "Connect Instagram, Threads, TikTok, and X with official OAuth. Postvia never stores your social passwords.",
-    shot: "/landing/accounts.svg" as const,
-    shotAlt:
-      "Postvia accounts screen showing connected Instagram, Threads, TikTok, and X profiles",
+    layout: "split",
     bullets: [
       "Connect multiple accounts where your plan allows it.",
       "Reconnect accounts when access needs attention.",
@@ -25,9 +28,7 @@ const steps = [
     title: "Write",
     heading: "Create once. Tailor each network.",
     text: "Start with one caption, then customize individual accounts when the platform needs a different version.",
-    shot: "/landing/composer.svg" as const,
-    shotAlt:
-      "Postvia composer showing a global caption with per-platform versions and character counts",
+    layout: "split-reverse",
     bullets: [
       "See platform-specific previews before publishing.",
       "Keep character limits visible while you write.",
@@ -36,12 +37,10 @@ const steps = [
   },
   {
     id: "schedule",
-    title: "Schedule / Publish",
+    title: "Schedule",
     heading: "Schedule or publish, then see the result.",
     text: "Schedule Instagram, Threads, and TikTok, or publish now. X publishes immediately. Every connected account reports its own status.",
-    shot: "/landing/calendar.svg" as const,
-    shotAlt:
-      "Postvia content calendar showing scheduled posts across a month grid",
+    layout: "wide",
     bullets: [
       "Plan upcoming posts on the visual calendar.",
       "Bulk schedule up to 10 videos on Growth and Scale.",
@@ -50,6 +49,54 @@ const steps = [
   },
 ] as const;
 
+function BulletList({ bullets }: { bullets: readonly string[] }) {
+  return (
+    <ul className="flex flex-col gap-2.5 border-t border-border pt-5">
+      {bullets.map((bullet) => (
+        <li
+          key={bullet}
+          className="flex items-start gap-2.5 text-sm text-muted-foreground"
+        >
+          <span
+            aria-hidden="true"
+            className="mt-[7px] size-1.5 shrink-0 rounded-full bg-signal"
+          />
+          {bullet}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function StepCopy({
+  heading,
+  text,
+  bullets,
+}: {
+  heading: string;
+  text: string;
+  bullets: readonly string[];
+}) {
+  return (
+    <div className="min-w-0">
+      <h3 className="font-heading text-xl font-semibold tracking-tight">
+        {heading}
+      </h3>
+      <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
+        {text}
+      </p>
+      <div className="mt-5">
+        <BulletList bullets={bullets} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Interactive product showcase: the three-step workflow as tabs with a
+ * connected step rail. Copy/visual composition varies per step —
+ * split, mirrored split, then a full-width calendar moment.
+ */
 export function HowItWorks() {
   const [active, setActive] = useState(0);
   const tablistRef = useRef<HTMLDivElement>(null);
@@ -81,30 +128,40 @@ export function HowItWorks() {
     <section
       id="how"
       aria-labelledby="how-heading"
-      className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-14 md:px-8 md:py-20"
+      className="mx-auto w-full max-w-6xl scroll-mt-20 px-4 py-16 md:px-8 md:py-24"
     >
-      <div className="max-w-2xl">
+      <Reveal className="max-w-2xl">
+        <p className="text-sm font-medium text-muted-foreground">
+          How it works
+        </p>
         <h2
           id="how-heading"
-          className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
+          className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance md:text-4xl"
         >
           From connected accounts to published posts.
         </h2>
-        <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
+        <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
           Three steps. One place to create, schedule, publish, and check the
           result.
         </p>
-      </div>
-      <div className="mt-10 grid items-start gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+      </Reveal>
+
+      <Reveal delay={150} className="mt-10">
+        {/* Connected step rail */}
         <div
           ref={tablistRef}
           role="tablist"
           aria-label="How Postvia works"
           onKeyDown={onKeyDown}
-          className="flex flex-row gap-2 lg:flex-col"
+          className="relative grid grid-cols-3 gap-2 sm:gap-3"
         >
+          <div
+            aria-hidden="true"
+            className="absolute top-5 right-8 left-8 hidden h-px bg-border sm:block"
+          />
           {steps.map((step, index) => {
             const isActive = index === active;
+            const isDone = index < active;
             return (
               <button
                 key={step.id}
@@ -116,34 +173,52 @@ export function HowItWorks() {
                 tabIndex={isActive ? 0 : -1}
                 onClick={() => setActive(index)}
                 className={cn(
-                  "flex-1 rounded-lg border p-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 lg:flex-none",
+                  "group relative min-w-0 rounded-xl border p-2.5 text-left outline-none transition-colors duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:p-4",
                   isActive
-                    ? "border-foreground/20 bg-background"
-                    : "border-transparent text-muted-foreground hover:bg-muted/60"
+                    ? "border-foreground/20 bg-card"
+                    : "border-transparent hover:bg-muted/60"
                 )}
               >
-                <span className="flex items-center gap-2.5">
+                <span className="flex items-center gap-2 sm:gap-2.5">
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium tabular-nums",
+                      "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-medium tabular-nums transition-colors duration-200 motion-reduce:transition-none",
                       isActive
                         ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
+                        : isDone
+                          ? "bg-success/15 text-success"
+                          : "bg-muted text-muted-foreground"
                     )}
                   >
                     {index + 1}
                   </span>
-                  <span className="text-sm font-medium">{step.title}</span>
+                  <span
+                    className={cn(
+                      "min-w-0 truncate text-[13px] font-medium sm:text-sm",
+                      !isActive && "text-muted-foreground group-hover:text-foreground"
+                    )}
+                  >
+                    {step.title}
+                  </span>
                 </span>
-                <span className="mt-1.5 hidden text-xs leading-relaxed text-muted-foreground lg:block">
+                <span className="mt-1.5 hidden text-xs leading-relaxed text-muted-foreground md:block">
                   {step.heading}
                 </span>
+                {isActive && (
+                  <span
+                    key={active}
+                    aria-hidden="true"
+                    className="absolute inset-x-3 bottom-1.5 hidden h-0.5 origin-left animate-[how-progress_.45s_ease_both] rounded-full bg-primary/40 motion-reduce:animate-none sm:block"
+                  />
+                )}
               </button>
             );
           })}
         </div>
-        <div>
+
+        {/* Active panel */}
+        <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
           {steps.map((step, index) => (
             <div
               key={step.id}
@@ -151,44 +226,56 @@ export function HowItWorks() {
               id={`${baseId}-panel-${step.id}`}
               aria-labelledby={`${baseId}-tab-${step.id}`}
               hidden={index !== active}
-              className="overflow-hidden rounded-xl border border-border bg-card"
             >
-              <div className="p-4 md:p-6">
-                <h3 className="text-base font-medium">{step.heading}</h3>
-                <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                  {step.text}
-                </p>
-                <ul className="mt-4 flex flex-col gap-2">
-                  {step.bullets.map((bullet) => (
-                    <li
-                      key={bullet}
-                      className="flex items-start gap-2 text-sm text-muted-foreground"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="mt-[7px] size-1.5 shrink-0 rounded-full bg-muted-foreground"
-                      />
-                      {bullet}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-5">
-                  <ProductShot src={step.shot} alt={step.shotAlt} />
+              {index === active && step.layout !== "wide" && (
+                <div
+                  key={step.id}
+                  className="grid animate-[post-in_.4s_ease_both] items-center gap-6 p-4 motion-reduce:animate-none sm:p-6 md:p-8 lg:grid-cols-2 lg:gap-10"
+                >
+                  <StepCopy
+                    heading={step.heading}
+                    text={step.text}
+                    bullets={step.bullets}
+                  />
+                  <div className={cn(step.layout === "split-reverse" && "lg:order-first")}>
+                    {step.id === "connect" ? <AccountsVisual /> : <ComposerVisual />}
+                  </div>
                 </div>
-              </div>
+              )}
+              {index === active && step.layout === "wide" && (
+                <div
+                  key={step.id}
+                  className="animate-[post-in_.4s_ease_both] p-4 motion-reduce:animate-none sm:p-6 md:p-8"
+                >
+                  <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-10">
+                    <div className="min-w-0">
+                      <h3 className="font-heading text-xl font-semibold tracking-tight">
+                        {step.heading}
+                      </h3>
+                      <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
+                        {step.text}
+                      </p>
+                    </div>
+                    <BulletList bullets={step.bullets} />
+                  </div>
+                  <div className="mt-6 md:mt-8">
+                    <CalendarVisual />
+                  </div>
+                </div>
+              )}
             </div>
           ))}
-          <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <PlatformIcon platform="INSTAGRAM" className="size-3.5" />
-              <PlatformIcon platform="THREADS" className="size-3.5" />
-              <PlatformIcon platform="TIKTOK" className="size-3.5" />
-              <PlatformIcon platform="X" className="size-3.5" />
-            </span>
-            Showing: {current.heading}
-          </p>
         </div>
-      </div>
+        <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1" aria-hidden="true">
+            <PlatformIcon platform="INSTAGRAM" className="size-3.5" />
+            <PlatformIcon platform="THREADS" className="size-3.5" />
+            <PlatformIcon platform="TIKTOK" className="size-3.5" />
+            <PlatformIcon platform="X" className="size-3.5" />
+          </span>
+          Showing: {current.heading}
+        </p>
+      </Reveal>
     </section>
   );
 }
