@@ -52,10 +52,7 @@ import {
   monitorInstagramContainer,
   publishInstagramMedia,
 } from "@/lib/social/instagram";
-import {
-  getPlatformCapabilities,
-  type PlatformCapabilities,
-} from "@/lib/platforms/capabilities";
+import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
 import {
   normalizeTiktokContent,
   resolveEffectiveTargetContent,
@@ -290,18 +287,6 @@ async function updateTargetFailure(
   });
 }
 
-async function resolveTargetMedia(
-  post: PublishPost,
-  target: PublishTarget,
-  caps: PlatformCapabilities
-): Promise<{ media?: PublishMedia; error?: string }> {
-  const mediaValidation = validateTargetMedia(caps, post.media);
-  if (!mediaValidation.ok) return { error: mediaValidation.error };
-  if (target.platform !== "THREADS") return {};
-  return chooseThreadsMedia(post.media, (pathname, ttlMs) =>
-    createSignedGetUrl({ pathname, ttlMs })
-  );
-}
 
 async function executeTargetPublish(
   post: PublishPost,
@@ -633,11 +618,14 @@ async function executeTiktokTarget(
     await updateTargetFailure(post.id, target.id, mediaValidation.error);
     return failedOutcome(target, mediaValidation.error);
   }
-  // TikTok Direct Post requires its own text: the global post text is
-  // never a fallback. Video publishes the title as its caption (2200);
-  // photo publishes title (90) + description (4000) with at least one
-  // present. The media policy decides the flow before text validation so
-  // each flow enforces its own contract.
+  // One common Content field: the global post text is the default
+  // TikTok caption/title (TikTok's title is API-optional); an explicit
+  // per-target override still wins. Video publishes the title as its
+  // caption (2200); photo publishes title (90) + description (4000).
+  // The remaining empty-text gates below are safety nets for posts with
+  // no text at all — unreachable through the composer, which requires
+  // text before submit. The media policy decides the flow before text
+  // validation so each flow enforces its own contract.
   const settings = tiktokSettingsFromRaw(effective.settings);
   const policy = resolveTiktokMediaPolicy(post.media, settings.photoCoverIndex);
   if (policy.kind === "error") {
@@ -645,12 +633,12 @@ async function executeTiktokTarget(
     return failedOutcome(target, policy.message);
   }
   const tiktokContent = normalizeTiktokContent(effective.content);
-  const title = tiktokContent.title.trim();
+  const title = tiktokContent.title.trim() || effective.text.trim();
   const description = tiktokContent.description.trim();
 
   if (policy.kind === "photo") {
     if (!title && !description) {
-      const error = "TikTok photo posts need a title or a description. Add one — the global post text is never used as a fallback.";
+      const error = "TikTok photo post has no text. Add post text, a custom title, or a description.";
       await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
       return failedOutcome(target, error);
     }
@@ -674,7 +662,7 @@ async function executeTiktokTarget(
   }
 
   if (!title) {
-    const error = "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback.";
+    const error = "TikTok video has no caption text. Add post text or a custom TikTok title.";
     await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
     return failedOutcome(target, error);
   }

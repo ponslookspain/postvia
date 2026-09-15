@@ -34,7 +34,7 @@ const videoMedia = [{ type: "VIDEO", mimeType: "video/mp4" }] as const;
 function photoModel(overrides: { accountId: string; text?: string; description?: string }[]) {
   return buildComposerPreviewModel({
     accounts: [TIKTOK_ACCOUNT],
-    globalText: "global never leaks",
+    globalText: "Shared post text",
     overrides,
     media: [...photoMedia],
   })[0]!;
@@ -208,12 +208,12 @@ describe("composer preview model for TikTok flows", () => {
     assert.equal(model.tiktokMode, "photo");
     assert.equal(model.maxLength, 90);
     assert.equal(model.descriptionMaxLength, 4000);
-    assert.equal(model.text, "");
+    assert.equal(model.text, "Shared post text");
     assert.equal(model.description, "");
-    assert.equal(model.validation.valid, false);
+    assert.equal(model.validation.valid, true);
     assert.deepEqual(
       model.validation.errors.map((issue) => issue.code),
-      ["tiktok-title-missing"]
+      []
     );
   });
 
@@ -258,7 +258,7 @@ describe("composer preview model for TikTok flows", () => {
   test("video media keeps the single 2200 caption flow", () => {
     const [model] = buildComposerPreviewModel({
       accounts: [TIKTOK_ACCOUNT],
-      globalText: "global never leaks",
+      globalText: "Shared post text",
       overrides: [{ accountId: "acc-tiktok", text: "caption" }],
       media: [...videoMedia],
     });
@@ -268,25 +268,24 @@ describe("composer preview model for TikTok flows", () => {
     assert.equal(model!.validation.valid, true);
   });
 
-  test("no media keeps the legacy single-title behavior", () => {
+  test("no media keeps the single-title behavior with global fallback", () => {
     const [model] = buildComposerPreviewModel({
       accounts: [TIKTOK_ACCOUNT],
-      globalText: "global never leaks",
+      globalText: "Shared post text",
       overrides: [],
     });
     assert.equal(model!.tiktokMode, "unknown");
     assert.equal(model!.maxLength, 2200);
-    assert.equal(model!.text, "");
-    // No media attached: the title error stays first, followed by the
-    // platform media requirement.
+    assert.equal(model!.text, "Shared post text");
+    // No media attached: only the platform media requirement remains.
     assert.deepEqual(
       model!.validation.errors.map((issue) => issue.code),
-      ["tiktok-title-missing", "media-required"]
+      ["media-required"]
     );
   });
 
-  test("global text never leaks into any TikTok flow", () => {
-    assert.equal(photoModel([]).text, "");
+  test("global text flows into every TikTok flow", () => {
+    assert.equal(photoModel([]).text, "Shared post text");
     assert.equal(photoModel([]).description, "");
   });
 });

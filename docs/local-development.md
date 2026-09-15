@@ -112,10 +112,10 @@ PUT → webhook → `Media` row appears (poll `/api/media/status`). Without
 
 Connect test accounts on `/accounts`, publish per platform. Current
 verified behavior: Threads video/text, Instagram photo/Reel, TikTok
-video (`FILE_UPLOAD`) and photo (`PULL_FROM_URL` bridge). TikTok photo
-needs its own title and/or description (global text is never a fallback;
-Publish stays disabled until set). X needs funded API credits — depleted
-credits surface top-up guidance, not reconnect guidance.
+video (`FILE_UPLOAD`) and photo (`PULL_FROM_URL` bridge). TikTok uses
+the global post text as its caption by default; a custom title or photo
+description is optional per target. X needs funded API credits —
+depleted credits surface top-up guidance, not reconnect guidance.
 
 ## 13. Stopping / restarting dev
 

@@ -14,11 +14,11 @@ function humanizePrivacy(value: unknown): string | null {
 /**
  * Stage 2B mock, Stage 2D fidelity pass: TikTok shape — a 9:16 card
  * constrained so it never overflows its container, video-first with a
- * bottom overlay carrying username, the effective title and the chosen
+ * bottom overlay carrying username, the effective caption and the chosen
  * privacy. Photo posts render the title and the description as separate
  * lines, mirroring the photo post_info contract; video posts render the
- * title as the caption. Never renders global text as title — the model
- * carries an empty title instead. Side action rail, no 1:1 imitation.
+ * title as the caption. The title defaults to the global post text
+ * (TikTok's title is optional). Side action rail, no 1:1 imitation.
  */
 export function TikTokPreview({
   model,
@@ -59,7 +59,7 @@ export function TikTokPreview({
               <p className="line-clamp-2 text-xs font-medium break-words text-white">
                 {model.text || (
                   <span className="font-normal text-white/70">
-                    Add a title via Customize
+                    Add post text above or a custom title
                   </span>
                 )}
               </p>
@@ -75,7 +75,7 @@ export function TikTokPreview({
             <p className="line-clamp-3 text-xs break-words text-white/90">
               {model.text || (
                 <span className="text-white/70">
-                  Add a title via Customize — TikTok posts its own title
+                  Add post text above — it becomes the TikTok caption
                 </span>
               )}
             </p>
