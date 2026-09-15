@@ -21,7 +21,8 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `STRIPE_WEBHOOK_SECRET` | yes (billing) | per-env | Webhook signature (src) | **yes** |
 | `STRIPE_PRICE_GROWTH` / `STRIPE_PRICE_SCALE` | yes (billing) | per-env | Test prices required for test mode (src) | no |
 | `CRON_SECRET` | prod yes | prod | Cron Bearer auth; missing ⇒ always 401 (src) | **yes** |
-| `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src) | **yes** |
+| `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src). The SDK refuses presigned URLs without it | **yes** |
+| `VERCEL_BLOB_CALLBACK_URL` | yes (media) | local only | Overrides the Blob upload-completed webhook target (src reads it via SDK). Set to the ngrok origin locally, otherwise no `Media` rows are created; on Vercel the platform origin applies automatically | no |
 | `BLOB_READ_WRITE_TOKEN` | yes (media) | local only | Blob credential for local uploads (src). Production gets its store binding from the platform; locally a missing token fails every upload ("No blob credentials found"). Create a Read-Write token in Vercel Dashboard → Storage (prefer a separate dev store) | **yes** |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | all | Error reporting; missing ⇒ console-only (src) | no |
 | `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |

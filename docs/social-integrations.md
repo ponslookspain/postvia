@@ -47,6 +47,19 @@ device cookie (`applyDeviceCookie`).
    (no codes, tokens, or raw provider messages in logs/URLs — TikTok and
    Instagram use fixed failure codes).
 
+## OAuth redirect origins (`src/lib/oauth-redirect.ts`)
+
+Callback redirects are absolute URLs rebuilt from validated proxy
+headers (`X-Forwarded-Host` → `Host`), never from `request.url` — Next.js
+derives `request.url` from the server listen address, which behind ngrok
+produced `https://localhost:3000/...`. The host must match the Better
+Auth allowlist (production, `*.vercel.app`, `localhost:3000`,
+`BETTER_AUTH_TRUSTED_ORIGINS` extras); anything else falls back to the
+request host, never off-app. (`NextResponse.redirect()` rejects relative
+URLs, so root-relative targets were not an option.) Local callbacks use
+the ngrok origin, production uses `postvia.online` — never
+`https://localhost`.
+
 ## Account management
 
 - `GET /api/accounts` — list. `DELETE /api/accounts/:provider?accountId=…`
@@ -61,13 +74,19 @@ device cookie (`applyDeviceCookie`).
 
 - X: Basic-auth token exchange/refresh, race-safe `ensureFreshXToken`;
   media via the v2 chunked upload (`media/upload/initialize` → `append`
-  4 MB segments → `finalize` → `STATUS` poll) attached as `media_ids` on
+  4 MB segments → `finalize` → STATUS poll) attached as `media_ids` on
   `POST /2/tweets` (up to 4 photos, 1 GIF, or 1 video; pay-per-use
-  billing applies per post). The official API offers no idempotency key,
+  billing applies per post — depleted credits reject publishes, see
+  error mapping). The official API offers no idempotency key,
   so ambiguous outcomes (timeout/throw past the tweet POST) resolve to
   `FAILED` with check-your-profile-first guidance, and crashed attempts
   leave an `x-req-*` marker for `resumeXTarget` (never an automatic
   second POST) — see Retry below.
+- X error mapping (`xErrorMessage`): billing/credits signals are
+  classified **before** auth errors — depleted credits surface top-up
+  guidance ("no need to reconnect"), while genuine 401/invalid-token
+  still surfaces the reconnect guidance. Do not claim X publishing is
+  fully verified while credits are depleted.
 - Threads: short→long-lived exchange, container → poll → publish
   (container id persisted immediately for resume). Single-media scope:
   text, one image, or one MP4 video — the official API also supports
@@ -94,7 +113,7 @@ device cookie (`applyDeviceCookie`).
 | --- | --- | --- | --- | --- | --- | --- |
 | Threads | ✅ | ✅ JPEG/PNG/WebP | ✅ (image) | ✅ MP4 only | 1 | No carousel in Postvia (API supports it) |
 | X | ✅ 280 | ✅ JPG/PNG/WebP ≤5 MB | ✅ single ≤15 MB | ✅ MP4/MOV | 4 photos / 1 GIF / 1 video | No mixing; duration enforced server-side by X |
-| TikTok | ❌ (own title) | ✅ JPEG/WebP ≤20 MB | ❌ | ✅ MP4/WebM/MOV | 4 (API allows 35) | No mixing; video: title ≤2200 required; photo: title ≤90 + description ≤4000, at least one required; never global-text fallback |
+| TikTok | ❌ (own title) | ✅ JPEG/WebP ≤20 MB | ❌ | ✅ MP4/WebM/MOV | 4 (API allows 35) | No mixing; video: title ≤2200 required; photo: title ≤90 + description ≤4000, at least one required; never global-text fallback; composer blocks Publish while the TikTok target has preview errors |
 | Instagram | ❌ (caption+media) | ✅ JPEG only | ❌ | ✅ MP4 Reel | 1 | No carousel/stories/alt_text in Postvia (API supports them) |
 
 ## Retry / duplicate protection (`externalJobId` semantics per platform)

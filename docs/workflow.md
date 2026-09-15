@@ -143,8 +143,9 @@ blindly over local files, and never print secret values.
 
 ## Database safety
 
-Preview/optional-remote and Production can share one Neon database, so any
-remote testing with real data needs care:
+Local development uses the dedicated Neon `development` branch; Production
+uses `main`. The two must never be mixed (see [`database.md`](database.md)
+topology), so any remote testing with real data needs care:
 
 - Test users are deleted only individually (`scripts/cleanup-test-users.ts`
   with explicit `--email`), never by mass cleanup without approval.

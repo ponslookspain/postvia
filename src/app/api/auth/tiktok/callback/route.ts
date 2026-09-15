@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { oauthRedirect } from "@/lib/oauth-redirect";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
@@ -46,6 +47,14 @@ function safeOAuthError(value: string | null): string {
   return "tiktok_callback_failed";
 }
 
+// All redirects below go through oauthRedirect(): Next.js builds
+// request.url from the server's listen address (localhost:3000 in dev),
+// so absolute redirects derived from it would bounce ngrok users to
+// https://localhost:3000. The helper rebuilds the origin from validated
+// proxy headers instead — correct on ngrok / localhost / postvia.online /
+// Preview. (NextResponse.redirect() rejects relative URLs, so a
+// root-relative Location is not an option.)
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -53,7 +62,7 @@ export async function GET(request: NextRequest) {
   const providerError = searchParams.get("error");
 
   const redirectWith = (path: string) => {
-    const redirect = NextResponse.redirect(new URL(path, request.url));
+    const redirect = oauthRedirect(request,path);
     redirect.cookies.delete("tiktok_oauth_state");
     return redirect;
   };
@@ -72,7 +81,7 @@ export async function GET(request: NextRequest) {
   // Every exit clears the single-use state cookie (same hygiene as the
   // Instagram callback): a stale state must never survive a failed attempt.
   const response = (path: string) => {
-    const redirect = NextResponse.redirect(new URL(path, request.url));
+    const redirect = oauthRedirect(request,path);
     redirect.cookies.delete("tiktok_oauth_state");
     return redirect;
   };

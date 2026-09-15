@@ -56,6 +56,33 @@ export function describeBlobAuth(
   return { mode: "unconfigured", missing };
 }
 
+export type MediaUploadConfigStatus =
+  | { ok: true }
+  | { ok: false; missing: string[] };
+
+/**
+ * Full preflight for the presigned browser-upload endpoint
+ * (`POST /api/media/upload` → `handleUploadPresigned`). Beyond Blob API
+ * credentials, the SDK also requires `webhookPublicKey` up front to verify
+ * the later `blob.upload-completed` callback — without it the SDK throws
+ * "Missing webhook public key" before any token is minted, and the browser
+ * only sees "Failed to retrieve the presigned URL". Names only, never
+ * values.
+ */
+export function describeMediaUploadConfig(
+  env: Record<string, string | undefined> = process.env
+): MediaUploadConfigStatus {
+  const missing: string[] = [];
+  if (!env.BLOB_WEBHOOK_PUBLIC_KEY?.trim()) {
+    missing.push("BLOB_WEBHOOK_PUBLIC_KEY");
+  }
+  const auth = describeBlobAuth(env);
+  if (auth.mode === "unconfigured") {
+    missing.push(...auth.missing);
+  }
+  return missing.length === 0 ? { ok: true } : { ok: false, missing };
+}
+
 export type GetPresignRequest = {
   access: "private";
   operation: "get";

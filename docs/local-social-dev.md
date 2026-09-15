@@ -101,6 +101,18 @@ INSTAGRAM_APP_ID= / INSTAGRAM_APP_SECRET=
 # Obtain: Vercel Dashboard → Storage → Blob store → create a Read-Write
 # token (prefer a separate dev store; never commit the value):
 BLOB_READ_WRITE_TOKEN=
+
+# Webhook verification key for the SAME dev store (the SDK requires it
+# before minting any presigned URL; missing key fails uploads with
+# "Failed to retrieve the presigned URL"). Obtain: Vercel Dashboard →
+# Storage → Blob store → webhook/signing public key of the dev store.
+# This verifies Vercel's callbacks — it is not a write credential:
+BLOB_WEBHOOK_PUBLIC_KEY=
+
+# Webhook callback target override (read by the Blob SDK). Without it the
+# SDK cannot determine a callback URL outside Vercel and Media rows are
+# never created — uploads appear to succeed but never register:
+VERCEL_BLOB_CALLBACK_URL=https://lavish-passion-dipped.ngrok-free.dev
 ```
 
 Notes:

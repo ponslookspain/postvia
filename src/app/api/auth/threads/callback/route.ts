@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { oauthRedirect } from "@/lib/oauth-redirect";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
@@ -11,6 +12,14 @@ import {
 } from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
 
+// All redirects below go through oauthRedirect(): Next.js builds
+// request.url from the server's listen address (localhost:3000 in dev),
+// so absolute redirects derived from it would bounce ngrok users to
+// https://localhost:3000. The helper rebuilds the origin from validated
+// proxy headers instead — correct on ngrok / localhost / postvia.online /
+// Preview. (NextResponse.redirect() rejects relative URLs, so a
+// root-relative Location is not an option.)
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
@@ -18,14 +27,14 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error");
 
   if (error) {
-    return NextResponse.redirect(
-      new URL(`/accounts?error=${encodeURIComponent(error)}`, request.url)
+    return oauthRedirect(request,
+      `/accounts?error=${encodeURIComponent(error)}`
     );
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(
-      new URL("/accounts?error=missing_parameters", request.url)
+    return oauthRedirect(request,
+      "/accounts?error=missing_parameters"
     );
   }
 
@@ -33,14 +42,14 @@ export async function GET(request: NextRequest) {
   const storedState = cookieStore.get("threads_oauth_state")?.value;
 
   if (!storedState) {
-    return NextResponse.redirect(
-      new URL("/accounts?error=invalid_session", request.url)
+    return oauthRedirect(request,
+      "/accounts?error=invalid_session"
     );
   }
 
   if (state.length !== storedState.length) {
-    return NextResponse.redirect(
-      new URL("/accounts?error=invalid_state", request.url)
+    return oauthRedirect(request,
+      "/accounts?error=invalid_state"
     );
   }
   let stateDiff = 0;
@@ -48,22 +57,22 @@ export async function GET(request: NextRequest) {
     stateDiff |= state.charCodeAt(i) ^ storedState.charCodeAt(i);
   }
   if (stateDiff !== 0) {
-    return NextResponse.redirect(
-      new URL("/accounts?error=invalid_state", request.url)
+    return oauthRedirect(request,
+      "/accounts?error=invalid_state"
     );
   }
 
   try {
     const user = await getApiUser();
     if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return oauthRedirect(request,"/login");
     }
 
     // Callback flood protection (initiation-only limits leave this path
     // open): per-IP + per-user buckets. Denied attempts redirect, never 500.
     if (!(await gateOAuthCallback({ request, userId: user.id }))) {
-      return NextResponse.redirect(
-        new URL("/accounts?error=too_many_requests", request.url)
+      return oauthRedirect(request,
+        "/accounts?error=too_many_requests"
       );
     }
 
@@ -113,8 +122,8 @@ export async function GET(request: NextRequest) {
           isPaidActivePlan(effectiveForAbuse.plan, effectiveForAbuse.status),
       });
       if (!abuseGate.ok) {
-        return NextResponse.redirect(
-          new URL(`/accounts?error=${abuseGate.errorParam}`, request.url)
+        return oauthRedirect(request,
+          `/accounts?error=${abuseGate.errorParam}`
         );
       }
       // New connections consume plan quota (race-safe: concurrent
@@ -129,22 +138,17 @@ export async function GET(request: NextRequest) {
       });
       if (!linked.ok) {
         if (linked.code === "account_in_use") {
-          return NextResponse.redirect(
-            new URL("/accounts?error=account_in_use", request.url)
+          return oauthRedirect(request,
+            "/accounts?error=account_in_use"
           );
         }
-        return NextResponse.redirect(
-          new URL(
-            `/accounts?error=account_limit_reached${linked.upgradeTo ? `&upgradeTo=${linked.upgradeTo}` : ""}`,
-            request.url
-          )
+        return oauthRedirect(request,
+          `/accounts?error=account_limit_reached${linked.upgradeTo ? `&upgradeTo=${linked.upgradeTo}` : ""}`
         );
       }
     }
 
-    const response = NextResponse.redirect(
-      new URL("/accounts?connected=true", request.url)
-    );
+    const response = oauthRedirect(request,"/accounts?connected=true");
     response.cookies.delete("threads_oauth_state");
     return response;
   } catch (err) {
@@ -156,11 +160,8 @@ export async function GET(request: NextRequest) {
     });
     const message =
       err instanceof Error ? err.message : "callback_failed";
-    return NextResponse.redirect(
-      new URL(
-        `/accounts?error=${encodeURIComponent(message)}`,
-        request.url
-      )
+    return oauthRedirect(request,
+      `/accounts?error=${encodeURIComponent(message)}`
     );
   }
 }

@@ -227,6 +227,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+Canonical local guide (env, ngrok, DB, Blob, OAuth, smoke tests):
+[`docs/local-development.md`](docs/local-development.md).
+
 ## Scripts
 
 ```bash

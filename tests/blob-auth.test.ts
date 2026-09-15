@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { describeBlobAuth } from "../src/lib/blob";
+import { describeBlobAuth, describeMediaUploadConfig } from "../src/lib/blob";
 
 /**
  * Regression test for the local upload failure behind the browser error
@@ -48,11 +48,45 @@ describe("describeBlobAuth", () => {
     });
   });
 
+  test("token with surrounding whitespace still counts (SDK trims)", () => {
+    assert.deepEqual(
+      describeBlobAuth({ BLOB_READ_WRITE_TOKEN: "  vercel_blob_rw_abc\n" }),
+      { mode: "read-write-token" }
+    );
+  });
+
   test("empty env is unconfigured and names the read-write token", () => {
     assert.deepEqual(describeBlobAuth({}), {
       mode: "unconfigured",
       missing: ["BLOB_READ_WRITE_TOKEN"],
     });
+  });
+
+  test("missing webhook key is reported even with a valid token", () => {
+    // Exact local incident: BLOB_READ_WRITE_TOKEN present, but
+    // BLOB_WEBHOOK_PUBLIC_KEY absent — the SDK throws "Missing webhook
+    // public key" before minting any token.
+    assert.deepEqual(
+      describeMediaUploadConfig({ BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_abc" }),
+      { ok: false, missing: ["BLOB_WEBHOOK_PUBLIC_KEY"] }
+    );
+  });
+
+  test("missing credentials are reported even with a webhook key", () => {
+    assert.deepEqual(
+      describeMediaUploadConfig({ BLOB_WEBHOOK_PUBLIC_KEY: "pk_test" }),
+      { ok: false, missing: ["BLOB_READ_WRITE_TOKEN"] }
+    );
+  });
+
+  test("fully configured env passes the preflight", () => {
+    assert.deepEqual(
+      describeMediaUploadConfig({
+        BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_abc",
+        BLOB_WEBHOOK_PUBLIC_KEY: "pk_test",
+      }),
+      { ok: true }
+    );
   });
 
   test("blank values count as missing, output never echoes secrets", () => {
