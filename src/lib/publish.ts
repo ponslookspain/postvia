@@ -31,6 +31,8 @@ import {
   tiktokErrorMessage,
   tiktokFailReasonMessage,
   TIKTOK_CAPTION_MAX_LENGTH,
+  TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH,
+  TIKTOK_PHOTO_TITLE_MAX_LENGTH,
   TIKTOK_STATUS_COMPLETE,
   TIKTOK_STATUS_FAILED,
   type TiktokPublishSettings,
@@ -49,6 +51,7 @@ import {
   type PlatformCapabilities,
 } from "@/lib/platforms/capabilities";
 import {
+  normalizeTiktokContent,
   resolveEffectiveTargetContent,
   validateTargetMedia,
   validateTargetOverrides,
@@ -628,11 +631,46 @@ async function executeTiktokTarget(
     await updateTargetFailure(post.id, target.id, mediaValidation.error);
     return failedOutcome(target, mediaValidation.error);
   }
-  // TikTok Direct Post requires its own title: the global post text is
-  // never a fallback. A missing title is a validation failure, not a
-  // reason to publish the wrong caption.
-  const rawTitle = typeof effective.content.title === "string" ? effective.content.title : "";
-  const title = rawTitle.trim();
+  // TikTok Direct Post requires its own text: the global post text is
+  // never a fallback. Video publishes the title as its caption (2200);
+  // photo publishes title (90) + description (4000) with at least one
+  // present. The media policy decides the flow before text validation so
+  // each flow enforces its own contract.
+  const settings = tiktokSettingsFromRaw(effective.settings);
+  const policy = resolveTiktokMediaPolicy(post.media, settings.photoCoverIndex);
+  if (policy.kind === "error") {
+    await updateTargetFailure(post.id, target.id, policy.message, { clearJobId: true });
+    return failedOutcome(target, policy.message);
+  }
+  const tiktokContent = normalizeTiktokContent(effective.content);
+  const title = tiktokContent.title.trim();
+  const description = tiktokContent.description.trim();
+
+  if (policy.kind === "photo") {
+    if (!title && !description) {
+      const error = "TikTok photo posts need a title or a description. Add one — the global post text is never used as a fallback.";
+      await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+      return failedOutcome(target, error);
+    }
+    if (Array.from(title).length > TIKTOK_PHOTO_TITLE_MAX_LENGTH) {
+      const error = `TikTok photo title exceeds the ${TIKTOK_PHOTO_TITLE_MAX_LENGTH} character limit.`;
+      await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+      return failedOutcome(target, error);
+    }
+    if (Array.from(description).length > TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH) {
+      const error = `TikTok photo description exceeds the ${TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH} character limit.`;
+      await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+      return failedOutcome(target, error);
+    }
+    return executeTiktokPhotoTarget(post, target, account, {
+      title,
+      description,
+      settings,
+      mediaIds: policy.mediaIds,
+      coverIndex: policy.coverIndex,
+    });
+  }
+
   if (!title) {
     const error = "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback.";
     await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
@@ -642,21 +680,6 @@ async function executeTiktokTarget(
     const error = `TikTok title exceeds the ${TIKTOK_CAPTION_MAX_LENGTH} character limit.`;
     await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
     return failedOutcome(target, error);
-  }
-  const settings = tiktokSettingsFromRaw(effective.settings);
-  const policy = resolveTiktokMediaPolicy(post.media, settings.photoCoverIndex);
-  if (policy.kind === "error") {
-    await updateTargetFailure(post.id, target.id, policy.message, { clearJobId: true });
-    return failedOutcome(target, policy.message);
-  }
-
-  if (policy.kind === "photo") {
-    return executeTiktokPhotoTarget(post, target, account, {
-      title,
-      settings,
-      mediaIds: policy.mediaIds,
-      coverIndex: policy.coverIndex,
-    });
   }
 
   const video = post.media.find((item) => item.id === policy.mediaId);
@@ -778,6 +801,7 @@ async function executeTiktokPhotoTarget(
   account: PublishAccount,
   input: {
     title: string;
+    description: string;
     settings: TiktokPublishSettings;
     mediaIds: string[];
     coverIndex: number;
@@ -820,6 +844,7 @@ async function executeTiktokPhotoTarget(
     accessToken,
     {
       title: input.title,
+      description: input.description,
       settings: input.settings,
       photoUrls,
       coverIndex: input.coverIndex,

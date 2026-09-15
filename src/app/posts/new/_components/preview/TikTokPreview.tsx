@@ -15,8 +15,10 @@ function humanizePrivacy(value: unknown): string | null {
  * Stage 2B mock, Stage 2D fidelity pass: TikTok shape — a 9:16 card
  * constrained so it never overflows its container, video-first with a
  * bottom overlay carrying username, the effective title and the chosen
- * privacy. Never renders global text as title — the model carries an
- * empty title instead. Side action rail, no 1:1 imitation.
+ * privacy. Photo posts render the title and the description as separate
+ * lines, mirroring the photo post_info contract; video posts render the
+ * title as the caption. Never renders global text as title — the model
+ * carries an empty title instead. Side action rail, no 1:1 imitation.
  */
 export function TikTokPreview({
   model,
@@ -24,6 +26,8 @@ export function TikTokPreview({
 }: PlatformPostProps & { media: DraftMedia[] }) {
   const video = media.find((item) => item.kind === "VIDEO") ?? media[0];
   const privacy = humanizePrivacy(model.settings["privacy_level"]);
+  const isPhoto = model.tiktokMode === "photo";
+  const description = model.description;
   return (
     <div className="flex justify-center gap-3">
       <div className="relative w-full max-w-60 min-w-0 overflow-hidden rounded-md border bg-muted">
@@ -50,13 +54,32 @@ export function TikTokPreview({
           <p className="truncate text-sm font-semibold text-white">
             @{model.username}
           </p>
-          <p className="line-clamp-3 text-xs break-words text-white/90">
-            {model.text || (
-              <span className="text-white/70">
-                Add a title via Customize — TikTok posts its own title
-              </span>
-            )}
-          </p>
+          {isPhoto ? (
+            <>
+              <p className="line-clamp-2 text-xs font-medium break-words text-white">
+                {model.text || (
+                  <span className="font-normal text-white/70">
+                    Add a title via Customize
+                  </span>
+                )}
+              </p>
+              <p className="line-clamp-3 text-xs break-words text-white/90">
+                {description || (
+                  <span className="text-white/70">
+                    Add a description via Customize
+                  </span>
+                )}
+              </p>
+            </>
+          ) : (
+            <p className="line-clamp-3 text-xs break-words text-white/90">
+              {model.text || (
+                <span className="text-white/70">
+                  Add a title via Customize — TikTok posts its own title
+                </span>
+              )}
+            </p>
+          )}
           {privacy && (
             <p className="text-[11px] text-white/70">Privacy: {privacy}</p>
           )}

@@ -246,6 +246,8 @@ export function canSubmitComposer(input: {
   hasSelection: boolean;
   busy: boolean;
   quotaBlocked: boolean;
+  /** Per-target preview validation errors (e.g. missing TikTok title). */
+  previewError?: boolean;
 }): boolean {
   return (
     input.textPresent &&
@@ -253,7 +255,8 @@ export function canSubmitComposer(input: {
     !input.mediaError &&
     input.hasSelection &&
     !input.busy &&
-    !input.quotaBlocked
+    !input.quotaBlocked &&
+    !input.previewError
   );
 }
 

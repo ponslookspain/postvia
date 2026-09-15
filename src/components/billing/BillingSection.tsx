@@ -506,13 +506,6 @@ export function BillingSection({
             );
           })}
         </div>
-        {error && (
-          <ErrorBlock
-            title="Something went wrong"
-            description={error}
-            className="mt-4"
-          />
-        )}
       </Section>
 
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>

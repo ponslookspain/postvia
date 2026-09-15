@@ -10,19 +10,28 @@ export default function DashboardLoading() {
           <Skeleton className="h-8 w-40" />
           <Skeleton className="mt-2 h-4 w-64" />
         </div>
-        <Skeleton className="h-8 w-32 shrink-0" />
+        <Skeleton className="h-9 w-32 shrink-0 rounded-full" />
       </div>
 
       <div className="flex flex-col" style={{ gap: "var(--section-gap)" }}>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 sm:gap-x-6">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-28 w-full rounded-xl" />
+            <div key={index} className="min-w-0">
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="mt-2 h-4 w-24" />
+              <Skeleton className="mt-1 h-3 w-20" />
+            </div>
           ))}
         </div>
 
-        <div className="grid items-start gap-3 lg:grid-cols-3">
-          <Skeleton className="h-44 w-full rounded-xl lg:col-span-2" />
-          <Skeleton className="h-44 w-full rounded-xl" />
+        <div className="grid items-start gap-10 lg:grid-cols-3">
+          <Skeleton className="h-56 w-full rounded-xl lg:col-span-2" />
+          <div className="flex flex-col gap-1">
+            <Skeleton className="mb-2 h-4 w-24" />
+            <Skeleton className="h-9 w-full rounded-full" />
+            <Skeleton className="h-9 w-full rounded-full" />
+            <Skeleton className="h-9 w-full rounded-full" />
+          </div>
         </div>
 
         <div>

@@ -6,8 +6,10 @@ login UI. This file mirrors the implementation (`src/app/signup`,
 `src/app/login`, `src/components/GoogleButton.tsx`); auth mechanics live
 in [`docs/auth.md`](auth.md), process in [`docs/workflow.md`](workflow.md).
 
-All auth screens share `AuthShell`: centered `max-w-sm` column, `postvia`
-wordmark, `h1` title + muted description.
+All auth screens share `AuthShell`: centered `max-w-sm` column, centered
+`postvia` wordmark, centered `h1` title + muted description, no card
+chrome and no entrance animation. Visual language follows
+[`docs/design-system.md`](design-system.md).
 
 ## Signup — `/signup`
 
@@ -24,8 +26,8 @@ wordmark, `h1` title + muted description.
 - Legal notice directly under the button (`aria-describedby="signup-legal"`):
   `By continuing, you agree to Postvia's Terms of Service and Privacy Policy.`
   (`/terms`, `/privacy`, existing pages — no duplicates).
-- `or` separator → `GoogleButton` → `Already have an account? Sign in`
-  (`/login`).
+- `FieldSeparator` (`Or continue with`) → `GoogleButton` →
+  `Already have an account? Sign in` (`/login`, centered).
 
 ## OTP — `/verify-otp?email=…&mode=signup|login`
 
@@ -36,8 +38,8 @@ wordmark, `h1` title + muted description.
 - Title `Check your email`, description
   `We sent a 6-digit code to ${email}. Enter it below.`
 - Field `6-digit code` (`inputMode=numeric`,
-  `autoComplete=one-time-code`, placeholder `123456`; spaces/dashes are
-  stripped before verify).
+  `autoComplete=one-time-code`, placeholder `123456`, centered with
+  wide tracking; spaces/dashes are stripped before verify).
 - Submit button: `Verify & continue` (signup) / `Sign in` (login), then
   `Verifying...`. Signup verifies via `authClient.emailOtp.verifyEmail`,
   login via `authClient.signIn.emailOtp`; both push to `/post-auth` on
@@ -107,8 +109,9 @@ description `Publish to social media in one place`.
   `/verify-otp?mode=login` → OTP → dashboard. Hint under it:
   `No password yet? Use Sign in with a code — we will email you a 6-digit code.`
   Passwordless users log in exactly this way; login OTP never mints a User.
-- `or` separator → `GoogleButton` → `Don't have an account? Sign up`
-  (`/signup`) → `Terms of Service · Privacy Policy` links.
+- `FieldSeparator` (`Or continue with`) → `GoogleButton` →
+  `Don't have an account? Sign up` (`/signup`, centered) →
+  centered `Terms of Service · Privacy Policy` links.
 - Preserved query flags: `?deleted=1` (`Your account has been deleted.`),
   `?passwordChanged=1`, `?error=account_not_linked` (Google-oauth notice).
 

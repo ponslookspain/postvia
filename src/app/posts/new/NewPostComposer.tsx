@@ -21,7 +21,9 @@ import {
   buildComposerPreviews,
   buildComposerMediaErrors,
   countCharacters,
+  firstBlockingPreviewError,
   hasBlockingFileIssues,
+  hasBlockingPreviewErrors,
   PREVIEW_PLATFORM_ORDER,
   resolvePreviewTarget,
 } from "@/lib/composer-previews";
@@ -30,6 +32,7 @@ import {
   type PollProgress,
   type SettledPost,
 } from "@/lib/publish-poll";
+import { waitForMediaRegistration } from "@/lib/media-registration";
 import {
   canSubmitComposer,
   continueEditingFromSaved,
@@ -44,20 +47,13 @@ import {
   selectMediaForUpload,
   type ScheduleFlowDenial,
 } from "@/lib/composer-media";
+import { createSingleFlight, newOperationId } from "@/lib/idempotency";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { EmptyBlock } from "@/components/StateBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Empty,
   EmptyDescription,
@@ -78,7 +74,6 @@ import { MediaGrid } from "./_components/MediaGrid";
 import { PreviewCard } from "./_components/PreviewCard";
 import { PlatformSwitcher } from "./_components/PlatformSwitcher";
 import { PublishCard } from "./_components/PublishCard";
-import { ScheduleCard } from "./_components/ScheduleCard";
 import { MobileComposerBar } from "./_components/MobileComposerBar";
 import { ScheduleDialog } from "./_components/ScheduleDialog";
 import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
@@ -103,29 +98,6 @@ function nextMediaKey(): string {
 type PrepareResponse = {
   pathname: string;
 };
-
-const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
-const MEDIA_REGISTER_POLL_MS = 500;
-
-async function waitForMediaRegistration(
-  postId: string,
-  pathname: string
-): Promise<string | null> {
-  const deadline = Date.now() + MEDIA_REGISTER_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const res = await fetch(
-      `/api/media/status?postId=${encodeURIComponent(postId)}&pathname=${encodeURIComponent(pathname)}`
-    );
-    if (res.ok) {
-      const data = (await res.json().catch(() => null)) as {
-        exists?: boolean;
-      } | null;
-      if (data?.exists) return null;
-    }
-    await new Promise((r) => setTimeout(r, MEDIA_REGISTER_POLL_MS));
-  }
-  return "Upload did not finish registering in time. Please try again.";
-}
 
 function uploadFileToPost(
   postId: string,
@@ -190,19 +162,14 @@ function uploadFileToPost(
 
         // Step 3: the server registers the Media row from the verified
         // blob.upload-completed webhook; wait for it before publishing.
-        resolve(await waitForMediaRegistration(postId, storedPathname));
+        resolve(
+          await waitForMediaRegistration({ postId, pathname: storedPathname })
+        );
       } catch {
         resolve("Network error. Please try again.");
       }
     })();
   });
-}
-
-function toLocalInputValue(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate()
-  )}`;
 }
 
 function parseScheduleDenial(data: {
@@ -264,6 +231,30 @@ export default function NewPostComposer({
     upgradeTo: PlanId | null;
   } | null>(null);
 
+  // Idempotency key for this editing session: minted once, reused by every
+  // retry / double-submit of the same user action so POST /api/posts
+  // collapses repeats into one row. Rotated after each terminal success —
+  // the next explicit action is a new operation with a new key.
+  const operationIdRef = useRef<string | null>(null);
+  function getOperationId(): string {
+    if (!operationIdRef.current) {
+      operationIdRef.current = newOperationId();
+    }
+    return operationIdRef.current;
+  }
+  function rotateOperationId(): void {
+    operationIdRef.current = newOperationId();
+  }
+  // Synchronous single-flight guards. React state (`scheduling`, …) flips
+  // only on the next render, so two clicks in the same tick would both
+  // pass a state check and fire two POSTs; a ref read + set is
+  // synchronous, so the second entrant always loses. One guard per action.
+  const flightRefs = useRef({
+    schedule: createSingleFlight(),
+    save: createSingleFlight(),
+    publish: createSingleFlight(),
+  });
+
   const quotaBlocked = quota.postsLeft !== null && quota.postsLeft <= 0;
 
   const selectedAccounts = accounts.filter((account) =>
@@ -302,6 +293,8 @@ export default function NewPostComposer({
       return {
         accountId,
         text: account?.platform === "TIKTOK" ? override?.title : override?.text,
+        description:
+          account?.platform === "TIKTOK" ? override?.description : undefined,
       };
     }),
     overrideSettings: Object.fromEntries(
@@ -360,6 +353,13 @@ export default function NewPostComposer({
   // Per-file media issues (today: oversized files only) block submit too —
   // an unregistered oversized file can never publish.
   const hasBlockingFileIssue = hasBlockingFileIssues(previewModels);
+  // Targets the server would fail deterministically (e.g. a TikTok target
+  // without title/description) block Publish now, with the first blocking
+  // message shown in the Publish card. Drafts stay saveable.
+  const hasBlockingPreviewError = hasBlockingPreviewErrors(previewModels);
+  const publishBlockedReason = hasBlockingPreviewError
+    ? firstBlockingPreviewError(previewModels)
+    : null;
   const canSave = canSubmitComposer({
     textPresent: text.trim().length > 0,
     overLimit: hasOverLimit,
@@ -375,6 +375,7 @@ export default function NewPostComposer({
     hasSelection: selectedAccountIds.length > 0,
     busy: publishing || saving,
     quotaBlocked,
+    previewError: hasBlockingPreviewError,
   });
   const schedulingForX = selectedAccounts.some((account) => account.platform === "X");
   const { creatorInfos, creatorInfoErrors, retryCreatorInfo, resetForAccount } =
@@ -414,16 +415,23 @@ export default function NewPostComposer({
       platform,
       hasMedia: media.length > 0,
       mediaCount: media.length,
+      clientOperationId: getOperationId(),
       accountIds: selectedAccountIds,
       targets: selectedAccountIds.map((accountId) => {
         const account = accounts.find((item) => item.id === accountId);
         const override = targetOverrides[accountId];
         if (!override) return { accountId, overrides: null };
+        // TikTok video publishes the title as its caption; TikTok photo
+        // publishes title + description as separate post_info fields.
+        // The description is never sent for video (unsupported parameter).
         const content =
           account?.platform === "TIKTOK"
-            ? override.title
-              ? { title: override.title }
-              : {}
+            ? {
+                ...(override.title ? { title: override.title } : {}),
+                ...(override.description
+                  ? { description: override.description }
+                  : {}),
+              }
             : override.text
               ? { text: override.text }
               : {};
@@ -445,6 +453,7 @@ export default function NewPostComposer({
     patch: {
       text?: string;
       title?: string;
+      description?: string;
       settings?: Record<string, unknown>;
     }
   ) {
@@ -453,10 +462,11 @@ export default function NewPostComposer({
       const merged = { ...(next[accountId] ?? {}), ...patch };
       const hasText = Boolean(merged.text);
       const hasTitle = Boolean(merged.title);
+      const hasDescription = Boolean(merged.description);
       const hasSettings = Boolean(
         merged.settings && Object.keys(merged.settings).length > 0
       );
-      if (!hasText && !hasTitle && !hasSettings) {
+      if (!hasText && !hasTitle && !hasDescription && !hasSettings) {
         delete next[accountId];
       } else {
         next[accountId] = merged;
@@ -655,6 +665,9 @@ export default function NewPostComposer({
 
   async function handleSaveDraft() {
     if (!canSave) return;
+    // Single-flight FIRST, before any await: a second click in the same
+    // tick must not reach the POST below.
+    if (!flightRefs.current.save.tryAcquire()) return;
     setSaving(true);
     setQuotaError(null);
 
@@ -683,6 +696,9 @@ export default function NewPostComposer({
       }
       setSavedId(data.id);
       setSaved(true);
+      // Terminal success: the next explicit save is a new operation.
+      // Failures keep the key so a retry replays onto the same draft.
+      rotateOperationId();
     } catch {
       toast.add({
         title: "Failed to save draft",
@@ -692,6 +708,7 @@ export default function NewPostComposer({
       });
     } finally {
       setSaving(false);
+      flightRefs.current.save.release();
     }
   }
 
@@ -722,6 +739,10 @@ export default function NewPostComposer({
       return;
     }
 
+    // Single-flight AFTER sync validation, BEFORE any await: two clicks
+    // (dialog Confirm + card button, desktop + mobile bar) in the same
+    // tick must yield one POST, not two.
+    if (!flightRefs.current.schedule.tryAcquire()) return;
     setScheduling(true);
     try {
       // Safe order: create a DRAFT first, upload + register media, and only
@@ -811,15 +832,21 @@ export default function NewPostComposer({
       setSavedId(result.postId);
       setScheduledAt(scheduledIso);
       setScheduleMode(false);
+      // Terminal success: the next explicit schedule is a new operation.
+      // Every failure path above keeps the key, so confirming again
+      // replays onto the same draft instead of creating a second post.
+      rotateOperationId();
     } catch {
       setScheduleError("Failed to schedule post. Please try again.");
     } finally {
       setScheduling(false);
+      flightRefs.current.schedule.release();
     }
   }
 
   async function handlePublish() {
     if (!canPublish) return;
+    if (!flightRefs.current.publish.tryAcquire()) return;
     setPublishing(true);
     setPublishResult(null);
     setPublishWatchId(null);
@@ -933,6 +960,9 @@ export default function NewPostComposer({
         });
       }
       setSavedId(postData.id);
+      // The post now exists server-side regardless of the publish outcome;
+      // the next explicit publish is a new operation with a new key.
+      rotateOperationId();
     } catch {
       setPublishResult({
         ok: false,
@@ -942,6 +972,7 @@ export default function NewPostComposer({
     } finally {
       publishAbortRef.current = null;
       setPublishing(false);
+      flightRefs.current.publish.release();
     }
   }
 
@@ -1164,36 +1195,43 @@ export default function NewPostComposer({
         }
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+      <div className="grid items-start gap-8 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-8 lg:col-span-2">
           <section aria-labelledby="composer-content">
-            <Card>
-              <CardHeader>
-                <CardTitle>Post content</CardTitle>
-                <CardDescription>
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  id="composer-content"
+                  className="text-lg font-medium tracking-tight"
+                >
+                  Post content
+                </h2>
+                <p className="mt-1 max-w-[60ch] text-sm leading-5 text-muted-foreground">
                   Used by every selected platform unless customized — except
                   TikTok, which posts its own title instead
-                </CardDescription>
-                <CardAction>
-                  <Badge variant={hasOverLimit ? "destructive" : "secondary"}>
-                    {charCount} chars
-                  </Badge>
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <Field data-invalid={hasOverLimit || undefined}>
-                  <FieldLabel htmlFor="composer-text" className="sr-only">
-                    Post content
-                  </FieldLabel>
-                  <Textarea
-                    id="composer-text"
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder="Write something worth publishing..."
-                    rows={6}
-                    aria-invalid={hasOverLimit || undefined}
-                    className="min-h-36 text-[15px] leading-relaxed"
-                  />
+                </p>
+              </div>
+              <Badge
+                variant={hasOverLimit ? "destructive" : "secondary"}
+                className="shrink-0 tabular-nums"
+              >
+                {charCount} chars
+              </Badge>
+            </div>
+            <div>
+              <Field data-invalid={hasOverLimit || undefined}>
+                <FieldLabel htmlFor="composer-text" className="sr-only">
+                  Post content
+                </FieldLabel>
+                <Textarea
+                  id="composer-text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder="Write something worth publishing..."
+                  rows={8}
+                  aria-invalid={hasOverLimit || undefined}
+                  className="min-h-48 text-[15px] leading-relaxed"
+                />
                   {hasOverLimit ? (
                     <FieldError>
                       Too long for{" "}
@@ -1211,8 +1249,7 @@ export default function NewPostComposer({
                     </FieldDescription>
                   )}
                 </Field>
-              </CardContent>
-            </Card>
+              </div>
           </section>
 
           <AccountList
@@ -1235,31 +1272,19 @@ export default function NewPostComposer({
             onRetry={(key) => void retryFailedMedia(key)}
           />
 
-          <ScheduleCard
-            scheduleDate={scheduleDate}
-            scheduleTime={scheduleTime}
-            scheduledIso={scheduledIso}
-            scheduleError={scheduleError}
-            scheduling={scheduling}
-            schedulingForX={schedulingForX}
-            disabled={saving || publishing || scheduling}
-            onDateChange={setScheduleDate}
-            onTimeChange={setScheduleTime}
-            onScheduleClick={handleScheduleClick}
-          />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
-          <Card>
-            <CardHeader>
-              <CardTitle>Previews</CardTitle>
-              <CardDescription>
-                {previews.length === 0
-                  ? "Select a platform above to see its preview"
-                  : `${previews.length} selected`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <div className="flex min-w-0 flex-col gap-8 lg:sticky lg:top-6 lg:self-start">
+          <section aria-label="Preview" className="order-2 lg:order-1">
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-medium tracking-tight">Preview</h2>
+              {previews.length > 0 && (
+                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {previews.length} selected
+                </p>
+              )}
+            </div>
+            <div>
               {previews.length === 0 || !activePreviewModel || !previewTarget ? (
                 <Empty>
                   <EmptyHeader>
@@ -1289,6 +1314,12 @@ export default function NewPostComposer({
                         ? targetOverrides[activePreviewModel.accountId]?.title
                         : targetOverrides[activePreviewModel.accountId]?.text
                     }
+                    customDescription={
+                      activePreviewModel.platform === "TIKTOK"
+                        ? targetOverrides[activePreviewModel.accountId]
+                            ?.description
+                        : undefined
+                    }
                     hasOverride={Boolean(
                       targetOverrides[activePreviewModel.accountId]
                     )}
@@ -1307,7 +1338,10 @@ export default function NewPostComposer({
                     }
                     showTikTokTitleHint={
                       activePreviewModel.platform === "TIKTOK" &&
-                      !targetOverrides[activePreviewModel.accountId]?.title
+                      !targetOverrides[activePreviewModel.accountId]?.title &&
+                      (activePreviewModel.tiktokMode !== "photo" ||
+                        !targetOverrides[activePreviewModel.accountId]
+                          ?.description)
                     }
                     disabled={saving || publishing || scheduling}
                     onCustomTextChange={(value) =>
@@ -1317,6 +1351,11 @@ export default function NewPostComposer({
                           ? { title: value }
                           : { text: value }
                       )
+                    }
+                    onCustomDescriptionChange={(value) =>
+                      updateOverride(activePreviewModel.accountId, {
+                        description: value,
+                      })
                     }
                     onSettings={(patch) =>
                       updateOverride(activePreviewModel.accountId, {
@@ -1346,20 +1385,24 @@ export default function NewPostComposer({
                   />
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
+          <div className="order-1 lg:order-2">
           <PublishCard
             quotaBlocked={quotaBlocked}
             quotaError={quotaError}
             quotaUpgradeTo={quota.upgradeTo}
             schedulingForX={schedulingForX}
             scheduleMode={scheduleMode}
+            scheduleDate={scheduleDate}
+            scheduleTime={scheduleTime}
             xScheduleHint={xScheduleHint}
             publishing={publishing}
             publishProgress={publishProgress}
             canSave={canSave}
             canPublish={canPublish}
+            publishBlockedReason={publishBlockedReason}
             saving={saving}
             scheduling={scheduling}
             onSaveDraft={handleSaveDraft}
@@ -1368,6 +1411,7 @@ export default function NewPostComposer({
             onAbort={() => publishAbortRef.current?.abort()}
             onDismissXHint={() => setXScheduleHint(false)}
           />
+          </div>
         </div>
       </div>
 
@@ -1375,12 +1419,17 @@ export default function NewPostComposer({
         open={scheduleMode && !schedulingForX}
         scheduleDate={scheduleDate}
         scheduleTime={scheduleTime}
-        minDate={toLocalInputValue(new Date())}
         scheduledIso={scheduledIso}
         scheduleError={scheduleError}
         savedId={savedId}
         scheduling={scheduling}
         canSave={canSave}
+        textPresent={text.trim().length > 0}
+        overLimit={hasOverLimit}
+        mediaError={hasMediaError || hasBlockingFileIssue}
+        hasSelection={selectedAccountIds.length > 0}
+        quotaBlocked={quotaBlocked}
+        quotaReason={quotaError?.reason ?? null}
         onDateChange={setScheduleDate}
         onTimeChange={setScheduleTime}
         onOpenChange={(open) => {

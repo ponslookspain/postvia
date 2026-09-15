@@ -1,11 +1,32 @@
 # Database
 
-PostgreSQL (Neon) via Prisma 6. Schema: `prisma/schema.prisma`.
-Datasource URL env: `DATABASE_URL_POSTGRES_PRISMA_URL`.
-The database carries **no `_prisma_migrations` history** (it was created with
-`prisma db push`); the single migration file
-`prisma/migrations/20260913000000_abuse_event/migration.sql` was applied as
-DDL. `prisma migrate diff --from-url(live) --to-schema-datamodel` is empty.
+PostgreSQL (Neon project `postvia-db`) via Prisma 6. Schema:
+`prisma/schema.prisma`. Datasource URL env:
+`DATABASE_URL_POSTGRES_PRISMA_URL`.
+The database carries **no `_prisma_migrations` history** (created with
+`prisma db push`); later changes ship as additive migration SQL under
+`prisma/migrations/` (abuse event, billing guards, OTP/onboarding,
+post idempotency key) applied as DDL. `prisma migrate diff --from-url
+--to-schema-datamodel` must be empty apart from known optimization-only
+deltas (currently: missing `SocialAccount_userId_idx` — planner-only,
+harmless).
+
+## Topology: one database per environment, never per user
+
+- `main` → **Production** (Vercel Production, `postvia.online`).
+- `development` → **local development** (`localhost` + ngrok). Forked
+  from `main` **with data**, then wiped of copied users/OAuth tokens and
+  given one clean local admin. Test writes go here only.
+- Preview workflow is not used; historical `preview/*` branches are not
+  part of any flow.
+
+All tables below live once per environment and are shared by every user
+of that environment (`userId` scoping, never separate databases).
+Production OAuth tokens must never be copied into development (a refresh
+from a copied token would invalidate the production one). Before any
+write, compare the URL host against the known endpoint for that
+environment; abort on mismatch. Never `migrate reset`; never `db push`
+or destructive DDL against `main`/Production.
 
 ## Auth & accounts
 
@@ -21,7 +42,7 @@ DDL. `prisma migrate diff --from-url(live) --to-schema-datamodel` is empty.
 
 | Model | Notes |
 |---|---|
-| `Post` | `userId → User` (**no** `onDelete` — plain relation; account deletion removes posts explicitly in the route transaction). `status: PostStatus`, `scheduledAt/publishedAt`. Indexes: `[userId,status]`, `[status,scheduledAt]`, `[status,updatedAt]` |
+| `Post` | `userId → User` (**no** `onDelete` — plain relation; account deletion removes posts explicitly in the route transaction). `status: PostStatus`, `scheduledAt/publishedAt`, `clientOperationId String? @unique` (idempotency key — a missing column once caused bare 500s on create; see migration `20260914000001`). Indexes: `[userId,status]`, `[status,scheduledAt]`, `[status,updatedAt]` |
 | `PostTarget` | `postId → Post Cascade`; `socialAccountId → SocialAccount SetNull`; `@@index([postId, socialAccountId, externalJobId])` |
 | `Media` | `userId → User Cascade`, `postId → Post Cascade`; `@@unique([pathname])` (concurrent completions collapse via P2002) |
 | `SocialAccount` | `userId → User Cascade`; `@@unique([userId,platform,externalId])` **and** `@@unique([platform,externalId])` (one external account → one PostVia owner, DB-enforced); `@@index([userId,platform])` |

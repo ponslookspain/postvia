@@ -11,25 +11,36 @@ export default function PostsLoading() {
           <Skeleton className="mt-2 h-4 w-64" />
         </div>
         <div className="flex shrink-0 gap-2">
-          <Skeleton className="h-8 w-28" />
-          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-9 w-28 rounded-full" />
+          <Skeleton className="h-9 w-32 rounded-full" />
         </div>
       </div>
-      <div className="mb-4 flex flex-wrap gap-x-4 gap-y-2">
+      <div className="mb-6 flex gap-5 overflow-x-auto border-b border-border">
         {Array.from({ length: 7 }).map((_, index) => (
-          <Skeleton key={index} className="h-4 w-16" />
+          <Skeleton key={index} className="h-8 w-16 shrink-0 rounded-none" />
         ))}
       </div>
-      <div className="mb-4 flex flex-col gap-2 md:flex-row">
-        <Skeleton className="h-11 w-full" />
+      <div className="mb-6 flex flex-col gap-2 md:flex-row">
+        <Skeleton className="h-9 w-full" />
         <div className="flex gap-2">
-          <Skeleton className="h-11 w-full md:w-40" />
-          <Skeleton className="h-11 w-full md:w-36" />
+          <Skeleton className="h-9 w-full md:w-40" />
+          <Skeleton className="h-9 w-full md:w-36" />
         </div>
+      </div>
+      <div
+        aria-hidden="true"
+        className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border py-3 md:grid"
+      >
+        <Skeleton className="h-3 w-12" />
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-3 w-14" />
+        <Skeleton className="h-3 w-12" />
+        <span />
       </div>
       <LoadingBlock
         rows={5}
-        rowClassName="h-24 w-full rounded-xl"
+        rowClassName="h-20 w-full"
         label="Loading posts"
       />
       <span className="sr-only">Loading posts…</span>

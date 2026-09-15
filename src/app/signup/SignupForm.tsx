@@ -13,9 +13,9 @@ import {
   Field,
   FieldGroup,
   FieldLabel,
+  FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 
 export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
@@ -96,15 +96,11 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
           </FieldGroup>
         </form>
 
-        <div className="flex items-center gap-3">
-          <Separator className="flex-1" />
-          <span className="text-xs text-muted-foreground">or</span>
-          <Separator className="flex-1" />
-        </div>
+        <FieldSeparator>Or continue with</FieldSeparator>
 
         <GoogleButton newUserCallbackURL="/post-auth" callbackURL="/post-auth" />
 
-        <p className="text-sm text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href="/login" className="font-medium hover:underline">
             Sign in

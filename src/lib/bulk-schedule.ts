@@ -10,6 +10,7 @@
 
 import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
 import { validateTargetMedia } from "@/lib/platforms/overrides";
+import { validateMediaInput } from "@/lib/media";
 import type { Platform } from "@prisma/client";
 
 export const BULK_MAX_VIDEOS = 10;
@@ -242,6 +243,86 @@ export type BulkAccountRef = {
   platform: Platform;
   username: string;
 };
+
+export type BulkCapabilityIssue = {
+  accountId: string;
+  platform: Platform;
+  platformLabel: string;
+  fileName: string;
+  /**
+   * User-facing, fully attributed message, e.g.
+   * "video-02.mp4 — X: file exceeds the X video limit" style:
+   * "<file> — <Platform>: <registry reason>".
+   */
+  message: string;
+};
+
+export type BulkVideoRef = {
+  name: string;
+  mimeType: string;
+  size: number;
+};
+
+/**
+ * Capability check for one video against every selected account, reusing
+ * the platform registry (same rules as the manual composer) PLUS the
+ * global file gate (validateMediaInput). Returns one issue PER ACCOUNT so
+ * the UI can attribute every problem before any upload starts, e.g.
+ * "video-02.mp4 — X: file exceeds the 5 MB image limit".
+ *
+ * No upload, no POST, no Media row may happen while any issue exists —
+ * the caller must block the batch on a non-empty result.
+ */
+export function validateBulkVideoForAccountsDetailed(
+  file: BulkVideoRef,
+  accounts: readonly BulkAccountRef[]
+): BulkCapabilityIssue[] {
+  const issues: BulkCapabilityIssue[] = [];
+  // Global gate first: oversized/unknown files fail for every account.
+  const global = validateMediaInput(file.mimeType, file.size);
+  if (!global.ok) {
+    for (const account of accounts) {
+      const caps = getPlatformCapabilities(account.platform);
+      issues.push({
+        accountId: account.id,
+        platform: account.platform,
+        platformLabel: caps.label,
+        fileName: file.name,
+        message: `${file.name} — ${caps.label}: ${global.error}`,
+      });
+    }
+    return issues;
+  }
+  if (global.kind !== "VIDEO") {
+    for (const account of accounts) {
+      const caps = getPlatformCapabilities(account.platform);
+      issues.push({
+        accountId: account.id,
+        platform: account.platform,
+        platformLabel: caps.label,
+        fileName: file.name,
+        message: `${file.name} — ${caps.label}: only video files are accepted in a bulk batch.`,
+      });
+    }
+    return issues;
+  }
+  for (const account of accounts) {
+    const caps = getPlatformCapabilities(account.platform);
+    const result = validateTargetMedia(caps, [
+      { type: "VIDEO", mimeType: file.mimeType, size: file.size },
+    ]);
+    if (!result.ok) {
+      issues.push({
+        accountId: account.id,
+        platform: account.platform,
+        platformLabel: caps.label,
+        fileName: file.name,
+        message: `${file.name} — ${caps.label}: ${result.error}`,
+      });
+    }
+  }
+  return issues;
+}
 
 /**
  * Capability check for one video against every selected account, reusing

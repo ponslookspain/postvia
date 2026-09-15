@@ -1,13 +1,63 @@
 # Deployment
 
-## Vercel
+## Local development
 
-Linked project `postvia` (`prj_lSgzDjL7hwEKoaP9z6tNAcg7yno4`, `.vercel/project.json`).
-Pushing to `main` deploys via the linked project; `vercel --prod` deploys
-the working tree explicitly. Never force-push, never change the remote,
-never create a second production project, never change the production
-domain. Production env vars live in Vercel (per-environment Stripe keys);
-`ADMIN_EMAILS` must contain the operator address there.
+Primary loop — no Vercel involved:
+
+```bash
+npm install
+npm run dev          # http://localhost:3000 (main dev server)
+npm run dev:tunnel   # ngrok http 3000 → permanent dev HTTPS, only when a
+                     # public HTTPS origin is needed (OAuth/integration tests)
+```
+
+Local gates before every commit: `npx prisma validate` →
+`npx prisma generate` → `npx tsc --noEmit` → `npm test` →
+`npm run test:pg` (isolated PG, never production) → `npm run build`.
+Social/OAuth integration testing through the tunnel:
+[`docs/local-social-dev.md`](local-social-dev.md).
+
+## GitHub / PR flow
+
+```
+feature/fix/chore/staging branch → local verification → commit → push
+(no Vercel Preview) → GitHub Pull Request → review → merge to main
+→ AUTOMATIC Vercel Production
+```
+
+- Development happens on `staging/*` / feature / fix / chore branches,
+  never directly on `main`.
+- A push to a non-production branch must NOT produce any Vercel
+  deployment. Preview builds are off by policy, not just optional.
+- Merging to `main` IS the release: Vercel automatically builds and
+  deploys `main` to Production.
+
+## Production release (automatic from `main`)
+
+Production (`postvia.online`) deploys automatically on every merge to
+`main` — no manual step. `vercel --prod` is not part of the normal cycle;
+never force-push, never change the remote, never create a second
+production project, never change the production domain. Production env
+vars live in Vercel (per-environment Stripe keys); `ADMIN_EMAILS` must
+contain the operator address there.
+
+**Vercel Git deployment triggers are configured in the Vercel Project
+settings, outside the repository.** This repo contains no setting that
+enables or disables them (`vercel.json` below holds only the cron
+schedule). Required dashboard policy, to be set manually (one time):
+
+1. Settings → Git → **Production Branch = `main`** — merges to `main`
+   build and release Production automatically. Verified 2026-09-15 via
+   Vercel MCP: the live Production deployment was built from `main`.
+2. Settings → Git → **Ignored Build Step** — skip every non-production
+   branch so pushes never create Preview deployments. Example command
+   (exit 0 = skip the build, exit 1 = build it):
+   `bash -c 'test "$VERCEL_GIT_COMMIT_REF" != main'`
+   — `main` builds, everything else is skipped. This touches only build
+   triggering: Production env vars, domains, cron, and the database are
+   unaffected.
+
+Do not claim the repo or docs switch these triggers off by themselves.
 
 Cron: `vercel.json` → `0 3 * * *` → `/api/cron/publish-scheduled`
 (once daily — Hobby-plan maximum; scheduled posts can go out up to ~24h
@@ -41,25 +91,20 @@ Never: `migrate reset`, destructive SQL, touching other databases,
 deleting the Neon project. Production data changes go through app flows
 or keyed `WHERE` statements only.
 
-## Build & release checklist
-
-Local gates: `npx prisma validate` → `npx prisma generate` →
-`npx tsc --noEmit` → `npm test` → `npm run test:pg` (isolated PG, never
-production) → `npm run build`. Release flow (branches, Preview, PR,
-merge, Production, OpenCode stop-rule): [`docs/workflow.md`](workflow.md).
-`vercel --prod` is not part of the normal cycle — Production comes from
-`main` after an approved PR merge. Never force-push, never change the
-remote.
-
 ## Rollback
 
 Vercel: instant rollback to a previous deployment in the dashboard.
 Database: schema changes are additive-only by policy; data fixes use
 targeted statements, never resets.
 
-## Post-deploy smoke (no permanent test data)
+## Post-release smoke (after each automatic production deployment, no permanent test data)
 
-Homepage → login (Google) → admin surfaces → DB connectivity (dashboard
-loads usage) → `POST /api/posts` draft → OAuth initiation URL per
-provider → billing page → delete any probe data. Health endpoint: none
-exists — smoke via the surfaces above.
+`GET /api/health` (200 + `{ok:true,db:"ok"}`) → Homepage → login
+(Google) → admin surfaces → DB connectivity (dashboard loads usage) →
+`POST /api/posts` draft → OAuth initiation URL per provider → billing
+page → delete any probe data.
+
+Cron note (paid-plan requirement): the Hobby plan allows a single daily
+cron (`0 3 * * *`), so scheduled posts can publish up to ~24h after the
+selected time. Sub-daily scheduling needs a paid Vercel plan — no code
+workaround is attempted. The composer and Terms state this honestly.

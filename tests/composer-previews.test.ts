@@ -5,7 +5,9 @@ import {
   buildComposerPreviews,
   classifyMediaIssue,
   countCharacters,
+  firstBlockingPreviewError,
   hasBlockingFileIssues,
+  hasBlockingPreviewErrors,
   remainingCharacters,
   resolvePreviewTarget,
   type PreviewAccount,
@@ -190,6 +192,60 @@ describe("tiktok title contract", () => {
   test("global text change never leaks into the tiktok preview", () => {
     const previews = buildComposerPreviews([TIKTOK], "totally different global", []);
     assert.equal(previews[0].text, "");
+  });
+});
+
+describe("blocking preview errors gate Publish now", () => {
+  const photoMedia = [{ type: "IMAGE" as const, mimeType: "image/jpeg" }];
+
+  test("tiktok photo without title/description blocks publish", () => {
+    const models = buildComposerPreviewModel({
+      accounts: [TIKTOK],
+      globalText: GLOBAL,
+      overrides: [],
+      media: photoMedia,
+    });
+    const codes = models[0].validation.errors.map((issue) => issue.code);
+    assert.ok(codes.includes("tiktok-title-missing"));
+    assert.equal(hasBlockingPreviewErrors(models), true);
+    assert.ok(
+      (firstBlockingPreviewError(models) ?? "").length > 0,
+      "a message is surfaced next to the disabled button"
+    );
+  });
+
+  test("tiktok photo with a title no longer blocks publish", () => {
+    const models = buildComposerPreviewModel({
+      accounts: [TIKTOK],
+      globalText: GLOBAL,
+      overrides: [{ accountId: "acc-tiktok", text: "Мой заголовок" }],
+      media: photoMedia,
+    });
+    assert.equal(hasBlockingPreviewErrors(models), false);
+    assert.equal(firstBlockingPreviewError(models), null);
+  });
+
+  test("clean targets never block publish", () => {
+    const models = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [],
+    });
+    assert.equal(hasBlockingPreviewErrors(models), false);
+    assert.equal(firstBlockingPreviewError(models), null);
+  });
+
+  test("warnings alone never block publish", () => {
+    // content-empty is a warning by design: an empty Threads text post is
+    // allowed, only errors block.
+    const models = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: "",
+      overrides: [],
+      media: [],
+    });
+    assert.equal(hasBlockingPreviewErrors(models), false);
   });
 });
 

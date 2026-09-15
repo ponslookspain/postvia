@@ -13,7 +13,10 @@ import {
 } from "@/components/ui/dialog";
 
 const links = [
-  { href: "#product", label: "Product" },
+  { href: "#how", label: "How it works" },
+  { href: "#preview", label: "Preview" },
+  { href: "#calendar", label: "Calendar" },
+  { href: "#reliability", label: "Reliability" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
@@ -66,9 +69,10 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
           onClick={() => setOpen(true)}
           aria-label="Open menu"
           aria-expanded={open}
+          aria-haspopup="dialog"
           className="md:hidden"
         >
-          <MenuIcon />
+          <MenuIcon aria-hidden="true" />
         </Button>
       </div>
       <Dialog open={open} onOpenChange={setOpen}>

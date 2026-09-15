@@ -1,3 +1,9 @@
+/**
+ * Legacy ephemeral in-memory limiter. Abuse-relevant scopes use the
+ * persistent ledger in `abuse.ts` (`rateTakeWithClient`) so limits hold
+ * across instances. Do not use this for abuse/security decisions — it is
+ * kept for local ephemeral UX throttling and its unit test only.
+ */
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
 const DEFAULT_MAX = 3;

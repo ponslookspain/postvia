@@ -32,6 +32,7 @@ export function PreviewCard({
   userName,
   media,
   customText,
+  customDescription,
   hasOverride,
   overrideSettings,
   isCustomizing,
@@ -40,6 +41,7 @@ export function PreviewCard({
   showTikTokTitleHint,
   disabled,
   onCustomTextChange,
+  onCustomDescriptionChange,
   onSettings,
   onRetryCreatorInfo,
   onOpenAccounts,
@@ -51,6 +53,7 @@ export function PreviewCard({
   userName: string;
   media: DraftMedia[];
   customText: string | undefined;
+  customDescription?: string | undefined;
   hasOverride: boolean;
   overrideSettings: Record<string, unknown>;
   isCustomizing: boolean;
@@ -59,6 +62,7 @@ export function PreviewCard({
   showTikTokTitleHint: boolean;
   disabled: boolean;
   onCustomTextChange: (value: string) => void;
+  onCustomDescriptionChange?: (value: string) => void;
   onSettings: (patch: Record<string, unknown>) => void;
   onRetryCreatorInfo: () => void;
   onOpenAccounts: () => void;
@@ -90,38 +94,111 @@ export function PreviewCard({
       {isCustomizing ? (
         <div className="rounded-lg border border-border bg-muted/40 p-3">
           <FieldGroup className="gap-3">
-          <Field data-invalid={model.overLimit || undefined}>
-            <FieldLabel htmlFor={`custom-${model.accountId}`}>
-              {model.platform === "TIKTOK"
-                ? "Title / caption for TikTok"
-                : `Text for ${model.label}`}
-            </FieldLabel>
-            <Textarea
-              id={`custom-${model.accountId}`}
-              value={customText ?? model.text}
-              rows={4}
-              placeholder={
-                model.platform === "TIKTOK"
-                  ? "Title / caption for TikTok"
-                  : `Text for ${model.label}`
-              }
-              aria-invalid={model.overLimit || undefined}
-              onChange={(event) => onCustomTextChange(event.target.value)}
-            />
-            <FieldDescription aria-label={remainingLabel}>
-              {countCharacters(model.text)} / {model.maxLength}
-            </FieldDescription>
-            {model.overLimit && (
-              <FieldError>
-                Exceeds the {model.maxLength} character limit for{" "}
-                {model.label}
-              </FieldError>
-            )}
-          </Field>
+          {model.platform === "TIKTOK" ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium">TikTok</p>
+                <p className="text-xs text-muted-foreground">
+                  These fields apply only to TikTok. Other platforms use
+                  the post content above.
+                </p>
+              </div>
+              <Field data-invalid={model.overLimit || undefined}>
+                <FieldLabel htmlFor={`custom-${model.accountId}`}>
+                  Title
+                </FieldLabel>
+                <Textarea
+                  id={`custom-${model.accountId}`}
+                  value={customText ?? model.text}
+                  rows={model.tiktokMode === "photo" ? 2 : 4}
+                  placeholder={
+                    model.tiktokMode === "photo"
+                      ? "Short title for the photo post"
+                      : "Caption shown with the video"
+                  }
+                  aria-invalid={model.overLimit || undefined}
+                  onChange={(event) => onCustomTextChange(event.target.value)}
+                />
+                <FieldDescription aria-label={remainingLabel}>
+                  {countCharacters(customText ?? model.text)} /{" "}
+                  {model.maxLength}
+                </FieldDescription>
+                {model.overLimit && (
+                  <FieldError>
+                    Exceeds the {model.maxLength} character limit for{" "}
+                    {model.label}
+                  </FieldError>
+                )}
+              </Field>
+              {model.tiktokMode === "photo" && (
+                <Field
+                  data-invalid={
+                    countCharacters(customDescription ?? model.description) >
+                      model.descriptionMaxLength || undefined
+                  }
+                >
+                  <FieldLabel htmlFor={`custom-desc-${model.accountId}`}>
+                    Description
+                  </FieldLabel>
+                  <Textarea
+                    id={`custom-desc-${model.accountId}`}
+                    value={customDescription ?? model.description}
+                    rows={4}
+                    placeholder="Hashtags and details for the photo post"
+                    aria-invalid={
+                      countCharacters(customDescription ?? model.description) >
+                        model.descriptionMaxLength || undefined
+                    }
+                    onChange={(event) =>
+                      onCustomDescriptionChange?.(event.target.value)
+                    }
+                  />
+                  <FieldDescription
+                    aria-label={`${remainingCharacters(customDescription ?? model.description, model.descriptionMaxLength)} characters remaining of ${model.descriptionMaxLength} for the TikTok description`}
+                  >
+                    {countCharacters(customDescription ?? model.description)} /{" "}
+                    {model.descriptionMaxLength}
+                  </FieldDescription>
+                  {countCharacters(customDescription ?? model.description) >
+                    model.descriptionMaxLength && (
+                    <FieldError>
+                      Exceeds the {model.descriptionMaxLength} character limit
+                      for the TikTok description
+                    </FieldError>
+                  )}
+                </Field>
+              )}
+            </>
+          ) : (
+            <Field data-invalid={model.overLimit || undefined}>
+              <FieldLabel htmlFor={`custom-${model.accountId}`}>
+                {`Text for ${model.label}`}
+              </FieldLabel>
+              <Textarea
+                id={`custom-${model.accountId}`}
+                value={customText ?? model.text}
+                rows={4}
+                placeholder={`Text for ${model.label}`}
+                aria-invalid={model.overLimit || undefined}
+                onChange={(event) => onCustomTextChange(event.target.value)}
+              />
+              <FieldDescription aria-label={remainingLabel}>
+                {countCharacters(model.text)} / {model.maxLength}
+              </FieldDescription>
+              {model.overLimit && (
+                <FieldError>
+                  Exceeds the {model.maxLength} character limit for{" "}
+                  {model.label}
+                </FieldError>
+              )}
+            </Field>
+          )}
           {model.platform === "TIKTOK" && (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 border-t border-border pt-3">
+              <p className="text-sm font-medium">Settings</p>
               <TiktokTargetSettings
                 accountId={model.accountId}
+                mode={model.tiktokMode}
                 creatorInfo={creatorInfo}
                 creatorInfoError={creatorInfoError}
                 settings={overrideSettings}
@@ -157,7 +234,9 @@ export function PreviewCard({
               {countCharacters(model.text)} / {model.maxLength}
             </FieldDescription>
             {model.customized && (
-              <Badge variant="secondary">custom text</Badge>
+              <Badge variant="secondary">
+                {model.platform === "TIKTOK" ? "custom" : "custom text"}
+              </Badge>
             )}
             <Button
               type="button"

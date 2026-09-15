@@ -6,7 +6,7 @@ import { validateScheduledAt } from "@/lib/schedule";
 import {
   canCreatePost,
   checkBulkBatch,
-  createWithMonthlyQuota,
+  claimMonthlyQuota,
   getEffectivePlan,
   getMonthStart,
   getPeriodKey,
@@ -18,12 +18,20 @@ import {
   getAbusePepper,
   isAbuseEnforcementEnabled,
 } from "@/lib/abuse";
-import { createFreePostAtomic } from "@/lib/free-post-kernel";
+import { createFreePostAtomic, makeTxQuotaStore } from "@/lib/free-post-kernel";
+import { createPostIdempotent } from "@/lib/post-create";
+import { reportError } from "@/lib/diagnostics";
 import {
   validateCreatePostContent,
   validateTargetAccountSelection,
   validateTargetOverrides,
 } from "@/lib/platforms/overrides";
+import {
+  IDEMPOTENCY_KEY_HEADER,
+  isIdempotencyConflict,
+  isValidBulkOperationId,
+  normalizeOperationId,
+} from "@/lib/idempotency";
 
 export async function GET(request: NextRequest) {
   try {
@@ -92,7 +100,33 @@ export async function POST(request: NextRequest) {
       hasMedia = false,
       mediaCount: rawMediaCount,
       bulkBatchSize: rawBulkBatchSize,
+      clientOperationId: rawOperationId,
     } = await request.json();
+
+    // Idempotency key: one user action = one key. Header wins over the
+    // body field; both accept plain UUIDs (single composer) and
+    // "<uuid>:<slot>" bulk item keys. Invalid values are ignored
+    // (legacy non-idempotent create) — never trusted, never stored.
+    const headerKey = request.headers.get(IDEMPOTENCY_KEY_HEADER);
+    const operationId =
+      normalizeOperationId(headerKey) ??
+      normalizeOperationId(rawOperationId) ??
+      (isValidBulkOperationId(headerKey) || isValidBulkOperationId(rawOperationId)
+        ? String(isValidBulkOperationId(headerKey) ? headerKey : rawOperationId)
+        : null);
+
+    // Replay fast-path: this action already created its post (retry after
+    // a network timeout, double-submit that arrived sequentially). Return
+    // the existing row WITHOUT consuming quota again.
+    if (operationId) {
+      const existing = await prisma.post.findFirst({
+        where: { userId: user.id, clientOperationId: operationId },
+        include: { targets: true },
+      });
+      if (existing) {
+        return NextResponse.json(existing, { status: 200 });
+      }
+    }
 
     // Server-side bulk gate: an attested batch must fit the plan. Free has
     // no bulk; paid plans cap videos per batch. Undeclared sequential
@@ -239,54 +273,83 @@ export async function POST(request: NextRequest) {
       isFreePlan && effective.entitlements.monthlyPosts !== null
         ? (effective.entitlements.monthlyPosts as number)
         : null;
-    let created: Awaited<ReturnType<typeof createWithMonthlyQuota>> | null =
-      null;
-    if (freeLimit !== null) {
-      const kernel = await createFreePostAtomic({
-        userId: user.id,
-        email: user.email,
-        limit: freeLimit,
-        enforce: enforceAbuse,
-        pepper: getAbusePepper(),
-        period: getPeriodKey(),
-        monthStart,
-        buildInsert: (tx) =>
-          tx.post.create({
-            data: {
-              userId: user.id,
-              text: text.trim(),
-              status: isScheduled ? "SCHEDULED" : "DRAFT",
-              scheduledAt: scheduledAtDate,
-              publishedAt: null,
-              targets: { create: targets },
-            },
-            include: { targets: true },
-          }),
-        liveCountForBackfill: () =>
-          prisma.post.count({
-            where: { userId: user.id, createdAt: { gte: monthStart } },
-          }),
-        legacyInsert: () =>
-          prisma.post.create({
-            data: {
-              userId: user.id,
-              text: text.trim(),
-              status: isScheduled ? "SCHEDULED" : "DRAFT",
-              scheduledAt: scheduledAtDate,
-              publishedAt: null,
-              targets: { create: targets },
-            },
-            include: { targets: true },
-          }),
+    // Simultaneous double-delivery with the same key: the loser hits the
+    // unique index. Resolve it to the winner's row instead of a 500.
+    const resolveConflict = async () => {
+      if (!operationId) return null;
+      return prisma.post.findFirst({
+        where: { userId: user.id, clientOperationId: operationId },
+        include: { targets: true },
       });
-      if (!kernel.ok) {
+    };
+    if (freeLimit !== null) {
+      let kernel: Awaited<ReturnType<typeof createFreePostAtomic>> | null = null;
+      try {
+        kernel = await createFreePostAtomic({
+          userId: user.id,
+          email: user.email,
+          limit: freeLimit,
+          enforce: enforceAbuse,
+          pepper: getAbusePepper(),
+          period: getPeriodKey(),
+          monthStart,
+          buildInsert: (tx) =>
+            tx.post.create({
+              data: {
+                userId: user.id,
+                text: text.trim(),
+                status: isScheduled ? "SCHEDULED" : "DRAFT",
+                scheduledAt: scheduledAtDate,
+                publishedAt: null,
+                clientOperationId: operationId,
+                targets: { create: targets },
+              },
+              include: { targets: true },
+            }),
+          liveCountForBackfill: () =>
+            prisma.post.count({
+              where: { userId: user.id, createdAt: { gte: monthStart } },
+            }),
+          legacyInsert: () =>
+            prisma.post.create({
+              data: {
+                userId: user.id,
+                text: text.trim(),
+                status: isScheduled ? "SCHEDULED" : "DRAFT",
+                scheduledAt: scheduledAtDate,
+                publishedAt: null,
+                clientOperationId: operationId,
+                targets: { create: targets },
+              },
+              include: { targets: true },
+            }),
+        });
+      } catch (error) {
+        // Inside the kernel transaction the insert rolls every ledger
+        // mutation back, so the loser consumed nothing — safe to replay.
+        if (operationId && isIdempotencyConflict(error)) {
+          const replay = await resolveConflict();
+          if (replay) return NextResponse.json(replay, { status: 200 });
+        }
+        throw error;
+      }
+      if (!kernel || !kernel.ok) {
+        // Twin-consumed last unit: a concurrent same-key request commits
+        // its identity+user claims atomically WITH its post, so a LIMIT
+        // denial with a live twin row is a replay, not a 403. Genuine
+        // exhaustion (no twin row) still denies. RESTRICTED never replays.
+        if (operationId && kernel && !kernel.ok && kernel.code === "LIMIT") {
+          const twin = await resolveConflict();
+          if (twin) return NextResponse.json(twin, { status: 200 });
+        }
+        const observed = kernel && !kernel.ok ? kernel.observed : undefined;
         return NextResponse.json(
           {
             code: "UPGRADE_REQUIRED",
             reason:
-              kernel.code === "RESTRICTED"
+              kernel && !kernel.ok && kernel.code === "RESTRICTED"
                 ? "This account is restricted. Contact support."
-                : `Monthly post limit reached (${kernel.observed}/${freeLimit}).`,
+                : `Monthly post limit reached (${observed ?? freeLimit}/${freeLimit}).`,
             upgradeTo: getUpgradeTarget(effective.plan),
           },
           { status: 403 }
@@ -294,32 +357,87 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json(kernel.value, { status: 201 });
     }
-    created = await createWithMonthlyQuota({
+    // Paid/bypass path through the idempotent orchestration. Keyed creates
+    // run claim + insert in ONE transaction (strict one-key-one-post-one-
+    // unit even under simultaneous delivery); keyless creates keep the
+    // exact legacy claim-then-insert behavior via a passthrough.
+    const paidLimit = effective.entitlements.monthlyPosts;
+    const paidBypass = effective.bypass;
+    const paidPeriod = getPeriodKey();
+    const paidInsertBase = {
       userId: user.id,
-      limit: effective.entitlements.monthlyPosts,
-      bypass: effective.bypass,
-      liveCount: () =>
-        prisma.post.count({
-          where: { userId: user.id, createdAt: { gte: monthStart } },
-        }),
-      quota: liveQuotaStore,
-      insert: () =>
-        prisma.post.create({
-          data: {
-            userId: user.id,
-            text: text.trim(),
-            status: isScheduled ? "SCHEDULED" : "DRAFT",
-            scheduledAt: scheduledAtDate,
-            publishedAt: null,
-            targets: { create: targets },
-          },
-          include: { targets: true },
-        }),
-    });
-    if (!created.ok) {
+      text: text.trim(),
+      status: isScheduled ? "SCHEDULED" : "DRAFT",
+      scheduledAt: scheduledAtDate,
+      publishedAt: null,
+      targets: { create: targets },
+    } as const;
+    const outcome = await createPostIdempotent(
+      {
+        findByOperationId: (key) =>
+          prisma.post.findFirst({
+            where: { userId: user.id, clientOperationId: key },
+            include: { targets: true },
+          }),
+        runAtomic: (fn) =>
+          operationId
+            ? prisma.$transaction((tx) =>
+                fn({
+                  claimQuota: async () => {
+                    if (paidBypass || paidLimit === null) {
+                      return { ok: true as const };
+                    }
+                    return claimMonthlyQuota({
+                      userId: user.id,
+                      period: paidPeriod,
+                      limit: paidLimit,
+                      liveCount: await tx.post.count({
+                        where: {
+                          userId: user.id,
+                          createdAt: { gte: monthStart },
+                        },
+                      }),
+                      store: makeTxQuotaStore(tx),
+                    });
+                  },
+                  insertPost: (key) =>
+                    tx.post.create({
+                      data: { ...paidInsertBase, clientOperationId: key },
+                      include: { targets: true },
+                    }),
+                })
+              )
+            : fn({
+                claimQuota: async () => {
+                  if (paidBypass || paidLimit === null) {
+                    return { ok: true as const };
+                  }
+                  return claimMonthlyQuota({
+                    userId: user.id,
+                    period: paidPeriod,
+                    limit: paidLimit,
+                    liveCount: await prisma.post.count({
+                      where: { userId: user.id, createdAt: { gte: monthStart } },
+                    }),
+                    store: liveQuotaStore,
+                  });
+                },
+                insertPost: (key) =>
+                  prisma.post.create({
+                    data: { ...paidInsertBase, clientOperationId: key },
+                    include: { targets: true },
+                  }),
+              }),
+      },
+      operationId
+    );
+    if (outcome.outcome === "replay") {
+      return NextResponse.json(outcome.post, { status: 200 });
+    }
+    if (outcome.outcome === "denied") {
       const denial = canCreatePost(effective, {
         ...usage,
-        postsThisMonth: created.observed,
+        postsThisMonth: outcome.observed,
       });
       if (!denial.ok) {
         return NextResponse.json(
@@ -336,10 +454,14 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    const post = created.value;
 
-    return NextResponse.json(post, { status: 201 });
-  } catch {
+    return NextResponse.json(outcome.post, { status: 201 });
+  } catch (error) {
+    // Server-side diagnosis only: the client keeps the generic message
+    // (no tokens, no post text, no operation ids — presence flags only).
+    // A silent catch here once hid a P2022 schema-drift failure behind a
+    // bare 500 with zero server info.
+    reportError("posts", "create post failed", error, {});
     return NextResponse.json(
       { error: "Failed to create post" },
       { status: 500 }

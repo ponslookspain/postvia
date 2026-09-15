@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { pollPostSettled } from "@/lib/publish-poll";
 import { PencilIcon, SendIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import {
   X_POST_CHAR_LIMIT,
@@ -73,28 +74,45 @@ interface Post {
   }[];
 }
 
-const PUBLISH_POLL_MS = 2000;
-const PUBLISH_POLL_TIMEOUT_MS = 330_000;
-
 // Publish/retry respond 202 while the work continues server-side.
 // Poll the real per-target statuses from the DB instead of assuming success.
+// Shared contract with the composer via pollPostSettled (2s interval,
+// 330s timeout, transient-null tolerant, abort-aware).
 async function pollUntilSettled(
   postId: string,
-  applySnapshot: (data: Partial<Post>) => void
-): Promise<void> {
-  const deadline = Date.now() + PUBLISH_POLL_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, PUBLISH_POLL_MS));
-    try {
-      const res = await fetch(`/api/posts/${postId}`);
-      if (!res.ok) continue;
-      const data = (await res.json()) as Partial<Post>;
-      applySnapshot(data);
-      if (data.status && data.status !== "PUBLISHING") return;
-    } catch {
-      // transient error: keep polling until the deadline
-    }
-  }
+  applySnapshot: (data: Partial<Post>) => void,
+  signal?: AbortSignal
+): Promise<{ outcome: "settled" | "timeout" | "aborted" }> {
+  const result = await pollPostSettled({
+    postId,
+    signal,
+    fetchPost: async (id) => {
+      try {
+        const res = await fetch(`/api/posts/${id}`, { signal });
+        if (!res.ok) return null;
+        const data = (await res.json()) as Partial<Post> & {
+          targets?: { status: string; platform: string; externalPostId: string | null }[];
+        };
+        applySnapshot(data);
+        if (data.status && data.status !== "PUBLISHING") {
+          return {
+            status: data.status,
+            errorMessage: data.errorMessage,
+            targets: (data.targets ?? []).map((t) => ({
+              status: t.status,
+              platform: t.platform as never,
+              externalPostId: t.externalPostId ?? null,
+            })),
+          };
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    },
+    onProgress: undefined,
+  });
+  return { outcome: result.outcome };
 }
 
 async function startBackgroundAction(
@@ -250,6 +268,7 @@ export default function PostDetailPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const pollAbortRef = useRef<AbortController | null>(null);
   const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState("");
@@ -311,15 +330,31 @@ export default function PostDetailPage({
 
   async function handlePublish() {
     setPublishing(true);
-    const result = await startBackgroundAction(`/api/posts/${id}/publish`);
-    if (!result.started) {
-      setPost((prev) => ({ ...prev, errorMessage: result.error }));
-    } else {
-      await pollUntilSettled(id, (data) =>
-        setPost((prev) => ({ ...prev, ...data }))
-      );
+    pollAbortRef.current?.abort();
+    const controller = new AbortController();
+    pollAbortRef.current = controller;
+    try {
+      const result = await startBackgroundAction(`/api/posts/${id}/publish`);
+      if (!result.started) {
+        setPost((prev) => ({ ...prev, errorMessage: result.error }));
+      } else {
+        const polled = await pollUntilSettled(
+          id,
+          (data) => setPost((prev) => ({ ...prev, ...data })),
+          controller.signal
+        );
+        if (polled.outcome === "timeout") {
+          toast.add({
+            title: "Still publishing",
+            description: "The server keeps working — reopen this post to see the result.",
+            type: "warning",
+          });
+        }
+      }
+    } finally {
+      pollAbortRef.current = null;
+      setPublishing(false);
     }
-    setPublishing(false);
   }
 
   async function handleDeleteMedia(mediaId: string) {
@@ -344,18 +379,34 @@ export default function PostDetailPage({
 
   async function handleRetry(targetId?: string) {
     setRetrying(true);
-    const result = await startBackgroundAction(
-      `/api/posts/${id}/retry`,
-      targetId ? { targetId } : {}
-    );
-    if (!result.started) {
-      setPost((prev) => ({ ...prev, errorMessage: result.error }));
-    } else {
-      await pollUntilSettled(id, (data) =>
-        setPost((prev) => ({ ...prev, ...data }))
+    pollAbortRef.current?.abort();
+    const controller = new AbortController();
+    pollAbortRef.current = controller;
+    try {
+      const result = await startBackgroundAction(
+        `/api/posts/${id}/retry`,
+        targetId ? { targetId } : {}
       );
+      if (!result.started) {
+        setPost((prev) => ({ ...prev, errorMessage: result.error }));
+      } else {
+        const polled = await pollUntilSettled(
+          id,
+          (data) => setPost((prev) => ({ ...prev, ...data })),
+          controller.signal
+        );
+        if (polled.outcome === "timeout") {
+          toast.add({
+            title: "Still retrying",
+            description: "The server keeps working — reopen this post to see the result.",
+            type: "warning",
+          });
+        }
+      }
+    } finally {
+      pollAbortRef.current = null;
+      setRetrying(false);
     }
-    setRetrying(false);
   }
 
   function openReschedule() {

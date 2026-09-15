@@ -36,7 +36,15 @@ Better Auth with the Prisma adapter (`src/lib/auth.ts`), mounted at
 Cookie sessions (`Session.token`). Helpers: `getSessionUser()` (nullable),
 `requireUser()` (RSC redirect to `/login`), `getApiUser()` (API alias —
 there is no API-token path). Logout is client `authClient.signOut()`.
-`trustedOrigins`: localhost, `postvia.online`, `www`, `https://*.vercel.app`.
+`trustedOrigins`: localhost, `postvia.online`, `www`, `https://*.vercel.app`
+(+ local-dev extras from `BETTER_AUTH_TRUSTED_ORIGINS`, unset everywhere
+except local machines — see `docs/local-social-dev.md`).
+`baseURL` is dynamic (`allowedHosts`: `postvia.online`, `www`, `*.vercel.app`,
+`localhost:3000` + the same extras as hosts, fallback = production
+resolution): each environment keeps its own hostname, so Preview auth never
+escapes to Production (a static string or the shared `BETTER_AUTH_URL` would
+pin every env to `postvia.online` and break Preview OAuth with
+`state_mismatch`).
 
 ## Abuse hooks (non-enforcing by design)
 

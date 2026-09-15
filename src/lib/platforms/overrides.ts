@@ -130,6 +130,33 @@ export function validateTargetOverrides(
   };
 }
 
+export type NormalizedTiktokContent = {
+  title: string;
+  description: string;
+};
+
+/**
+ * Backward-compatible reader for TikTok override content. Historical
+ * drafts store only `{ title }`; newer ones store `{ title, description }`.
+ * Unknown shapes degrade to empty strings — user text is never dropped,
+ * only absent values default. A legacy `text` key (never written by the
+ * composer, but tolerated) falls back into `title` so no caption is lost.
+ */
+export function normalizeTiktokContent(content: unknown): NormalizedTiktokContent {
+  if (!isRecord(content)) return { title: "", description: "" };
+  const rawTitle = content.title;
+  const rawDescription = content.description;
+  const rawText = content.text;
+  const title =
+    typeof rawTitle === "string"
+      ? rawTitle
+      : typeof rawText === "string"
+        ? rawText
+        : "";
+  const description = typeof rawDescription === "string" ? rawDescription : "";
+  return { title, description };
+}
+
 export function resolveEffectiveTargetContent(
   globalText: string,
   overrides: unknown
@@ -141,9 +168,75 @@ export function resolveEffectiveTargetContent(
   return { text, content, settings };
 }
 
+export type ValidatableMediaItem = {
+  type: MediaKind;
+  mimeType: string;
+  /** Byte size when known (bulk pre-upload check, stored Media rows). */
+  size?: number;
+};
+
+function maxItemsError(caps: PlatformCapabilities): string {
+  return `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`;
+}
+
+function mixingError(caps: PlatformCapabilities): string {
+  const kinds =
+    caps.platform === "X"
+      ? "photos and videos"
+      : caps.platform === "TIKTOK"
+        ? "photos and videos"
+        : "images and videos";
+  // Historical messages name the platform explicitly ("X does not support
+  // mixing…", "TikTok does not support mixing…"); keep them verbatim.
+  if (caps.platform === "X") {
+    return "X does not support mixing photos and videos in one post. Publish the video and the photos as separate posts.";
+  }
+  if (caps.platform === "TIKTOK") {
+    return "TikTok does not support mixing photos and videos in one post. Publish the video and the photos as separate posts.";
+  }
+  return `${caps.label} does not support mixing ${kinds} in one post.`;
+}
+
+function singleVideoError(caps: PlatformCapabilities): string {
+  // Historical messages kept verbatim (tests pin "only one video").
+  if (caps.platform === "X") return "X supports only one video per post.";
+  if (caps.platform === "TIKTOK") return "TikTok supports only one video per post.";
+  return `${caps.label} supports only one video per post.`;
+}
+
+/**
+ * Structural media rules driven by the capability registry flags
+ * (supportsMixedMedia / supportsMultipleVideos / maxItems). The X and
+ * TikTok branches below only add their platform-specific empty-set and
+ * GIF rules; the mixing / single-video verdicts come from the flags so
+ * the registry stays the single source of truth.
+ */
+function checkMediaStructure(
+  caps: PlatformCapabilities,
+  media: readonly ValidatableMediaItem[]
+): string | null {
+  const hasVideo = media.some((item) => item.type === "VIDEO");
+  const hasImage = media.some((item) => item.type === "IMAGE");
+  if (hasVideo && hasImage && !caps.media.supportsMixedMedia) {
+    return mixingError(caps);
+  }
+  if (hasVideo && media.length > 1 && !caps.media.supportsMultipleVideos) {
+    return singleVideoError(caps);
+  }
+  if (media.length > caps.media.maxItems) {
+    return maxItemsError(caps);
+  }
+  return null;
+}
+
+function formatMegabytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return Number.isInteger(mb) ? String(mb) : mb.toFixed(1);
+}
+
 export function validateTargetMedia(
   caps: PlatformCapabilities,
-  media: readonly { type: MediaKind; mimeType: string }[]
+  media: readonly ValidatableMediaItem[]
 ): { ok: true } | { ok: false; error: string } {
   if (media.length > 0 && caps.media.maxItems === 0) {
     return {
@@ -152,33 +245,14 @@ export function validateTargetMedia(
     };
   }
   // X supports text, up to 4 photos, 1 GIF, or 1 video per post
-  // (official v2 media upload + media_ids attach). Mixing photos and
-  // video is always rejected; the fine-grained rules (5 MB photos,
-  // 15 MB GIF, MP4/MOV video) live in resolveXMediaPolicy so the global
-  // media pipeline stays broader than X.
+  // (official v2 media upload + media_ids attach). The fine-grained
+  // publish-time rules (15 MB GIF, MP4/MOV video, per-photo bytes) live
+  // in resolveXMediaPolicy; the registry-level size cap below (5 MB
+  // photos) is the pre-upload subset that binds tighter than global.
   if (caps.platform === "X") {
     if (media.length === 0) return { ok: true };
-    const hasVideo = media.some((item) => item.type === "VIDEO");
-    const hasImage = media.some((item) => item.type === "IMAGE");
-    if (hasVideo && hasImage) {
-      return {
-        ok: false,
-        error:
-          "X does not support mixing photos and videos in one post. Publish the video and the photos as separate posts.",
-      };
-    }
-    if (hasVideo && media.length > 1) {
-      return {
-        ok: false,
-        error: "X supports only one video per post.",
-      };
-    }
-    if (media.length > caps.media.maxItems) {
-      return {
-        ok: false,
-        error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
-      };
-    }
+    const structural = checkMediaStructure(caps, media);
+    if (structural) return { ok: false, error: structural };
   } else if (caps.platform === "TIKTOK") {
     if (media.length === 0) {
       return {
@@ -186,39 +260,16 @@ export function validateTargetMedia(
         error: "TikTok requires one video or at least one photo (JPEG/WebP).",
       };
     }
-    const hasVideo = media.some((item) => item.type === "VIDEO");
-    const hasImage = media.some((item) => item.type === "IMAGE");
-    if (hasVideo && hasImage) {
-      return {
-        ok: false,
-        error:
-          "TikTok does not support mixing photos and videos in one post. Publish the video and the photos as separate posts.",
-      };
-    }
-    if (hasVideo && media.length > 1) {
-      return {
-        ok: false,
-        error: "TikTok supports only one video per post.",
-      };
-    }
-    if (media.length > caps.media.maxItems) {
-      return {
-        ok: false,
-        error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
-      };
-    }
+    const structural = checkMediaStructure(caps, media);
+    if (structural) return { ok: false, error: structural };
   } else {
     if (media.length === 0) {
       return caps.supportsText
         ? { ok: true }
         : { ok: false, error: `${caps.label} requires exactly one media item` };
     }
-    if (media.length > caps.media.maxItems) {
-      return {
-        ok: false,
-        error: `${caps.label} supports at most ${caps.media.maxItems} media item${caps.media.maxItems === 1 ? "" : "s"}`,
-      };
-    }
+    const structural = checkMediaStructure(caps, media);
+    if (structural) return { ok: false, error: structural };
     if (caps.media.requiredKind && caps.media.requiredKind === "VIDEO") {
       if (media.some((item) => item.type !== "VIDEO")) {
         return {
@@ -242,6 +293,24 @@ if (!caps.implemented) {
         return {
           ok: false,
           error: `${caps.label} does not support ${item.mimeType}. ${caps.label} accepts ${caps.media.mimeTypes.map((m) => m.split("/").pop()).join(" / ")} files.`,
+        };
+      }
+      // Platform byte caps stricter than global (today: X stills 5 MB).
+      // Size is optional — callers without it (legacy text checks) skip.
+      const cap =
+        item.type === "VIDEO"
+          ? caps.media.maxFileSizeBytes?.video
+          : caps.media.maxFileSizeBytes?.image;
+      if (
+        cap !== undefined &&
+        Number.isFinite(item.size) &&
+        (item.size as number) > 0 &&
+        (item.size as number) > cap
+      ) {
+        const kindNoun = item.type === "VIDEO" ? "video" : "image";
+        return {
+          ok: false,
+          error: `${caps.label} accepts ${kindNoun} files up to ${formatMegabytes(cap)} MB.`,
         };
       }
     }

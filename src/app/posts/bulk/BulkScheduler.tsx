@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import { validateMediaInput } from "@/lib/media";
+import { waitForMediaRegistration } from "@/lib/media-registration";
 import {
   BULK_INTERVAL_PRESETS,
   BULK_MAX_VIDEOS,
@@ -26,10 +27,12 @@ import {
   partitionDuplicateAdds,
   shouldAcceptRunRequest,
   validateBulkConfig,
-  validateBulkVideoForAccounts,
+  validateBulkVideoForAccountsDetailed,
   zonedTimeToIso,
   type BulkAccountRef,
+  type BulkCapabilityIssue,
 } from "@/lib/bulk-schedule";
+import { bulkItemOperationId, newOperationId } from "@/lib/idempotency";
 import { getPlan, type PlanId } from "@/lib/plans";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
@@ -75,11 +78,17 @@ type ItemStatus =
   | "uploading"
   | "registering"
   | "scheduling"
-  | "done"
-  | "error";
+  | "scheduled"
+  | "failed";
 
 type BulkItem = {
   key: string;
+  /**
+   * Stable batch slot assigned once when the item enters the batch.
+   * Survives removals and retry-only runs: the idempotency key derives
+   * from (batchId, slot), never from the list position.
+   */
+  slot: number;
   file: File;
   progress: number;
   status: ItemStatus;
@@ -87,10 +96,6 @@ type BulkItem = {
   postId?: string;
   scheduledIso?: string;
 };
-
-// Upload/status polling windows mirror the manual composer (same pipeline).
-const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
-const MEDIA_REGISTER_POLL_MS = 500;
 
 let itemKeyCounter = 0;
 
@@ -138,26 +143,6 @@ function formatInZone(iso: string, timeZone: string): string {
   });
 }
 
-async function waitForMediaRegistration(
-  postId: string,
-  pathname: string
-): Promise<string | null> {
-  const deadline = Date.now() + MEDIA_REGISTER_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    const res = await fetch(
-      `/api/media/status?postId=${encodeURIComponent(postId)}&pathname=${encodeURIComponent(pathname)}`
-    );
-    if (res.ok) {
-      const data = (await res.json().catch(() => null)) as {
-        exists?: boolean;
-      } | null;
-      if (data?.exists) return null;
-    }
-    await new Promise((r) => setTimeout(r, MEDIA_REGISTER_POLL_MS));
-  }
-  return "Upload did not finish registering in time. Please try again.";
-}
-
 export function BulkScheduler({
   accounts,
   billing,
@@ -185,6 +170,21 @@ export function BulkScheduler({
   const [intervalMinutes, setIntervalMinutes] = useState(1440);
   const [running, setRunning] = useState(false);
   const runningRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  // Batch idempotency: one batch id per component lifetime, one stable
+  // slot per item. Every create carries bulkItemOperationId(batchId, slot)
+  // so a double-submit — even two runs interleaved — collapses onto the
+  // same Post rows server-side instead of creating 2N posts.
+  const batchIdRef = useRef<string | null>(null);
+  const slotCounterRef = useRef(0);
+  function getBatchId(): string {
+    if (!batchIdRef.current) batchIdRef.current = newOperationId();
+    return batchIdRef.current;
+  }
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
   const [configError, setConfigError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
   const [pendingDupes, setPendingDupes] = useState<File[]>([]);
@@ -217,29 +217,48 @@ export function BulkScheduler({
     accountCount: selectedAccountIds.length,
   });
 
-  // Capability gate per file, same registry rules as the manual composer.
-  const fileProblems = useMemo(() => {
+  // Capability gate per file, same registry rules as the manual composer
+  // plus the global file gate (size/type). Fully attributed per file and
+  // per account BEFORE any upload starts: "clip.mp4 — X: <reason>".
+  // Keyed by item key so two items sharing a filename stay independent.
+  const { bulkIssues, fileProblems }: {
+    bulkIssues: BulkCapabilityIssue[];
+    fileProblems: Map<string, string[]>;
+  } = useMemo(() => {
+    const all: BulkCapabilityIssue[] = [];
     const problems = new Map<string, string[]>();
     for (const item of items) {
-      const errors = validateBulkVideoForAccounts(
-        item.file.type,
+      const issues = validateBulkVideoForAccountsDetailed(
+        { name: item.file.name, mimeType: item.file.type, size: item.file.size },
         selectedAccounts
       );
-      if (errors.length > 0) problems.set(item.key, errors);
+      all.push(...issues);
+      if (issues.length > 0) {
+        problems.set(
+          item.key,
+          issues.map((issue) => issue.message)
+        );
+      }
     }
-    return problems;
+    return { bulkIssues: all, fileProblems: problems };
   }, [items, selectedAccounts]);
 
-  const doneCount = items.filter((item) => item.status === "done").length;
-  const errorCount = items.filter((item) => item.status === "error").length;
+  const doneCount = items.filter((item) => item.status === "scheduled").length;
+  const errorCount = items.filter((item) => item.status === "failed").length;
   const activeCount = items.filter(
-    (item) => item.status !== "done" && item.status !== "error"
+    (item) => item.status !== "scheduled" && item.status !== "failed"
   ).length;
 
   function appendFiles(files: File[]) {
+    // Slots are assigned outside the state updater (updaters must stay
+    // pure and may re-run); gaps from room-capping are harmless.
+    const withSlots = files.map((file) => ({
+      file,
+      slot: slotCounterRef.current++,
+    }));
     setItems((prev) => {
       const room = batchCap - prev.length;
-      const capped = files.slice(0, Math.max(0, room));
+      const capped = withSlots.slice(0, Math.max(0, room));
       if (files.length > capped.length) {
         toast.add({
           title: "Batch is full",
@@ -249,8 +268,9 @@ export function BulkScheduler({
       }
       return [
         ...prev,
-        ...capped.map((file) => ({
+        ...capped.map(({ file, slot }) => ({
           key: nextItemKey(),
+          slot,
           file,
           progress: 0,
           status: "queued" as const,
@@ -333,7 +353,9 @@ export function BulkScheduler({
   async function uploadOneVideo(
     postId: string,
     file: File,
-    onProgress: (percent: number) => void
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+    onRegistering?: () => void
   ): Promise<string | null> {
     onProgress(0);
     const prepRes = await fetch("/api/media/prepare", {
@@ -367,7 +389,14 @@ export function BulkScheduler({
           onProgress(Math.min(100, Math.round(percentage))),
       });
       onProgress(100);
-      return await waitForMediaRegistration(postId, uploaded.pathname || pathname);
+      // Bytes are stored; now waiting on the server webhook to register
+      // the Media row — a distinct, visible stage.
+      onRegistering?.();
+      return await waitForMediaRegistration({
+        postId,
+        pathname: uploaded.pathname || pathname,
+        signal,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown upload error";
       return `Upload failed: ${message}`;
@@ -377,10 +406,17 @@ export function BulkScheduler({
   async function processItem(
     item: BulkItem,
     scheduledIso: string,
-    batchSize: number
+    batchSize: number,
+    signal?: AbortSignal
   ): Promise<boolean> {
+    if (signal?.aborted) {
+      patchItem(item.key, { status: "failed", error: "Batch cancelled." });
+      return false;
+    }
     // 1. Draft first: an aborted batch leaves harmless drafts, never
-    //    half-broken scheduled posts.
+    //    half-broken scheduled posts. The idempotency key is stable per
+    //    (batch, slot): a retried or double-submitted item replays onto
+    //    its own existing draft instead of creating a second post.
     patchItem(item.key, { status: "creating", error: undefined });
     let postId: string;
     try {
@@ -392,12 +428,13 @@ export function BulkScheduler({
           // Attests the whole batch size so the server can enforce the
           // plan's bulk gate per item; the monthly quota backstops the rest.
           bulkBatchSize: batchSize,
+          clientOperationId: bulkItemOperationId(getBatchId(), item.slot),
         }),
       });
       const created = await createRes.json().catch(() => null);
       if (!createRes.ok || typeof created?.id !== "string") {
         patchItem(item.key, {
-          status: "error",
+          status: "failed",
           error:
             typeof created?.error === "string"
               ? created.error
@@ -407,20 +444,24 @@ export function BulkScheduler({
       }
       postId = created.id;
     } catch {
-      patchItem(item.key, { status: "error", error: "Network error. Please try again." });
+      patchItem(item.key, { status: "failed", error: "Network error. Please try again." });
       return false;
     }
     patchItem(item.key, { postId });
 
     // 2. Upload the video through the standard secure pipeline.
     patchItem(item.key, { status: "uploading", progress: 0 });
-    const uploadError = await uploadOneVideo(postId, item.file, (percent) =>
-      patchItem(item.key, { progress: percent })
+    const uploadError = await uploadOneVideo(
+      postId,
+      item.file,
+      (percent) => patchItem(item.key, { progress: percent }),
+      signal,
+      () => patchItem(item.key, { status: "registering" })
     );
     if (uploadError) {
       // No half-broken scheduled post: remove the draft (and its blob).
       await fetch(`/api/posts/${postId}`, { method: "DELETE" }).catch(() => null);
-      patchItem(item.key, { status: "error", error: uploadError });
+      patchItem(item.key, { status: "failed", error: uploadError });
       return false;
     }
 
@@ -436,7 +477,7 @@ export function BulkScheduler({
       if (!scheduleRes.ok) {
         await fetch(`/api/posts/${postId}`, { method: "DELETE" }).catch(() => null);
         patchItem(item.key, {
-          status: "error",
+          status: "failed",
           error:
             typeof scheduled?.error === "string"
               ? scheduled.error
@@ -446,10 +487,10 @@ export function BulkScheduler({
       }
     } catch {
       await fetch(`/api/posts/${postId}`, { method: "DELETE" }).catch(() => null);
-      patchItem(item.key, { status: "error", error: "Network error. Please try again." });
+      patchItem(item.key, { status: "failed", error: "Network error. Please try again." });
       return false;
     }
-    patchItem(item.key, { status: "done", progress: 100, scheduledIso });
+    patchItem(item.key, { status: "scheduled", progress: 100, scheduledIso });
     return true;
   }
 
@@ -473,7 +514,7 @@ export function BulkScheduler({
       return;
     }
     const queue = items.filter((item) =>
-      retryOnly ? item.status === "error" : item.status !== "done"
+      retryOnly ? item.status === "failed" : item.status !== "scheduled"
     );
     if (queue.length === 0) return;
     // Monthly quota is enforced per post server-side; check up front so a
@@ -489,24 +530,28 @@ export function BulkScheduler({
       intervalMinutes,
       items.length
     );
+    const controller = new AbortController();
+    abortRef.current = controller;
     setRunning(true);
     runningRef.current = true;
     setFinished(false);
     let succeeded = 0;
     try {
       for (const item of queue) {
+        if (controller.signal.aborted) break;
         const index = items.findIndex((entry) => entry.key === item.key);
         const iso = isos[index];
         if (!iso) {
-          patchItem(item.key, { status: "error", error: "Could not compute schedule." });
+          patchItem(item.key, { status: "failed", error: "Could not compute schedule." });
           continue;
         }
-        if (await processItem(item, iso, queue.length)) succeeded++;
+        if (await processItem(item, iso, queue.length, controller.signal)) succeeded++;
       }
     } finally {
       runningRef.current = false;
       setRunning(false);
       setFinished(true);
+      abortRef.current = null;
     }
     if (succeeded === queue.length && queue.length > 0) {
       const firstIso = isos[items.findIndex((entry) => entry.key === queue[0].key)];
@@ -714,12 +759,12 @@ export function BulkScheduler({
                         className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground"
                       >
                         <ClapperboardIcon className="size-5" />
-                        {item.status === "done" && (
+                        {item.status === "scheduled" && (
                           <span className="absolute inset-0 flex items-center justify-center bg-primary/70">
                             <CircleCheckIcon className="size-5 text-primary-foreground" />
                           </span>
                         )}
-                        {item.status === "error" && (
+                        {item.status === "failed" && (
                           <span className="absolute inset-0 flex items-center justify-center bg-destructive/60">
                             <OctagonXIcon className="size-5 text-white" />
                           </span>
@@ -749,12 +794,21 @@ export function BulkScheduler({
                             {item.error}
                           </span>
                         )}
+                        {item.status === "queued" &&
+                          (fileProblems.get(item.key) ?? []).map((message) => (
+                            <span
+                              key={message}
+                              className="mt-0.5 block truncate text-xs text-destructive"
+                            >
+                              {message}
+                            </span>
+                          ))}
                       </span>
-                      {item.status === "done" ? (
+                      {item.status === "scheduled" ? (
                         <Badge variant="secondary" className="shrink-0">
                           Scheduled
                         </Badge>
-                      ) : item.status === "error" ? (
+                      ) : item.status === "failed" ? (
                         <Badge variant="destructive" className="shrink-0">
                           Failed
                         </Badge>
@@ -1061,7 +1115,21 @@ export function BulkScheduler({
                   <TriangleAlertIcon />
                   <AlertTitle>Unsupported combination</AlertTitle>
                   <AlertDescription>
-                    {Array.from(fileProblems.values()).flat().join(" ")}
+                    <span className="mb-1 block">
+                      Fix these before scheduling — nothing has been uploaded yet.
+                    </span>
+                    <ul className="flex list-disc flex-col gap-0.5 pl-4">
+                      {bulkIssues.slice(0, 8).map((issue) => (
+                        <li key={`${issue.fileName}-${issue.accountId}`}>
+                          {issue.message}
+                        </li>
+                      ))}
+                    </ul>
+                    {bulkIssues.length > 8 && (
+                      <span className="mt-1 block">
+                        …and {bulkIssues.length - 8} more.
+                      </span>
+                    )}
                   </AlertDescription>
                 </Alert>
               )}
@@ -1109,11 +1177,11 @@ export function BulkScheduler({
                             "no accounts"}
                         </p>
                       </div>
-                      {item.status === "done" ? (
+                      {item.status === "scheduled" ? (
                         <Badge variant="secondary" className="shrink-0">
                           Scheduled
                         </Badge>
-                      ) : item.status === "error" ? (
+                      ) : item.status === "failed" ? (
                         <Badge variant="destructive" className="shrink-0">
                           Failed
                         </Badge>
@@ -1207,6 +1275,16 @@ export function BulkScheduler({
                   value={Math.round(((doneCount + errorCount) / items.length) * 100)}
                   aria-label="Batch progress"
                 />
+              )}
+              {running && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => abortRef.current?.abort()}
+                  className="min-h-11 w-full"
+                >
+                  Cancel batch
+                </Button>
               )}
               {finished && !allDone && (
                 <Alert variant="destructive">

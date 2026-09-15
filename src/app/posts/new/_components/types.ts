@@ -36,7 +36,13 @@ export type ConnectedAccount = {
 
 export type TargetOverrideState = Record<
   string,
-  { text?: string; title?: string; settings?: Record<string, unknown> }
+  {
+    text?: string;
+    title?: string;
+    /** TikTok photo description (photo flow only; never sent for video). */
+    description?: string;
+    settings?: Record<string, unknown>;
+  }
 >;
 
 export type TiktokCreatorInfo = {

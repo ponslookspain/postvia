@@ -4,59 +4,48 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "cn";
-import { Reveal } from "@/components/landing/Reveal";
 import { Button } from "@/components/ui/button";
 
-const faqs: { question: string; answer: React.ReactNode }[] = [
+const faqs = [
   {
-    question: "What is Postvia?",
+    question: "Which platforms does Postvia support?",
     answer:
-      "Postvia is a workspace for publishing to social media. You write a post once, preview it per platform, and schedule or publish it to every connected profile from one place.",
-  },
-  {
-    question: "Which platforms are supported?",
-    answer:
-      "Instagram, Threads, TikTok and X. Connect any combination of them; more platforms will follow.",
+      "Postvia supports Instagram, Threads, TikTok, and X. You can connect any combination of them, subject to your plan's account limit.",
   },
   {
     question: "Can I schedule posts?",
     answer:
-      "Yes — pick a date and time and the post goes out automatically. X publishes immediately; scheduling is available for Threads, TikTok and Instagram.",
+      "Yes. Instagram, Threads, and TikTok can be scheduled for a future date and time. X publishes immediately.",
   },
   {
-    question: "Can I customize content per platform?",
+    question: "Can I customize a post for each platform?",
     answer:
-      "Yes. Every post starts from one global text, and each connected account can carry its own version — including TikTok titles and posting options.",
+      "Yes. Start with one global caption, then customize individual accounts when needed. TikTok also supports its own title and publishing settings.",
   },
   {
-    question: "Can I upload videos?",
+    question: "How many accounts can I connect?",
     answer:
-      "Yes. MP4 and WebM videos up to 100 MB, and JPG, PNG, WebP or GIF images up to 10 MB. You see upload progress per file.",
+      "Free includes 1 connected account, Growth includes up to 5, and Scale is unlimited.",
   },
   {
     question: "How does bulk video scheduling work?",
     answer:
-      "Drop up to 10 videos, choose a start date, a timezone and an interval. Each video becomes its own scheduled post, and you land on the calendar with the full batch.",
+      "Growth and Scale let you add up to 10 videos to a batch, choose the starting time and interval, review the schedule, and create the posts at once.",
   },
   {
-    question: "Can I connect multiple accounts?",
+    question: "What can I upload?",
     answer:
-      "Yes, up to your plan's total limit (Free: 1, Growth: 5, Scale: unlimited), including several handles on the same platform where supported. Each account can be reconnected or disconnected independently.",
+      "Postvia supports common image formats plus MP4, WebM, and MOV video, with per-file upload progress. Each network applies its own media requirements before publishing.",
   },
   {
-    question: "How does media storage work?",
+    question: "Does Postvia store my social media password?",
     answer:
-      "Uploads land in your private store. Still images are kept as optimized canonical copies, videos untouched. Files without a post are swept automatically, and everything is removed when you delete the post.",
+      "No. Social connections use OAuth. Postvia stores access tokens rather than your social passwords.",
   },
   {
-    question: "Is my social password stored?",
+    question: "What happens if publishing fails?",
     answer:
-      "No. Connections use official OAuth, so Postvia only ever holds access tokens — never your social passwords. Disconnecting removes access.",
-  },
-  {
-    question: "What happens when a scheduled post fails?",
-    answer:
-      "The post keeps its error message and every failed target can be retried individually from the post page. Partially published posts show exactly which platforms succeeded.",
+      "Failed accounts keep their status and error information so you can retry them individually. If some accounts already published, those successful targets are left untouched.",
   },
 ];
 
@@ -68,7 +57,7 @@ function FaqItem({
   index,
 }: {
   question: string;
-  answer: React.ReactNode;
+  answer: string;
   open: boolean;
   onToggle: () => void;
   index: number;
@@ -98,10 +87,8 @@ function FaqItem({
         id={`faq-panel-${index}`}
         role="region"
         aria-labelledby={`faq-button-${index}`}
-        className={cn(
-          "grid transition-[grid-template-rows] duration-200 motion-reduce:transition-none",
-          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-        )}
+        hidden={!open}
+        className="grid grid-rows-[1fr] motion-reduce:transition-none"
       >
         <div className="overflow-hidden">
           <p className="max-w-2xl pb-5 text-sm leading-relaxed text-muted-foreground">
@@ -116,43 +103,32 @@ function FaqItem({
 export function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   return (
-    <section id="faq" className="scroll-mt-20 border-t border-border">
+    <section
+      id="faq"
+      aria-labelledby="faq-heading"
+      className="scroll-mt-20 border-t border-border"
+    >
       <div className="mx-auto w-full max-w-3xl px-4 py-14 md:px-8 md:py-20">
-        <Reveal>
-          <h2 className="text-3xl font-semibold tracking-tight text-balance md:text-4xl">
-            Questions, answered.
-          </h2>
-        </Reveal>
-        <Reveal className="mt-8" delayMs={80}>
-          <div>
-            {faqs.map((faq, index) => (
-              <FaqItem
-                key={faq.question}
-                index={index}
-                question={faq.question}
-                answer={faq.answer}
-                open={openIndex === index}
-                onToggle={() =>
-                  setOpenIndex((current) => (current === index ? null : index))
-                }
-              />
-            ))}
-          </div>
-        </Reveal>
-        <Reveal className="mt-10 text-center" delayMs={120}>
-          <p className="text-sm text-muted-foreground">
-            Ready to publish everywhere?{" "}
-            <Link href="/signup" className="font-medium text-foreground underline underline-offset-4 hover:no-underline">
-              Get started
-            </Link>
-            .
-          </p>
-          <div className="mt-4 flex justify-center">
-            <Button nativeButton={false} render={<Link href="/signup" />}>
-              Get started
-            </Button>
-          </div>
-        </Reveal>
+        <h2
+          id="faq-heading"
+          className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
+        >
+          Questions, answered.
+        </h2>
+        <div className="mt-8">
+          {faqs.map((faq, index) => (
+            <FaqItem
+              key={faq.question}
+              index={index}
+              question={faq.question}
+              answer={faq.answer}
+              open={openIndex === index}
+              onToggle={() =>
+                setOpenIndex((current) => (current === index ? null : index))
+              }
+            />
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -160,26 +136,42 @@ export function Faq() {
 
 export function FinalCta() {
   return (
-    <section className="border-t border-border">
+    <section
+      aria-labelledby="final-cta-heading"
+      className="border-t border-border"
+    >
       <div className="mx-auto w-full max-w-3xl px-4 py-16 text-center md:px-8 md:py-24">
-        <Reveal>
-          <h2 className="text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-            Stop posting one app at a time.
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
-            One workspace for writing, scheduling and publishing everywhere
-            you are.
-          </p>
-          <div className="mt-8 flex justify-center">
-            <Button
-              size="lg"
-              nativeButton={false}
-              render={<Link href="/signup" />}
-            >
-              Get started
-            </Button>
-          </div>
-        </Reveal>
+        <h2
+          id="final-cta-heading"
+          className="text-4xl font-semibold tracking-tight text-balance md:text-5xl"
+        >
+          Publish with less busywork.
+        </h2>
+        <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">
+          Create once, tailor where needed, schedule ahead, and keep every
+          publishing result visible.
+        </p>
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Button
+            size="lg"
+            nativeButton={false}
+            render={<Link href="/signup" />}
+          >
+            Get started free
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            nativeButton={false}
+            render={<Link href="#pricing" />}
+          >
+            See pricing
+          </Button>
+        </div>
+        <p className="mt-4 text-sm text-muted-foreground">
+          15 posts/month on Free · 1 connected account · no credit card
+          required
+        </p>
       </div>
     </section>
   );
@@ -193,12 +185,15 @@ export function Footer() {
           <div>
             <p className="text-lg font-semibold tracking-tight">postvia</p>
             <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-              Publish everywhere. Stay in one place.
+              Create once. Tailor for every network. Know what published.
             </p>
           </div>
-          <nav aria-label="Footer" className="grid grid-cols-2 gap-x-12 gap-y-2.5 sm:grid-cols-3">
+          <nav
+            aria-label="Footer"
+            className="grid grid-cols-2 gap-x-12 gap-y-2.5 sm:grid-cols-3"
+          >
             {[
-              { href: "#product", label: "Product" },
+              { href: "#how", label: "How it works" },
               { href: "#pricing", label: "Pricing" },
               { href: "#faq", label: "FAQ" },
               { href: "/privacy", label: "Privacy" },
@@ -217,7 +212,7 @@ export function Footer() {
           </nav>
         </div>
         <p className="mt-8 text-xs text-muted-foreground">
-          Postvia — one workspace for social publishing.
+          Postvia — social publishing without the tab-hopping.
         </p>
       </div>
     </footer>

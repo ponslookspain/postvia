@@ -21,19 +21,28 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `STRIPE_WEBHOOK_SECRET` | yes (billing) | per-env | Webhook signature (src) | **yes** |
 | `STRIPE_PRICE_GROWTH` / `STRIPE_PRICE_SCALE` | yes (billing) | per-env | Test prices required for test mode (src) | no |
 | `CRON_SECRET` | prod yes | prod | Cron Bearer auth; missing ⇒ always 401 (src) | **yes** |
-| `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src) | **yes** |
+| `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src). The SDK refuses presigned URLs without it | **yes** |
+| `VERCEL_BLOB_CALLBACK_URL` | yes (media) | local only | Overrides the Blob upload-completed webhook target (src reads it via SDK). Set to the ngrok origin locally, otherwise no `Media` rows are created; on Vercel the platform origin applies automatically | no |
+| `BLOB_READ_WRITE_TOKEN` | yes (media) | local only | Blob credential for local uploads (src). Production gets its store binding from the platform; locally a missing token fails every upload ("No blob credentials found"). Create a Read-Write token in Vercel Dashboard → Storage (prefer a separate dev store) | **yes** |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | all | Error reporting; missing ⇒ console-only (src) | no |
 | `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |
-| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | no | CI | Sourcemap upload | **yes** |
-| `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src) | no |
+| `SENTRY_AUTH_TOKEN` | no | Vercel (Secret) | Sourcemap upload + release creation (org `postvia` / project `javascript-nextjs` are pinned in `next.config.ts`); missing ⇒ upload skipped, build stays green | **yes** |
+| `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src). Local social-dev: set to the tunnel origin (src fallback + email links + TikTok bridge host) | no |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | no | local only | CSV of extra Better Auth origins appended to `allowedHosts`/`trustedOrigins` (src). Never set in Vercel Preview/Production | no |
 | `OTP_E2E_DEBUG` / `OTP_DEBUG_TOKEN` | no | local test only | Plaintext-OTP + gated code reader for local automated E2E (`src/lib/auth.ts`, `/api/auth/otp/debug`). Never set outside local testing; production/preview always hash | **yes** |
-| `THREADS_POLL_DELAY_MS` (+ `MAX_ATTEMPTS`, `TIMEOUT_MS`, `VIDEO_*`) | no | all | Threads publish polling tuning (src) | no |
+| `THREADS_POLL_DELAY_MS` / `THREADS_MAX_ATTEMPTS` / `THREADS_TIMEOUT_MS` | no | all | Threads publish polling tuning (src) | no |
+| `THREADS_VIDEO_POLL_DELAY_MS` / `THREADS_VIDEO_MAX_ATTEMPTS` / `THREADS_VIDEO_TIMEOUT_MS` | no | all | Threads video publish polling tuning (src) | no |
+| `ALLOW_TEST_CLEANUP` | no | local test only | Gate for `scripts/cleanup-test-users.ts` | no |
+| `PG_INTEGRATION` | no | local test only | `1` enables `npm run test:pg` against an isolated DB (never production) | no |
+| `E2E_BASE` | no | local test only | Base URL for `scripts/e2e-otp-check.ts` | no |
+| `BLOB_STORE_ID` | no | local scripts | Vercel Blob store used by `scripts/reset-data.ts` | **yes** |
 
 Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
 `VERCEL_PROJECT_PRODUCTION_URL`. `NODE_ENV` switches dev/prod defaults.
 `NEXT_RUNTIME` is branched in Blob code. Local-only: `DATABASE_URL`
 (example), `CRON_SECRET` dev value, `VERCEL_OIDC_TOKEN` (CLI auth).
+Template with safe placeholders: [`.env.example`](../.env.example).
 
 Adding/changing a Vercel Environment Variable normally needs a new
-deployment (or Redeploy) before it applies. Full Local → Preview →
-Production process: [`docs/workflow.md`](workflow.md).
+deployment (or Redeploy) before it applies. Full Local → PR → automatic
+Production-from-`main` process: [`docs/workflow.md`](workflow.md).

@@ -4,6 +4,8 @@ import { getApiUser } from "@/lib/auth";
 import { deleteBlobs } from "@/lib/blob";
 import { resolveScheduledAtUpdate } from "@/lib/schedule";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
+import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
+import { validateTargetMedia } from "@/lib/platforms/overrides";
 
 async function findOwnedPost(id: string, userId: string) {
   return prisma.post.findFirst({
@@ -120,6 +122,34 @@ export async function PATCH(
       data.scheduledAt = resolution.data.scheduledAt;
       data.status = resolution.data.status;
       data.errorMessage = null;
+
+      // Defense-in-depth: never park a post in SCHEDULED with media its
+      // targets cannot publish. The client blocks incompatible combos
+      // before upload (capability validation) and the publish pipeline
+      // re-checks at publish time; this is the middle layer that keeps a
+      // broken combination a DRAFT instead of a doomed schedule. The post
+      // is left untouched — the caller keeps the draft id for recovery.
+      if (resolution.data.status === "SCHEDULED" && existing.media.length > 0) {
+        const storedMedia = existing.media.map((item) => ({
+          type: item.type,
+          mimeType: item.mimeType,
+          size: item.size,
+        }));
+        for (const target of existing.targets) {
+          const verdict = validateTargetMedia(
+            getPlatformCapabilities(target.platform),
+            storedMedia
+          );
+          if (!verdict.ok) {
+            return NextResponse.json(
+              {
+                error: `Cannot schedule: ${verdict.error} ${existing.status === "SCHEDULED" ? "The existing schedule was left unchanged." : "The post was kept as a draft."}`,
+              },
+              { status: 400 }
+            );
+          }
+        }
+      }
     }
 
     if (Object.keys(data).length === 0) {

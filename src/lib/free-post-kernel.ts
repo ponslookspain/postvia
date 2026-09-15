@@ -24,6 +24,7 @@ import {
   type QuotaClaimStore,
 } from "@/lib/entitlements";
 import { reportError } from "@/lib/diagnostics";
+import { isIdempotencyConflict } from "@/lib/idempotency";
 
 /**
  * Atomic Free post-creation kernel.
@@ -438,7 +439,14 @@ export async function createFreePostAtomic<T>(input: {
     return await runOnce();
   } catch (txError) {
     let error: unknown = txError;
-    if (isRaceConflictError(txError)) {
+    // A unique violation on the idempotency key is NOT a merge/link race:
+    // it proves a twin request with the same clientOperationId already
+    // committed its post (unique checks only fail against committed rows —
+    // an uncommitted twin would block, then proceed-or-fail on its own
+    // fate). Retrying would re-run the whole resolve+claim body just to
+    // fail the insert again, so skip straight to the route-level winner
+    // lookup. Every other race conflict keeps the single optimistic retry.
+    if (isRaceConflictError(txError) && !isIdempotencyConflict(txError)) {
       // Optimistic-concurrency retry: a concurrent merge/link aborted our
       // transaction (never a partial commit). The body is idempotent, so
       // exactly one retry is safe and converts a razor-edge 500 into a

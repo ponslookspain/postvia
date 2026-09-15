@@ -255,6 +255,12 @@ describe("canSubmitComposer", () => {
     assert.equal(canSubmitComposer({ ...ready, hasSelection: false }), false);
     assert.equal(canSubmitComposer({ ...ready, busy: true }), false);
   });
+
+  test("preview validation errors block publish (tiktok title missing)", () => {
+    assert.equal(canSubmitComposer({ ...ready, previewError: true }), false);
+    assert.equal(canSubmitComposer({ ...ready, previewError: false }), true);
+    assert.equal(canSubmitComposer(ready), true);
+  });
 });
 
 describe("isTikTokReconnectNeeded", () => {

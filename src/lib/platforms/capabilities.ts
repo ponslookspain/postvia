@@ -25,9 +25,35 @@ export type PlatformCapabilities = {
     maxItems: number;
     requiredKind?: MediaKind;
     mimeTypes?: readonly string[];
+    /**
+     * Per-kind byte caps STRICTER than the global MEDIA_LIMITS
+     * (validateMediaInput: 10 MB images, 100 MB videos). Absent means the
+     * platform accepts everything the global gate lets through:
+     *   - video: Threads / X (official 512 MB chunked upload) / Instagram
+     *     (Reels, GB-scale) / TikTok (Direct Post, GB-scale) all sit far
+     *     above the global 100 MB ceiling, so no platform video cap binds.
+     *   - image: only X stills are stricter (5 MB per photo). TikTok photos
+     *     (20 MB) are LOOSER than global — a known gap: 10–20 MB JPEGs are
+     *     blocked globally before TikTok's own gate. Narrowing the global
+     *     image ceiling per platform is out of scope; the publish pipeline
+     *     (resolveTiktokMediaPolicy) stays authoritative at publish time.
+     * Sizes here mirror the provider constants (X_IMAGE_MAX_BYTES, …) —
+     * update both sides together; a unit test pins the equality.
+     */
+    maxFileSizeBytes?: {
+      image?: number;
+      video?: number;
+    };
+    /** False: photos and video can never share one post on this platform. */
+    supportsMixedMedia: boolean;
+    /** False: at most one video per post, even when maxItems > 1. */
+    supportsMultipleVideos: boolean;
   };
   fields: readonly CapabilityField[];
 };
+
+/** 5 MB — mirrors X_IMAGE_MAX_BYTES in @/lib/social/x. */
+export const X_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 
 const THREADS: PlatformCapabilities = {
   platform: "THREADS",
@@ -43,6 +69,8 @@ const THREADS: PlatformCapabilities = {
     video: true,
     maxItems: 1,
     mimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4"],
+    supportsMixedMedia: false,
+    supportsMultipleVideos: false,
   },
   fields: [
     { key: "text", label: "Text", type: "text", maxLength: 500 },
@@ -71,6 +99,12 @@ const X: PlatformCapabilities = {
       "video/mp4",
       "video/quicktime",
     ],
+    // X stills are stricter than global (5 MB vs 10 MB). GIFs (15 MB
+    // official) never bind: the global 10 MB image ceiling is tighter.
+    // Video (official 512 MB chunked) never binds either.
+    maxFileSizeBytes: { image: X_PHOTO_MAX_BYTES },
+    supportsMixedMedia: false,
+    supportsMultipleVideos: false,
   },
   fields: [
     { key: "text", label: "Text", type: "text", maxLength: 280 },
@@ -95,9 +129,22 @@ const TIKTOK: PlatformCapabilities = {
       "image/jpeg",
       "image/webp",
     ],
+    supportsMixedMedia: false,
+    supportsMultipleVideos: false,
   },
   fields: [
+    // The `title` capability is the superset gate (video caption, 2200):
+    // the photo flow narrows it to 90 downstream in
+    // resolveTiktokPhotoPostInfo, because capabilities are platform-level
+    // while the title limit is media-flow-specific. `description` is
+    // photo-only — the video endpoint has no such parameter.
     { key: "title", label: "Title", type: "text", maxLength: 2200 },
+    {
+      key: "description",
+      label: "Description",
+      type: "text",
+      maxLength: 4000,
+    },
     {
       key: "privacy_level",
       label: "Privacy",
@@ -152,6 +199,8 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
       // Meta's Content Publishing accepts JPEG images only and MP4/MOV video;
       // our store uploads MP4, so the API-compatible pair is jpeg + mp4.
       mimeTypes: ["image/jpeg", "video/mp4"],
+      supportsMixedMedia: false,
+      supportsMultipleVideos: false,
     },
     fields: [
       { key: "text", label: "Caption", type: "text", maxLength: 2200 },
@@ -162,7 +211,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     label: "Facebook",
     implemented: false,
     supportsText: true,
-    media: { image: true, video: true, maxItems: 1 },
+    media: { image: true, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
   },
   LINKEDIN: {
@@ -170,7 +219,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     label: "LinkedIn",
     implemented: false,
     supportsText: true,
-    media: { image: true, video: true, maxItems: 1 },
+    media: { image: true, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
   },
   YOUTUBE: {
@@ -178,7 +227,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     label: "YouTube",
     implemented: false,
     supportsText: false,
-    media: { image: false, video: true, maxItems: 1 },
+    media: { image: false, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
   },
   PINTEREST: {
@@ -186,7 +235,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     label: "Pinterest",
     implemented: false,
     supportsText: false,
-    media: { image: true, video: true, maxItems: 1 },
+    media: { image: true, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
   },
 };

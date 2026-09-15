@@ -14,3 +14,4 @@ as of the current tree; if anything disagrees with the code, the code wins.
 - [Deployment](deployment.md) — Vercel, Neon, migrations, rollback, smoke tests
 - [Security](security.md) — secrets, cookies, CSRF, rate limiting, PII, admin, DB
 - [Development](development.md) — local setup, scripts, testing
+- [Audit report](audit-report.md) — production hardening findings (A–Q) and KEEP/OPTIMIZE/… decisions

@@ -9,6 +9,53 @@ posting, billing, [abuse protection](docs/abuse-protection.md), environment,
 deployment, [workflow](docs/workflow.md), security, development). The code
 is the source of truth; docs mirror it.
 
+## Local development
+
+### One-time setup
+
+```bash
+npm install
+# configure .env.local (DATABASE_URL_POSTGRES_PRISMA_URL, BETTER_AUTH_SECRET,
+# provider keys, RESEND_API_KEY, ABUSE_HASH_PEPPER, ADMIN_EMAILS) —
+# template: .env.example, details: docs/environment.md. Never commit secrets.
+npx prisma db push   # empty/dev databases only — never production
+```
+
+### Daily run
+
+First terminal:
+```bash
+npm run dev
+```
+
+Second terminal (only when social/OAuth testing is needed):
+```bash
+npm run dev:tunnel   # ngrok http 3000 — the ngrok agent must be running
+```
+
+- Local app: [http://localhost:3000](http://localhost:3000) — the app
+  always runs here.
+- Social/OAuth test URL:
+  [https://lavish-passion-dipped.ngrok-free.dev](https://lavish-passion-dipped.ngrok-free.dev)
+  — permanent development hostname proxied by ngrok to your localhost.
+  This is NOT Production.
+- Log in locally with email OTP / password, connect real X / Threads /
+  TikTok / Instagram accounts on `/accounts`, publish a test video.
+  Google OAuth is not part of this flow. Full guide:
+  [`docs/local-social-dev.md`](docs/local-social-dev.md).
+
+### Ship it
+
+```
+feature/fix/chore/staging → local testing → commit → push (no Preview)
+→ GitHub Pull Request → review → merge main
+→ automatic Vercel Production (postvia.online)
+```
+
+Vercel Preview is not part of daily development. Checks before commit:
+`npx prisma validate` → `npx prisma generate` → `npm run typecheck` →
+`npm run lint` → `npm test` → `npm run build`.
+
 ## Stack
 
 - **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
@@ -183,10 +230,16 @@ npm run dev:tunnel
 ```
 Open [http://localhost:3000](http://localhost:3000). or https://lavish-passion-dipped.ngrok-free.dev
 
+Canonical local guide (env, ngrok, DB, Blob, OAuth, smoke tests):
+[`docs/local-development.md`](docs/local-development.md).
+
 ## Scripts
 
 ```bash
-npm run dev        # start dev server
+npm run dev        # start dev server (http://localhost:3000)
+npm run dev:local  # same, explicit local-only dev server
+npm run dev:tunnel # ngrok http 3000 (permanent dev HTTPS for OAuth
+                   # callbacks; needs the `ngrok` CLI)
 npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
@@ -196,13 +249,31 @@ npm run test:pg    # real-PostgreSQL concurrency suite (18 tests) —
                    # needs PG_INTEGRATION=1 + isolated test DB, never prod
 ```
 
-## Deploy
+## Development & release (local-first)
 
-Connected Vercel project `postvia` (see `.vercel/project.json`).
-Development happens on staging/feature branches → automatic Preview;
-`main` → automatic Production (`postvia.online`). Full process, stop-rule
-and release discipline: [`docs/workflow.md`](docs/workflow.md). Scheduled
-publishing runs on the cron defined in
-`vercel.json` (daily at 03:00 UTC — the maximum frequency on the current
-Hobby plan, so scheduled posts can go out up to ~24h late; a paid plan
-unlocks sub-daily schedules).
+Development is local-first: edit and verify on your own machine, then ship
+through GitHub. Vercel is the release platform, not a mandatory preview
+environment.
+
+- Local dev server: `npm run dev` → [http://localhost:3000](http://localhost:3000).
+- Public HTTPS for OAuth callbacks / integration testing only:
+  `npm run dev:tunnel` (`ngrok http 3000`) → permanent development URL
+  `https://lavish-passion-dipped.ngrok-free.dev`, which proxies to
+  `localhost:3000`. It never replaces Production. Real social testing
+  guide: [`docs/local-social-dev.md`](docs/local-social-dev.md).
+- Flow: feature/fix/chore/staging branch → local testing → commit →
+  push (**no Vercel Preview is built**) → GitHub Pull Request → review →
+  merge to `main` → **automatic Vercel Production deployment** of `main`
+  (`postvia.online`). Vercel Preview is not part of daily development.
+- Vercel Preview is NOT a required step of daily development and must NOT
+  be built for feature-branch pushes. Vercel Git deployment triggers live
+  in the Vercel Project settings (dashboard, outside this repository) —
+  the repo and docs cannot switch them off by themselves. Required
+  dashboard policy: Production Branch = `main` (auto-deploys on merge),
+  non-production branches skipped (no Preview builds).
+
+Full process contract: [`docs/workflow.md`](docs/workflow.md). Release
+details: [`docs/deployment.md`](docs/deployment.md). Scheduled publishing
+runs on the cron defined in `vercel.json` (daily at 03:00 UTC — the
+maximum frequency on the current Hobby plan, so scheduled posts can go
+out up to ~24h late; a paid plan unlocks sub-daily schedules).

@@ -10,10 +10,9 @@ import {
 } from "lucide-react";
 import { formatPostDate, formatStatusLabel } from "@/lib/utils";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { StatusBadge } from "@/components/StatusBadge";
+import { StatusDot } from "@/components/StatusBadge";
 import { EmptyBlock } from "@/components/StateBlock";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -113,7 +112,7 @@ export function PostsList({
   const toolbarActive = query.trim() !== "" || platform !== "all";
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div
         role="search"
         aria-label="Filter posts"
@@ -130,7 +129,7 @@ export function PostsList({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search posts…"
             aria-label="Search posts"
-            className="h-11 pl-9"
+            className="pl-9"
           />
         </div>
         <div className="flex gap-2">
@@ -140,7 +139,7 @@ export function PostsList({
           >
             <SelectTrigger
               aria-label="Filter by platform"
-              className="h-11 min-w-0 flex-1 md:w-40 md:flex-none"
+              className="min-w-0 flex-1 md:w-40 md:flex-none"
             >
               <SelectValue />
             </SelectTrigger>
@@ -164,7 +163,7 @@ export function PostsList({
           >
             <SelectTrigger
               aria-label="Sort posts"
-              className="h-11 min-w-0 flex-1 md:w-36 md:flex-none"
+              className="min-w-0 flex-1 md:w-36 md:flex-none"
             >
               <SelectValue />
             </SelectTrigger>
@@ -186,7 +185,6 @@ export function PostsList({
             description="Nothing matches the current search and filters."
             actions={
               <Button
-                size="sm"
                 variant="outline"
                 onClick={() => {
                   setQuery("");
@@ -221,7 +219,6 @@ export function PostsList({
             description="Create your first post to get started."
             actions={
               <Button
-                size="sm"
                 nativeButton={false}
                 render={<Link href="/posts/new" />}
               >
@@ -232,104 +229,106 @@ export function PostsList({
           />
         )
       ) : (
-        <Card className="overflow-hidden">
-          <div className="px-4 sm:px-5">
-            <div
-              aria-hidden="true"
-              className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border py-3 text-xs font-medium text-muted-foreground md:grid"
-            >
-              <span>Media</span>
-              <span>Content</span>
-              <span>Platforms</span>
-              <span>Status</span>
-              <span>Date</span>
-              <span className="sr-only">Actions</span>
-            </div>
-            <ul className="divide-y divide-border">
-              {visible.map((post) => (
-                <li
-                  key={post.id}
-                  className="grid animate-[post-in_.45s_ease_both] grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 py-4 motion-reduce:animate-none md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4"
+        <div>
+          <div
+            aria-hidden="true"
+            className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border py-3 text-xs font-medium text-muted-foreground md:grid"
+          >
+            <span>Media</span>
+            <span>Content</span>
+            <span>Platforms</span>
+            <span>Status</span>
+            <span>Date</span>
+            <span className="sr-only">Actions</span>
+          </div>
+          <ul className="divide-y divide-border border-b border-border">
+            {visible.map((post) => (
+              <li
+                key={post.id}
+                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 py-4 md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4"
+              >
+                <Link
+                  href={`/posts/${post.id}`}
+                  aria-label={`Open post: ${post.text || "Untitled post"}`}
+                  className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
+                  <MediaThumb post={post} />
+                </Link>
+                <div className="min-w-0">
                   <Link
                     href={`/posts/${post.id}`}
-                    aria-label={`Open post: ${post.text || "Untitled post"}`}
-                    className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                    className="block truncate text-[15px] leading-snug font-medium text-foreground outline-none hover:underline hover:underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring/50 md:line-clamp-2 md:whitespace-normal md:break-words md:hover:no-underline"
                   >
-                    <MediaThumb post={post} />
+                    {post.text || "Untitled post"}
                   </Link>
-                  <div className="min-w-0">
-                    <Link
-                      href={`/posts/${post.id}`}
-                      className="block truncate text-sm leading-snug font-medium text-foreground outline-none hover:underline hover:underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring/50 md:line-clamp-2 md:whitespace-normal md:break-words md:hover:no-underline"
-                    >
-                      {post.text || "Untitled post"}
-                    </Link>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground md:hidden">
-                      <span className="flex items-center gap-1">
-                        {post.targets.map((target) => (
-                          <span
-                            key={target.id}
-                            title={target.platform}
-                            className="flex size-4 items-center justify-center [&_svg]:size-4"
-                          >
-                            <PlatformIcon
-                              platform={target.platform}
-                              className="size-4"
-                            />
-                            <span className="sr-only">
-                              {target.platform}
-                            </span>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground md:hidden">
+                    <span className="flex items-center gap-1">
+                      {post.targets.map((target) => (
+                        <span
+                          key={target.id}
+                          title={target.platform}
+                          className="flex size-4 items-center justify-center [&_svg]:size-4"
+                        >
+                          <PlatformIcon
+                            platform={target.platform}
+                            className="size-4"
+                          />
+                          <span className="sr-only">
+                            {target.platform}
                           </span>
-                        ))}
-                      </span>
-                      <StatusBadge status={post.status} />
-                      <span>
-                        {formatPostDate({
-                          status: post.status,
-                          publishedAt: toDate(post.publishedAt),
-                          scheduledAt: toDate(post.scheduledAt),
-                          createdAt:
-                            toDate(post.createdAt) ?? new Date(post.createdAt),
-                        })}
-                      </span>
-                    </div>
+                        </span>
+                      ))}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <StatusDot status={post.status} />
+                      {formatStatusLabel(post.status)}
+                    </span>
+                    <span>
+                      {formatPostDate({
+                        status: post.status,
+                        publishedAt: toDate(post.publishedAt),
+                        scheduledAt: toDate(post.scheduledAt),
+                        createdAt:
+                          toDate(post.createdAt) ?? new Date(post.createdAt),
+                      })}
+                    </span>
                   </div>
-                  <span className="hidden min-w-0 items-center gap-1 md:flex">
-                    {post.targets.map((target) => (
-                      <span
-                        key={target.id}
-                        title={target.platform}
-                        className="flex size-4 items-center justify-center [&_svg]:size-4"
-                      >
-                        <PlatformIcon
-                          platform={target.platform}
-                          className="size-4"
-                        />
-                        <span className="sr-only">{target.platform}</span>
-                      </span>
-                    ))}
-                  </span>
-                  <span className="hidden min-w-0 md:block">
-                    <StatusBadge status={post.status} />
-                  </span>
-                  <span className="hidden min-w-0 truncate text-[13px] text-muted-foreground tabular-nums md:block">
-                    {formatPostDate({
-                      status: post.status,
-                      publishedAt: toDate(post.publishedAt),
-                      scheduledAt: toDate(post.scheduledAt),
-                      createdAt:
-                        toDate(post.createdAt) ?? new Date(post.createdAt),
-                    })}
-                  </span>
-                  <span className="flex justify-end">
-                    <PostRowMenu id={post.id} status={post.status} />
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Card>
+                </div>
+                <span className="hidden min-w-0 items-center gap-1 md:flex">
+                  {post.targets.map((target) => (
+                    <span
+                      key={target.id}
+                      title={target.platform}
+                      className="flex size-4 items-center justify-center [&_svg]:size-4"
+                    >
+                      <PlatformIcon
+                        platform={target.platform}
+                        className="size-4"
+                      />
+                      <span className="sr-only">{target.platform}</span>
+                    </span>
+                  ))}
+                </span>
+                <span className="hidden min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground md:flex">
+                  <StatusDot status={post.status} />
+                  {formatStatusLabel(post.status)}
+                </span>
+                <span className="hidden min-w-0 truncate text-[13px] text-muted-foreground tabular-nums md:block">
+                  {formatPostDate({
+                    status: post.status,
+                    publishedAt: toDate(post.publishedAt),
+                    scheduledAt: toDate(post.scheduledAt),
+                    createdAt:
+                      toDate(post.createdAt) ?? new Date(post.createdAt),
+                  })}
+                </span>
+                <span className="flex justify-end">
+                  <PostRowMenu id={post.id} status={post.status} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

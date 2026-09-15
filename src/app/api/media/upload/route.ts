@@ -4,7 +4,10 @@ import type { HandleUploadPresignedBody } from "@vercel/blob/client";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { MEDIA_LIMITS, validateMediaInput } from "@/lib/media";
-import { createPutSignedToken } from "@/lib/blob";
+import {
+  createPutSignedToken,
+  describeMediaUploadConfig,
+} from "@/lib/blob";
 import {
   buildUploadTokenPayload,
   CLIENT_UPLOAD_TTL_MS,
@@ -40,6 +43,27 @@ export async function POST(request: NextRequest) {
     body = (await request.json()) as HandleUploadPresignedBody;
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  // Fail fast on missing Blob configuration (local dev without
+  // BLOB_READ_WRITE_TOKEN and/or BLOB_WEBHOOK_PUBLIC_KEY): otherwise the
+  // SDK throws deep inside (`No blob credentials found` / `Missing webhook
+  // public key`) and the browser only sees the opaque SDK error "Failed to
+  // retrieve the presigned URL". Presence flags only — never secret values.
+  const uploadConfig = describeMediaUploadConfig();
+  if (!uploadConfig.ok) {
+    reportError(
+      "media",
+      "media upload not configured",
+      new Error(`Missing media configuration: ${uploadConfig.missing.join(", ")}`),
+      { stage: body?.type ?? "unknown", missing: uploadConfig.missing }
+    );
+    return NextResponse.json(
+      {
+        error: `Media storage is not configured on this environment (missing: ${uploadConfig.missing.join(", ")}). See docs/local-social-dev.md.`,
+      },
+      { status: 500 }
+    );
   }
 
   try {

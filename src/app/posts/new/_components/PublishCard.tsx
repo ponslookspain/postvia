@@ -20,6 +20,7 @@ import {
 import { FieldDescription } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
+import { parseDateKey } from "./ScheduleDatePicker";
 import type { PlanId } from "@/lib/plans";
 import {
   formatElapsed,
@@ -28,9 +29,10 @@ import {
 } from "@/lib/publish-poll";
 
 /**
- * Stage H6: Publish card moved 1:1 from NewPostComposer (quota alert with
- * UpgradeCta, X-scheduling notices, Save/Schedule/Publish buttons, live
- * publishing progress with elapsed time and Cancel).
+ * Single publishing hub. Publish now, Schedule and Save draft live
+ * here. Scheduling is edited once in the Schedule dialog; this card
+ * shows a compact summary of the chosen date and time with an Edit
+ * action that reopens the same dialog. No second schedule UI.
  */
 export function PublishCard({
   quotaBlocked,
@@ -38,11 +40,14 @@ export function PublishCard({
   quotaUpgradeTo,
   schedulingForX,
   scheduleMode,
+  scheduleDate,
+  scheduleTime,
   xScheduleHint,
   publishing,
   publishProgress,
   canSave,
   canPublish,
+  publishBlockedReason,
   saving,
   scheduling,
   onSaveDraft,
@@ -56,11 +61,14 @@ export function PublishCard({
   quotaUpgradeTo: PlanId | null;
   schedulingForX: boolean;
   scheduleMode: boolean;
+  scheduleDate: string;
+  scheduleTime: string;
   xScheduleHint: boolean;
   publishing: boolean;
   publishProgress: PollProgress | null;
   canSave: boolean;
   canPublish: boolean;
+  publishBlockedReason: string | null;
   saving: boolean;
   scheduling: boolean;
   onSaveDraft: () => void;
@@ -69,6 +77,8 @@ export function PublishCard({
   onAbort: () => void;
   onDismissXHint: () => void;
 }) {
+  const selectedDate = parseDateKey(scheduleDate);
+  const hasSchedule = scheduleDate !== "" || scheduleTime !== "";
   return (
     <Card>
       <CardHeader>
@@ -127,6 +137,13 @@ export function PublishCard({
             Scheduling is available for Threads. Publish to X is available now.
           </FieldDescription>
         )}
+        {publishBlockedReason && !publishing && (
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>Complete required fields</AlertTitle>
+            <AlertDescription>{publishBlockedReason}</AlertDescription>
+          </Alert>
+        )}
         {/* Rail action stack; on mobile the fixed bottom bar owns these actions. */}
         <div className="hidden flex-col gap-2 lg:flex">
           <Button
@@ -154,6 +171,31 @@ export function PublishCard({
             <CalendarClockIcon data-icon="inline-start" />
             {scheduling ? "Scheduling..." : "Schedule"}
           </Button>
+          {hasSchedule && (
+            <div className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2">
+              <p className="min-w-0 truncate text-[13px] text-muted-foreground tabular-nums">
+                Scheduled for{" "}
+                {selectedDate
+                  ? selectedDate.toLocaleDateString("en-GB", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    })
+                  : "no date"}
+                {" · "}
+                {scheduleTime || "no time"}
+              </p>
+              <Button
+                type="button"
+                variant="link"
+                onClick={onScheduleClick}
+                disabled={scheduling}
+                className="h-auto shrink-0 p-0 text-[13px]"
+              >
+                Edit
+              </Button>
+            </div>
+          )}
           <Button
             variant="outline"
             size="lg"
