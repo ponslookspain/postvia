@@ -236,8 +236,8 @@ export function CalendarView({
     if (Number.isNaN(local.getTime())) {
       toast.add({
         title: "Cannot move this post",
-        description: "The target date is invalid.",
-        type: "error",
+        description: "That day can't take a post. Drop it on another day.",
+        type: "warning",
       });
       return;
     }
@@ -248,18 +248,17 @@ export function CalendarView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduledAt: local.toISOString() }),
       });
-      const data = await res.json().catch(() => null);
+      await res.json().catch(() => null);
       if (!res.ok) {
         toast.add({
-          title: "Could not reschedule",
-          description:
-            typeof data?.error === "string" ? data.error : "Please try again.",
+          title: "Unable to move this post",
+          description: "Please try again.",
           type: "error",
         });
         return;
       }
       toast.add({
-        title: post.status === "DRAFT" ? "Post scheduled" : "Post moved",
+        title: "Post moved",
         description: local.toLocaleString("en-GB", {
           day: "numeric",
           month: "short",
@@ -271,8 +270,8 @@ export function CalendarView({
       router.refresh();
     } catch {
       toast.add({
-        title: "Could not reschedule",
-        description: "Network error. Please try again.",
+        title: "Unable to move this post",
+        description: "Please try again.",
         type: "error",
       });
     } finally {
@@ -495,9 +494,8 @@ export function CalendarView({
             )}
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            Only scheduled posts and drafts can be moved. Publishing,
-            published and failed posts stay put. Times shown in your
-            local timezone.
+            Only scheduled posts and unscheduled drafts can be moved.
+            Times shown in your local timezone.
           </p>
         </aside>
       </div>

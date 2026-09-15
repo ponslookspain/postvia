@@ -100,7 +100,7 @@ export function PostRow({
           </span>
           {error && (
             <span className="mt-1 block truncate text-xs text-destructive">
-              {error}
+              Couldn&apos;t publish — open the post to review.
             </span>
           )}
         </span>

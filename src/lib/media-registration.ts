@@ -62,17 +62,17 @@ export async function waitForMediaRegistration(input: {
     });
   const start = now();
   for (;;) {
-    if (signal?.aborted) return "Upload wait cancelled.";
+    if (signal?.aborted) return "Upload wait canceled.";
     if (now() - start >= timeoutMs) {
       return "Upload did not finish registering in time. Please try again.";
     }
     const exists = await fetchStatus(input.postId, input.pathname, signal);
     if (exists) return null;
-    if (signal?.aborted) return "Upload wait cancelled.";
+    if (signal?.aborted) return "Upload wait canceled.";
     const slept = await sleep(
       Math.min(pollMs, Math.max(0, timeoutMs - (now() - start))),
       signal
     );
-    if (slept === "aborted") return "Upload wait cancelled.";
+    if (slept === "aborted") return "Upload wait canceled.";
   }
 }

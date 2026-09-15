@@ -166,7 +166,7 @@ function uploadFileToPost(
           await waitForMediaRegistration({ postId, pathname: storedPathname })
         );
       } catch {
-        resolve("Network error. Please try again.");
+        resolve("Unable to upload this file. Please try again.");
       }
     })();
   });
@@ -701,7 +701,7 @@ export default function NewPostComposer({
       rotateOperationId();
     } catch {
       toast.add({
-        title: "Failed to save draft",
+        title: "Unable to save draft",
         description: "Please try again.",
         type: "error",
         priority: "high",
@@ -967,7 +967,7 @@ export default function NewPostComposer({
       setPublishResult({
         ok: false,
         platform,
-        error: "Network error. Please try again.",
+        error: "Unable to publish. Please try again.",
       });
     } finally {
       publishAbortRef.current = null;

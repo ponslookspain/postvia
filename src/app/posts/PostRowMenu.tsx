@@ -61,7 +61,7 @@ export function PostRowMenu({ id, status }: { id: string; status: string }) {
       router.refresh();
     } catch {
       toast.add({
-        title: "Failed to retry post",
+        title: "Unable to retry post",
         description: "Please try again.",
         type: "error",
       });
@@ -81,7 +81,7 @@ export function PostRowMenu({ id, status }: { id: string; status: string }) {
       router.refresh();
     } catch {
       toast.add({
-        title: "Failed to delete post",
+        title: "Unable to delete post",
         description: "Please try again.",
         type: "error",
       });

@@ -30,9 +30,9 @@ function mapOtpError(message: string): string {
     return "Incorrect code. Check the email and try again.";
   }
   if (lower.includes("not found") || lower.includes("no account")) {
-    return "No account is waiting for this code. Start again from sign up or sign in.";
+    return "This code doesn't match an account. Start again from sign up or sign in.";
   }
-  return message || "Unable to verify the code.";
+  return "Unable to verify the code. Check it and try again.";
 }
 
 export function VerifyOtpForm({
@@ -67,7 +67,7 @@ export function VerifyOtpForm({
           body: JSON.stringify({ email }),
         });
         if (pre.status === 429) {
-          setError("Too many attempts. Request a new code and try again later.");
+          setError("Too many wrong attempts. Request a new code below.");
           setVerifying(false);
           return;
         }
@@ -102,7 +102,7 @@ export function VerifyOtpForm({
       router.push("/post-auth");
       router.refresh();
     } catch {
-      setError("Unable to verify the code. Please try again.");
+      setError("Unable to verify the code. Check it and try again.");
       setVerifying(false);
     }
   }
@@ -129,13 +129,13 @@ export function VerifyOtpForm({
           setError(formatOtpRateLimitMessage(retryAfter));
           startResendRetryCountdown(retryAfter);
         } else {
-          setError(data.error || "Failed to resend. Please try again.");
+          setError("Unable to resend the code. Please try again.");
         }
       } else {
         setResendNote("New code sent. Check your inbox.");
       }
     } catch {
-      setError("Failed to resend. Please try again.");
+      setError("Unable to resend the code. Please try again.");
     }
     setResending(false);
   }

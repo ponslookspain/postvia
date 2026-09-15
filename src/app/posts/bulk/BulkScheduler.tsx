@@ -397,7 +397,7 @@ export function BulkScheduler({
     signal?: AbortSignal
   ): Promise<boolean> {
     if (signal?.aborted) {
-      patchItem(item.key, { status: "failed", error: "Batch cancelled." });
+      patchItem(item.key, { status: "failed", error: "Batch canceled." });
       return false;
     }
     // 1. Draft first: an aborted batch leaves harmless drafts, never
@@ -422,16 +422,13 @@ export function BulkScheduler({
       if (!createRes.ok || typeof created?.id !== "string") {
         patchItem(item.key, {
           status: "failed",
-          error:
-            typeof created?.error === "string"
-              ? created.error
-              : "Failed to create post",
+          error: "Unable to create this post. Please try again.",
         });
         return false;
       }
       postId = created.id;
     } catch {
-      patchItem(item.key, { status: "failed", error: "Network error. Please try again." });
+      patchItem(item.key, { status: "failed", error: "Unable to create this post. Please try again." });
       return false;
     }
     patchItem(item.key, { postId });
@@ -448,7 +445,7 @@ export function BulkScheduler({
     if (uploadError) {
       // No half-broken scheduled post: remove the draft (and its blob).
       await fetch(`/api/posts/${postId}`, { method: "DELETE" }).catch(() => null);
-      patchItem(item.key, { status: "failed", error: uploadError });
+      patchItem(item.key, { status: "failed", error: "Unable to upload this file. Please try again." });
       return false;
     }
 
@@ -460,21 +457,18 @@ export function BulkScheduler({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduledAt: scheduledIso }),
       });
-      const scheduled = await scheduleRes.json().catch(() => null);
+      await scheduleRes.json().catch(() => null);
       if (!scheduleRes.ok) {
         await fetch(`/api/posts/${postId}`, { method: "DELETE" }).catch(() => null);
         patchItem(item.key, {
           status: "failed",
-          error:
-            typeof scheduled?.error === "string"
-              ? scheduled.error
-              : "Failed to schedule post",
+          error: "Unable to schedule this post. Please try again.",
         });
         return false;
       }
     } catch {
       await fetch(`/api/posts/${postId}`, { method: "DELETE" }).catch(() => null);
-      patchItem(item.key, { status: "failed", error: "Network error. Please try again." });
+      patchItem(item.key, { status: "failed", error: "Unable to schedule this post. Please try again." });
       return false;
     }
     patchItem(item.key, { status: "scheduled", progress: 100, scheduledIso });
@@ -990,8 +984,8 @@ export function BulkScheduler({
                 </Field>
               </div>
               {fileProblems.size > 0 && (
-                <Alert variant="destructive">
-                  <TriangleAlertIcon />
+                <Alert>
+                  <TriangleAlertIcon className="text-warning" />
                   <AlertTitle>Unsupported combination</AlertTitle>
                   <AlertDescription>
                     <span className="mb-1 block">
@@ -1013,8 +1007,8 @@ export function BulkScheduler({
                 </Alert>
               )}
               {configError && (
-                <Alert variant="destructive">
-                  <TriangleAlertIcon />
+                <Alert>
+                  <TriangleAlertIcon className="text-warning" />
                   <AlertTitle>Cannot start batch</AlertTitle>
                   <AlertDescription>{configError}</AlertDescription>
                 </Alert>
@@ -1101,12 +1095,11 @@ export function BulkScheduler({
                 </Button>
               )}
               {finished && !allDone && (
-                <Alert variant="destructive">
-                  <TriangleAlertIcon />
+                <Alert>
                   <AlertTitle>Batch partially scheduled</AlertTitle>
                   <AlertDescription>
-                    {doneCount} of {items.length} posts scheduled. Failed
-                    items kept their errors above — retry them or remove them.
+                    {doneCount} of {items.length} posts scheduled. Retry the
+                    failed items or remove them.
                   </AlertDescription>
                 </Alert>
               )}

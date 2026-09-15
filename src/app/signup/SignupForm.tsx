@@ -58,7 +58,7 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
           setError(formatOtpRateLimitMessage(retryAfter));
           startRetryCountdown(retryAfter);
         } else {
-          setError(data.error || "Unable to continue. Please try again.");
+          setError("Unable to continue. Please try again.");
         }
         setSubmitting(false);
         return;

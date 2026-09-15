@@ -95,6 +95,7 @@ export function SettingsClient({
   const [name, setName] = useState(initialName);
   const [savingName, setSavingName] = useState(false);
   const [nameMessage, setNameMessage] = useState<Message>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const [password, setPassword] = useState({
     current: "",
@@ -124,37 +125,35 @@ export function SettingsClient({
   async function handleSaveName() {
     const trimmed = name.trim();
     if (!trimmed) {
-      setNameMessage({ type: "error", text: "Name is required" });
+      setNameError("Name is required");
       return;
     }
     if (trimmed.length > 50) {
-      setNameMessage({
-        type: "error",
-        text: "Name must be 50 characters or fewer",
-      });
+      setNameError("Name must be 50 characters or fewer");
       return;
     }
     setSavingName(true);
     setNameMessage(null);
+    setNameError(null);
     try {
       const res = await fetch("/api/settings/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmed }),
       });
-      const data = await res.json().catch(() => ({}));
+      await res.json().catch(() => null);
       if (!res.ok) {
         setNameMessage({
           type: "error",
-          text: data.error || "Failed to update profile",
+          text: "Unable to save changes. Please try again.",
         });
         return;
       }
       setName(trimmed);
-      setNameMessage({ type: "success", text: "Profile updated" });
+      setNameMessage({ type: "success", text: "Profile saved." });
       router.refresh();
     } catch {
-      setNameMessage({ type: "error", text: "Failed to update profile" });
+      setNameMessage({ type: "error", text: "Unable to save changes. Please try again." });
     } finally {
       setSavingName(false);
     }
@@ -186,11 +185,11 @@ export function SettingsClient({
           confirmPassword: password.confirm,
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      await res.json().catch(() => null);
       if (!res.ok) {
         setPasswordMessage({
           type: "error",
-          text: data.error || "Failed to change password",
+          text: "Unable to change password. Please try again.",
         });
         return;
       }
@@ -198,10 +197,10 @@ export function SettingsClient({
       setPasswordErrors({});
       setPasswordMessage({
         type: "success",
-        text: "Password changed. Other sessions have been signed out.",
+        text: "Password saved. Other sessions have been signed out.",
       });
     } catch {
-      setPasswordMessage({ type: "error", text: "Failed to change password" });
+      setPasswordMessage({ type: "error", text: "Unable to change password. Please try again." });
     } finally {
       setSavingPassword(false);
     }
@@ -231,11 +230,11 @@ export function SettingsClient({
           confirmPassword: password.confirm,
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      await res.json().catch(() => null);
       if (!res.ok) {
         setPasswordMessage({
           type: "error",
-          text: data.error || "Failed to set password",
+          text: "Unable to set password. Please try again.",
         });
         return;
       }
@@ -243,11 +242,11 @@ export function SettingsClient({
       setPasswordErrors({});
       setPasswordMessage({
         type: "success",
-        text: "Password set. You can now sign in with email and password.",
+        text: "Password saved. You can now sign in with email and password.",
       });
       router.refresh();
     } catch {
-      setPasswordMessage({ type: "error", text: "Failed to set password" });
+      setPasswordMessage({ type: "error", text: "Unable to set password. Please try again." });
     } finally {
       setSavingPassword(false);
     }
@@ -267,21 +266,21 @@ export function SettingsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [key]: nextValue }),
       });
-      const data = await res.json().catch(() => ({}));
+      await res.json().catch(() => null);
       if (!res.ok) {
         setPrefs(previous);
         setPrefsMessage({
           type: "error",
-          text: data.error || "Failed to save preferences",
+          text: "Unable to save preferences. Please try again.",
         });
         return;
       }
-      setPrefsMessage({ type: "success", text: "Preferences saved" });
+      setPrefsMessage({ type: "success", text: "Preferences saved." });
     } catch {
       setPrefs(previous);
       setPrefsMessage({
         type: "error",
-        text: "Failed to save preferences",
+        text: "Unable to save preferences. Please try again.",
       });
     } finally {
       setSavingPref(null);
@@ -304,11 +303,11 @@ export function SettingsClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmation: confirmText }),
       });
-      const data = await res.json().catch(() => ({}));
+      await res.json().catch(() => null);
       if (!res.ok) {
         setDeleteMessage({
           type: "error",
-          text: data.error || "Failed to delete account",
+          text: "Unable to delete account. Please try again.",
         });
         setDeleting(false);
         return;
@@ -323,7 +322,7 @@ export function SettingsClient({
     } catch {
       setDeleteMessage({
         type: "error",
-        text: "Failed to delete account. Please try again.",
+        text: "Unable to delete account. Please try again.",
       });
       setDeleting(false);
     }
@@ -347,7 +346,7 @@ export function SettingsClient({
             </CardHeader>
             <CardContent>
               <FieldGroup>
-                <Field>
+                <Field data-invalid={nameError ? true : undefined}>
                   <FieldLabel htmlFor="settings-name">Name</FieldLabel>
                   <Input
                     id="settings-name"
@@ -355,8 +354,13 @@ export function SettingsClient({
                     autoComplete="name"
                     value={name}
                     maxLength={50}
-                    onChange={(e) => setName(e.target.value)}
+                    aria-invalid={nameError ? true : undefined}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      setNameError(null);
+                    }}
                   />
+                  {nameError && <FieldError>{nameError}</FieldError>}
                 </Field>
                 <Field data-disabled>
                   <FieldLabel htmlFor="settings-email">

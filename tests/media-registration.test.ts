@@ -43,7 +43,7 @@ describe("waitForMediaRegistration", () => {
         return null;
       },
     });
-    assert.match(result ?? "", /cancelled/i);
+    assert.match(result ?? "", /canceled/i);
     assert.equal(calls, 0);
   });
 });

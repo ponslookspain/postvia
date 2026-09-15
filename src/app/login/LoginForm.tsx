@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Field,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
@@ -40,6 +41,7 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
@@ -53,6 +55,7 @@ export function LoginForm({
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setEmailError(null);
     setEmailNotVerified(false);
     setResendSuccess(false);
 
@@ -70,7 +73,7 @@ export function LoginForm({
         setSubmitting(false);
         return;
       }
-      setError(signInError.message || "Unable to sign in");
+      setError("Unable to sign in. Check your email and password, then try again.");
       setSubmitting(false);
       return;
     }
@@ -81,13 +84,14 @@ export function LoginForm({
   }
 
   async function handleSignInWithCode() {
-    if (!email) {
-      setError("Enter your email first, then request a code.");
+    if (!email.trim()) {
+      setEmailError("Enter your email first, then request a code.");
       return;
     }
     if (otpRetryRemaining > 0) return;
     setSendingCode(true);
     setError(null);
+    setEmailError(null);
     setOtpRateLimited(false);
     try {
       // Neutral endpoint: same response for existing and unknown emails,
@@ -106,7 +110,7 @@ export function LoginForm({
           setError(formatOtpRateLimitMessage(retryAfter));
           startOtpRetryCountdown(retryAfter);
         } else {
-          setError(data.error || "Unable to send code. Please try again.");
+          setError("Unable to send code. Please try again.");
         }
         setSendingCode(false);
         return;
@@ -129,9 +133,9 @@ export function LoginForm({
         body: JSON.stringify({ email }),
       });
       if (res.ok) setResendSuccess(true);
-      else setError("Failed to resend. Please try again.");
+      else setError("Unable to resend the verification email. Please try again.");
     } catch {
-      setError("Failed to resend. Please try again.");
+      setError("Unable to resend the verification email. Please try again.");
     }
     setResending(false);
   }
@@ -212,7 +216,7 @@ export function LoginForm({
 
         <form onSubmit={(e) => void handleSubmit(e)}>
           <FieldGroup>
-            <Field>
+            <Field data-invalid={emailError ? true : undefined}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
@@ -220,8 +224,13 @@ export function LoginForm({
                 required
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={emailError ? true : undefined}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError(null);
+                }}
               />
+              {emailError && <FieldError>{emailError}</FieldError>}
             </Field>
             <Field>
               <FieldLabel htmlFor="password">Password</FieldLabel>

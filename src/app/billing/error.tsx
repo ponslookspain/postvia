@@ -20,7 +20,7 @@ export default function BillingError({
     <PageContainer>
       <ErrorBlock
         title="Billing failed to load"
-        description="No charge was made. Please try again — the webhook remains the source of truth for your plan."
+        description="No charge was made. Please try again."
       />
       <div className="mt-4">
         <Button type="button" variant="outline" onClick={() => reset()}>

@@ -114,21 +114,18 @@ export function BillingSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
       });
-      const data = await res.json().catch(() => null);
+      await res.json().catch(() => null);
       if (!res.ok) {
-        setError(
-          typeof data?.error === "string" ? data.error : "Failed to change plan"
-        );
+        setError("Unable to change plan. Please try again.");
         return;
       }
       toast.add({
         title: `Switched to ${getPlan(plan).name}`,
-        description: "Test mode — nothing was charged.",
         type: "success",
       });
       router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      setError("Unable to change plan. Please try again.");
     } finally {
       setChanging(null);
     }
@@ -146,16 +143,12 @@ export function BillingSection({
       const data = await res.json().catch(() => null);
       const url = data?.url;
       if (!res.ok || !isStripeRedirectUrl(url)) {
-        setError(
-          typeof data?.error === "string"
-            ? data.error
-            : "Failed to start checkout"
-        );
+        setError("Unable to start checkout. Please try again.");
         return;
       }
       window.location.assign(url);
     } catch {
-      setError("Network error. Please try again.");
+      setError("Unable to start checkout. Please try again.");
     } finally {
       setRedirecting(null);
     }
@@ -169,16 +162,12 @@ export function BillingSection({
       const data = await res.json().catch(() => null);
       const url = data?.url;
       if (!res.ok || !isStripeRedirectUrl(url)) {
-        setError(
-          typeof data?.error === "string"
-            ? data.error
-            : "Failed to open billing management"
-        );
+        setError("Unable to open subscription settings. Please try again.");
         return;
       }
       window.location.assign(url);
     } catch {
-      setError("Network error. Please try again.");
+      setError("Unable to open subscription settings. Please try again.");
     } finally {
       setRedirecting(null);
     }
@@ -189,11 +178,9 @@ export function BillingSection({
     setError(null);
     try {
       const res = await fetch("/api/billing/cancel", { method: "POST" });
-      const data = await res.json().catch(() => null);
+      await res.json().catch(() => null);
       if (!res.ok) {
-        setError(
-          typeof data?.error === "string" ? data.error : "Failed to cancel"
-        );
+        setError("Unable to cancel the subscription. Please try again.");
         return;
       }
       toast.add({
@@ -204,7 +191,7 @@ export function BillingSection({
       setCancelOpen(false);
       router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      setError("Unable to cancel the subscription. Please try again.");
     } finally {
       setCancelling(false);
     }
@@ -308,7 +295,7 @@ export function BillingSection({
             )}
             {initial.checkoutResult === "cancelled" && (
               <Alert>
-                <AlertTitle>Checkout cancelled</AlertTitle>
+                <AlertTitle>Checkout canceled</AlertTitle>
                 <AlertDescription>
                   No charge was made. You can subscribe any time.
                 </AlertDescription>
@@ -324,21 +311,12 @@ export function BillingSection({
                 </AlertDescription>
               </Alert>
             )}
-            {initial.status === "PAST_DUE" && (
-              <Alert variant="destructive">
-                <AlertTitle>Payment past due</AlertTitle>
+            {(initial.status === "PAST_DUE" || initial.status === "UNPAID") && (
+              <Alert>
+                <AlertTitle>Payment needs attention</AlertTitle>
                 <AlertDescription>
-                  Update payment in billing management to keep your plan.
-                </AlertDescription>
-              </Alert>
-            )}
-            {initial.status === "UNPAID" && (
-              <Alert variant="destructive">
-                <AlertTitle>Payment failed</AlertTitle>
-                <AlertDescription>
-                  Paid features are paused while the subscription is unpaid.
-                  Update payment in billing management to restore access — your
-                  posts and accounts are kept.
+                  Update your payment method to keep your plan. Your posts
+                  and accounts are kept.
                 </AlertDescription>
               </Alert>
             )}
@@ -526,7 +504,7 @@ export function BillingSection({
               onClick={() => void cancelSubscription()}
               disabled={cancelling}
             >
-              {cancelling ? "Cancelling…" : "Confirm cancellation"}
+              {cancelling ? "Canceling…" : "Confirm cancellation"}
             </Button>
           </DialogFooter>
         </DialogContent>
