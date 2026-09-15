@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireOnboardedUser } from "@/lib/onboarding";
-import { formatPlatformName, formatStatusLabel } from "@/lib/utils";
+import { formatStatusLabel } from "@/lib/utils";
 import { getDisplayPostsUsed, getEffectivePlan, getRemainingQuota, getUsage } from "@/lib/entitlements";
 import { getPlan } from "@/lib/plans";
 import { AppShell } from "@/components/AppShell";
@@ -17,9 +17,7 @@ import {
 } from "@/components/layout/PageContainer";
 import { Section, SectionHeader } from "@/components/Section";
 import { EmptyBlock } from "@/components/StateBlock";
-import { PlatformIcon } from "@/components/PlatformIcon";
 import { PlanBadge, UpgradeCta } from "@/components/billing/BillingWidgets";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,12 +25,27 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import {
+  bucketWeeks,
+  buildInsights,
+  formatRelativeTime,
+  summarizePlatforms,
+} from "@/lib/dashboard-analytics";
 import { DashboardPostFilter } from "@/app/dashboard/DashboardPostFilter";
 import { PostRow } from "@/app/dashboard/PostRow";
+import { ActivityChart } from "@/app/dashboard/ActivityChart";
+import { InsightList } from "@/app/dashboard/InsightList";
+import { KpiStrip } from "@/app/dashboard/KpiStrip";
+import { OutcomeDonut, type OutcomeSegment } from "@/app/dashboard/OutcomeDonut";
+import {
+  PlatformHealth,
+  type PlatformHealthRow,
+} from "@/app/dashboard/PlatformHealth";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +85,11 @@ export default async function DashboardPage({
     ? rawStatus
     : "all";
 
+  // Activity window for the charts: bounded reads only, volumes capped
+  // by plan maxima, so server-side bucketing stays cheap.
+  const twelveWeeksAgo = new Date();
+  twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 7 * 12);
+
   // One groupBy replaces the per-status count queries; total is the sum of
   // the same groups. All independent reads run in parallel.
   const [
@@ -82,6 +100,9 @@ export default async function DashboardPage({
     accounts,
     effective,
     usage,
+    targetStats,
+    recentActivity,
+    accountPulse,
   ] = await Promise.all([
     prisma.post.groupBy({
       by: ["status"],
@@ -115,11 +136,27 @@ export default async function DashboardPage({
     }),
     prisma.socialAccount.findMany({
       where: { userId: user.id },
-      select: { platform: true, username: true, expiresAt: true },
+      select: { id: true, platform: true, username: true, expiresAt: true },
       orderBy: [{ platform: "asc" }, { username: "asc" }],
     }),
     getEffectivePlan({ userId: user.id, userEmail: user.email }),
     getUsage(user.id),
+    prisma.postTarget.groupBy({
+      by: ["platform", "status"],
+      where: { post: { userId: user.id } },
+      _count: { _all: true },
+    }),
+    prisma.post.findMany({
+      where: { userId: user.id, createdAt: { gte: twelveWeeksAgo } },
+      select: { createdAt: true, status: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.postTarget.groupBy({
+      by: ["socialAccountId"],
+      where: { post: { userId: user.id }, socialAccountId: { not: null } },
+      _count: { _all: true },
+      _max: { publishedAt: true },
+    }),
   ]);
 
   const countsByStatus = Object.fromEntries(
@@ -192,11 +229,75 @@ export default async function DashboardPage({
     month: "short",
   });
 
+  const failed =
+    (countsByStatus.FAILED ?? 0) + (countsByStatus.PARTIALLY_PUBLISHED ?? 0);
+  const publishing = countsByStatus.PUBLISHING ?? 0;
+
   const stats = [
     { label: "Posts this month", value: displayPostsUsed, hint: usageHint, accent: false },
-    { label: "Drafts", value: drafts, hint: "Saved, not scheduled", accent: false },
-    { label: "Scheduled", value: scheduled, hint: "Will publish automatically", accent: true },
     { label: "Published", value: published, hint: "Live on platforms", accent: false },
+    { label: "Scheduled", value: scheduled, hint: "Will publish automatically", accent: true },
+    { label: "Drafts", value: drafts, hint: "Saved, not scheduled", accent: false },
+    {
+      label: "Accounts",
+      value: accounts.length,
+      hint:
+        expiredAccounts.length > 0
+          ? `${expiredAccounts.length} expired`
+          : accounts.length > 0
+            ? "All connected"
+            : "None connected",
+      accent: false,
+    },
+  ];
+
+  const weeks = bucketWeeks(recentActivity, 12, now);
+  const platformSummary = summarizePlatforms(
+    targetStats.map((group) => ({
+      platform: group.platform,
+      status: group.status,
+      count: group._count._all,
+    }))
+  );
+  const platformSuccess = new Map(
+    platformSummary.platforms.map((row) => [row.platform, row])
+  );
+  const pulseByAccount = new Map(
+    accountPulse.map((row) => [row.socialAccountId, row])
+  );
+  const healthRows: PlatformHealthRow[] = [...byPlatform.values()].map(
+    (entry) => {
+      const summary = platformSuccess.get(entry.platform);
+      let lastPublished: Date | null = null;
+      for (const account of accounts) {
+        if (account.platform !== entry.platform) continue;
+        const pulse = pulseByAccount.get(account.id);
+        const at = pulse?._max.publishedAt ?? null;
+        if (at && (!lastPublished || at > lastPublished)) lastPublished = at;
+      }
+      return {
+        platform: entry.platform,
+        usernames: entry.usernames,
+        expired: entry.expired,
+        published: summary?.published ?? 0,
+        successRate: summary?.successRate ?? null,
+        lastPublishedLabel: lastPublished
+          ? formatRelativeTime(lastPublished, now)
+          : null,
+      };
+    }
+  );
+  const insights = buildInsights({
+    failedCount: failed,
+    expiredCount: expiredAccounts.length,
+    postsLeft: quota.postsLeft,
+    scheduledCount: scheduled,
+  });
+  const segments: OutcomeSegment[] = [
+    { label: "Published", value: published, className: "text-primary", dotClassName: "bg-primary" },
+    { label: "Scheduled", value: scheduled + publishing, className: "text-muted-foreground", dotClassName: "bg-muted-foreground/60" },
+    { label: "Drafts", value: drafts, className: "text-muted-foreground/60", dotClassName: "bg-muted-foreground/40" },
+    { label: "Failed", value: failed, className: "text-destructive", dotClassName: "bg-destructive" },
   ];
 
   return (
@@ -205,6 +306,7 @@ export default async function DashboardPage({
         <PageHeader
           title={greetingFor(user.name)}
           description="Your publishing activity at a glance."
+          className="mb-6"
           actions={
             <Button
               nativeButton={false}
@@ -241,126 +343,135 @@ export default async function DashboardPage({
             }
           />
         ) : (
-          <PageSections>
+          <PageSections className="gap-8">
             <Section label="Publishing overview">
-              <dl
-                aria-label="Publishing overview"
-                className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-4 sm:gap-x-6"
-              >
-                {stats.map((stat) => (
-                  <div key={stat.label} className="min-w-0">
-                    <dd
-                      className={
-                        stat.accent
-                          ? "text-3xl leading-none font-semibold tracking-tight text-primary tabular-nums"
-                          : "text-3xl leading-none font-semibold tracking-tight tabular-nums"
-                      }
-                    >
-                      {stat.value}
-                    </dd>
-                    <dt className="mt-1.5 truncate text-[13px] leading-5 text-muted-foreground">
-                      {stat.label}
-                    </dt>
-                    <dd className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {stat.hint}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+              <KpiStrip stats={stats} />
             </Section>
 
-            <div className="grid items-start gap-10 lg:grid-cols-3">
-              <Card className="lg:col-span-2">
+            <div className="grid gap-6 lg:grid-cols-3">
+              <Card size="sm" className="min-w-0 lg:col-span-2">
                 <CardHeader>
-                  <CardTitle>Usage</CardTitle>
+                  <CardTitle>Activity</CardTitle>
                   <CardDescription>
-                    {periodLabel}, resets {resetLabel}
+                    Published, scheduled and failed posts per week
                   </CardDescription>
-                  <CardAction>
-                    <Link
-                      href="/billing"
-                      className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-                    >
-                      Manage plan
-                    </Link>
-                  </CardAction>
                 </CardHeader>
-                <CardContent className="flex flex-1 flex-col">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <PlanBadge
-                      plan={effective.plan}
-                      status={effective.status}
-                    />
+                <CardContent>
+                  <ActivityChart weeks={weeks} />
+                </CardContent>
+              </Card>
+              <Card size="sm">
+                <CardHeader>
+                  <CardTitle>Outcomes</CardTitle>
+                  <CardDescription>Posts by status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <OutcomeDonut segments={segments} />
+                </CardContent>
+              </Card>
+            </div>
+
+            {insights.length > 0 && (
+              <Section label="Insights">
+                <InsightList insights={insights} />
+              </Section>
+            )}
+
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle>Usage</CardTitle>
+                <CardDescription>
+                  {periodLabel}, resets {resetLabel}
+                </CardDescription>
+                <CardAction>
+                  <Link
+                    href="/billing"
+                    className="rounded-sm text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+                  >
+                    Manage plan
+                  </Link>
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PlanBadge
+                        plan={effective.plan}
+                        status={effective.status}
+                      />
+                    </div>
+                    <p className="mt-2 text-2xl leading-none font-semibold tracking-tight tabular-nums">
+                      {monthlyLimit === null ? (
+                        "Unlimited"
+                      ) : (
+                        <>
+                          {displayPostsUsed}
+                          <span className="text-base font-normal text-muted-foreground">
+                            {" "}
+                            of {monthlyLimit} posts
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {plan.name} plan
+                    </p>
                   </div>
-                  <p className="mt-3 text-2xl leading-none font-semibold tracking-tight tabular-nums">
-                    {monthlyLimit === null ? (
-                      "Unlimited"
-                    ) : (
-                      <>
-                        {displayPostsUsed}
-                        <span className="text-base font-normal text-muted-foreground">
-                          {" "}
-                          of {monthlyLimit} posts
-                        </span>
-                      </>
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {plan.name} plan
-                  </p>
                   {monthlyLimit !== null && (
                     <Progress
                       value={usagePercent}
                       aria-label={`Posts used this month: ${displayPostsUsed} of ${monthlyLimit}`}
-                      className="mt-auto pt-3"
+                      className="w-full sm:max-w-xs"
                     />
                   )}
-                  {effective.plan === "free" &&
-                    monthlyLimit !== null &&
-                    quota.postsLeft === 0 && (
-                      <div className="mt-3">
-                        <UpgradeCta
-                          reason={`You've reached your ${monthlyLimit} free posts this month.`}
-                          upgradeTo="growth"
-                          compact
-                        />
-                      </div>
-                    )}
-                </CardContent>
-              </Card>
-
-              <nav aria-label="Quick actions" className="flex min-w-0 flex-col gap-1">
-                <p className="px-1 pb-1 text-[13px] font-medium text-muted-foreground">
-                  Quick actions
-                </p>
-                <Button
-                  nativeButton={false}
-                  render={<Link href="/posts/new" />}
-                  className="w-full justify-start"
+                </div>
+                {effective.plan === "free" &&
+                  monthlyLimit !== null &&
+                  quota.postsLeft === 0 && (
+                    <div className="mt-3">
+                      <UpgradeCta
+                        reason={`You've reached your ${monthlyLimit} free posts this month.`}
+                        upgradeTo="growth"
+                        compact
+                      />
+                    </div>
+                  )}
+              </CardContent>
+              <CardFooter className="flex-wrap gap-2 border-t border-border">
+                <nav
+                  aria-label="Quick actions"
+                  className="flex flex-wrap items-center gap-2"
                 >
-                  <PlusIcon data-icon="inline-start" />
-                  Create post
-                </Button>
-                <Button
-                  variant="ghost"
-                  nativeButton={false}
-                  render={<Link href="/calendar" />}
-                  className="w-full justify-start"
-                >
-                  <CalendarIcon data-icon="inline-start" />
-                  Open calendar
-                </Button>
-                <Button
-                  variant="ghost"
-                  nativeButton={false}
-                  render={<Link href="/accounts" />}
-                  className="w-full justify-start"
-                >
-                  <UsersIcon data-icon="inline-start" />
-                  Manage accounts
-                </Button>
-              </nav>
-            </div>
+                  <Button
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link href="/posts/new" />}
+                  >
+                    <PlusIcon data-icon="inline-start" />
+                    Create post
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    nativeButton={false}
+                    render={<Link href="/calendar" />}
+                  >
+                    <CalendarIcon data-icon="inline-start" />
+                    Open calendar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    nativeButton={false}
+                    render={<Link href="/accounts" />}
+                  >
+                    <UsersIcon data-icon="inline-start" />
+                    Manage accounts
+                  </Button>
+                </nav>
+              </CardFooter>
+            </Card>
 
             {attentionPosts.length > 0 && (
               <Section labelledBy="attention-heading">
@@ -377,7 +488,7 @@ export default async function DashboardPage({
                     </Badge>
                   }
                 />
-                <Card>
+                <Card size="sm">
                   <CardContent>
                     <ul className="divide-y divide-border">
                       {attentionPosts.map((post, index) => (
@@ -412,7 +523,7 @@ export default async function DashboardPage({
                     </Link>
                   }
                 />
-                <Card>
+                <Card size="sm">
                   <CardContent>
                     <ul className="divide-y divide-border">
                       {upcomingPosts.map((post, index) => (
@@ -442,7 +553,7 @@ export default async function DashboardPage({
                   </Link>
                 }
               />
-              <Card>
+              <Card size="sm">
                 <CardContent>
                   <DashboardPostFilter q={q} status={statusFilter} />
                   {recentPosts.length === 0 ? (
@@ -495,7 +606,8 @@ export default async function DashboardPage({
             <Section labelledBy="accounts-heading">
               <SectionHeader
                 id="accounts-heading"
-                title="Connected accounts"
+                title="Platforms and accounts"
+                description="Publish totals, success rate and connection state per platform"
                 actions={
                   <Link
                     href="/accounts"
@@ -505,58 +617,9 @@ export default async function DashboardPage({
                   </Link>
                 }
               />
-              <Card>
+              <Card size="sm">
                 <CardContent>
-                  {accounts.length === 0 ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-muted-foreground">
-                        Connect a profile to start publishing.
-                      </p>
-                      <Button
-                        nativeButton={false}
-                        render={<Link href="/accounts" />}
-                      >
-                        Connect account
-                      </Button>
-                    </div>
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {[...byPlatform.values()].map((entry) => (
-                        <li
-                          key={entry.platform}
-                          className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                        >
-                          <Avatar className="size-9">
-                            <AvatarFallback aria-label={formatPlatformName(entry.platform)}>
-                              <PlatformIcon
-                                platform={entry.platform}
-                                className="size-4"
-                              />
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
-                              {formatPlatformName(entry.platform)}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {entry.usernames
-                                .map((name) => `@${name}`)
-                                .join(", ")}
-                            </p>
-                          </div>
-                          {entry.expired ? (
-                            <Badge variant="destructive">Expired</Badge>
-                          ) : (
-                            <Badge variant="secondary">
-                              {entry.usernames.length === 1
-                                ? "Connected"
-                                : `${entry.usernames.length} connected`}
-                            </Badge>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                  <PlatformHealth rows={healthRows} />
                   {expiredAccounts.length > 0 && (
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
                       <p className="text-xs text-muted-foreground">
