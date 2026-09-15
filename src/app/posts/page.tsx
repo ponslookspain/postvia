@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { ClapperboardIcon, PlusIcon } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { formatStatusLabel } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { PostsList, type PostListItem } from "./PostsList";
+import { StatusTabs } from "./StatusTabs";
+import { POST_PAGE_DEFAULT } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +30,30 @@ export default async function PostsPage({
   const params = await searchParams;
   const rawStatus = typeof params.status === "string" ? params.status : "all";
   const statusFilter = STATUS_FILTERS.includes(rawStatus) ? rawStatus : "all";
-  const posts = await prisma.post.findMany({
-    where: {
-      userId: user.id,
-      ...(statusFilter !== "all" ? { status: statusFilter as never } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: { targets: true, media: true },
-  });
+  const where = {
+    userId: user.id,
+    ...(statusFilter !== "all" ? { status: statusFilter as never } : {}),
+  };
+  // Bounded first page (B6): newest-first with a limit+1 probe for the
+  // next cursor, plus a cheap count for the "showing N of M" line.
+  // Only the thumbnail media row loads per post; the overflow badge uses
+  // the media count, not full rows.
+  const [rows, total] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: POST_PAGE_DEFAULT + 1,
+      include: {
+        targets: true,
+        media: { take: 1, select: { id: true, type: true } },
+        _count: { select: { media: true } },
+      },
+    }),
+    prisma.post.count({ where }),
+  ]);
+  const posts = rows.slice(0, POST_PAGE_DEFAULT);
+  const nextCursor =
+    rows.length > POST_PAGE_DEFAULT ? (posts[posts.length - 1]?.id ?? null) : null;
 
   // Dates cannot cross the server boundary: strip rows to plain JSON.
   const items: PostListItem[] = posts.map((post) => ({
@@ -51,6 +68,7 @@ export default async function PostsPage({
       platform: target.platform,
     })),
     media: post.media.map((item) => ({ id: item.id, type: item.type })),
+    mediaCount: post._count.media,
   }));
 
   return (
@@ -80,38 +98,15 @@ export default async function PostsPage({
           }
         />
 
-        <nav
-          aria-label="Filter posts by status"
-          className="mb-6 flex gap-5 overflow-x-auto border-b border-border"
-        >
-          <Link
-            href="/posts"
-            aria-current={statusFilter === "all" ? "page" : undefined}
-            className={
-              statusFilter === "all"
-                ? "-mb-px shrink-0 border-b-2 border-primary px-0.5 py-2 text-[13px] font-medium whitespace-nowrap text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                : "-mb-px shrink-0 border-b-2 border-transparent px-0.5 py-2 text-[13px] whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-            }
-          >
-            All
-          </Link>
-          {STATUS_FILTERS.map((option) => (
-            <Link
-              key={option}
-              href={`/posts?status=${option}`}
-              aria-current={statusFilter === option ? "page" : undefined}
-              className={
-                statusFilter === option
-                  ? "-mb-px shrink-0 border-b-2 border-primary px-0.5 py-2 text-[13px] font-medium whitespace-nowrap text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-                  : "-mb-px shrink-0 border-b-2 border-transparent px-0.5 py-2 text-[13px] whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-              }
-            >
-              {formatStatusLabel(option)}
-            </Link>
-          ))}
-        </nav>
+        <StatusTabs value={statusFilter} />
 
-        <PostsList posts={items} statusFilter={statusFilter} />
+        <PostsList
+          key={statusFilter}
+          posts={items}
+          statusFilter={statusFilter}
+          initialNextCursor={nextCursor}
+          total={total}
+        />
       </PageContainer>
     </AppShell>
   );
