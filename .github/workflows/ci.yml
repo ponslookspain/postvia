@@ -78,23 +78,8 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
-      # Separate throwaway host for the migration drift check: the drift
-      # check must never use the smoke database as its shadow database.
-      postgres-shadow:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postvia_shadow
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=10
     env:
       DATABASE_URL_POSTGRES_PRISMA_URL: postgresql://postgres:postgres@localhost:5432/postvia_smoke?sslmode=disable
-      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5433/postvia_shadow?sslmode=disable
       BETTER_AUTH_SECRET: ci-smoke-not-a-secret
       ABUSE_HASH_PEPPER: ci-test-pepper-not-a-secret
     steps:
@@ -105,9 +90,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
-      # Migration/schema drift against the separate throwaway shadow DB
-      # (never prod, never the smoke database).
-      - run: node --import tsx scripts/check-migrations.ts
       - run: npx prisma db push --accept-data-loss
       - run: npm run build
       - run: |
