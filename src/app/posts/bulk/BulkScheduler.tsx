@@ -6,14 +6,10 @@ import Link from "next/link";
 import {
   CalendarClockIcon,
   CheckIcon,
-  CircleCheckIcon,
   ClapperboardIcon,
-  OctagonXIcon,
   RotateCcwIcon,
-  Trash2Icon,
   TriangleAlertIcon,
   UploadIcon,
-  XIcon,
 } from "lucide-react";
 import { cn } from "cn";
 import { validateMediaInput } from "@/lib/media";
@@ -36,7 +32,6 @@ import { bulkItemOperationId, newOperationId } from "@/lib/idempotency";
 import { getPlan, type PlanId } from "@/lib/plans";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
-import { PlatformIcon } from "@/components/PlatformIcon";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,15 +43,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
-  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
-  FieldLegend,
-  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -71,6 +62,9 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { ChannelStrip } from "../new/_components/ChannelStrip";
+import { ScheduleDatePicker } from "../new/_components/ScheduleDatePicker";
+import { BulkVideoRow } from "./BulkVideoRow";
 
 type ItemStatus =
   | "queued"
@@ -125,13 +119,6 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-
-const PLATFORM_NAMES: Record<string, string> = {
-  THREADS: "Threads",
-  X: "X",
-  INSTAGRAM: "Instagram",
-  TIKTOK: "TikTok",
-};
 
 function formatInZone(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleString("en-GB", {
@@ -715,11 +702,11 @@ export function BulkScheduler({
         })}
       </ol>
 
-      <PageSections>
-        <div className="grid items-start gap-6 lg:grid-cols-3">
-          <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+      <PageSections className="gap-8">
+        <div className="grid items-start gap-5 lg:grid-cols-3">
+          <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
         <section aria-labelledby="bulk-videos">
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Videos</CardTitle>
               <CardDescription>
@@ -739,7 +726,7 @@ export function BulkScheduler({
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={running}
-                  className="h-28 w-full flex-col gap-1.5 border-dashed py-4"
+                  className="h-20 w-full flex-col gap-1 border-dashed py-3"
                 >
                   <UploadIcon data-icon="inline-start" />
                   Add videos
@@ -749,88 +736,23 @@ export function BulkScheduler({
                 </Button>
               ) : (
                 <ul className="flex flex-col gap-2">
-                  {items.map((item) => (
-                    <li
+                  {items.map((item, index) => (
+                    <BulkVideoRow
                       key={item.key}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground"
-                      >
-                        <ClapperboardIcon className="size-5" />
-                        {item.status === "scheduled" && (
-                          <span className="absolute inset-0 flex items-center justify-center bg-primary/70">
-                            <CircleCheckIcon className="size-5 text-primary-foreground" />
-                          </span>
-                        )}
-                        {item.status === "failed" && (
-                          <span className="absolute inset-0 flex items-center justify-center bg-destructive/60">
-                            <OctagonXIcon className="size-5 text-white" />
-                          </span>
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {item.file.name}
-                        </span>
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground tabular-nums">
-                          {formatFileSize(item.file.size)}
-                          {item.status === "uploading" &&
-                            ` · ${item.progress}%`}
-                          {item.status !== "queued" &&
-                            item.status !== "uploading" &&
-                            ` · ${item.status}`}
-                        </span>
-                        {item.status === "uploading" && (
-                          <Progress
-                            value={item.progress}
-                            aria-label={`Uploading ${item.file.name}`}
-                            className="mt-1.5 w-full max-w-48"
-                          />
-                        )}
-                        {item.error && (
-                          <span className="mt-0.5 block truncate text-xs text-destructive">
-                            {item.error}
-                          </span>
-                        )}
-                        {item.status === "queued" &&
-                          (fileProblems.get(item.key) ?? []).map((message) => (
-                            <span
-                              key={message}
-                              className="mt-0.5 block truncate text-xs text-destructive"
-                            >
-                              {message}
-                            </span>
-                          ))}
-                      </span>
-                      {item.status === "scheduled" ? (
-                        <Badge variant="secondary" className="shrink-0">
-                          Scheduled
-                        </Badge>
-                      ) : item.status === "failed" ? (
-                        <Badge variant="destructive" className="shrink-0">
-                          Failed
-                        </Badge>
-                      ) : running || item.status !== "queued" ? (
-                        <Spinner
-                          data-icon="inline-start"
-                          aria-hidden="true"
-                          className="shrink-0"
-                        />
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => removeItem(item.key)}
-                          aria-label={`Remove ${item.file.name}`}
-                          className="shrink-0"
-                        >
-                          <XIcon />
-                        </Button>
-                      )}
-                    </li>
+                      name={item.file.name}
+                      sizeLabel={formatFileSize(item.file.size)}
+                      status={item.status}
+                      progress={item.progress}
+                      error={item.error ?? null}
+                      problems={fileProblems.get(item.key) ?? []}
+                      timeLabel={
+                        schedule.length > 0
+                          ? formatInZone(schedule[index] ?? "", timeZone)
+                          : null
+                      }
+                      running={running}
+                      onRemove={() => removeItem(item.key)}
+                    />
                   ))}
                 </ul>
               )}
@@ -896,7 +818,7 @@ export function BulkScheduler({
         </section>
 
         <section aria-labelledby="bulk-content">
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Content</CardTitle>
               <CardDescription>
@@ -913,129 +835,83 @@ export function BulkScheduler({
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Write something worth publishing..."
-                  rows={4}
-                  className="min-h-28 text-[15px] leading-relaxed"
+                  rows={3}
+                  className="min-h-24 text-[15px] leading-relaxed"
                 />
               </Field>
             </CardContent>
           </Card>
         </section>
 
-        <section aria-labelledby="bulk-targets">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div>
-              <h2 id="bulk-targets" className="text-lg font-medium">
-                Publish to
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Only connected accounts that support video are listed.
-              </p>
-            </div>
-            <Badge variant="secondary" className="tabular-nums">
-              {selectedAccountIds.length} selected
-            </Badge>
-          </div>
-          <div>
-            <FieldSet>
-              <FieldLegend variant="label" className="sr-only">
-                Publish to
-              </FieldLegend>
-              <FieldGroup className="gap-2 sm:grid sm:grid-cols-2">
-                {accounts.map((account) => {
-                  const selected = selectedAccountIds.includes(account.id);
-                  return (
-                    <Field
-                      key={account.id}
-                      orientation="horizontal"
-                      onClick={(event) => {
-                        if (running) return;
-                        const target = event.target as HTMLElement | null;
-                        if (
-                          target?.closest?.(
-                            'label, [data-slot="checkbox"]'
-                          )
-                        ) {
-                          return;
-                        }
-                        setSelectedAccountIds((current) =>
-                          selected
-                            ? current.filter((id) => id !== account.id)
-                            : [...current, account.id]
-                        );
-                      }}
-                      className={cn(
-                        "rounded-xl border border-border bg-card p-3 transition-colors",
-                        !running &&
-                          "cursor-pointer hover:border-foreground/25 hover:bg-muted/40 has-[:focus-visible]:border-ring has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
-                        selected &&
-                          !running &&
-                          "border-signal/60 bg-signal/[0.05] hover:border-signal/60 hover:bg-signal/[0.05]"
-                      )}
-                    >
-                      <Checkbox
-                        id={`bulk-account-${account.id}`}
-                        checked={selected}
-                        disabled={running}
-                        onCheckedChange={(checked) =>
-                          setSelectedAccountIds((current) =>
-                            checked === true
-                              ? [...current, account.id]
-                              : current.filter((id) => id !== account.id)
-                          )
-                        }
-                        className="sr-only"
-                      />
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "flex size-9 shrink-0 self-center items-center justify-center rounded-lg",
-                          selected && !running
-                            ? "bg-signal/10 text-signal"
-                            : "bg-muted text-muted-foreground"
-                        )}
-                      >
-                        <PlatformIcon
-                          platform={account.platform}
-                          className="size-5"
-                        />
-                      </span>
-                      <FieldContent className="self-center">
-                        <FieldLabel htmlFor={`bulk-account-${account.id}`}>
-                          {PLATFORM_NAMES[account.platform] ?? account.platform}{" "}
-                          <span className="font-normal text-muted-foreground">
-                            @{account.username}
-                          </span>
-                        </FieldLabel>
-                      </FieldContent>
-                    </Field>
-                  );
-                })}
-              </FieldGroup>
-            </FieldSet>
-          </div>
-        </section>
+        <ChannelStrip
+          accounts={accounts.map((account) => ({
+            ...account,
+            implemented: true,
+          }))}
+          selectedAccountIds={selectedAccountIds}
+          targetOverrides={{}}
+          disabled={running}
+          mediaErrors={[]}
+          onToggle={(accountId, checked) => {
+            if (running) return;
+            setSelectedAccountIds((current) =>
+              checked
+                ? [...current, accountId]
+                : current.filter((id) => id !== accountId)
+            );
+          }}
+        />
 
         <section aria-labelledby="bulk-schedule">
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Schedule</CardTitle>
               <CardDescription>
                 First post goes out at the start time, the rest follow
-                spaced by the interval. All times shown in the selected
-                timezone.
+                spaced by the interval.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <FieldGroup>
+              <div
+                aria-live="polite"
+                className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-[13px] leading-5 text-muted-foreground tabular-nums"
+              >
+                <CalendarClockIcon
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0"
+                />
+                <p className="min-w-0">
+                  {!scheduleDate || !scheduleTime ? (
+                    "Choose a start date and time."
+                  ) : !startIso || schedule.length === 0 ? (
+                    "Pick a valid future start — the schedule appears here."
+                  ) : (
+                    <>
+                      First post {formatInZone(startIso, timeZone)} → then
+                      every{" "}
+                      {intervalMinutes >= 60
+                        ? `${intervalMinutes / 60}h`
+                        : `${intervalMinutes}m`}{" "}
+                      · {schedule.length}{" "}
+                      {schedule.length === 1 ? "post" : "posts"} · last{" "}
+                      {formatInZone(
+                        schedule[schedule.length - 1] ?? "",
+                        timeZone
+                      )}{" "}
+                      · {timeZone.replaceAll("_", " ")}
+                    </>
+                  )}
+                </p>
+              </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field>
                   <FieldLabel htmlFor="bulk-date">Start date</FieldLabel>
-                  <Input
+                  <ScheduleDatePicker
                     id="bulk-date"
-                    type="date"
                     value={scheduleDate}
-                    onChange={(e) => setScheduleDate(e.target.value)}
                     disabled={running}
+                    onChange={setScheduleDate}
                   />
                 </Field>
                 <Field>
@@ -1084,8 +960,11 @@ export function BulkScheduler({
                     disabled={running}
                   />
                   <FieldDescription>
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      <span>Presets:</span>
+                    <span
+                      role="group"
+                      aria-label="Interval presets"
+                      className="flex flex-wrap items-center gap-1.5"
+                    >
                       {BULK_INTERVAL_PRESETS.map((preset) => {
                         const active = intervalMinutes === preset;
                         return (
@@ -1096,7 +975,7 @@ export function BulkScheduler({
                             aria-pressed={active}
                             onClick={() => setIntervalMinutes(preset)}
                             className={cn(
-                              "h-7 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40",
+                              "h-6 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40",
                               active
                                 ? "border-signal/60 bg-signal/[0.07] text-signal"
                                 : "border-border bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground"
@@ -1145,75 +1024,10 @@ export function BulkScheduler({
           </Card>
         </section>
 
-        {items.length > 0 && schedule.length > 0 && (
-          <section aria-labelledby="bulk-review">
-            <Card>
-              <CardHeader>
-                <CardTitle>Review</CardTitle>
-                <CardDescription>
-                  One ordinary scheduled post per video. Each stays
-                  editable, retryable and deletable on its own.
-                </CardDescription>
-                <CardAction>
-                  <Badge variant="secondary" className="tabular-nums">
-                    {items.length} {items.length === 1 ? "post" : "posts"}
-                  </Badge>
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <ul className="flex flex-col gap-2">
-                  {items.map((item, index) => (
-                    <li
-                      key={item.key}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {item.file.name}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground tabular-nums">
-                          {formatInZone(schedule[index] ?? "", timeZone)} ·{" "}
-                          {selectedAccounts.map((a) => a.platform).join(", ") ||
-                            "no accounts"}
-                        </p>
-                      </div>
-                      {item.status === "scheduled" ? (
-                        <Badge variant="secondary" className="shrink-0">
-                          Scheduled
-                        </Badge>
-                      ) : item.status === "failed" ? (
-                        <Badge variant="destructive" className="shrink-0">
-                          Failed
-                        </Badge>
-                      ) : running ? (
-                        <Spinner
-                          data-icon="inline-start"
-                          aria-hidden="true"
-                          className="shrink-0"
-                        />
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => removeItem(item.key)}
-                          aria-label={`Remove ${item.file.name}`}
-                          className="shrink-0"
-                        >
-                          <Trash2Icon />
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </section>
-        )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start">
-          <Card>
+          <Card size="sm">
             <CardHeader>
               <CardTitle>Batch</CardTitle>
               <CardDescription>
