@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { fetchPrivateBlob, deleteBlobs } from "@/lib/blob";
+import { runMediaDeleteFlow } from "@/lib/delete-resources";
 
 export async function GET(
   request: NextRequest,
@@ -87,28 +88,31 @@ export async function DELETE(
       return NextResponse.json({ error: "Media not found" }, { status: 404 });
     }
 
-    try {
-      await deleteBlobs([media.pathname]);
-    } catch {
+    // DB-first (see runMediaDeleteFlow): leftover bytes are sweepable
+    // orphans, never rows pointing at missing blobs.
+    const outcome = await runMediaDeleteFlow({
+      mediaId: id,
+      userId: user.id,
+      pathname: media.pathname,
+      deleteMediaRow: async (mediaId, userId) => {
+        // Atomic ownership: scoped deleteMany + count check.
+        const deleted = await prisma.media.deleteMany({
+          where: { id: mediaId, userId },
+        });
+        return deleted.count > 0 ? "deleted" : "missing";
+      },
+      deleteBlobs,
+    });
+    if (outcome.outcome === "not-found") {
+      return NextResponse.json({ error: "Media not found" }, { status: 404 });
+    }
+    if (outcome.outcome === "blobs-failed") {
       return NextResponse.json(
         { error: "Failed to delete file" },
         { status: 500 }
       );
     }
-
-    try {
-      // Atomic ownership: scoped deleteMany + count check (not delete-by-id
-      // after a separate read). A concurrently deleted row reports 404.
-      const deleted = await prisma.media.deleteMany({
-        where: { id, userId: user.id },
-      });
-      if (deleted.count === 0) {
-        return NextResponse.json(
-          { error: "Media not found" },
-          { status: 404 }
-        );
-      }
-    } catch {
+    if (outcome.outcome === "failed") {
       return NextResponse.json(
         { error: "Failed to delete media record" },
         { status: 500 }
