@@ -21,7 +21,18 @@ export async function POST(request: NextRequest) {
       planHint: body?.plan,
     });
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      const body: Record<string, unknown> = { error: result.error };
+      if (result.code) body.code = result.code;
+      if (typeof result.retryAfterSeconds === "number") {
+        body.retryAfterSeconds = result.retryAfterSeconds;
+      }
+      const response = NextResponse.json(body, { status: result.status });
+      // HTTP semantics for 429: Retry-After in seconds (real remaining
+      // wait, not a static value). Applies only to this OTP endpoint.
+      if (result.status === 429 && typeof result.retryAfterSeconds === "number") {
+        response.headers.set("Retry-After", String(result.retryAfterSeconds));
+      }
+      return response;
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

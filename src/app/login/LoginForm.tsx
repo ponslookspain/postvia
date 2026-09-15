@@ -8,6 +8,12 @@ import { authClient } from "@/lib/auth-client";
 import { GoogleButton } from "@/components/GoogleButton";
 import { AuthShell } from "@/components/AuthShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  OTP_RATE_LIMITED_CODE,
+  formatOtpRateLimitMessage,
+  normalizeRetryAfterSeconds,
+  useOtpRetryCountdown,
+} from "@/lib/otp-rate-limit";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -39,6 +45,9 @@ export function LoginForm({
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resending, setResending] = useState(false);
+  const [otpRateLimited, setOtpRateLimited] = useState(false);
+  const { remaining: otpRetryRemaining, start: startOtpRetryCountdown } =
+    useOtpRetryCountdown();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,8 +85,10 @@ export function LoginForm({
       setError("Enter your email first, then request a code.");
       return;
     }
+    if (otpRetryRemaining > 0) return;
     setSendingCode(true);
     setError(null);
+    setOtpRateLimited(false);
     try {
       // Neutral endpoint: same response for existing and unknown emails,
       // so this button is not an enumeration oracle. Unknown emails simply
@@ -89,7 +100,14 @@ export function LoginForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Unable to send code. Please try again.");
+        const retryAfter = normalizeRetryAfterSeconds(data.retryAfterSeconds);
+        if (res.status === 429 && data.code === OTP_RATE_LIMITED_CODE && retryAfter !== null) {
+          setOtpRateLimited(true);
+          setError(formatOtpRateLimitMessage(retryAfter));
+          startOtpRetryCountdown(retryAfter);
+        } else {
+          setError(data.error || "Unable to send code. Please try again.");
+        }
         setSendingCode(false);
         return;
       }
@@ -148,8 +166,14 @@ export function LoginForm({
         {error && (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>Sign-in failed</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>
+              {otpRateLimited ? "Too many code requests" : "Sign-in failed"}
+            </AlertTitle>
+            <AlertDescription aria-live="polite">
+              {otpRateLimited && otpRetryRemaining > 0
+                ? formatOtpRateLimitMessage(otpRetryRemaining)
+                : error}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -217,12 +241,16 @@ export function LoginForm({
             <Button
               type="button"
               variant="outline"
-              disabled={sendingCode || submitting}
+              disabled={sendingCode || submitting || otpRetryRemaining > 0}
               onClick={() => void handleSignInWithCode()}
               className="w-full"
             >
               {sendingCode && <Spinner data-icon="inline-start" />}
-              {sendingCode ? "Sending code..." : "Sign in with a code"}
+              {sendingCode
+                ? "Sending code..."
+                : otpRetryRemaining > 0
+                  ? `Wait ${otpRetryRemaining}s`
+                  : "Sign in with a code"}
             </Button>
             <p className="text-xs text-muted-foreground">
               No password yet? Use{" "}

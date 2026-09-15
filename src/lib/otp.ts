@@ -13,7 +13,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   canonicalizeEmail,
-  checkAbuseRate,
+  checkAbuseRateDetailed,
   emailSignal,
   getAbusePepper,
   hashRateKey,
@@ -59,9 +59,34 @@ export function planHintToDb(planHint: unknown): "GROWTH" | "SCALE" | "FREE" | u
   return undefined;
 }
 
+export const OTP_RATE_LIMITED_CODE = "RATE_LIMITED" as const;
+
+/**
+ * Latest-safe wait across denied buckets (pure, testable).
+ * Each entry is one scope's detailed gate result; allowed scopes
+ * contribute 0. Returns >= 1 whenever any scope denied, 0 otherwise.
+ */
+export function maxDeniedRetryAfterSeconds(
+  results: ReadonlyArray<{ allowed: boolean; retryAfterSeconds: number }>
+): number {
+  let peak = 0;
+  for (const result of results) {
+    if (!result.allowed && Number.isFinite(result.retryAfterSeconds)) {
+      peak = Math.max(peak, Math.ceil(result.retryAfterSeconds));
+    }
+  }
+  return peak <= 0 ? (results.some((r) => !r.allowed) ? 1 : 0) : peak;
+}
+
 export type OtpRequestResult =
   | { ok: true }
-  | { ok: false; error: string; status: 400 | 429 };
+  | {
+      ok: false;
+      error: string;
+      status: 400 | 429;
+      code?: typeof OTP_RATE_LIMITED_CODE;
+      retryAfterSeconds?: number;
+    };
 
 /**
  * Request a one-time code. ALWAYS returns `{ ok: true }` for valid emails,
@@ -99,15 +124,15 @@ export async function requestOtp(input: {
     const pepper = getAbusePepper();
     const hourKey = hashRateKey(["otp-send", email], pepper);
     const coolKey = hashRateKey(["otp-send-cool", email], pepper);
-    const [hourOk, coolOk] = await Promise.all([
-      checkAbuseRate({
+    const [hour, cool] = await Promise.all([
+      checkAbuseRateDetailed({
         scope: "otp-send",
         keyHash: hourKey,
         max: OTP_SEND_MAX_PER_HOUR,
         windowMs: 60 * 60_000,
         stores: liveAbuseStores,
       }),
-      checkAbuseRate({
+      checkAbuseRateDetailed({
         scope: "otp-send-cool",
         keyHash: coolKey,
         max: 1,
@@ -115,11 +140,16 @@ export async function requestOtp(input: {
         stores: liveAbuseStores,
       }),
     ]);
-    if (!hourOk || !coolOk) {
+    if (!hour.allowed || !cool.allowed) {
+      // Real remaining wait: latest-safe of the denied buckets.
+      // Hourly cap yields up to ~3600s; cooldown yields up to 60s.
+      const retryAfterSeconds = maxDeniedRetryAfterSeconds([hour, cool]);
       return {
         ok: false,
         error: "Too many codes requested. Please wait a minute and try again.",
         status: 429,
+        code: OTP_RATE_LIMITED_CODE,
+        retryAfterSeconds,
       };
     }
   } catch (error) {
