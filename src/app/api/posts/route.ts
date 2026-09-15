@@ -33,6 +33,22 @@ import {
   normalizeOperationId,
 } from "@/lib/idempotency";
 
+/**
+ * Replay lookup by the globally unique idempotency key, then ownership
+ * check in code. `clientOperationId` is `@unique`, so `findUnique` is the
+ * true index lookup; a row owned by another user behaves exactly like a
+ * miss (null) — same as the previous `findFirst({userId, key})` scoping,
+ * including the P2002 → resolveConflict → 500 path for foreign keys.
+ */
+async function findOwnPostByOperationId(operationId: string, userId: string) {
+  const row = await prisma.post.findUnique({
+    where: { clientOperationId: operationId },
+    include: { targets: true },
+  });
+  if (!row || row.userId !== userId) return null;
+  return row;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getApiUser();
@@ -119,10 +135,7 @@ export async function POST(request: NextRequest) {
     // a network timeout, double-submit that arrived sequentially). Return
     // the existing row WITHOUT consuming quota again.
     if (operationId) {
-      const existing = await prisma.post.findFirst({
-        where: { userId: user.id, clientOperationId: operationId },
-        include: { targets: true },
-      });
+      const existing = await findOwnPostByOperationId(operationId, user.id);
       if (existing) {
         return NextResponse.json(existing, { status: 200 });
       }
@@ -277,10 +290,7 @@ export async function POST(request: NextRequest) {
     // unique index. Resolve it to the winner's row instead of a 500.
     const resolveConflict = async () => {
       if (!operationId) return null;
-      return prisma.post.findFirst({
-        where: { userId: user.id, clientOperationId: operationId },
-        include: { targets: true },
-      });
+      return findOwnPostByOperationId(operationId, user.id);
     };
     if (freeLimit !== null) {
       let kernel: Awaited<ReturnType<typeof createFreePostAtomic>> | null = null;
@@ -375,10 +385,7 @@ export async function POST(request: NextRequest) {
     const outcome = await createPostIdempotent(
       {
         findByOperationId: (key) =>
-          prisma.post.findFirst({
-            where: { userId: user.id, clientOperationId: key },
-            include: { targets: true },
-          }),
+          findOwnPostByOperationId(key, user.id),
         runAtomic: (fn) =>
           operationId
             ? prisma.$transaction((tx) =>
