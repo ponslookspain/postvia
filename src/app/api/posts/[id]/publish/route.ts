@@ -66,9 +66,13 @@ export async function POST(
       );
     }
 
+    // Atomic ownership: the claim itself is scoped to this user's row,
+    // so a TOCTOU swap between the read above and this write can only
+    // miss (400 below), never publish another user's post.
     const claim = await prisma.post.updateMany({
       where: {
         id,
+        userId: user.id,
         status: { in: ["DRAFT", "SCHEDULED", "FAILED", "PARTIALLY_PUBLISHED"] },
       },
       data: { status: "PUBLISHING" },
