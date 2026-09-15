@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildComposerMediaErrors,
   buildComposerPreviewModel,
   buildComposerPreviews,
   classifyMediaIssue,
@@ -426,6 +427,55 @@ describe("composer preview model", () => {
       ["media-too-large"]
     );
     assert.equal(threads?.validation.valid, true);
+  });
+
+  test("X 6 MB photo surfaces the platform byte cap before upload", () => {
+    const [x] = buildComposerPreviewModel({
+      accounts: [X],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [
+        { type: "IMAGE", mimeType: "image/jpeg", size: 6 * 1024 * 1024 },
+      ],
+    });
+    assert.equal(x?.mediaState, "error");
+    assert.deepEqual(
+      x?.validation.errors.map((issue) => issue.code),
+      ["media-too-large"]
+    );
+    assert.match(x?.validation.errors[0]?.message ?? "", /5 MB/);
+  });
+
+  test("same 6 MB photo passes Threads (global gate only)", () => {
+    const [threads] = buildComposerPreviewModel({
+      accounts: [THREADS],
+      globalText: GLOBAL,
+      overrides: [],
+      media: [
+        { type: "IMAGE", mimeType: "image/jpeg", size: 6 * 1024 * 1024 },
+      ],
+    });
+    assert.equal(threads?.mediaState, "ok");
+    assert.equal(threads?.validation.valid, true);
+  });
+
+  test("registry byte-cap wording classifies as media-too-large", () => {
+    assert.equal(
+      classifyMediaIssue("X accepts image files up to 5 MB."),
+      "media-too-large"
+    );
+  });
+
+  test("buildComposerMediaErrors threads size into platform caps", () => {
+    const file = {
+      type: "IMAGE" as const,
+      mimeType: "image/jpeg",
+      size: 6 * 1024 * 1024,
+    };
+    assert.deepEqual(buildComposerMediaErrors([THREADS], [file]), []);
+    const xErrors = buildComposerMediaErrors([X], [file]);
+    assert.equal(xErrors.length, 1);
+    assert.match(xErrors[0] ?? "", /5 MB/);
   });
 
   test("override settings travel on the model", () => {

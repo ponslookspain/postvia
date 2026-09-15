@@ -5,6 +5,10 @@ import { deleteBlobs, listMediaBlobs } from "@/lib/blob";
 import { sweepOrphanBlobs } from "@/lib/media-cleanup";
 import { reportError } from "@/lib/diagnostics";
 import {
+  liveAbuseStores,
+  TOMBSTONE_SOCIAL_TTL_MS,
+} from "@/lib/abuse";
+import {
   isCronAuthorized,
   runScheduledPublishTick,
   type SchedulingDb,
@@ -43,11 +47,21 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
     } catch {
       // Sweep failures are logged inside; the tick result stands.
     }
-    return NextResponse.json({ ok: true, ...stats, orphans });
+    // Abuse tombstone retention, same best-effort contract: delete only
+    // rows older than the LONGEST tombstone TTL (social, 180d), so no
+    // live row of any kind is ever removed. Failures never fail the tick.
+    let tombstones = 0;
+    try {
+      tombstones = await liveAbuseStores.sweepTombstones(
+        new Date(Date.now() - TOMBSTONE_SOCIAL_TTL_MS)
+      );
+    } catch (error) {
+      reportError("cron", "tombstone sweep failed", error);
+    }
+    return NextResponse.json({ ok: true, ...stats, orphans, tombstones });
   } catch (error) {
     reportError("cron", "publish tick failed", error);
-    const message = error instanceof Error ? error.message : "Cron run failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Cron run failed" }, { status: 500 });
   }
 }
 

@@ -357,3 +357,103 @@ describe("defaultSelectedAccountIds", () => {
     );
   });
 });
+
+describe("planMediaAdd TikTok size guidance", () => {
+  const TIKTOK = { id: "tt-1", platform: "TIKTOK" };
+  const bigJpeg = {
+    name: "photo.jpg",
+    type: "image/jpeg",
+    size: 12 * 1024 * 1024,
+  };
+
+  test("12 MB JPEG names the TikTok 20 MB support without allowing it", () => {
+    const plan = planMediaAdd({
+      files: [bigJpeg],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["tt-1"],
+      accounts: [TIKTOK],
+    });
+    assert.equal(plan.accepted.length, 0);
+    assert.equal(plan.rejected.length, 1);
+    assert.match(plan.rejected[0]?.error ?? "", /10 MB/);
+    assert.match(plan.rejected[0]?.error ?? "", /TikTok supports photos up to 20 MB/);
+  });
+
+  test("same file without a TikTok target keeps the generic message", () => {
+    const plan = planMediaAdd({
+      files: [bigJpeg],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["threads-1"],
+      accounts: ACCOUNTS,
+    });
+    assert.equal(plan.rejected.length, 1);
+    assert.doesNotMatch(plan.rejected[0]?.error ?? "", /TikTok/);
+  });
+
+  test("over-20 MB JPEG never gets the TikTok hint", () => {
+    const plan = planMediaAdd({
+      files: [{ ...bigJpeg, size: 21 * 1024 * 1024 }],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["tt-1"],
+      accounts: [TIKTOK],
+    });
+    assert.equal(plan.rejected.length, 1);
+    assert.doesNotMatch(plan.rejected[0]?.error ?? "", /TikTok supports/);
+  });
+});
+
+describe("canSubmitComposer description-only TikTok photo", () => {
+  const base = {
+    overLimit: false,
+    mediaError: false,
+    hasSelection: true,
+    busy: false,
+    quotaBlocked: false,
+  };
+
+  test("empty text with a photo description counts as content", () => {
+    assert.equal(
+      canSubmitComposer({ ...base, textPresent: false, descriptionPresent: true }),
+      true
+    );
+  });
+
+  test("empty text without a description stays blocked", () => {
+    assert.equal(
+      canSubmitComposer({ ...base, textPresent: false }),
+      false
+    );
+    assert.equal(
+      canSubmitComposer({
+        ...base,
+        textPresent: false,
+        descriptionPresent: false,
+      }),
+      false
+    );
+  });
+
+  test("description does not override other gates", () => {
+    assert.equal(
+      canSubmitComposer({
+        ...base,
+        textPresent: false,
+        descriptionPresent: true,
+        overLimit: true,
+      }),
+      false
+    );
+  });
+});
+
+describe("TikTok photo byte mirror", () => {
+  test("local 20 MB mirror matches the provider constant", async () => {
+    const { TIKTOK_PHOTO_MAX_BYTES } = await import(
+      "../src/lib/social/tiktok"
+    );
+    assert.equal(20 * 1024 * 1024, TIKTOK_PHOTO_MAX_BYTES);
+  });
+});

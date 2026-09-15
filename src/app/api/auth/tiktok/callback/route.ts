@@ -132,8 +132,9 @@ export async function GET(request: NextRequest) {
     });
     if (existing) {
       // Reconnect: rotate tokens in place, never duplicate the account.
-      await prisma.socialAccount.update({
-        where: { id: existing.id },
+      // updateMany scopes the write to this user's row atomically.
+      await prisma.socialAccount.updateMany({
+        where: { id: existing.id, userId: user.id },
         data: accountData,
       });
     } else {

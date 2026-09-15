@@ -138,20 +138,24 @@ export async function reserveUploadPathname(input: {
   mimeType: string;
   size: number;
 }): Promise<ReserveUploadResult> {
+  // Pure input gates before any database work: unauthenticated or
+  // post-less requests fail without touching Prisma.
+  if (!input.user) {
+    return { ok: false, status: 401, error: "Not authenticated" };
+  }
+  if (!input.postId) {
+    return { ok: false, status: 400, error: "postId is required" };
+  }
   // Ownership lookup and the per-post media count are independent reads
-  // (both scoped by user id); the media count query is harmless for a
-  // foreign/unauthenticated post because every decision below still
-  // short-circuits on the authorization/validation results in the same
-  // order as before.
+  // (both scoped by user id); every decision below still short-circuits
+  // on the authorization/validation results in the same order as before.
   const [post, existingMediaCount] = await Promise.all([
-    input.user
-      ? prisma.post.findFirst({
-          where: { id: input.postId, userId: input.user.id },
-          select: { userId: true },
-        })
-      : Promise.resolve(null),
+    prisma.post.findFirst({
+      where: { id: input.postId, userId: input.user.id },
+      select: { userId: true },
+    }),
     prisma.media.count({
-      where: { postId: input.postId, userId: input.user?.id ?? "" },
+      where: { postId: input.postId, userId: input.user.id },
     }),
   ]);
 
@@ -262,7 +266,9 @@ export type CompletedUploadOutcome =
 /**
  * Pure validation of a completed-upload event before it becomes a row:
  * - the tokenPayload (server-issued) determines user/post/filename,
- * - the stored pathname must stay inside `media/{userId}/{postId}/`,
+ * - the stored pathname must be a pathname this server reserved
+ *   (strict reserved-path check, not a prefix match, so a re-encoded or
+ *   non-ASCII pathname can never validate),
  * - the actual stored content type + size must pass media policy.
  */
 export function validateCompletedUpload(input: {
@@ -274,7 +280,7 @@ export function validateCompletedUpload(input: {
   if (!parsed.ok) return parsed;
   const { userId, postId, filename } = parsed.data;
 
-  if (!input.blob.pathname.startsWith(`media/${userId}/${postId}/`)) {
+  if (!validateReservedPathname(input.blob.pathname, userId, postId)) {
     return {
       ok: false,
       error: "Uploaded blob path does not match the authorized scope",
@@ -348,7 +354,8 @@ export async function registerCompletedUpload(payload: {
     throw new Error(outcome.error);
   }
 
-  const existing = await prisma.media.findFirst({
+  // `@@unique([pathname])`: the true unique lookup (Batch 2 pattern).
+  const existing = await prisma.media.findUnique({
     where: { pathname: meta.pathname },
     select: { id: true },
   });

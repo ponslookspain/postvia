@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isGoogleOAuthConfigured } from "@/lib/auth";
 import { LoginForm } from "./LoginForm";
 
 export const dynamic = "force-dynamic";
@@ -16,5 +16,11 @@ export default async function LoginPage({
   const deleted = params.deleted === "1";
   const passwordChanged = params.passwordChanged === "1";
 
-  return <LoginForm deleted={deleted} passwordChanged={passwordChanged} />;
+  return (
+    <LoginForm
+      deleted={deleted}
+      passwordChanged={passwordChanged}
+      googleEnabled={isGoogleOAuthConfigured()}
+    />
+  );
 }

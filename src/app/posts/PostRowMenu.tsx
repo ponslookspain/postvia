@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
+import { reportError } from "@/lib/diagnostics";
 
 /**
  * Row actions behind a single menu trigger (shadcn DropdownMenu pattern
@@ -59,9 +60,10 @@ export function PostRowMenu({ id, status }: { id: string; status: string }) {
       toast.add({ title: "Retrying post", type: "success" });
       setMenuOpen(false);
       router.refresh();
-    } catch {
+    } catch (error) {
+      reportError("posts-client", "retry post failed", error, { postId: id });
       toast.add({
-        title: "Failed to retry post",
+        title: "Unable to retry post",
         description: "Please try again.",
         type: "error",
       });
@@ -79,9 +81,10 @@ export function PostRowMenu({ id, status }: { id: string; status: string }) {
       setDeleteOpen(false);
       setMenuOpen(false);
       router.refresh();
-    } catch {
+    } catch (error) {
+      reportError("posts-client", "delete post failed", error, { postId: id });
       toast.add({
-        title: "Failed to delete post",
+        title: "Unable to delete post",
         description: "Please try again.",
         type: "error",
       });

@@ -48,6 +48,7 @@ import {
   type ScheduleFlowDenial,
 } from "@/lib/composer-media";
 import { createSingleFlight, newOperationId } from "@/lib/idempotency";
+import { reportError } from "@/lib/diagnostics";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -135,10 +136,13 @@ function uploadFileToPost(
         // Step 2: official Vercel Blob client upload for private stores.
         // The SDK is imported lazily so its chunk stays out of the
         // composer's initial bundle until a file is actually uploaded.
-        let storedPathname = pathname;
+        // The reserved pathname is the server truth (signed scope +
+        // webhook registration key): the SDK echo is ignored so a
+        // re-encoded/non-ASCII echo can never desync registration polling
+        // from the stored object.
         try {
           const { uploadPresigned } = await import("@vercel/blob/client");
-          const uploaded = await uploadPresigned(pathname, file, {
+          await uploadPresigned(pathname, file, {
             access: "private",
             handleUploadUrl: "/api/media/upload",
             clientPayload: JSON.stringify({
@@ -151,7 +155,6 @@ function uploadFileToPost(
             onUploadProgress: ({ percentage }) =>
               onProgress(Math.min(100, Math.round(percentage))),
           });
-          storedPathname = uploaded.pathname || pathname;
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Unknown upload error";
@@ -162,11 +165,12 @@ function uploadFileToPost(
 
         // Step 3: the server registers the Media row from the verified
         // blob.upload-completed webhook; wait for it before publishing.
-        resolve(
-          await waitForMediaRegistration({ postId, pathname: storedPathname })
-        );
-      } catch {
-        resolve("Network error. Please try again.");
+        resolve(await waitForMediaRegistration({ postId, pathname }));
+      } catch (error) {
+        reportError("composer-client", "upload file failed", error, {
+          postId,
+        });
+        resolve("Unable to upload this file. Please try again.");
       }
     })();
   });
@@ -277,7 +281,11 @@ export default function NewPostComposer({
   const hasOverLimit = previews.some((preview) => preview.overLimit);
   const mediaErrors = buildComposerMediaErrors(
     selectedAccounts,
-    media.map((item) => ({ type: item.kind, mimeType: item.file.type }))
+    media.map((item) => ({
+      type: item.kind,
+      mimeType: item.file.type,
+      size: item.file.size,
+    }))
   );
   const hasMediaError = mediaErrors.length > 0;
   // Stage 2B: single-preview presentation model. Derived from the same
@@ -360,8 +368,18 @@ export default function NewPostComposer({
   const publishBlockedReason = hasBlockingPreviewError
     ? firstBlockingPreviewError(previewModels)
     : null;
+  // Description-only TikTok photo posts carry no global text: a
+  // non-empty photo description counts as content for submit gating
+  // (the server accepts empty text for TikTok-description targets).
+  const descriptionPresent = previewModels.some(
+    (model) =>
+      model.platform === "TIKTOK" &&
+      model.tiktokMode === "photo" &&
+      model.description.trim().length > 0
+  );
   const canSave = canSubmitComposer({
     textPresent: text.trim().length > 0,
+    descriptionPresent,
     overLimit: hasOverLimit,
     mediaError: hasMediaError || hasBlockingFileIssue,
     hasSelection: selectedAccountIds.length > 0,
@@ -370,6 +388,7 @@ export default function NewPostComposer({
   });
   const canPublish = canSubmitComposer({
     textPresent: text.trim().length > 0,
+    descriptionPresent,
     overLimit: hasOverLimit,
     mediaError: hasMediaError || hasBlockingFileIssue,
     hasSelection: selectedAccountIds.length > 0,
@@ -699,9 +718,10 @@ export default function NewPostComposer({
       // Terminal success: the next explicit save is a new operation.
       // Failures keep the key so a retry replays onto the same draft.
       rotateOperationId();
-    } catch {
+    } catch (error) {
+      reportError("composer-client", "save draft failed", error);
       toast.add({
-        title: "Failed to save draft",
+        title: "Unable to save draft",
         description: "Please try again.",
         type: "error",
         priority: "high",
@@ -836,7 +856,8 @@ export default function NewPostComposer({
       // Every failure path above keeps the key, so confirming again
       // replays onto the same draft instead of creating a second post.
       rotateOperationId();
-    } catch {
+    } catch (error) {
+      reportError("composer-client", "schedule failed", error);
       setScheduleError("Failed to schedule post. Please try again.");
     } finally {
       setScheduling(false);
@@ -963,11 +984,14 @@ export default function NewPostComposer({
       // The post now exists server-side regardless of the publish outcome;
       // the next explicit publish is a new operation with a new key.
       rotateOperationId();
-    } catch {
+    } catch (error) {
+      reportError("composer-client", "publish failed", error, {
+        platform,
+      });
       setPublishResult({
         ok: false,
         platform,
-        error: "Network error. Please try again.",
+        error: "Unable to publish. Please try again.",
       });
     } finally {
       publishAbortRef.current = null;
@@ -1424,7 +1448,9 @@ export default function NewPostComposer({
         savedId={savedId}
         scheduling={scheduling}
         canSave={canSave}
-        textPresent={text.trim().length > 0}
+        // Content present: global text or a TikTok photo description
+        // (description-only posts schedule like text posts).
+        textPresent={text.trim().length > 0 || descriptionPresent}
         overLimit={hasOverLimit}
         mediaError={hasMediaError || hasBlockingFileIssue}
         hasSelection={selectedAccountIds.length > 0}

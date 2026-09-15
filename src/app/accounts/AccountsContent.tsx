@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { reportError } from "@/lib/diagnostics";
 
 interface PlatformAccount {
   id: string;
@@ -96,7 +97,7 @@ function getSearchParamMessage(searchParams: URLSearchParams): {
   const connected = searchParams.get("connected");
   const error = searchParams.get("error");
 
-  if (connected) return { text: "Account connected successfully", error: false };
+  if (connected) return { text: "Account connected", error: false };
   if (error) {
     if (error === "account_limit_reached") {
       const upgradeTo = searchParams.get("upgradeTo");
@@ -107,16 +108,16 @@ function getSearchParamMessage(searchParams: URLSearchParams): {
       };
     }
     const errors: Record<string, string> = {
-      access_denied: "Authorization was denied by the user",
-      invalid_state: "Invalid OAuth state. Please try again.",
-      invalid_session: "Session expired. Please try again.",
-      missing_parameters: "Missing authorization parameters",
+      access_denied: "You canceled connecting the account before it finished.",
+      invalid_state: "The connection didn't finish. Please try again.",
+      invalid_session: "Your sign-in expired. Please sign in and try again.",
+      missing_parameters: "The connection didn't finish. Please try again.",
       instagram_personal_account:
         "Only Instagram Business or Creator accounts can be connected.",
-      instagram_callback_failed: "Instagram connection failed. Please try again.",
-      tiktok_callback_failed: "TikTok connection failed. Please try again.",
+      instagram_callback_failed: "Unable to connect Instagram. Please try again.",
+      tiktok_callback_failed: "Unable to connect TikTok. Please try again.",
     };
-    return { text: errors[error] || "Connection failed. Please try again.", error: true };
+    return { text: errors[error] || "Unable to connect the account. Please try again.", error: true };
   }
   return null;
 }
@@ -193,20 +194,24 @@ export default function AccountsContent({
         window.location.assign(url);
         return;
       }
+      await res.json().catch(() => null);
       setMessage({
-        text:
-          typeof data?.error === "string"
-            ? data.error
-            : "Failed to initiate connection",
+        text: "Unable to start the connection. Please try again.",
         error: true,
       });
       setConnecting(null);
     } catch (error) {
+      // Aborts are user-visible timeouts, not faults: report only real failures.
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        reportError("accounts-client", "connect failed", error, {
+          platform: config.platform,
+        });
+      }
       setMessage({
         text:
           error instanceof DOMException && error.name === "AbortError"
-            ? "Connection timed out. Please try again."
-            : "Failed to connect. Please try again.",
+            ? "The connection is taking too long. Please try again."
+            : "Unable to connect. Please try again.",
         error: true,
       });
       setConnecting(null);
@@ -234,11 +239,14 @@ export default function AccountsContent({
         }));
         setMessage({ text: `${config.name} account disconnected`, error: false });
       } else {
-        const data = await res.json();
-        setMessage({ text: data.error || "Failed to disconnect", error: true });
+        await res.json().catch(() => null);
+        setMessage({ text: "Unable to disconnect the account. Please try again.", error: true });
       }
-    } catch {
-      setMessage({ text: "Failed to disconnect. Please try again.", error: true });
+    } catch (error) {
+      reportError("accounts-client", "disconnect failed", error, {
+        accountId: account.id,
+      });
+      setMessage({ text: "Unable to disconnect the account. Please try again.", error: true });
     } finally {
       setDisconnecting(null);
     }
@@ -356,8 +364,8 @@ export default function AccountsContent({
                                 @{account.username}
                               </p>
                               {expired && (
-                                <p className="truncate text-xs text-destructive">
-                                  Token expired, reconnect to keep publishing
+                                <p className="truncate text-xs text-muted-foreground">
+                                  Connection expired — reconnect to keep publishing
                                 </p>
                               )}
                             </div>

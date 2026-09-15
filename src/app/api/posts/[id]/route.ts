@@ -5,7 +5,10 @@ import { deleteBlobs } from "@/lib/blob";
 import { resolveScheduledAtUpdate } from "@/lib/schedule";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
-import { validateTargetMedia } from "@/lib/platforms/overrides";
+import {
+  validateCreatePostContent,
+  validateTargetMedia,
+} from "@/lib/platforms/overrides";
 
 async function findOwnedPost(id: string, userId: string) {
   return prisma.post.findFirst({
@@ -86,6 +89,16 @@ export async function PATCH(
           { status: 400 }
         );
       }
+      // Same per-platform text-length contract as POST /api/posts: an edit
+      // must not save text the targets could never publish.
+      const textCheck = validateCreatePostContent({
+        text: body.text.trim(),
+        mediaCount: null,
+        platforms: existing.targets.map((target) => target.platform),
+      });
+      if (!textCheck.ok) {
+        return NextResponse.json({ error: textCheck.error }, { status: 400 });
+      }
       data.text = body.text.trim();
     }
 
@@ -156,11 +169,20 @@ export async function PATCH(
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    const post = await prisma.post.update({
-      where: { id },
+    // Atomic ownership: the write itself is scoped to this user's row
+    // (updateMany + count check) instead of trusting the earlier
+    // find-then-update sequence alone.
+    const updated = await prisma.post.updateMany({
+      where: { id, userId: user.id },
       data,
-      include: { targets: { include: { socialAccount: { select: { username: true } } } }, media: true },
     });
+    if (updated.count === 0) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+    const post = await findOwnedPost(id, user.id);
+    if (!post) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
 
     return NextResponse.json(post);
   } catch {
@@ -201,7 +223,14 @@ export async function DELETE(
     // Quota invariant: deleting a post never touches the PostUsage ledger,
     // so create/delete loops cannot refill the monthly quota. The deleted
     // unit stays consumed — fail-closed by design.
-    await prisma.post.delete({ where: { id } });
+    // Atomic ownership: scoped deleteMany + count check (not delete-by-id
+    // after a separate read).
+    const deleted = await prisma.post.deleteMany({
+      where: { id, userId: user.id },
+    });
+    if (deleted.count === 0) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

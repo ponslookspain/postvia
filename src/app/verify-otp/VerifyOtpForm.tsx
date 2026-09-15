@@ -7,6 +7,12 @@ import { MailCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { AuthShell } from "@/components/AuthShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  OTP_RATE_LIMITED_CODE,
+  formatOtpRateLimitMessage,
+  normalizeRetryAfterSeconds,
+} from "@/lib/otp-rate-limit";
+import { useOtpRetryCountdown } from "@/hooks/use-otp-retry-countdown";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -24,9 +30,9 @@ function mapOtpError(message: string): string {
     return "Incorrect code. Check the email and try again.";
   }
   if (lower.includes("not found") || lower.includes("no account")) {
-    return "No account is waiting for this code. Start again from sign up or sign in.";
+    return "This code doesn't match an account. Start again from sign up or sign in.";
   }
-  return message || "Unable to verify the code.";
+  return "Unable to verify the code. Check it and try again.";
 }
 
 export function VerifyOtpForm({
@@ -42,6 +48,9 @@ export function VerifyOtpForm({
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendNote, setResendNote] = useState<string | null>(null);
+  const [resendRateLimited, setResendRateLimited] = useState(false);
+  const { remaining: resendRetryRemaining, start: startResendRetryCountdown } =
+    useOtpRetryCountdown();
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
@@ -58,7 +67,7 @@ export function VerifyOtpForm({
           body: JSON.stringify({ email }),
         });
         if (pre.status === 429) {
-          setError("Too many attempts. Request a new code and try again later.");
+          setError("Too many wrong attempts. Request a new code below.");
           setVerifying(false);
           return;
         }
@@ -93,15 +102,17 @@ export function VerifyOtpForm({
       router.push("/post-auth");
       router.refresh();
     } catch {
-      setError("Unable to verify the code. Please try again.");
+      setError("Unable to verify the code. Check it and try again.");
       setVerifying(false);
     }
   }
 
   async function handleResend() {
+    if (resendRetryRemaining > 0) return;
     setResending(true);
     setResendNote(null);
     setError(null);
+    setResendRateLimited(false);
     try {
       const res = await fetch("/api/auth/otp/request", {
         method: "POST",
@@ -110,12 +121,21 @@ export function VerifyOtpForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Failed to resend. Please try again.");
+        const retryAfter = normalizeRetryAfterSeconds(data.retryAfterSeconds);
+        if (res.status === 429 && data.code === OTP_RATE_LIMITED_CODE && retryAfter !== null) {
+          // Same structured response as signup/login; countdown is
+          // display-only, the next resend is still server-gated.
+          setResendRateLimited(true);
+          setError(formatOtpRateLimitMessage(retryAfter));
+          startResendRetryCountdown(retryAfter);
+        } else {
+          setError("Unable to resend the code. Please try again.");
+        }
       } else {
         setResendNote("New code sent. Check your inbox.");
       }
     } catch {
-      setError("Failed to resend. Please try again.");
+      setError("Unable to resend the code. Please try again.");
     }
     setResending(false);
   }
@@ -129,8 +149,14 @@ export function VerifyOtpForm({
         {error && (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>Verification failed</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>
+              {resendRateLimited ? "Too many code requests" : "Verification failed"}
+            </AlertTitle>
+            <AlertDescription aria-live="polite">
+              {resendRateLimited && resendRetryRemaining > 0
+                ? formatOtpRateLimitMessage(resendRetryRemaining)
+                : error}
+            </AlertDescription>
           </Alert>
         )}
         {resendNote && (
@@ -169,11 +195,15 @@ export function VerifyOtpForm({
           variant="outline"
           size="sm"
           onClick={() => void handleResend()}
-          disabled={resending}
+          disabled={resending || resendRetryRemaining > 0}
           className="w-full"
         >
           {resending && <Spinner data-icon="inline-start" />}
-          {resending ? "Sending..." : "Resend code"}
+          {resending
+            ? "Sending..."
+            : resendRetryRemaining > 0
+              ? `Wait ${resendRetryRemaining}s`
+              : "Resend code"}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
           Wrong email?{" "}

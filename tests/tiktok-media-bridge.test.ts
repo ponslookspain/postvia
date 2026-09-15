@@ -348,3 +348,49 @@ describe("composer gate matrix (audit scenarios A-K)", () => {
     });
   });
 });
+
+describe("bridge signing secret precedence", () => {
+  test("dedicated TIKTOK_BRIDGE_SECRET wins over BETTER_AUTH_SECRET", () => {
+    const savedBridge = process.env.TIKTOK_BRIDGE_SECRET;
+    const savedAuth = process.env.BETTER_AUTH_SECRET;
+    try {
+      process.env.TIKTOK_BRIDGE_SECRET = "dedicated-bridge-secret";
+      process.env.BETTER_AUTH_SECRET = "auth-secret-fallback";
+      const url = createTiktokMediaUrl({ mediaId: MEDIA_A, baseUrl: BASE, nowMs: NOW });
+      const parsed = parts(url);
+      assert.deepEqual(
+        verifyTiktokMediaToken({ ...parsed, secret: "dedicated-bridge-secret", nowMs: NOW }),
+        { ok: true }
+      );
+      assert.deepEqual(
+        verifyTiktokMediaToken({ ...parsed, secret: "auth-secret-fallback", nowMs: NOW }),
+        { ok: false, reason: "invalid" }
+      );
+    } finally {
+      if (savedBridge === undefined) delete process.env.TIKTOK_BRIDGE_SECRET;
+      else process.env.TIKTOK_BRIDGE_SECRET = savedBridge;
+      if (savedAuth === undefined) delete process.env.BETTER_AUTH_SECRET;
+      else process.env.BETTER_AUTH_SECRET = savedAuth;
+    }
+  });
+
+  test("BETTER_AUTH_SECRET fallback keeps existing URLs verifying", () => {
+    const savedBridge = process.env.TIKTOK_BRIDGE_SECRET;
+    const savedAuth = process.env.BETTER_AUTH_SECRET;
+    try {
+      delete process.env.TIKTOK_BRIDGE_SECRET;
+      process.env.BETTER_AUTH_SECRET = "auth-secret-fallback";
+      const url = createTiktokMediaUrl({ mediaId: MEDIA_A, baseUrl: BASE, nowMs: NOW });
+      const parsed = parts(url);
+      assert.deepEqual(
+        verifyTiktokMediaToken({ ...parsed, secret: "auth-secret-fallback", nowMs: NOW }),
+        { ok: true }
+      );
+    } finally {
+      if (savedBridge === undefined) delete process.env.TIKTOK_BRIDGE_SECRET;
+      else process.env.TIKTOK_BRIDGE_SECRET = savedBridge;
+      if (savedAuth === undefined) delete process.env.BETTER_AUTH_SECRET;
+      else process.env.BETTER_AUTH_SECRET = savedAuth;
+    }
+  });
+});

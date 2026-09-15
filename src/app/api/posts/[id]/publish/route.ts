@@ -14,8 +14,8 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -87,8 +87,11 @@ export async function POST(
       { status: 202 }
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to publish";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Generic client body: the raw cause stays server-side in diagnostics.
+    reportError("publish", "publish request failed", error, { postId: id });
+    return NextResponse.json(
+      { error: "Failed to start publishing" },
+      { status: 500 }
+    );
   }
 }

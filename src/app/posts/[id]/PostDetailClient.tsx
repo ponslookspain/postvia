@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { reportError } from "@/lib/diagnostics";
 
 interface Post {
   id: string;
@@ -126,14 +127,16 @@ async function startBackgroundAction(
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 202 || res.ok) return { started: true };
-    const data = await res.json().catch(() => null);
+    await res.json().catch(() => null);
     return {
       started: false,
-      error:
-        typeof data?.error === "string" ? data.error : "Publication failed",
+      error: "Unable to start publishing. Please try again.",
     };
-  } catch {
-    return { started: false, error: "Network error" };
+  } catch (error) {
+    reportError("post-client", "start background publish failed", error, {
+      path,
+    });
+    return { started: false, error: "Unable to start publishing. Please try again." };
   }
 }
 
@@ -274,6 +277,7 @@ export default function PostDetailPage({
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [rescheduleTime, setRescheduleTime] = useState("");
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [rescheduleInvalid, setRescheduleInvalid] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
 
@@ -300,9 +304,10 @@ export default function PostDetailPage({
       const data = await res.json();
       setPost((prev) => ({ ...prev, text: data.text }));
       setEditing(false);
-    } catch {
+    } catch (error) {
+      reportError("post-client", "save post failed", error, { postId: id });
       toast.add({
-        title: "Failed to save changes",
+        title: "Unable to save changes",
         description: "Please try again.",
         type: "error",
       });
@@ -317,9 +322,10 @@ export default function PostDetailPage({
       const res = await fetch(`/api/posts/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       router.push("/posts");
-    } catch {
+    } catch (error) {
+      reportError("post-client", "delete post failed", error, { postId: id });
       toast.add({
-        title: "Failed to delete post",
+        title: "Unable to delete post",
         description: "Please try again.",
         type: "error",
       });
@@ -345,8 +351,8 @@ export default function PostDetailPage({
         );
         if (polled.outcome === "timeout") {
           toast.add({
-            title: "Still publishing",
-            description: "The server keeps working — reopen this post to see the result.",
+            title: "Still working",
+            description: "Check back in a minute to see the result.",
             type: "warning",
           });
         }
@@ -366,9 +372,13 @@ export default function PostDetailPage({
         ...prev,
         media: prev.media.filter((m) => m.id !== mediaId),
       }));
-    } catch {
+    } catch (error) {
+      reportError("post-client", "delete media failed", error, {
+        postId: id,
+        mediaId,
+      });
       toast.add({
-        title: "Failed to delete media",
+        title: "Unable to delete media",
         description: "Please try again.",
         type: "error",
       });
@@ -397,8 +407,8 @@ export default function PostDetailPage({
         );
         if (polled.outcome === "timeout") {
           toast.add({
-            title: "Still retrying",
-            description: "The server keeps working — reopen this post to see the result.",
+            title: "Still working",
+            description: "Check back in a minute to see the result.",
             type: "warning",
           });
         }
@@ -416,6 +426,7 @@ export default function PostDetailPage({
     setRescheduleDate(localDateInputValue(base));
     setRescheduleTime(localTimeInputValue(base));
     setRescheduleError(null);
+    setRescheduleInvalid(false);
     setRescheduleOpen(true);
   }
 
@@ -428,16 +439,17 @@ export default function PostDetailPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scheduledAt: value }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setRescheduleError(data.error || "Failed to reschedule.");
+        setRescheduleError("Unable to save the new time. Please try again.");
         return false;
       }
       setPost((prev) => ({ ...prev, ...data }));
       setRescheduleOpen(false);
       return true;
-    } catch {
-      setRescheduleError("Network error. Please try again.");
+    } catch (error) {
+      reportError("post-client", "reschedule failed", error, { postId: id });
+      setRescheduleError("Unable to save the new time. Please try again.");
       return false;
     } finally {
       setRescheduling(false);
@@ -447,9 +459,10 @@ export default function PostDetailPage({
   async function handleRescheduleSave() {
     const iso = localInputToIso(rescheduleDate, rescheduleTime);
     if (!iso) {
-      setRescheduleError("Please choose a valid date and time.");
+      setRescheduleInvalid(true);
       return;
     }
+    setRescheduleInvalid(false);
     await sendScheduledAt(iso);
   }
 
@@ -607,7 +620,8 @@ export default function PostDetailPage({
                         </p>
                         {targetItem.errorMessage && (
                           <p className="truncate text-xs text-destructive">
-                            {targetItem.errorMessage}
+                            Couldn&apos;t publish to{" "}
+                            {formatPlatformName(targetItem.platform)}.
                           </p>
                         )}
                       </div>
@@ -624,9 +638,7 @@ export default function PostDetailPage({
                             View
                           </a>
                         )}
-                      <Badge variant="secondary">
-                        {targetItem.status.toLowerCase()}
-                      </Badge>
+                      <StatusBadge status={targetItem.status} />
                       {targetItem.status === "FAILED" && (
                         <Button
                           variant="outline"
@@ -689,14 +701,6 @@ export default function PostDetailPage({
                     })}
                   </dd>
                 </div>
-                {externalPostId && (
-                  <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-muted-foreground">External ID</dt>
-                    <dd className="truncate text-right font-mono text-xs text-muted-foreground">
-                      {externalPostId}
-                    </dd>
-                  </div>
-                )}
               </dl>
             </CardContent>
           </Card>
@@ -820,6 +824,9 @@ export default function PostDetailPage({
                 />
               </Field>
             </div>
+            {rescheduleInvalid && (
+              <FieldError>Please choose a valid date and time.</FieldError>
+            )}
             {rescheduleError && (
               <Alert variant="destructive">
                 <TriangleAlertIcon />

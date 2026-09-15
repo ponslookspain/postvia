@@ -97,7 +97,17 @@ export async function DELETE(
     }
 
     try {
-      await prisma.media.delete({ where: { id } });
+      // Atomic ownership: scoped deleteMany + count check (not delete-by-id
+      // after a separate read). A concurrently deleted row reports 404.
+      const deleted = await prisma.media.deleteMany({
+        where: { id, userId: user.id },
+      });
+      if (deleted.count === 0) {
+        return NextResponse.json(
+          { error: "Media not found" },
+          { status: 404 }
+        );
+      }
     } catch {
       return NextResponse.json(
         { error: "Failed to delete media record" },

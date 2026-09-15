@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   EmailClient,
+  EmailNotConfiguredError,
   PRODUCTION_EMAIL_FROM,
   PRODUCTION_REPLY_TO,
   VerificationEmailError,
   getEmailFrom,
   getEmailReplyTo,
+  isEmailConfigured,
   renderVerificationEmail,
+  sendOtpEmail,
   sendVerificationEmail,
 } from "../src/lib/email";
 import { PRODUCTION_URL, resolveBaseURL } from "../src/lib/base-url";
@@ -256,5 +259,60 @@ describe("sendVerificationEmail failure behavior", () => {
       }
     );
     assert.equal(captured.payload?.["from"], "Acme <mail@acme.com>");
+  });
+});
+
+describe("OTP email configuration", () => {
+  test("isEmailConfigured reflects key presence", () => {
+    assert.equal(isEmailConfigured({}), false);
+    assert.equal(isEmailConfigured({ RESEND_API_KEY: "" }), false);
+    assert.equal(isEmailConfigured({ RESEND_API_KEY: "re_test" }), true);
+  });
+
+  test("configured local Resend takes the send path", async () => {
+    const captured: { payload?: CapturedPayload } = {};
+    await sendOtpEmail(
+      { email: "user@example.com", otp: "123456", type: "email-verification" },
+      {
+        env: { NODE_ENV: "development", RESEND_API_KEY: "re_test" },
+        client: okClient(captured),
+      }
+    );
+    assert.equal(captured.payload?.["to"], "user@example.com");
+    assert.equal(captured.payload?.["subject"], "Verify your email — Postvia");
+    assert.ok((captured.payload?.["html"] as string).includes("123456"));
+  });
+
+  test("missing local key rejects explicitly instead of faking success", async () => {
+    await assert.rejects(
+      () =>
+        sendOtpEmail(
+          { email: "user@example.com", otp: "123456", type: "email-verification" },
+          { env: { NODE_ENV: "development" } }
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof EmailNotConfiguredError);
+        assert.ok(err instanceof VerificationEmailError);
+        assert.ok((err as Error).message.includes("RESEND_API_KEY"));
+        assert.ok(!(err as Error).message.includes("user@example.com"));
+        assert.ok(!(err as Error).message.includes("123456"));
+        return true;
+      }
+    );
+  });
+
+  test("missing production key keeps the hard failure", async () => {
+    await assert.rejects(
+      () =>
+        sendOtpEmail(
+          { email: "user@example.com", otp: "123456", type: "email-verification" },
+          { env: { NODE_ENV: "production" } }
+        ),
+      (err: unknown) => {
+        assert.ok(err instanceof EmailNotConfiguredError);
+        assert.ok(!(err as Error).message.includes(".env.local"));
+        return true;
+      }
+    );
   });
 });

@@ -641,6 +641,55 @@ describe("race conditions on connect", () => {
       "account_in_use"
     );
   });
+
+  test("sequential same-account reconnects converge, second refreshes tokens", async () => {
+    const { store, rows } = makeAccountStore();
+    const first = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "THREADS",
+      externalId: "t1",
+      data: { ...accountData("t1", "one"), accessToken: "tok-1" },
+      effective: effective("growth"),
+      store,
+    });
+    assert.equal(first.ok, true);
+    const second = await createSocialAccountRaceSafe({
+      userId: "u1",
+      platform: "THREADS",
+      externalId: "t1",
+      data: { ...accountData("t1", "one"), accessToken: "tok-2" },
+      effective: effective("growth"),
+      store,
+    });
+    assert.equal(second.ok, true);
+    assert.equal(
+      (second as { reconnected?: boolean }).reconnected,
+      true
+    );
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].data.accessToken, "tok-2");
+  });
+
+  test("non-unique create errors propagate instead of converging", async () => {
+    const { store } = makeAccountStore();
+    const failing: SocialAccountStore = {
+      ...store,
+      create: async () => {
+        throw new Error("db down");
+      },
+    };
+    await assert.rejects(
+      createSocialAccountRaceSafe({
+        userId: "u1",
+        platform: "THREADS",
+        externalId: "t9",
+        data: accountData("t9", "x"),
+        effective: effective("growth"),
+        store: failing,
+      }),
+      /db down/
+    );
+  });
 });
 
 describe("disconnect targets a concrete account", () => {

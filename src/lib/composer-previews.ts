@@ -158,12 +158,14 @@ export function buildComposerPreviews(
  */
 export function buildComposerMediaErrors(
   accounts: readonly PreviewAccount[],
-  media: readonly { type: MediaKind; mimeType: string }[]
+  media: readonly { type: MediaKind; mimeType: string; size?: number }[]
 ): string[] {
   const errors: string[] = [];
   const seen = new Set<string>();
   for (const account of accounts) {
     const caps = getPlatformCapabilities(account.platform);
+    // Size rides along so platform byte caps stricter than global
+    // (X stills 5 MB) surface before upload instead of at publish time.
     const result = validateTargetMedia(caps, media);
     if (!result.ok && !seen.has(result.error)) {
       seen.add(result.error);
@@ -337,6 +339,13 @@ export function classifyMediaIssue(message: string): PreviewIssueCode {
   ) {
     return "media-too-large";
   }
+  // Registry byte-cap wording ("X accepts image files up to 5 MB.").
+  if (
+    message.includes("accepts image files up to") ||
+    message.includes("accepts video files up to")
+  ) {
+    return "media-too-large";
+  }
   if (message.includes("TikTok photo posts support JPEG and WebP")) {
     return "media-mime-unsupported";
   }
@@ -491,7 +500,11 @@ export function buildComposerPreviewModel(
 
     const mediaResult = validateTargetMedia(
       caps,
-      mediaInput.map((item) => ({ type: item.type, mimeType: item.mimeType }))
+      mediaInput.map((item) => ({
+        type: item.type,
+        mimeType: item.mimeType,
+        size: item.size,
+      }))
     );
     const mediaIssues = mediaResult.ok ? [] : [toIssue(mediaResult.error)];
 

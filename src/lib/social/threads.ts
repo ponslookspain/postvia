@@ -1,4 +1,5 @@
 import { logDiagnostic, logErrorDiagnostic } from "@/lib/diagnostics";
+import { prisma } from "@/lib/prisma";
 import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
 
 const THREADS_AUTH_URL = "https://threads.net/oauth/authorize";
@@ -106,6 +107,16 @@ function threadsAuthSignal(status: number, code: string, message: string): boole
       message
     )
   );
+}
+
+/**
+ * True only for terminal auth failures (expired/revoked token). Used by
+ * stale recovery so transient provider/rate-limit/5xx failures stay
+ * resumable instead of failing the target and dropping the container.
+ */
+export function isThreadsAuthError(error: unknown): boolean {
+  if (!(error instanceof ThreadsApiError)) return false;
+  return threadsAuthSignal(error.httpStatus, error.code, error.message);
 }
 
 /**
@@ -415,6 +426,135 @@ export async function publishThreadsMedia(
     },
     deps
   );
+}
+
+const THREADS_REFRESH_URL = "https://graph.threads.net/refresh_access_token";
+
+/**
+ * Rotate a long-lived Threads token (server-side only). Unlike X/TikTok
+ * the access token itself is the refresh credential
+ * (`th_refresh_token` grant); there is no separate refresh token.
+ */
+export async function refreshThreadsToken(accessToken: string): Promise<{
+  accessToken: string;
+  expiresAt?: Date;
+}> {
+  const res = await fetch(
+    `${THREADS_REFRESH_URL}?grant_type=th_refresh_token&access_token=${encodeURIComponent(accessToken)}`
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ThreadsApiError(
+      res.status === 400 || res.status === 401 || res.status === 403
+        ? "invalid_grant"
+        : `http_${res.status}`,
+      `Threads token refresh failed: HTTP ${res.status}${body ? ` ${body}` : ""}`,
+      res.status
+    );
+  }
+  const data = (await res.json().catch(() => null)) as {
+    access_token?: unknown;
+    expires_in?: unknown;
+  } | null;
+  if (!data || typeof data.access_token !== "string" || !data.access_token) {
+    throw new ThreadsApiError(
+      "token_refresh_failed",
+      "Threads did not return a new access token",
+      502
+    );
+  }
+  return {
+    accessToken: data.access_token,
+    expiresAt:
+      typeof data.expires_in === "number" &&
+      Number.isFinite(data.expires_in) &&
+      data.expires_in > 0
+        ? new Date(Date.now() + data.expires_in * 1000)
+        : undefined,
+  };
+}
+
+type ThreadsTokenStore = {
+  findUnique: (args: {
+    where: { id: string };
+    select: { accessToken: boolean; expiresAt: boolean };
+  }) => Promise<{
+    accessToken: string;
+    expiresAt: Date | null;
+  } | null>;
+  updateMany: (args: {
+    where: { id: string; accessToken: string };
+    data: { accessToken: string; expiresAt?: Date };
+  }) => Promise<{ count: number }>;
+  update: (args: {
+    where: { id: string };
+    data: { accessToken: string; expiresAt?: Date };
+  }) => Promise<unknown>;
+};
+
+/**
+ * Returns a fresh access token for a stored Threads account, refreshing
+ * and persisting the rotated token when close to expiry. Never logs
+ * secrets.
+ *
+ * Race-safe (same contract as X/TikTok/Instagram): the stored row is
+ * re-read first so a concurrent worker's rotation is reused, and the
+ * rotated token is persisted with a conditional update keyed on the
+ * previously seen access token — the loser re-reads the winner instead
+ * of overwriting fresh tokens.
+ */
+export async function ensureFreshThreadsToken(
+  account: {
+    id: string;
+    accessToken: string;
+    expiresAt: Date | null;
+  },
+  store?: ThreadsTokenStore
+): Promise<string> {
+  const db: ThreadsTokenStore = store ?? prisma.socialAccount;
+  const now = Date.now();
+  if (account.expiresAt && account.expiresAt.getTime() > now + 5 * 60_000) {
+    return account.accessToken;
+  }
+  const stored = await db.findUnique({
+    where: { id: account.id },
+    select: { accessToken: true, expiresAt: true },
+  });
+  const current = stored ?? account;
+  if (
+    current.expiresAt &&
+    current.expiresAt.getTime() > Date.now() + 5 * 60_000 &&
+    current.accessToken !== account.accessToken
+  ) {
+    // Another worker refreshed concurrently; reuse its rotated token.
+    return current.accessToken;
+  }
+  const tokens = await refreshThreadsToken(current.accessToken);
+  const next: { accessToken: string; expiresAt?: Date } = {
+    accessToken: tokens.accessToken,
+    ...(tokens.expiresAt ? { expiresAt: tokens.expiresAt } : {}),
+  };
+  try {
+    const claimed = await db.updateMany({
+      where: { id: account.id, accessToken: current.accessToken },
+      data: next,
+    });
+    if (claimed.count === 0) {
+      // Lost the rotation race: re-read the winner's token.
+      const winner = await db.findUnique({
+        where: { id: account.id },
+        select: { accessToken: true, expiresAt: true },
+      });
+      if (winner && winner.accessToken !== current.accessToken) {
+        return winner.accessToken;
+      }
+    }
+  } catch {
+    // Conditional update unsupported (or transient DB error): fall back
+    // to a plain update so the token still rotates, then return it.
+    await db.update({ where: { id: account.id }, data: next });
+  }
+  return next.accessToken;
 }
 
 function getAppId(): string {

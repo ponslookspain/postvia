@@ -8,6 +8,12 @@ import { GoogleButton } from "@/components/GoogleButton";
 import { AuthShell } from "@/components/AuthShell";
 import type { PlanId } from "@/lib/plans";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  OTP_RATE_LIMITED_CODE,
+  formatOtpRateLimitMessage,
+  normalizeRetryAfterSeconds,
+} from "@/lib/otp-rate-limit";
+import { useOtpRetryCountdown } from "@/hooks/use-otp-retry-countdown";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -18,16 +24,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 
-export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
+export function SignupForm({
+  plan = null,
+  googleEnabled = true,
+}: {
+  plan?: PlanId | null;
+  googleEnabled?: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { remaining: retryRemaining, start: startRetryCountdown } =
+    useOtpRetryCountdown();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (retryRemaining > 0) return;
     setSubmitting(true);
     setError(null);
+    setRateLimited(false);
     try {
       // Server persists the paid plan hint into User.selectedPlan
       // (authoritative intent); the ?plan=/localStorage channel is only a
@@ -39,7 +56,16 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Unable to continue. Please try again.");
+        const retryAfter = normalizeRetryAfterSeconds(data.retryAfterSeconds);
+        if (res.status === 429 && data.code === OTP_RATE_LIMITED_CODE && retryAfter !== null) {
+          // Server is the sole limiter; the countdown is display-only and
+          // the next submit is re-checked server-side.
+          setRateLimited(true);
+          setError(formatOtpRateLimitMessage(retryAfter));
+          startRetryCountdown(retryAfter);
+        } else {
+          setError("Unable to continue. Please try again.");
+        }
         setSubmitting(false);
         return;
       }
@@ -59,8 +85,14 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
         {error && (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>Something went wrong</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>
+              {rateLimited ? "Too many code requests" : "Something went wrong"}
+            </AlertTitle>
+            <AlertDescription aria-live="polite">
+              {rateLimited && retryRemaining > 0
+                ? formatOtpRateLimitMessage(retryRemaining)
+                : error}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -78,9 +110,17 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
                 aria-describedby="signup-legal"
               />
             </Field>
-            <Button type="submit" disabled={submitting} className="w-full">
+            <Button
+              type="submit"
+              disabled={submitting || retryRemaining > 0}
+              className="w-full"
+            >
               {submitting && <Spinner data-icon="inline-start" />}
-              {submitting ? "Sending code..." : "Continue"}
+              {submitting
+                ? "Sending code..."
+                : retryRemaining > 0
+                  ? `Wait ${retryRemaining}s`
+                  : "Continue"}
             </Button>
             <p id="signup-legal" className="text-xs text-muted-foreground">
               By continuing, you agree to Postvia&apos;s{" "}
@@ -96,9 +136,16 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
           </FieldGroup>
         </form>
 
-        <FieldSeparator>Or continue with</FieldSeparator>
+        {googleEnabled && (
+          <>
+            <FieldSeparator>Or continue with</FieldSeparator>
 
-        <GoogleButton newUserCallbackURL="/post-auth" callbackURL="/post-auth" />
+            <GoogleButton
+              newUserCallbackURL="/post-auth"
+              callbackURL="/post-auth"
+            />
+          </>
+        )}
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}

@@ -104,8 +104,6 @@ export const PLANS: Plan[] = [
   },
 ];
 
-export const PLAN_STORAGE_KEY = "postvia:selected-plan";
-
 export function parsePlanParam(raw: unknown): PlanId | null {
   if (raw === "free" || raw === "growth" || raw === "scale") return raw;
   return null;

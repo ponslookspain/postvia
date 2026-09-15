@@ -8,9 +8,16 @@ import { authClient } from "@/lib/auth-client";
 import { GoogleButton } from "@/components/GoogleButton";
 import { AuthShell } from "@/components/AuthShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  OTP_RATE_LIMITED_CODE,
+  formatOtpRateLimitMessage,
+  normalizeRetryAfterSeconds,
+} from "@/lib/otp-rate-limit";
+import { useOtpRetryCountdown } from "@/hooks/use-otp-retry-countdown";
 import { Button } from "@/components/ui/button";
 import {
   Field,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
@@ -21,9 +28,11 @@ import { Spinner } from "@/components/ui/spinner";
 export function LoginForm({
   deleted = false,
   passwordChanged = false,
+  googleEnabled = true,
 }: {
   deleted?: boolean;
   passwordChanged?: boolean;
+  googleEnabled?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,16 +43,21 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
   const [emailNotVerified, setEmailNotVerified] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resending, setResending] = useState(false);
+  const [otpRateLimited, setOtpRateLimited] = useState(false);
+  const { remaining: otpRetryRemaining, start: startOtpRetryCountdown } =
+    useOtpRetryCountdown();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setEmailError(null);
     setEmailNotVerified(false);
     setResendSuccess(false);
 
@@ -61,7 +75,7 @@ export function LoginForm({
         setSubmitting(false);
         return;
       }
-      setError(signInError.message || "Unable to sign in");
+      setError("Unable to sign in. Check your email and password, then try again.");
       setSubmitting(false);
       return;
     }
@@ -72,12 +86,15 @@ export function LoginForm({
   }
 
   async function handleSignInWithCode() {
-    if (!email) {
-      setError("Enter your email first, then request a code.");
+    if (!email.trim()) {
+      setEmailError("Enter your email first, then request a code.");
       return;
     }
+    if (otpRetryRemaining > 0) return;
     setSendingCode(true);
     setError(null);
+    setEmailError(null);
+    setOtpRateLimited(false);
     try {
       // Neutral endpoint: same response for existing and unknown emails,
       // so this button is not an enumeration oracle. Unknown emails simply
@@ -89,7 +106,14 @@ export function LoginForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Unable to send code. Please try again.");
+        const retryAfter = normalizeRetryAfterSeconds(data.retryAfterSeconds);
+        if (res.status === 429 && data.code === OTP_RATE_LIMITED_CODE && retryAfter !== null) {
+          setOtpRateLimited(true);
+          setError(formatOtpRateLimitMessage(retryAfter));
+          startOtpRetryCountdown(retryAfter);
+        } else {
+          setError("Unable to send code. Please try again.");
+        }
         setSendingCode(false);
         return;
       }
@@ -111,9 +135,9 @@ export function LoginForm({
         body: JSON.stringify({ email }),
       });
       if (res.ok) setResendSuccess(true);
-      else setError("Failed to resend. Please try again.");
+      else setError("Unable to resend the verification email. Please try again.");
     } catch {
-      setError("Failed to resend. Please try again.");
+      setError("Unable to resend the verification email. Please try again.");
     }
     setResending(false);
   }
@@ -148,8 +172,14 @@ export function LoginForm({
         {error && (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>Sign-in failed</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTitle>
+              {otpRateLimited ? "Too many code requests" : "Sign-in failed"}
+            </AlertTitle>
+            <AlertDescription aria-live="polite">
+              {otpRateLimited && otpRetryRemaining > 0
+                ? formatOtpRateLimitMessage(otpRetryRemaining)
+                : error}
+            </AlertDescription>
           </Alert>
         )}
 
@@ -188,7 +218,7 @@ export function LoginForm({
 
         <form onSubmit={(e) => void handleSubmit(e)}>
           <FieldGroup>
-            <Field>
+            <Field data-invalid={emailError ? true : undefined}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
@@ -196,8 +226,13 @@ export function LoginForm({
                 required
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={emailError ? true : undefined}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError(null);
+                }}
               />
+              {emailError && <FieldError>{emailError}</FieldError>}
             </Field>
             <Field>
               <FieldLabel htmlFor="password">Password</FieldLabel>
@@ -217,12 +252,16 @@ export function LoginForm({
             <Button
               type="button"
               variant="outline"
-              disabled={sendingCode || submitting}
+              disabled={sendingCode || submitting || otpRetryRemaining > 0}
               onClick={() => void handleSignInWithCode()}
               className="w-full"
             >
               {sendingCode && <Spinner data-icon="inline-start" />}
-              {sendingCode ? "Sending code..." : "Sign in with a code"}
+              {sendingCode
+                ? "Sending code..."
+                : otpRetryRemaining > 0
+                  ? `Wait ${otpRetryRemaining}s`
+                  : "Sign in with a code"}
             </Button>
             <p className="text-xs text-muted-foreground">
               No password yet? Use{" "}
@@ -232,9 +271,16 @@ export function LoginForm({
           </FieldGroup>
         </form>
 
-        <FieldSeparator>Or continue with</FieldSeparator>
+        {googleEnabled && (
+          <>
+            <FieldSeparator>Or continue with</FieldSeparator>
 
-        <GoogleButton newUserCallbackURL="/post-auth" callbackURL="/post-auth" />
+            <GoogleButton
+              newUserCallbackURL="/post-auth"
+              callbackURL="/post-auth"
+            />
+          </>
+        )}
 
         <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}

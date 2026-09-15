@@ -60,7 +60,7 @@ export function AdminBillingPanel() {
       }
       setState(await res.json());
     } catch {
-      setError("Failed to load test state");
+      setError("Unable to load test settings. Please try again.");
     }
   }
 
@@ -85,16 +85,16 @@ export function AdminBillingPanel() {
           currentPeriodEnd: periodEnd || null,
         }),
       });
-      const data = await res.json().catch(() => null);
+      await res.json().catch(() => null);
       if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "Failed to apply");
+        setError("Unable to apply test settings. Please try again.");
         return;
       }
-      toast.add({ title: "Test override applied", type: "success" });
+      toast.add({ title: "Test settings applied", type: "success" });
       await load();
       router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      setError("Unable to apply test settings. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -117,14 +117,14 @@ export function AdminBillingPanel() {
         }),
       });
       if (!res.ok) {
-        setError("Failed to simulate expiration");
+        setError("Unable to run the expiration test. Please try again.");
         return;
       }
-      toast.add({ title: "Expiration simulated", type: "success" });
+      toast.add({ title: "Expiration test finished", type: "success" });
       await load();
       router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      setError("Unable to run the expiration test. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -134,7 +134,7 @@ export function AdminBillingPanel() {
     setSaving(true);
     try {
       await fetch("/api/admin/billing-override", { method: "DELETE" });
-      toast.add({ title: "Test override cleared", type: "success" });
+      toast.add({ title: "Test settings cleared", type: "success" });
       await load();
       router.refresh();
     } finally {
@@ -160,9 +160,14 @@ export function AdminBillingPanel() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
         {state && (
-          <pre className="overflow-auto rounded-md border border-border bg-muted/50 p-3 text-xs">
-            {JSON.stringify(state, null, 2)}
-          </pre>
+          <details className="overflow-auto rounded-md border border-border bg-muted/50 px-3 py-2 text-xs">
+            <summary className="cursor-pointer rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+              Technical details
+            </summary>
+            <pre className="mt-2 overflow-auto p-1">
+              {JSON.stringify(state, null, 2)}
+            </pre>
+          </details>
         )}
         {error && (
           <Alert variant="destructive">

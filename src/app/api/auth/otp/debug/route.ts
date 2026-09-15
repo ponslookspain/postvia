@@ -5,16 +5,27 @@ import { logErrorDiagnostic } from "@/lib/diagnostics";
 /**
  * TEST-ONLY code reader for local automated E2E.
  *
- * Triple-gated: requires OTP_E2E_DEBUG=1 AND a non-production runtime AND a
- * matching OTP_DEBUG_TOKEN bearer. Production/preview always 404. Never
- * deploy with OTP_E2E_DEBUG=1 outside local testing.
+ * Triple-gated: requires OTP_E2E_DEBUG=1 AND a non-Vercel runtime AND a
+ * matching OTP_DEBUG_TOKEN bearer. Any Vercel environment (including
+ * preview) always 404s — VERCEL_ENV is set on every Vercel build, so its
+ * absence proves a local `next dev` runtime. Never set OTP_E2E_DEBUG=1
+ * outside local testing.
  */
-function debugEnabled(): boolean {
+/**
+ * Local-only predicate (exported for tests): the endpoint answers only on
+ * a local `next dev` runtime. VERCEL_ENV is set on every Vercel build
+ * (development/preview/production), so its absence is the locality proof.
+ */
+export function isOtpDebugEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
   return (
-    process.env.OTP_E2E_DEBUG === "1" &&
-    process.env.VERCEL_ENV !== "production" &&
-    process.env.NODE_ENV !== "production"
+    env.OTP_E2E_DEBUG === "1" && !env.VERCEL_ENV && env.NODE_ENV !== "production"
   );
+}
+
+function debugEnabled(): boolean {
+  return isOtpDebugEnabled();
 }
 
 export async function POST(request: NextRequest) {

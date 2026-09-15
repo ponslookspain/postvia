@@ -1,6 +1,9 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { validateCreatePostContent } from "../src/lib/platforms/overrides";
+import {
+  allowsEmptyPostText,
+  validateCreatePostContent,
+} from "../src/lib/platforms/overrides";
 
 describe("validateCreatePostContent", () => {
   test("valid request passes on every implemented platform", () => {
@@ -129,5 +132,52 @@ describe("validateCreatePostContent", () => {
       }),
       { ok: true }
     );
+  });
+});
+
+describe("allowsEmptyPostText (description-only TikTok photo)", () => {
+  test("TikTok-only with a description override is allowed", () => {
+    assert.equal(
+      allowsEmptyPostText({
+        platforms: ["TIKTOK"],
+        contents: [{ title: "", description: "look at this" }],
+      }),
+      true
+    );
+    assert.equal(
+      allowsEmptyPostText({
+        platforms: ["TIKTOK", "TIKTOK"],
+        contents: [{}, { title: "hi", description: "" }],
+      }),
+      true
+    );
+  });
+
+  test("TikTok-only without any caption is rejected", () => {
+    assert.equal(
+      allowsEmptyPostText({ platforms: ["TIKTOK"], contents: [{}] }),
+      false
+    );
+    assert.equal(
+      allowsEmptyPostText({
+        platforms: ["TIKTOK"],
+        contents: [{ title: "  ", description: "" }],
+      }),
+      false
+    );
+  });
+
+  test("mixed platforms are rejected even with a description", () => {
+    assert.equal(
+      allowsEmptyPostText({
+        platforms: ["TIKTOK", "THREADS"],
+        contents: [{ title: "", description: "look" }],
+      }),
+      false
+    );
+  });
+
+  test("empty platform list is rejected", () => {
+    assert.equal(allowsEmptyPostText({ platforms: [], contents: [] }), false);
   });
 });

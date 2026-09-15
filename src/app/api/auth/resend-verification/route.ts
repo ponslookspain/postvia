@@ -10,15 +10,29 @@ import {
   liveAbuseStores,
 } from "@/lib/abuse";
 
+/**
+ * Caller-supplied verification callbackURL, constrained to root-relative
+ * app paths (never absolute URLs or protocol-relative "//evil"): without
+ * this an attacker could turn the verification email into an open
+ * redirect. Exported pure for tests.
+ */
+export function resolveVerificationCallbackURL(value: unknown): string {
+  if (
+    typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//")
+  ) {
+    return value;
+  }
+  return "/verify-email";
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);
     const email =
       typeof body?.email === "string" ? body.email.toLowerCase() : "";
-    const callbackURL =
-      typeof body?.callbackURL === "string"
-        ? body.callbackURL
-        : "/verify-email";
+    const callbackURL = resolveVerificationCallbackURL(body?.callbackURL);
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(

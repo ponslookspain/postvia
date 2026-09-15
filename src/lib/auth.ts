@@ -112,11 +112,23 @@ async function releaseOldEmail(
 }
 
 // Plaintext OTP storage ONLY for local automated E2E (explicit flag and
-// never any production env): lets the gated debug endpoint read the code
-// back. Production and previews always hash.
+// never any Vercel env): lets the gated debug endpoint read the code
+// back. VERCEL_ENV is set on every Vercel build (including preview), so
+// its absence proves a local `next dev` runtime. All deployed
+// environments always hash.
+// Google OAuth is optional per environment: when the credentials are
+// absent the provider is not registered and the login/signup pages hide
+// the button (never a dead action failing with
+// CLIENT_ID_AND_SECRET_REQUIRED at request time). Server-only helper —
+// reads names only, never logs values.
+export function isGoogleOAuthConfigured(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  return Boolean(env.GOOGLE_CLIENT_ID) && Boolean(env.GOOGLE_CLIENT_SECRET);
+}
 const otpE2EDebug =
   process.env.OTP_E2E_DEBUG === "1" &&
-  process.env.VERCEL_ENV !== "production" &&
+  !process.env.VERCEL_ENV &&
   process.env.NODE_ENV !== "production";
 
 export const auth = betterAuth({
@@ -254,14 +266,22 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    },
+    // Registered only when both credentials exist — an unconfigured
+    // Google provider throws CLIENT_ID_AND_SECRET_REQUIRED at request
+    // time (observed in production). The login/signup UI is gated on the
+    // same predicate via isGoogleOAuthConfigured().
+    ...(isGoogleOAuthConfigured()
+      ? {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+          },
+        }
+      : {}),
   },
   account: {
     accountLinking: {
-      trustedProviders: ["google"],
+      trustedProviders: isGoogleOAuthConfigured() ? ["google"] : [],
     },
   },
   advanced: {

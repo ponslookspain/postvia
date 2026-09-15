@@ -461,7 +461,8 @@ export function resolveTiktokMediaPolicy(
   if (media.length === 0) {
     return {
       kind: "error",
-      message: "TikTok requires media: one video or up to 4 photos (JPEG/WebP).",
+      message:
+        "TikTok requires media: one video or at least one photo (JPEG/WebP, up to 4 per Postvia post).",
     };
   }
   const hasVideo = media.some((item) => item.type === "VIDEO");

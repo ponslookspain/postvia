@@ -4,6 +4,30 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { getPlan, type PlanId } from "@/lib/plans";
 
+/** Human-readable subscription status. Never a raw enum string. */
+function statusLabel(status: string): string {
+  switch (status) {
+    case "CANCELLING":
+      return "Canceling";
+    case "UNPAID":
+      return "Unpaid";
+    case "PAST_DUE":
+      return "Past due";
+    case "TRIALING":
+      return "Trial";
+    case "INCOMPLETE":
+      return "Incomplete";
+    case "INCOMPLETE_EXPIRED":
+      return "Expired";
+    case "CANCELED":
+      return "Canceled";
+    case "ACTIVE":
+      return "Active";
+    default:
+      return "Unknown";
+  }
+}
+
 /** Compact current-plan marker. Neutral; never a status color. */
 export function PlanBadge({
   plan,
@@ -19,11 +43,7 @@ export function PlanBadge({
         <Badge
           variant={status === "PAST_DUE" || status === "UNPAID" ? "destructive" : "outline"}
         >
-          {status === "CANCELLING"
-            ? "Canceling"
-            : status === "UNPAID"
-              ? "Unpaid"
-              : status.charAt(0) + status.slice(1).toLowerCase()}
+          {statusLabel(status)}
         </Badge>
       )}
     </span>

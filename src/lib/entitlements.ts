@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { getIdentityFreeUsage } from "@/lib/abuse";
 import {
@@ -12,7 +13,11 @@ import {
  * logic: pages, API routes and components must use these helpers and
  * never reimplement prices, limits or status rules.
  *
- * No React, no Next.js — pure logic + Prisma reads. UI stays thin.
+ * No React components, no Next.js — pure logic + Prisma reads. UI stays thin.
+ * Row reads below are request-memoized with React `cache()` (keyed by
+ * userId): AppShell and the page/route of the same request share one
+ * Subscription/override read instead of two. Request-scoped only — no
+ * global mutable cache, no cross-request or cross-user leakage.
  */
 
 export type DbPlan = "FREE" | "GROWTH" | "SCALE";
@@ -173,9 +178,7 @@ export function isAdminEmail(email: string | null | undefined): boolean {
 }
 
 /** Raw subscription row. Never auto-creates: reading is side-effect free. */
-export async function getSubscription(
-  userId: string
-): Promise<SubscriptionRow> {
+async function readSubscription(userId: string): Promise<SubscriptionRow> {
   const row = await prisma.subscription.findUnique({ where: { userId } });
   if (!row) return null;
   return {
@@ -189,10 +192,11 @@ export async function getSubscription(
   };
 }
 
+/** Request-memoized (see module header). Same signature and values. */
+export const getSubscription = cache(readSubscription);
+
 /** Raw admin test override. Only meaningful when the caller is an admin. */
-export async function getTestOverride(
-  userId: string
-): Promise<TestOverrideRow> {
+async function readTestOverride(userId: string): Promise<TestOverrideRow> {
   const row = await prisma.billingTestOverride.findUnique({
     where: { userId },
   });
@@ -205,6 +209,9 @@ export async function getTestOverride(
     currentPeriodEnd: row.currentPeriodEnd,
   };
 }
+
+/** Request-memoized (see module header). Same signature and values. */
+export const getTestOverride = cache(readTestOverride);
 
 type ResolvedBase = {
   plan: DbPlan;
@@ -389,10 +396,13 @@ export function selectPostCount(
   return counter ?? liveCount;
 }
 
-export async function getUsage(
-  userId: string,
-  nowMs: number = Date.now()
-): Promise<Usage> {
+/**
+ * Request-memoized usage read (same `cache()` contract as the row
+ * readers above). Callers pass only `userId`, so duplicate calls in one
+ * request share a single fan-out. `nowMs` stays injectable for tests.
+ */
+export const getUsage = cache(
+  async (userId: string, nowMs: number = Date.now()): Promise<Usage> => {
   const monthStart = getMonthStart(nowMs);
   const period = getPeriodKey(nowMs);
   const [postCount, usageRow, accountGroups, scheduledCount, identity] =
@@ -433,7 +443,8 @@ export async function getUsage(
     scheduledPosts: scheduledCount,
     identityPostsUsed: identity.identityId === null ? null : identity.used,
   };
-}
+  }
+);
 
 export function canCreatePost(
   eff: EffectiveSubscription,

@@ -19,6 +19,9 @@ jobs:
       - run: npm ci
       - run: npx prisma validate
       - run: npx prisma generate
+      - run: node --import tsx scripts/check-env.ts --require-boot=DATABASE_URL_POSTGRES_PRISMA_URL,BETTER_AUTH_SECRET
+        env:
+          BETTER_AUTH_SECRET: ci-dummy-not-a-secret
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

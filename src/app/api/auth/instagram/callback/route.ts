@@ -1,5 +1,5 @@
 import { NextRequest, type NextResponse } from "next/server";
-import { oauthRedirect } from "@/lib/oauth-redirect";
+import { oauthRedirect, safeProviderError } from "@/lib/oauth-redirect";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlan } from "@/lib/entitlements";
@@ -31,19 +31,26 @@ export async function GET(request: NextRequest) {
   const errorParam = searchParams.get("error");
 
   if (errorParam) {
-    return oauthRedirect(request,
-      `/accounts?error=${encodeURIComponent(errorParam)}`
+    // Provider error params are browser-controlled: whitelist only.
+    return clearState(
+      oauthRedirect(request,
+        `/accounts?error=${encodeURIComponent(safeProviderError(errorParam, "instagram_callback_failed"))}`
+      )
     );
   }
   if (!code || !state) {
-    return oauthRedirect(request,
-      "/accounts?error=missing_parameters"
+    return clearState(
+      oauthRedirect(request,
+        "/accounts?error=missing_parameters"
+      )
     );
   }
 
   const storedState = request.cookies.get("instagram_oauth_state")?.value;
   if (!storedState) {
-    return oauthRedirect(request,"/accounts?error=invalid_session");
+    return clearState(
+      oauthRedirect(request,"/accounts?error=invalid_session")
+    );
   }
   // Timing-safe state comparison.
   if (state.length !== storedState.length) {
@@ -106,8 +113,10 @@ export async function GET(request: NextRequest) {
       expiresAt: tokens.expiresAt,
     };
     if (existing) {
-      await prisma.socialAccount.update({
-        where: { id: existing.id },
+      // Reconnect: rotate tokens in place. updateMany scopes the write to
+      // this user's row atomically; a concurrently deleted row updates nothing.
+      await prisma.socialAccount.updateMany({
+        where: { id: existing.id, userId: user.id },
         data: accountData,
       });
     } else {

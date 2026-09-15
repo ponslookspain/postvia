@@ -264,11 +264,28 @@ export type BulkVideoRef = {
 };
 
 /**
- * Capability check for one video against every selected account, reusing
- * the platform registry (same rules as the manual composer) PLUS the
- * global file gate (validateMediaInput). Returns one issue PER ACCOUNT so
- * the UI can attribute every problem before any upload starts, e.g.
- * "video-02.mp4 — X: file exceeds the 5 MB image limit".
+ * Shared-text ceiling for one bulk account: the platform's text field,
+ * narrowed to the TikTok photo-title cap when the batch carries images
+ * but no video (photo flow). Pure and client-safe.
+ */
+export function bulkTextLimit(
+  platform: Platform,
+  media: { hasVideo: boolean; hasImage: boolean }
+): number {
+  // Photo flow narrows TikTok's 2200 title gate to 90 downstream
+  // (resolveTiktokPhotoPostInfo); there is no description override in
+  // bulk, so the shared text itself must fit the title cap.
+  if (platform === "TIKTOK" && !media.hasVideo && media.hasImage) return 90;
+  const caps = getPlatformCapabilities(platform);
+  return caps.fields.find((field) => field.type === "text")?.maxLength ?? 500;
+}
+
+/**
+ * Capability check for one file (image or video) against every selected
+ * account, reusing the platform registry (same rules as the manual
+ * composer) PLUS the global file gate (validateMediaInput). Returns one
+ * issue PER ACCOUNT so the UI can attribute every problem before any
+ * upload starts, e.g. "clip.mp4 — X: file exceeds the 5 MB image limit".
  *
  * No upload, no POST, no Media row may happen while any issue exists —
  * the caller must block the batch on a non-empty result.

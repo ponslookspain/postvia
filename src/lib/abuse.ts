@@ -1377,6 +1377,77 @@ export async function checkAbuseRate(input: {
   );
 }
 
+/**
+ * Pure remaining-seconds computation from a bucket reset timestamp.
+ * Never negative; callers clamp to >= 1 when reporting a denial.
+ * No PII involved — inputs are epoch millis only.
+ */
+export function retryAfterSecondsUntil(
+  resetAtMs: number,
+  nowMs: number = Date.now()
+): number {
+  if (!Number.isFinite(resetAtMs) || !Number.isFinite(nowMs)) return 0;
+  return Math.max(0, Math.ceil((resetAtMs - nowMs) / 1000));
+}
+
+/**
+ * Read-only view of a persistent rate bucket's reset time.
+ * Uses the live Prisma client directly (no consumption, no mutation).
+ * Fail-open: any failure returns null so callers fall back to a safe
+ * static cooldown. Never logs scope/key material (hashed PII).
+ */
+export async function getRateBucketResetAt(input: {
+  scope: string;
+  keyHash: string;
+}): Promise<Date | null> {
+  try {
+    const row = await prisma.abuseRateBucket.findUnique({
+      where: { scope_keyHash: { scope: input.scope, keyHash: input.keyHash } },
+      select: { resetAt: true },
+    });
+    return row?.resetAt ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Detailed rate check: same consumption semantics as checkAbuseRate,
+ * plus the real remaining wait when denied.
+ *
+ * Existing boolean callers are untouched — this is additive. When
+ * `allowed` is true, `retryAfterSeconds` is 0. When false, it is the
+ * ceiling of (resetAt - now) clamped to >= 1, falling back to the
+ * full window when the row cannot be read.
+ */
+export async function checkAbuseRateDetailed(input: {
+  scope: string;
+  keyHash: string;
+  max: number;
+  windowMs: number;
+  stores: AbuseStores;
+  nowMs?: number;
+  disabled?: boolean;
+}): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const nowMs = input.nowMs ?? Date.now();
+  const allowed = await checkAbuseRate({ ...input, nowMs });
+  if (allowed) return { allowed: true, retryAfterSeconds: 0 };
+  const resetAt = await getRateBucketResetAt({
+    scope: input.scope,
+    keyHash: input.keyHash,
+  });
+  if (!resetAt) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil(input.windowMs / 1000)),
+    };
+  }
+  return {
+    allowed: false,
+    retryAfterSeconds: Math.max(1, retryAfterSecondsUntil(resetAt.getTime(), nowMs)),
+  };
+}
+
 export function hashRateKey(parts: string[], pepper: string): string {
   return createHash("sha256")
     .update(`1:${pepper}:rate:${parts.join("|")}`, "utf8")
