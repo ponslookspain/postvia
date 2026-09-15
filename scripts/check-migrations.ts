@@ -15,10 +15,21 @@ import { execSync } from "node:child_process";
 
 const ROOT = process.cwd();
 
-const flag = process.argv.find((arg) =>
-  arg.startsWith("--shadow-database-url=")
-);
-const shadowUrl = flag ? flag.slice("--shadow-database-url=".length) : "";
+const args = process.argv.slice(2);
+
+function readShadowUrl(): string {
+  // Accept --flag=value, --flag value (some shells split `=` pairs), and
+  // the SHADOW_DATABASE_URL env var (no shell interpolation at all).
+  const eq = args.find((arg) => arg.startsWith("--shadow-database-url="));
+  if (eq) return eq.slice("--shadow-database-url=".length);
+  const idx = args.indexOf("--shadow-database-url");
+  if (idx !== -1 && typeof args[idx + 1] === "string") {
+    return args[idx + 1] as string;
+  }
+  return process.env.SHADOW_DATABASE_URL ?? "";
+}
+
+const shadowUrl = readShadowUrl();
 
 function fail(message: string): never {
   console.log(`FAIL ${message}`);
@@ -29,6 +40,14 @@ if (!shadowUrl) {
   fail(
     "a throwaway --shadow-database-url is required (refusing to run without one)"
   );
+}
+
+// The shadow host must never be the application database: drift checks
+// create temporary shadow databases on that server, and pointing them at
+// the app (or smoke) database risks touching real data stores.
+const appDbUrl = process.env.DATABASE_URL_POSTGRES_PRISMA_URL ?? "";
+if (appDbUrl && shadowUrl === appDbUrl) {
+  fail("shadow database must be separate from the application database");
 }
 
 let diff: string;
