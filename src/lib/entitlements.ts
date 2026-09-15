@@ -4,6 +4,7 @@ import { getIdentityFreeUsage } from "@/lib/abuse";
 import {
   getPlan,
   PLANS,
+  type FeatureKey,
   type PlanEntitlements,
   type PlanId,
 } from "@/lib/plans";
@@ -642,13 +643,31 @@ export function checkBulkBatch(
 }
 
 export function canUseCalendar(eff: EffectiveSubscription): Check {
-  if (eff.bypass || eff.entitlements.calendar) return { ok: true };
-  return upgradeDenial(eff.plan, "The content calendar is not included in this plan.");
+  return canUseFeature(eff, "calendar");
 }
 
 export function canRetry(eff: EffectiveSubscription): Check {
-  if (eff.bypass || eff.entitlements.retryReschedule) return { ok: true };
-  return upgradeDenial(eff.plan, "Retry and reschedule are not included in this plan.");
+  return canUseFeature(eff, "retryReschedule");
+}
+
+/**
+ * Single gate for boolean billing features (E3). Bypass and the plan
+ * flag decide; denial messages are the historical per-feature strings,
+ * verbatim. Bulk *count* caps stay in canBulkSchedule — this answers
+ * availability only.
+ */
+const FEATURE_DENIALS: Record<FeatureKey, string> = {
+  calendar: "The content calendar is not included in this plan.",
+  bulk: "Bulk video scheduling is not included in this plan.",
+  retryReschedule: "Retry and reschedule are not included in this plan.",
+};
+
+export function canUseFeature(
+  eff: EffectiveSubscription,
+  key: FeatureKey
+): Check {
+  if (eff.bypass || eff.entitlements[key]) return { ok: true };
+  return upgradeDenial(eff.plan, FEATURE_DENIALS[key]);
 }
 
 /**
@@ -685,6 +704,55 @@ export function getRemainingQuota(
         : Math.max(0, limit - getDisplayPostsUsed(eff, usage)),
     scheduledPosts: usage.scheduledPosts,
     totalAccounts: usage.totalAccounts,
+  };
+}
+
+/**
+ * Billing page view model (E3). Assembled in exactly one place from the
+ * same effective/usage/subscription inputs — pages never hand-roll it.
+ * No plan/status writes here: read-only projection for display.
+ */
+export type BillingView = {
+  plan: PlanId;
+  status: string;
+  price: number;
+  period: string;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  postsUsed: number;
+  postsLimit: number | null;
+  totalAccounts: number;
+  accountsLimit: number | null;
+  /** Checkout started, no authoritative subscription state yet — no paid grant. */
+  checkoutPending: boolean;
+  checkoutResult: "success" | "cancelled" | null;
+  /** A Stripe customer exists: upgrades/fixes go through the portal, not a new checkout. */
+  hasBillingCustomer: boolean;
+};
+
+export function buildBillingView(input: {
+  effective: EffectiveSubscription;
+  usage: Usage;
+  subscription: SubscriptionRow;
+  checkoutResult: "success" | "cancelled" | null;
+}): BillingView {
+  const { effective, usage, subscription, checkoutResult } = input;
+  return {
+    plan: effective.plan,
+    status: effective.status,
+    price: getPlan(effective.plan).price,
+    period: getPlan(effective.plan).period,
+    currentPeriodEnd: effective.currentPeriodEnd
+      ? effective.currentPeriodEnd.toISOString()
+      : null,
+    cancelAtPeriodEnd: effective.cancelAtPeriodEnd,
+    postsUsed: getDisplayPostsUsed(effective, usage),
+    postsLimit: effective.entitlements.monthlyPosts,
+    totalAccounts: usage.totalAccounts,
+    accountsLimit: effective.entitlements.maxTotalAccounts,
+    checkoutPending: isCheckoutPending(subscription),
+    checkoutResult,
+    hasBillingCustomer: !!subscription?.stripeCustomerId,
   };
 }
 

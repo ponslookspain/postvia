@@ -7,14 +7,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/button";
 import {
-  getDisplayPostsUsed,
+  buildBillingView,
   getEffectivePlan,
   getSubscription,
   getUsage,
   isAdminEmail,
-  isCheckoutPending,
 } from "@/lib/entitlements";
-import { getPlan } from "@/lib/plans";
 import { liveBillingStores } from "@/lib/billing-live-stores";
 import { isStripeConfigured, reconcileSubscriptionFromStripe } from "@/lib/stripe";
 import type { BillingView } from "@/components/billing/BillingSection";
@@ -83,25 +81,12 @@ export default async function BillingPage({
   // A FREE row holding a customer but no subscription means Checkout
   // started and no authoritative subscription state exists yet. Older rows
   // read as abandoned checkouts that may safely start over.
-  const checkoutPending = isCheckoutPending(subscription);
-
-  const billing: BillingView = {
-    plan: effective.plan,
-    status: effective.status,
-    price: getPlan(effective.plan).price,
-    period: getPlan(effective.plan).period,
-    currentPeriodEnd: effective.currentPeriodEnd
-      ? effective.currentPeriodEnd.toISOString()
-      : null,
-    cancelAtPeriodEnd: effective.cancelAtPeriodEnd,
-    postsUsed: getDisplayPostsUsed(effective, usage),
-    postsLimit: effective.entitlements.monthlyPosts,
-    totalAccounts: usage.totalAccounts,
-    accountsLimit: effective.entitlements.maxTotalAccounts,
-    checkoutPending,
+  const billing: BillingView = buildBillingView({
+    effective,
+    usage,
+    subscription,
     checkoutResult,
-    hasBillingCustomer: !!subscription?.stripeCustomerId,
-  };
+  });
 
   const isAdmin = isAdminEmail(user.email);
 

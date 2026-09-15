@@ -27,27 +27,12 @@ import { ErrorBlock } from "@/components/StateBlock";
 import { Section, SectionHeader } from "@/components/Section";
 import { CheckIcon } from "lucide-react";
 import { cn } from "cn";
-import { getPlan, PLANS, type Plan, type PlanId } from "@/lib/plans";
+import { getPlan, PLANS, FEATURE_KEYS, type FeatureKey, type Plan, type PlanEntitlements, type PlanId } from "@/lib/plans";
+import type { BillingView } from "@/lib/entitlements";
+
+export type { BillingView };
 import { isStripeRedirectUrl } from "@/lib/stripe-redirect";
 import { PlanBadge, UpgradeCta, UsageBar } from "@/components/billing/BillingWidgets";
-
-export type BillingView = {
-  plan: PlanId;
-  status: string;
-  price: number;
-  period: string;
-  currentPeriodEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-  postsUsed: number;
-  postsLimit: number | null;
-  totalAccounts: number;
-  accountsLimit: number | null;
-  /** Checkout started, no authoritative subscription state yet — no paid grant. */
-  checkoutPending: boolean;
-  checkoutResult: "success" | "cancelled" | null;
-  /** A Stripe customer exists: upgrades/fixes go through the portal, not a new checkout. */
-  hasBillingCustomer: boolean;
-};
 
 function formatPeriodEnd(iso: string | null): string | null {
   if (!iso) return null;
@@ -67,8 +52,25 @@ function isPaidPlanId(plan: PlanId): plan is PaidPlanId {
 /**
  * Compact feature rows derived from live entitlements — never enum
  * names, never duplicated limits. What the plan gates is what the
- * card lists.
+ * card lists. Feature rows iterate FEATURE_KEYS so a new paid gate
+ * adds one row here automatically.
  */
+function featureRow(
+  entitlements: PlanEntitlements,
+  key: FeatureKey
+): string | null {
+  switch (key) {
+    case "calendar":
+      return entitlements.calendar ? "Calendar" : null;
+    case "bulk":
+      return entitlements.bulk
+        ? `Bulk video scheduling (up to ${entitlements.maxBulkVideos} videos)`
+        : null;
+    case "retryReschedule":
+      return entitlements.retryReschedule ? "Retry failed posts" : null;
+  }
+}
+
 function planFeatureRows(plan: Plan): string[] {
   const e = plan.entitlements;
   const rows = [
@@ -81,10 +83,10 @@ function planFeatureRows(plan: Plan): string[] {
         ? "1 connected account"
         : `${e.maxTotalAccounts} connected accounts`,
   ];
-  if (e.calendar) rows.push("Calendar");
-  if (e.bulk)
-    rows.push(`Bulk video scheduling (up to ${e.maxBulkVideos} videos)`);
-  if (e.retryReschedule) rows.push("Retry failed posts");
+  for (const key of FEATURE_KEYS) {
+    const row = featureRow(e, key);
+    if (row) rows.push(row);
+  }
   return rows;
 }
 

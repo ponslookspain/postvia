@@ -25,6 +25,21 @@ export type PlanEntitlements = {
   retryReschedule: boolean;
 };
 
+/**
+ * Boolean-gated billing features (E3). Quota/count entitlements
+ * (maxTotalAccounts, monthlyPosts, maxBulkVideos) stay numeric and keep
+ * their dedicated gates; only on/off features live behind FeatureKey.
+ * A new paid gate means one key here, one denial line in
+ * `entitlements.ts`, one UI row — never a new boolean pair + `can*`.
+ */
+export type FeatureKey = "calendar" | "bulk" | "retryReschedule";
+
+export const FEATURE_KEYS: readonly FeatureKey[] = [
+  "calendar",
+  "bulk",
+  "retryReschedule",
+];
+
 export type Plan = {
   id: PlanId;
   name: string;
