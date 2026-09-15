@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
+import type { MediaKind } from "@/lib/media";
 
 /**
  * Instagram provider via the Instagram Platform API (Instagram Login).
@@ -324,7 +325,7 @@ export const INSTAGRAM_STATUS_EXPIRED = "EXPIRED";
 export async function createInstagramContainer(
   accessToken: string,
   igUserId: string,
-  media: { kind: "IMAGE" | "VIDEO"; url: string; caption: string }
+  media: { kind: MediaKind; url: string; caption: string }
 ): Promise<string> {
   const fields: Record<string, string> = { caption: media.caption };
   if (media.kind === "IMAGE") {
@@ -466,7 +467,7 @@ export async function publishInstagramMedia(
   accessToken: string,
   input: {
     igUserId: string;
-    kind: "IMAGE" | "VIDEO";
+    kind: MediaKind;
     mediaUrl: string;
     caption: string;
     existingContainerId?: string | null;

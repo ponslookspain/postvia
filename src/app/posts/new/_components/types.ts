@@ -1,4 +1,5 @@
 import type { Platform } from "@prisma/client";
+import type { MediaKind } from "@/lib/media";
 
 /**
  * Shared composer types (Stage H0: moved verbatim from
@@ -17,7 +18,7 @@ export type DraftMedia = {
   key: string;
   file: File;
   previewUrl: string;
-  kind: "IMAGE" | "VIDEO";
+  kind: MediaKind;
   name: string;
   size: number;
   status: "pending" | "uploading" | "done" | "error";

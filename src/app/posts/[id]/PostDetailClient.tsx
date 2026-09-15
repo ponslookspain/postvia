@@ -3,6 +3,7 @@
 import { use, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { pollPostSettled } from "@/lib/publish-poll";
+import type { MediaKind } from "@/lib/media";
 import { PencilIcon, SendIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import {
   X_POST_CHAR_LIMIT,
@@ -70,7 +71,7 @@ interface Post {
     filename: string;
     mimeType: string;
     size: number;
-    type: "IMAGE" | "VIDEO";
+    type: MediaKind;
     createdAt: string;
   }[];
 }

@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import type { Platform } from "@prisma/client";
+import type { MediaKind } from "@/lib/media";
 
 /**
  * Stage 2D: shared presentation primitives. Pure markup with no platform
@@ -30,7 +31,7 @@ export function PostAvatar({
 
 export type PreviewMediaSource = {
   key: string;
-  kind: "IMAGE" | "VIDEO";
+  kind: MediaKind;
   previewUrl: string;
   name: string;
 };

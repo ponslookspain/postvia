@@ -11,6 +11,8 @@
  * the scheduling engine.
  */
 
+import type { MediaKind } from "@/lib/media";
+
 export type CalendarTarget = {
   platform: string;
   username?: string | null;
@@ -24,7 +26,7 @@ export type CalendarPost = {
   publishedAt: string | null;
   createdAt: string;
   targets: CalendarTarget[];
-  previewMedia: { id: string; type: "IMAGE" | "VIDEO" } | null;
+  previewMedia: { id: string; type: MediaKind } | null;
 };
 
 /** Statuses the calendar renders. Everything else is ignored upstream. */
