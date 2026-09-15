@@ -35,10 +35,10 @@ npm run dev:tunnel   # ngrok http 3000 — the ngrok agent must be running
 
 - Local app: [http://localhost:3000](http://localhost:3000) — the app
   always runs here.
-- Social/OAuth test URL:
-  [https://lavish-passion-dipped.ngrok-free.dev](https://lavish-passion-dipped.ngrok-free.dev)
-  — permanent development hostname proxied by ngrok to your localhost.
-  This is NOT Production.
+- Social/OAuth test URL: `https://<NGROK_HOST>` — the operator's
+  permanent development hostname (current value in `.env.local` as
+  `BETTER_AUTH_URL`; see [`docs/local-development.md`](docs/local-development.md)),
+  proxied by ngrok to your localhost. This is NOT Production.
 - Log in locally with email OTP / password, connect real X / Threads /
   TikTok / Instagram accounts on `/accounts`, publish a test video.
   Google OAuth is not part of this flow. Full guide:
@@ -73,10 +73,11 @@ Vercel Preview is not part of daily development. Checks before commit:
 
 Implemented and connectable via OAuth: **Threads, X, TikTok, Instagram**.
 `Facebook`, `LinkedIn`, `YouTube`, `Pinterest` exist in the Prisma enum but
-are not implemented yet. Validation and preview rules are capability-driven
-(`src/lib/platforms/capabilities.ts` + `src/lib/platforms/overrides.ts`),
-but UI lists, icons, provider dispatch and resume paths still need
-per-platform wiring (see `docs/social-integrations.md`). Current media support: Threads — text / 1 image / 1 video;
+are not implemented yet. Platform behavior is capability-driven from the
+single registry (`src/lib/platforms/capabilities.ts` +
+`src/lib/platforms/overrides.ts` + `src/lib/platforms/providers.ts`:
+dispatch table, derived UI lists, display order); validation and preview
+rules read that registry (see `docs/social-integrations.md`). Current media support: Threads — text / 1 image / 1 video;
 X — text / up to 4 photos / 1 GIF / 1 video; TikTok — 1 video or 1–4 photos
 (JPEG/WebP, own title required); Instagram — 1 JPEG photo or 1 MP4 Reel.
 See [`docs/social-integrations.md`](docs/social-integrations.md) for the
@@ -233,7 +234,8 @@ npm run dev
 cd C:\Users\Ponslookspain\postvia
 npm run dev:tunnel
 ```
-Open [http://localhost:3000](http://localhost:3000). or https://lavish-passion-dipped.ngrok-free.dev
+Open [http://localhost:3000](http://localhost:3000), or `https://<NGROK_HOST>`
+for OAuth/social flows (see above).
 
 Canonical local guide (env, ngrok, DB, Blob, OAuth, smoke tests):
 [`docs/local-development.md`](docs/local-development.md).
@@ -263,7 +265,8 @@ environment.
 - Local dev server: `npm run dev` → [http://localhost:3000](http://localhost:3000).
 - Public HTTPS for OAuth callbacks / integration testing only:
   `npm run dev:tunnel` (`ngrok http 3000`) → permanent development URL
-  `https://lavish-passion-dipped.ngrok-free.dev`, which proxies to
+  `https://<NGROK_HOST>` (operator hostname, see
+  [`docs/local-development.md`](docs/local-development.md)), which proxies to
   `localhost:3000`. It never replaces Production. Real social testing
   guide: [`docs/local-social-dev.md`](docs/local-social-dev.md).
 - Flow: feature/fix/chore/staging branch → local testing → commit →

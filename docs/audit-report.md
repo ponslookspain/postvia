@@ -1,5 +1,12 @@
 # PostVia Production Audit Report
 
+> **Archived 2026-09-15 — historical record, not current issues.**
+> This report snapshots the `chore/production-hardening` audit; the
+> branches it names have since been merged and deleted. Items verified
+> as resolved are marked `RESOLVED` inline (see Reconciliation below);
+> anything below without that mark was **not re-verified** and must not
+> be quoted as a current finding. Source of truth is the code.
+
 Branch: `chore/production-hardening`. Source of truth is the code. Each item lists severity, affected files/flow, why it matters, solution, change risk, and whether it blocks production.
 
 Decision labels: KEEP / OPTIMIZE / REFACTOR / REMOVE / REPLACE / DOCUMENT.

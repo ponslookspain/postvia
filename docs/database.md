@@ -8,8 +8,9 @@ The database carries **no `_prisma_migrations` history** (created with
 `prisma/migrations/` (abuse event, billing guards, OTP/onboarding, post
 idempotency key, Batch 2 hot-path indexes) applied as DDL.
 `prisma migrate diff --from-url <prod-url> --to-schema-datamodel` must be
-empty; CI enforces the same invariant offline via
-`scripts/check-migrations.ts` (throwaway shadow DB, never production).
+empty; CI enforces the same invariant offline without a database via
+`tests/schema-drift.test.ts` (static schema + migration-SQL coverage,
+runs in `npm test`) plus `npx prisma validate`.
 
 ## Topology: one database per environment, never per user
 

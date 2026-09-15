@@ -51,9 +51,11 @@ no proposals — only what the code does today.
 ## Inputs / forms
 
 - `FieldGroup + Field + FieldLabel`, validation via `data-invalid` on
-  the `Field` and `aria-invalid` on the control. Native date/time
-  inputs keep their functional borders. 2–7 option sets and filters
-  use typographic underline tabs, not pill collections.
+   the `Field` and `aria-invalid` on the control. Native date/time
+   inputs keep their functional borders. Filter collections use the
+   Maia `Tabs` primitive (`ui/tabs.tsx`, URL-driven links), not
+   hand-rolled strips; plain underline treatments remain for inline
+   text links only.
 
 ## Cards / surfaces
 
@@ -112,8 +114,8 @@ no proposals — only what the code does today.
   schedule utility, sticky rail (borderless preview mock, single
   publish `Card`), one schedule dialog (no duplicate date/time entry),
   fixed mobile action bar.
-- **Posts:** underline status tabs, unified search/platform/sort
-  toolbar, hairline content rows with platform/status/date columns on
+- **Posts:** segmented `Tabs` status filter (URL-driven links),
+  unified search/platform/sort toolbar, hairline content rows with platform/status/date columns on
   desktop and stacked meta on mobile, row menu (view/edit/retry/delete
   + confirm dialog).
 - **Calendar:** light timetable, icon-only month nav + outline Today,
