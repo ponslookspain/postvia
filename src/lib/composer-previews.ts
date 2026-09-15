@@ -274,6 +274,32 @@ export function hasBlockingFileIssues(
 }
 
 /**
+ * True when any preview model carries a validation error (e.g. a TikTok
+ * target missing its title/description). The server would fail that target
+ * deterministically, so Publish now stays disabled until the user fixes
+ * it. Warnings (like content-empty) never block; drafts never block.
+ */
+export function hasBlockingPreviewErrors(
+  models: readonly ComposerPreviewModel[]
+): boolean {
+  return models.some((model) => model.validation.errors.length > 0);
+}
+
+/**
+ * First blocking preview error message across models, for display next to
+ * the disabled Publish button. Null when publishing is not preview-blocked.
+ */
+export function firstBlockingPreviewError(
+  models: readonly ComposerPreviewModel[]
+): string | null {
+  for (const model of models) {
+    const first = model.validation.errors[0];
+    if (first) return first.message;
+  }
+  return null;
+}
+
+/**
  * Maps existing validator messages (validateTargetMedia,
  * validateMediaInput) to stable codes. Single mapping over the existing
  * message contracts — not a second validation system.

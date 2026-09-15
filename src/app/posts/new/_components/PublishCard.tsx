@@ -47,6 +47,7 @@ export function PublishCard({
   publishProgress,
   canSave,
   canPublish,
+  publishBlockedReason,
   saving,
   scheduling,
   onSaveDraft,
@@ -67,6 +68,7 @@ export function PublishCard({
   publishProgress: PollProgress | null;
   canSave: boolean;
   canPublish: boolean;
+  publishBlockedReason: string | null;
   saving: boolean;
   scheduling: boolean;
   onSaveDraft: () => void;
@@ -134,6 +136,13 @@ export function PublishCard({
           <FieldDescription>
             Scheduling is available for Threads. Publish to X is available now.
           </FieldDescription>
+        )}
+        {publishBlockedReason && !publishing && (
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>Complete required fields</AlertTitle>
+            <AlertDescription>{publishBlockedReason}</AlertDescription>
+          </Alert>
         )}
         {/* Rail action stack; on mobile the fixed bottom bar owns these actions. */}
         <div className="hidden flex-col gap-2 lg:flex">

@@ -357,6 +357,33 @@ describe("X social layer", () => {
         "X access expired or was revoked. Reconnect your X account."
       );
     });
+
+    test("depleted credits map to top-up guidance, never reconnect", () => {
+      assert.equal(
+        x.xErrorMessage(new Error("credits depleted")),
+        "Your X API credits are depleted. Top up credit in the X developer portal, then retry this post — no need to reconnect your account."
+      );
+    });
+
+    test("403-shaped credit rejection maps to top-up, not reconnect", () => {
+      // Live shape: media upload rejects with 403 while the detail names
+      // credits. The auth-shaped status must not win over billing text.
+      assert.equal(
+        x.xErrorMessage(
+          new x.XApiError("unauthorized", "HTTP 403 credits depleted", 403)
+        ),
+        "Your X API credits are depleted. Top up credit in the X developer portal, then retry this post — no need to reconnect your account."
+      );
+    });
+
+    test("genuine 401 without billing text still maps to reconnect", () => {
+      assert.equal(
+        x.xErrorMessage(
+          new x.XApiError("unauthorized", "HTTP 401 Unauthorized", 401)
+        ),
+        "X access expired or was revoked. Reconnect your X account."
+      );
+    });
   });
 
   describe("publishPost", () => {

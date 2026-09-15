@@ -21,7 +21,9 @@ import {
   buildComposerPreviews,
   buildComposerMediaErrors,
   countCharacters,
+  firstBlockingPreviewError,
   hasBlockingFileIssues,
+  hasBlockingPreviewErrors,
   PREVIEW_PLATFORM_ORDER,
   resolvePreviewTarget,
 } from "@/lib/composer-previews";
@@ -351,6 +353,13 @@ export default function NewPostComposer({
   // Per-file media issues (today: oversized files only) block submit too —
   // an unregistered oversized file can never publish.
   const hasBlockingFileIssue = hasBlockingFileIssues(previewModels);
+  // Targets the server would fail deterministically (e.g. a TikTok target
+  // without title/description) block Publish now, with the first blocking
+  // message shown in the Publish card. Drafts stay saveable.
+  const hasBlockingPreviewError = hasBlockingPreviewErrors(previewModels);
+  const publishBlockedReason = hasBlockingPreviewError
+    ? firstBlockingPreviewError(previewModels)
+    : null;
   const canSave = canSubmitComposer({
     textPresent: text.trim().length > 0,
     overLimit: hasOverLimit,
@@ -366,6 +375,7 @@ export default function NewPostComposer({
     hasSelection: selectedAccountIds.length > 0,
     busy: publishing || saving,
     quotaBlocked,
+    previewError: hasBlockingPreviewError,
   });
   const schedulingForX = selectedAccounts.some((account) => account.platform === "X");
   const { creatorInfos, creatorInfoErrors, retryCreatorInfo, resetForAccount } =
@@ -1392,6 +1402,7 @@ export default function NewPostComposer({
             publishProgress={publishProgress}
             canSave={canSave}
             canPublish={canPublish}
+            publishBlockedReason={publishBlockedReason}
             saving={saving}
             scheduling={scheduling}
             onSaveDraft={handleSaveDraft}

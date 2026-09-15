@@ -57,6 +57,21 @@ export function isXAuthErrorCode(code: string): boolean {
   );
 }
 
+/**
+ * Billing/usage failures that must surface as-is instead of the reconnect
+ * message. X rejects publishes with 401/403-shaped errors when the
+ * developer project's API credits run out, and the auth mapping below
+ * would otherwise send the user to reconnect an account that is fine.
+ * Checked BEFORE any auth classification, on the raw provider text.
+ */
+export function isXBillingErrorMessage(message: string): boolean {
+  return (
+    /credits?[\s_-]*(deplet|exhaust|exceed|insufficient)/i.test(message) ||
+    /usage[\s_-]*cap/i.test(message) ||
+    /exceed.*(usage|quota|credits?)/i.test(message)
+  );
+}
+
 /** Classify a raw publish failure message as an auth failure. */
 export function isXAuthErrorMessage(message: string): boolean {
   return (
@@ -68,6 +83,11 @@ export function isXAuthErrorMessage(message: string): boolean {
 }
 
 export function xErrorMessage(error: unknown): string {
+  // Billing first: a depleted-credits rejection arrives with the same
+  // 401/403 shape as an auth failure, but reconnecting cannot fix it.
+  if (error instanceof Error && isXBillingErrorMessage(error.message)) {
+    return "Your X API credits are depleted. Top up credit in the X developer portal, then retry this post — no need to reconnect your account.";
+  }
   const code = error instanceof XApiError ? error.code : "";
   if (
     (typeof code === "string" && code.length > 0 && isXAuthErrorCode(code)) ||
