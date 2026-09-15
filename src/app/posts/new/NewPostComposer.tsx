@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   CalendarClockIcon,
   CircleCheckIcon,
   ExternalLinkIcon,
-  FileTextIcon,
+  EyeIcon,
   HourglassIcon,
   OctagonXIcon,
   PencilIcon,
@@ -56,28 +57,33 @@ import { EmptyBlock } from "@/components/StateBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { toast } from "@/components/ui/toast";
-import { AccountList } from "./_components/AccountList";
-import { MediaGrid } from "./_components/MediaGrid";
-import { PreviewCard } from "./_components/PreviewCard";
-import { PlatformSwitcher } from "./_components/PlatformSwitcher";
+import { ChannelStrip } from "./_components/ChannelStrip";
+import { ChannelCustomizer } from "./_components/ChannelCustomizer";
+import { ComposerCard } from "./_components/ComposerCard";
+import { PreviewRail } from "./_components/PreviewRail";
 import { PublishCard } from "./_components/PublishCard";
 import { MobileComposerBar } from "./_components/MobileComposerBar";
-import { ScheduleDialog } from "./_components/ScheduleDialog";
 import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
+
+/**
+ * Schedule dialog loads on demand (C3): it owns the calendar picker
+ * (react-day-picker), which otherwise ships in the initial composer
+ * bundle even though the dialog opens only on explicit click. Rendered
+ * conditionally so the chunk fetches on first open; the dialog is fully
+ * controlled so remounting loses no state.
+ */
+const ScheduleDialog = dynamic(
+  () =>
+    import("./_components/ScheduleDialog").then((mod) => mod.ScheduleDialog),
+  { loading: () => null }
+);
 
 import type { Platform } from "@prisma/client";
 import type {
@@ -1296,151 +1302,82 @@ export default function NewPostComposer({
             onRetry={(key) => void retryFailedMedia(key)}
           />
 
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-8 lg:sticky lg:top-6 lg:self-start">
-          <section aria-label="Preview" className="order-2 lg:order-1">
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <h2 className="text-lg font-medium tracking-tight">Preview</h2>
-              {previews.length > 0 && (
-                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {previews.length} selected
-                </p>
-              )}
-            </div>
-            <div>
-              {previews.length === 0 || !activePreviewModel || !previewTarget ? (
-                <Empty>
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <FileTextIcon />
-                    </EmptyMedia>
-                    <EmptyTitle>No previews yet</EmptyTitle>
-                    <EmptyDescription>
-                      Select a platform above to see how your post will look.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <PlatformSwitcher
-                    tabs={previewTabs}
-                    active={previewTarget.platform}
-                    onSelect={setPreviewPlatform}
-                  />
-                  <PreviewCard
-                    key={activePreviewModel.accountId}
-                    model={activePreviewModel}
-                    userName={userName}
-                    media={media}
-                    customText={
-                      activePreviewModel.platform === "TIKTOK"
-                        ? targetOverrides[activePreviewModel.accountId]?.title
-                        : targetOverrides[activePreviewModel.accountId]?.text
-                    }
-                    customDescription={
-                      activePreviewModel.platform === "TIKTOK"
-                        ? targetOverrides[activePreviewModel.accountId]
-                            ?.description
-                        : undefined
-                    }
-                    hasOverride={Boolean(
-                      targetOverrides[activePreviewModel.accountId]
-                    )}
-                    overrideSettings={
-                      targetOverrides[activePreviewModel.accountId]?.settings ??
-                      {}
-                    }
-                    isCustomizing={customizingIds.includes(
-                      activePreviewModel.accountId
-                    )}
-                    creatorInfo={
-                      creatorInfos[activePreviewModel.accountId]
-                    }
-                    creatorInfoError={
-                      creatorInfoErrors[activePreviewModel.accountId]
-                    }
-                    showTikTokTitleHint={
-                      activePreviewModel.platform === "TIKTOK" &&
-                      !targetOverrides[activePreviewModel.accountId]?.title &&
-                      (activePreviewModel.tiktokMode !== "photo" ||
-                        !targetOverrides[activePreviewModel.accountId]
-                          ?.description)
-                    }
-                    disabled={saving || publishing || scheduling}
-                    onCustomTextChange={(value) =>
-                      updateOverride(
-                        activePreviewModel.accountId,
-                        activePreviewModel.platform === "TIKTOK"
-                          ? { title: value }
-                          : { text: value }
-                      )
-                    }
-                    onCustomDescriptionChange={(value) =>
-                      updateOverride(activePreviewModel.accountId, {
-                        description: value,
-                      })
-                    }
-                    onSettings={(patch) =>
-                      updateOverride(activePreviewModel.accountId, {
-                        settings: patch,
-                      })
-                    }
-                    onRetryCreatorInfo={() =>
-                      retryCreatorInfo(activePreviewModel.accountId)
-                    }
-                    onOpenAccounts={() => router.push("/accounts")}
-                    onUseGlobal={() =>
-                      clearTargetOverride(activePreviewModel.accountId)
-                    }
-                    onDone={() =>
-                      setCustomizingIds((current) =>
-                        current.filter(
-                          (id) => id !== activePreviewModel.accountId
-                        )
-                      )
-                    }
-                    onCustomize={() =>
-                      setCustomizingIds((current) => [
-                        ...current,
-                        activePreviewModel.accountId,
-                      ])
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          </section>
-
-          <div className="order-1 lg:order-2">
-          <PublishCard
-            quotaBlocked={quotaBlocked}
-            quotaError={quotaError}
-            quotaUpgradeTo={quota.upgradeTo}
-            schedulingForX={schedulingForX}
-            scheduleMode={scheduleMode}
-            scheduleDate={scheduleDate}
-            scheduleTime={scheduleTime}
-            xScheduleHint={xScheduleHint}
-            publishing={publishing}
-            publishProgress={publishProgress}
-            canSave={canSave}
-            canPublish={canPublish}
-            publishBlockedReason={publishBlockedReason}
-            saving={saving}
-            scheduling={scheduling}
-            onSaveDraft={handleSaveDraft}
-            onScheduleClick={handleScheduleClick}
-            onPublish={handlePublish}
-            onAbort={() => publishAbortRef.current?.abort()}
-            onDismissXHint={() => setXScheduleHint(false)}
+          <ChannelCustomizer
+            selectedAccounts={selectedAccounts}
+            previewModels={previewModels}
+            targetOverrides={targetOverrides}
+            customizingIds={customizingIds}
+            creatorInfos={creatorInfos}
+            creatorInfoErrors={creatorInfoErrors}
+            disabled={saving || publishing || scheduling}
+            onExpand={handleCustomize}
+            onCollapse={(accountId) =>
+              setCustomizingIds((current) =>
+                current.filter((id) => id !== accountId)
+              )
+            }
+            onClearOverride={clearTargetOverride}
+            onCustomTextChange={(accountId, targetPlatform, value) =>
+              updateOverride(
+                accountId,
+                targetPlatform === "TIKTOK" ? { title: value } : { text: value }
+              )
+            }
+            onCustomDescriptionChange={(accountId, value) =>
+              updateOverride(accountId, { description: value })
+            }
+            onSettings={(accountId, patch) =>
+              updateOverride(accountId, { settings: patch })
+            }
+            onRetryCreatorInfo={retryCreatorInfo}
+            onOpenAccounts={() => router.push("/accounts")}
           />
+
+          <div className="lg:sticky lg:top-4 lg:z-20">
+            <PublishCard
+              quotaBlocked={quotaBlocked}
+              quotaError={quotaError}
+              quotaUpgradeTo={quota.upgradeTo}
+              schedulingForX={schedulingForX}
+              scheduleMode={scheduleMode}
+              scheduleDate={scheduleDate}
+              scheduleTime={scheduleTime}
+              xScheduleHint={xScheduleHint}
+              publishing={publishing}
+              publishProgress={publishProgress}
+              canSave={canSave}
+              canPublish={canPublish}
+              publishBlockedReason={publishBlockedReason}
+              saving={saving}
+              scheduling={scheduling}
+              onSaveDraft={handleSaveDraft}
+              onScheduleClick={handleScheduleClick}
+              onPublish={handlePublish}
+              onAbort={() => publishAbortRef.current?.abort()}
+              onDismissXHint={() => setXScheduleHint(false)}
+            />
           </div>
         </div>
+
+        <aside className="hidden min-w-0 lg:block" aria-label="Preview rail">
+          <div className="sticky top-6">
+            <PreviewRail
+              items={railItems}
+              userName={userName}
+              media={media}
+              disabled={saving || publishing || scheduling}
+              expandedId={effectiveExpandedId}
+              onToggleExpand={togglePreviewExpanded}
+              onCustomize={handleCustomize}
+            />
+          </div>
+        </aside>
+
       </div>
 
-      <ScheduleDialog
-        open={scheduleMode && !schedulingForX}
+      {scheduleMode && !schedulingForX ? (
+        <ScheduleDialog
+          open
         scheduleDate={scheduleDate}
         scheduleTime={scheduleTime}
         scheduledIso={scheduledIso}
@@ -1472,7 +1409,30 @@ export default function NewPostComposer({
         }}
         onConfirm={handleSchedule}
         onOpenDraft={(postId) => router.push(`/posts/${postId}`)}
-      />
+        />
+      ) : null}
+      <Sheet open={previewSheetOpen} onOpenChange={setPreviewSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          <SheetHeader className="px-1 pb-3 text-left">
+            <SheetTitle>Preview</SheetTitle>
+            <SheetDescription>
+              How your post will look on the selected channel.
+            </SheetDescription>
+          </SheetHeader>
+          <PreviewRail
+            items={railItems}
+            userName={userName}
+            media={media}
+            disabled={saving || publishing || scheduling}
+            expandedId={effectiveExpandedId}
+            onToggleExpand={togglePreviewExpanded}
+            onCustomize={(accountId) => {
+              setPreviewSheetOpen(false);
+              handleCustomize(accountId);
+            }}
+          />
+        </SheetContent>
+      </Sheet>
       {/* Spacer so the fixed mobile bar never covers content. */}
       <div aria-hidden="true" className="h-20 lg:hidden" />
       <MobileComposerBar

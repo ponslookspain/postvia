@@ -20,7 +20,7 @@ import {
 import { FieldDescription } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
-import { parseDateKey } from "./ScheduleDatePicker";
+import { parseDateKey } from "@/lib/schedule-date";
 import type { PlanId } from "@/lib/plans";
 import {
   formatElapsed,
