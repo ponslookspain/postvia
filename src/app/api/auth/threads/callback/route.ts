@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { oauthRedirect } from "@/lib/oauth-redirect";
+import { oauthRedirect, safeProviderError } from "@/lib/oauth-redirect";
 import { ThreadsProvider } from "@/lib/social/threads";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
@@ -26,14 +26,22 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state");
   const error = searchParams.get("error");
 
+  // Every exit clears the single-use state cookie so a stale state never
+  // survives a failed attempt (same hygiene as TikTok/Instagram).
+  const redirectWith = (path: string) => {
+    const redirect = oauthRedirect(request, path);
+    redirect.cookies.delete("threads_oauth_state");
+    return redirect;
+  };
+
   if (error) {
-    return oauthRedirect(request,
-      `/accounts?error=${encodeURIComponent(error)}`
+    return redirectWith(
+      `/accounts?error=${encodeURIComponent(safeProviderError(error, "threads_callback_failed"))}`
     );
   }
 
   if (!code || !state) {
-    return oauthRedirect(request,
+    return redirectWith(
       "/accounts?error=missing_parameters"
     );
   }
@@ -42,13 +50,13 @@ export async function GET(request: NextRequest) {
   const storedState = cookieStore.get("threads_oauth_state")?.value;
 
   if (!storedState) {
-    return oauthRedirect(request,
+    return redirectWith(
       "/accounts?error=invalid_session"
     );
   }
 
   if (state.length !== storedState.length) {
-    return oauthRedirect(request,
+    return redirectWith(
       "/accounts?error=invalid_state"
     );
   }
@@ -57,7 +65,7 @@ export async function GET(request: NextRequest) {
     stateDiff |= state.charCodeAt(i) ^ storedState.charCodeAt(i);
   }
   if (stateDiff !== 0) {
-    return oauthRedirect(request,
+    return redirectWith(
       "/accounts?error=invalid_state"
     );
   }
@@ -65,13 +73,13 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getApiUser();
     if (!user) {
-      return oauthRedirect(request,"/login");
+      return redirectWith("/login");
     }
 
     // Callback flood protection (initiation-only limits leave this path
     // open): per-IP + per-user buckets. Denied attempts redirect, never 500.
     if (!(await gateOAuthCallback({ request, userId: user.id }))) {
-      return oauthRedirect(request,
+      return redirectWith(
         "/accounts?error=too_many_requests"
       );
     }
@@ -98,8 +106,10 @@ export async function GET(request: NextRequest) {
       expiresAt: tokens.expiresAt,
     };
     if (existingAccount) {
-      await prisma.socialAccount.update({
-        where: { id: existingAccount.id },
+      // Reconnect: rotate tokens in place. updateMany scopes the write to
+      // this user's row atomically; a concurrently deleted row updates nothing.
+      await prisma.socialAccount.updateMany({
+        where: { id: existingAccount.id, userId: user.id },
         data: accountData,
       });
     } else {
@@ -122,7 +132,7 @@ export async function GET(request: NextRequest) {
           isPaidActivePlan(effectiveForAbuse.plan, effectiveForAbuse.status),
       });
       if (!abuseGate.ok) {
-        return oauthRedirect(request,
+        return redirectWith(
           `/accounts?error=${abuseGate.errorParam}`
         );
       }
@@ -138,29 +148,28 @@ export async function GET(request: NextRequest) {
       });
       if (!linked.ok) {
         if (linked.code === "account_in_use") {
-          return oauthRedirect(request,
+          return redirectWith(
             "/accounts?error=account_in_use"
           );
         }
-        return oauthRedirect(request,
+        return redirectWith(
           `/accounts?error=account_limit_reached${linked.upgradeTo ? `&upgradeTo=${linked.upgradeTo}` : ""}`
         );
       }
     }
 
-    const response = oauthRedirect(request,"/accounts?connected=true");
-    response.cookies.delete("threads_oauth_state");
-    return response;
+    return redirectWith("/accounts?connected=true");
   } catch (err) {
     // Presence flags only: the code/state values themselves are secrets.
+    // Raw error text never reaches the redirect (whitelist only).
     reportError("oauth", "threads callback failed", err, {
       provider: "THREADS",
       hasCode: Boolean(code),
       hasState: Boolean(state),
     });
     const message =
-      err instanceof Error ? err.message : "callback_failed";
-    return oauthRedirect(request,
+      err instanceof Error ? safeProviderError(err.message, "threads_callback_failed") : "threads_callback_failed";
+    return redirectWith(
       `/accounts?error=${encodeURIComponent(message)}`
     );
   }

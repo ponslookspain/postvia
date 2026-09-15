@@ -394,10 +394,10 @@ describe("signed URL generation (Threads image publishing)", () => {
 });
 
 describe("safe pathname logging", () => {
-  test("logs only the user-level path, never the post, random suffix or filename", () => {
+  test("logs a constant, never user/post/suffix/filename identifiers", () => {
     assert.equal(
       safePathname("media/alice/post1/9f2c-vacation video.mp4"),
-      "media/alice/***"
+      "media/***/***"
     );
     assert.equal(safePathname("not-a-media-path"), "***");
   });

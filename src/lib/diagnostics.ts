@@ -1,9 +1,14 @@
 import * as Sentry from "@sentry/nextjs";
 
+/**
+ * Log-safe blob path: the user id is a stable identifier and must never
+ * reach logs, so media paths collapse to a constant (post id, random
+ * suffix and filename are dropped along with it).
+ */
 export function safePathname(pathname: string): string {
   const parts = pathname.replace(/^\/+/, "").split("/");
-  if (parts[0] === "media" && parts[1]) {
-    return `media/${parts[1]}/***`;
+  if (parts[0] === "media") {
+    return "media/***/***";
   }
   return "***";
 }

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { XProvider } from "@/lib/social/x";
 import { ThreadsProvider } from "@/lib/social/threads";
+import { TiktokProvider } from "@/lib/social/tiktok";
+import { InstagramProvider } from "@/lib/social/instagram";
 import { deleteBlobs } from "@/lib/blob";
 import { cancelStripeSubscriptionNow, getStripeClient } from "@/lib/stripe";
 import {
@@ -137,12 +139,21 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Best-effort remote revocation before local rows disappear (Threads
+    // exposes no revoke endpoint — its call is an honest no-op).
     for (const account of accounts) {
       try {
         if (account.platform === "X") {
           await new XProvider().revokeToken(account.accessToken);
         } else if (account.platform === "THREADS") {
-          await new ThreadsProvider().revokeToken();
+          await new ThreadsProvider().revokeToken(account.accessToken);
+        } else if (account.platform === "TIKTOK") {
+          await new TiktokProvider().revokeToken(account.accessToken);
+        } else if (account.platform === "INSTAGRAM") {
+          await new InstagramProvider().revokeToken(
+            account.accessToken,
+            account.externalId
+          );
         }
       } catch {
         // Best-effort: revocation failure must not block account deletion

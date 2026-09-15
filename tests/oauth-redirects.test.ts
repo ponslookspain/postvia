@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolveRedirectOrigin } from "../src/lib/oauth-redirect";
+import { safeProviderError } from "../src/lib/oauth-redirect";
 
 /**
  * Regression test for the ngrok OAuth redirect bug: after a successful
@@ -193,5 +194,23 @@ describe("resolveRedirectOrigin()", () => {
       forwardedHost: "localhost:3000",
     });
     assert.equal(resolved, "http://localhost:3000");
+  });
+});
+
+describe("safeProviderError (browser-controlled error params)", () => {
+  test("whitelisted codes pass through", () => {
+    assert.equal(safeProviderError("access_denied", "x_callback_failed"), "access_denied");
+    assert.equal(safeProviderError("account_in_use", "threads_callback_failed"), "account_in_use");
+    assert.equal(
+      safeProviderError("instagram_personal_account", "instagram_callback_failed"),
+      "instagram_personal_account"
+    );
+  });
+
+  test("raw provider/attacker strings collapse to the fallback", () => {
+    assert.equal(safeProviderError("oops'; DROP TABLE", "x_callback_failed"), "x_callback_failed");
+    assert.equal(safeProviderError("Error: secret-token-abc", "threads_callback_failed"), "threads_callback_failed");
+    assert.equal(safeProviderError(null, "tiktok_callback_failed"), "tiktok_callback_failed");
+    assert.equal(safeProviderError("", "instagram_callback_failed"), "instagram_callback_failed");
   });
 });

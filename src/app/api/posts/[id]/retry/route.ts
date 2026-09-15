@@ -16,8 +16,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -133,8 +133,11 @@ export async function POST(
       { status: 202 }
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to retry";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Generic client body: the raw cause stays server-side in diagnostics.
+    reportError("publish", "retry request failed", error, { postId: id });
+    return NextResponse.json(
+      { error: "Failed to retry publishing" },
+      { status: 500 }
+    );
   }
 }

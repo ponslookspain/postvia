@@ -102,3 +102,35 @@ export function oauthRedirect(request: NextRequest, path: string): NextResponse 
   });
   return NextResponse.redirect(new URL(path, origin));
 }
+
+/**
+ * Provider `error` params are browser-controlled input: only whitelisted
+ * values may reach our redirect query string. Everything else collapses
+ * to the caller's fallback (e.g. `x_callback_failed`) so raw provider or
+ * attacker strings never leak into first-party URLs, logs, or UI.
+ */
+const KNOWN_OAUTH_ERRORS = new Set([
+  "access_denied",
+  "invalid_state",
+  "invalid_session",
+  "missing_parameters",
+  "too_many_requests",
+  "account_limit_reached",
+  "account_in_use",
+  "connection_restricted",
+  "connection_cooldown",
+  "x_callback_failed",
+  "threads_callback_failed",
+  "tiktok_callback_failed",
+  "instagram_profile_failed",
+  "instagram_personal_account",
+  "instagram_not_configured",
+]);
+
+export function safeProviderError(
+  value: string | null,
+  fallback: string
+): string {
+  if (value && KNOWN_OAUTH_ERRORS.has(value)) return value;
+  return fallback;
+}

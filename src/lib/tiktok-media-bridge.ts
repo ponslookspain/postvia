@@ -19,7 +19,9 @@ import { PRODUCTION_URL, resolveBaseURL } from "@/lib/base-url";
  *
  * Security model (no session, no cookies — pure server-to-server fetch):
  * - each URL is HMAC-SHA256 bound to ONE media id + expiry with a
- *   server-only secret (`BETTER_AUTH_SECRET`, never exposed);
+ *   server-only secret (dedicated TIKTOK_BRIDGE_SECRET, falling back to
+ *   BETTER_AUTH_SECRET only until the dedicated secret is configured —
+ *   never exposed);
  * - media ids are unguessable cuids, so URLs cannot be enumerated;
  * - a token for media A never validates for media B;
  * - the Blob store stays private; the route streams bytes server-side and
@@ -39,7 +41,15 @@ export function isValidTiktokBridgeMediaId(mediaId: string): boolean {
 }
 
 function getBridgeSecret(): string {
-  return process.env.BETTER_AUTH_SECRET?.trim() ?? "";
+  // Dedicated URL-signing secret; falls back to BETTER_AUTH_SECRET so
+  // in-flight bridge URLs (90 min TTL) keep verifying across the rollout.
+  // Set TIKTOK_BRIDGE_SECRET in every environment, then the fallback is
+  // inert key separation rather than key reuse.
+  return (
+    process.env.TIKTOK_BRIDGE_SECRET?.trim() ||
+    process.env.BETTER_AUTH_SECRET?.trim() ||
+    ""
+  );
 }
 
 export function signTiktokMediaToken(input: {
