@@ -1,55 +1,56 @@
+import { Reveal } from "@/components/landing/Reveal";
+
 const pains = [
   {
     title: "Copy-paste work",
-    text: "Rewrite the same post and upload the same media across multiple apps.",
+    text: "The same post, rewritten and re-uploaded across four apps.",
   },
   {
     title: "Four separate workflows",
-    text: "Different editors, limits, previews, and publishing flows for every network.",
+    text: "Different editors, limits, and publishing flows per network.",
   },
   {
     title: "Scattered schedules",
-    text: "Without a shared calendar, it is easy to miss a slot or lose track of what comes next.",
+    text: "No shared view of what is queued, so slots get missed.",
   },
   {
-    title: "Unclear publishing status",
-    text: "One network can fail while the others succeed. You only find out by checking each app.",
+    title: "Unclear outcomes",
+    text: "One network can fail silently while the others succeed.",
   },
 ] as const;
 
+/**
+ * Quiet editorial problem statement. Hairline rows, not cards —
+ * the page earns its cards later for real product UI.
+ */
 export function Problem() {
   return (
-    <section
-      aria-labelledby="problem-heading"
-      className="border-y border-border bg-muted/30"
-    >
-      <div className="mx-auto w-full max-w-6xl px-4 py-14 md:px-8 md:py-20">
-        <div className="max-w-2xl">
+    <section aria-labelledby="problem-heading">
+      <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-8 md:py-24">
+        <Reveal className="max-w-2xl">
+          <p className="text-sm font-medium text-muted-foreground">
+            Why Postvia exists
+          </p>
           <h2
             id="problem-heading"
-            className="text-3xl font-semibold tracking-tight text-balance md:text-4xl"
+            className="mt-3 font-heading text-3xl font-semibold tracking-tight text-balance md:text-4xl"
           >
             Publishing across networks gets messy fast.
           </h2>
-          <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-            Copying the same post between apps creates extra work — and makes
-            it harder to know what is scheduled, what failed, and what
-            actually went live.
-          </p>
-        </div>
-        <ul className="mt-10 grid gap-3 sm:grid-cols-2">
+        </Reveal>
+        <Reveal as="ul" delay={150} className="mt-8 border-t border-border">
           {pains.map((pain) => (
             <li
               key={pain.title}
-              className="rounded-xl border border-border bg-card p-4"
+              className="grid gap-1 border-b border-border py-4 sm:grid-cols-[220px_minmax(0,1fr)] sm:gap-6"
             >
-              <h3 className="text-base font-medium">{pain.title}</h3>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              <h3 className="text-[15px] font-medium">{pain.title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 {pain.text}
               </p>
             </li>
           ))}
-        </ul>
+        </Reveal>
       </div>
     </section>
   );

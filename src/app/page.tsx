@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Hero } from "@/components/landing/Hero";
+import { TrustBar } from "@/components/landing/TrustBar";
 import { Problem } from "@/components/landing/Problem";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { TailorPreview } from "@/components/landing/TailorPreview";
@@ -36,10 +37,11 @@ export default function HomePage() {
   // Static landing shell. Only NavbarState reads the session (inside a
   // Suspense boundary); /dashboard stays a separate route.
   return (
-    <div className="min-h-screen overflow-x-clip bg-background text-foreground antialiased">
+    <div className="min-h-screen overflow-x-clip bg-background font-sans text-foreground antialiased">
       <NavbarState />
       <main>
         <Hero />
+        <TrustBar />
         <Problem />
         <HowItWorks />
         <TailorPreview />

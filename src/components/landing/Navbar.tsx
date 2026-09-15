@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MenuIcon } from "lucide-react";
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,22 +14,37 @@ import {
 } from "@/components/ui/sheet";
 
 const links = [
+  { href: "#product", label: "Product" },
   { href: "#how", label: "How it works" },
-  { href: "#preview", label: "Preview" },
   { href: "#calendar", label: "Calendar" },
-  { href: "#reliability", label: "Reliability" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
 
 export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/85 backdrop-blur-md">
+    <header
+      className={cn(
+        "sticky top-0 z-50 bg-background/85 backdrop-blur-md transition-[border-color,box-shadow] duration-300 motion-reduce:transition-none",
+        scrolled
+          ? "border-b border-border shadow-[0_1px_12px_-6px_rgb(0_0_0/0.12)]"
+          : "border-b border-transparent"
+      )}
+    >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 md:px-8">
         <Link
           href="/"
-          className="rounded-sm text-lg font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="rounded-sm font-heading text-lg font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           postvia
         </Link>
@@ -37,7 +53,7 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-sm text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="rounded-sm text-sm text-muted-foreground outline-none transition-colors duration-200 hover:text-foreground motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {link.label}
             </Link>
