@@ -114,7 +114,7 @@ export function SettingsClient({
   const [savingPref, setSavingPref] = useState<string | null>(null);
   const [prefsMessage, setPrefsMessage] = useState<Message>(null);
 
-  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteMessage, setDeleteMessage] = useState<Message>(null);
@@ -287,8 +287,8 @@ export function SettingsClient({
     }
   }
 
-  function closeDeleteModal() {
-    setDeleteModalOpen(false);
+  function closeDeleteDialog() {
+    setDeleteDialogOpen(false);
     setConfirmText("");
     setDeleteMessage(null);
   }
@@ -632,7 +632,7 @@ export function SettingsClient({
                 <Button
                   variant="destructive"
                   size="lg"
-                  onClick={() => setDeleteModalOpen(true)}
+                  onClick={() => setDeleteDialogOpen(true)}
                   className="min-h-11 w-full sm:w-auto"
                 >
                   Delete account
@@ -644,10 +644,10 @@ export function SettingsClient({
       </PageSections>
 
       <Dialog
-        open={isDeleteModalOpen}
+        open={isDeleteDialogOpen}
         onOpenChange={(open) => {
-          if (!open) closeDeleteModal();
-          else setDeleteModalOpen(true);
+          if (!open) closeDeleteDialog();
+          else setDeleteDialogOpen(true);
         }}
       >
         <DialogContent>
@@ -675,7 +675,7 @@ export function SettingsClient({
             {deleteMessage && <FormAlert message={deleteMessage} />}
           </FieldGroup>
           <DialogFooter>
-            <Button variant="outline" onClick={closeDeleteModal} disabled={deleting}>
+            <Button variant="outline" onClick={closeDeleteDialog} disabled={deleting}>
               Cancel
             </Button>
             <Button

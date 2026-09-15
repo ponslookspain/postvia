@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { InfoIcon, UsersIcon } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { EmptyBlock } from "@/components/StateBlock";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";

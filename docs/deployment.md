@@ -10,13 +10,12 @@ involved locally.
 ## GitHub / PR flow
 
 ```
-feature/fix/chore/staging branch → local verification → commit → push
-(no Vercel Preview) → GitHub Pull Request → review → merge to main
-→ AUTOMATIC Vercel Production
+dev (active development) → local verification → commit → push
+(no Vercel Preview) → GitHub Pull Request (dev → main) → review
+→ merge to main → AUTOMATIC Vercel Production
 ```
 
-- Development happens on `staging/*` / feature / fix / chore branches,
-  never directly on `main`.
+- Development happens on `dev`, never directly on `main`.
 - A push to a non-production branch must NOT produce any Vercel
   deployment. Preview builds are off by policy, not just optional.
 - Merging to `main` IS the release: Vercel automatically builds and

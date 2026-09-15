@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 export function OnboardingForm({ initialName = "" }: { initialName?: string }) {
   const router = useRouter();

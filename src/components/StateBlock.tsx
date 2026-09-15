@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { TriangleAlertIcon } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Empty,

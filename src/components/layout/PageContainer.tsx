@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /**
  * Page container. One per page, directly inside AppShell's <main>.

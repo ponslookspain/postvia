@@ -1,6 +1,5 @@
-import { cn } from "cn";
+import { cn, formatStatusLabel } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { formatStatusLabel } from "@/lib/utils";
 
 /**
  * Post status language. One dot + one label everywhere: post lists,

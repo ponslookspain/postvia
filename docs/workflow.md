@@ -12,7 +12,7 @@ LOCAL EDIT
 → LOCAL TEST
 → optional ngrok HTTPS/OAuth TEST
 → COMMIT
-→ PUSH FEATURE/FIX/CHORE/STAGING (no Vercel Preview)
+→ PUSH dev (no Vercel Preview)
 → GITHUB PR
 → REVIEW
 → MERGE MAIN
@@ -48,8 +48,9 @@ LOCAL EDIT
   in `.env.local` — see `docs/local-development.md`) proxies
   to `localhost:3000`; the ngrok agent must be running. It never replaces
   Production.
-- **Git** — versions the project. Development happens on `staging/*` /
-  feature branches, never directly on `main`.
+- **Git** — versions the project. Development happens on `dev`
+  (`staging/*` / feature branches only when needed), never directly
+  on `main`.
 - **GitHub PR** — the review gate. No code reaches `main` without an
   accepted Pull Request + review.
 - **Production** — served at `postvia.online`, deployed automatically on
@@ -134,8 +135,8 @@ blindly over local files, and never print secret values.
 
 ## Vercel workflow
 
-- Feature/fix/chore/staging work is verified locally (+ tunnel when
-  needed), then pushed for PR review. A push builds NOTHING on Vercel by
+- Work on `dev` is verified locally (+ tunnel when
+  needed), then pushed for PR review (`dev` → `main`). A push builds NOTHING on Vercel by
   policy (no Preview). No `vercel deploy` in the normal cycle; no
   `vercel --prod` — Production comes from `main` automatically.
 - If a Preview deployment ever exists (e.g. created before this policy),
@@ -144,9 +145,11 @@ blindly over local files, and never print secret values.
 
 ## Database safety
 
-Local development uses the dedicated Neon `development` branch; Production
-uses `main`. The two must never be mixed (see [`database.md`](database.md)
-topology), so any remote testing with real data needs care:
+Local development uses the dedicated Neon `development` database branch;
+Production uses the Neon `main` database branch (database branches — not
+the Git branches of the same names). The two must never be mixed (see
+[`database.md`](database.md) topology), so any remote testing with real
+data needs care:
 
 - Test users are deleted only individually (`scripts/cleanup-test-users.ts`
   with explicit `--email`), never by mass cleanup without approval.

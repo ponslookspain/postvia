@@ -1,4 +1,4 @@
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /**
  * Brand glyphs for connected social platforms. All four are fill-based

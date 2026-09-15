@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /**
  * Page title row. Left-aligned, one per page: 24px semibold title,

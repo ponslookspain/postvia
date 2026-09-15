@@ -29,6 +29,7 @@ import {
   OTP_SEND_COOLDOWN_SECONDS,
   OTP_SEND_MAX_PER_HOUR,
 } from "@/lib/otp-config";
+import { OTP_RATE_LIMITED_CODE } from "@/lib/otp-rate-limit";
 
 export type OtpMode = "signup" | "login";
 export type OtpSendType = "email-verification" | "sign-in";
@@ -60,7 +61,13 @@ export function planHintToDb(planHint: unknown): "GROWTH" | "SCALE" | "FREE" | u
   return undefined;
 }
 
-export const OTP_RATE_LIMITED_CODE = "RATE_LIMITED" as const;
+/**
+ * Single canonical definition lives in `@/lib/otp-rate-limit` (server-safe,
+ * shared with client components). Imported above for local use and
+ * re-exported here so server code keeps importing from this module; both
+ * names resolve to the same value.
+ */
+export { OTP_RATE_LIMITED_CODE };
 
 /**
  * Latest-safe wait across denied buckets (pure, testable).

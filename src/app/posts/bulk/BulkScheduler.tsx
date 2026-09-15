@@ -11,8 +11,8 @@ import {
   TriangleAlertIcon,
   UploadIcon,
 } from "lucide-react";
-import { cn } from "cn";
-import { validateMediaInput } from "@/lib/media";
+import { cn } from "@/lib/utils";
+import { formatFileSize, validateMediaInput } from "@/lib/media";
 import { waitForMediaRegistration } from "@/lib/media-registration";
 import {
   BULK_INTERVAL_PRESETS,
@@ -117,12 +117,6 @@ function useDetectedTimeZone(): string {
     },
     () => "UTC"
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatInZone(iso: string, timeZone: string): string {

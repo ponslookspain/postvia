@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ChevronRightIcon, ClapperboardIcon } from "lucide-react";
-import { cn } from "cn";
-import { formatPostDate } from "@/lib/utils";
+import { cn, formatPostDate } from "@/lib/utils";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusBadge } from "@/components/StatusBadge";
 

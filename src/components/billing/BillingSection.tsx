@@ -26,7 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { ErrorBlock } from "@/components/StateBlock";
 import { Section, SectionHeader } from "@/components/Section";
 import { CheckIcon } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { getPlan, PLANS, FEATURE_KEYS, type FeatureKey, type Plan, type PlanEntitlements, type PlanId } from "@/lib/plans";
 import type { BillingView } from "@/lib/entitlements";
 

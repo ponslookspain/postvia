@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ErrorBlock } from "@/components/StateBlock";
-import { formatFileSize } from "./media-utils";
+import { formatFileSize } from "@/lib/media";
 import type { DraftMedia } from "./types";
 
 export function MediaGrid({

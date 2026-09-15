@@ -16,6 +16,7 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `X_CLIENT_ID` / `X_CLIENT_SECRET` / `X_REDIRECT_URI` | yes (X) | all | X OAuth + PKCE (src) | **yes** |
 | `THREADS_APP_ID` / `THREADS_APP_SECRET` / `THREADS_REDIRECT_URI` | yes (Threads) | all | Threads OAuth (src) | **yes** |
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` / `TIKTOK_REDIRECT_URI` | yes (TikTok) | all | TikTok OAuth (src) | **yes** |
+| `TIKTOK_BRIDGE_SECRET` | no | all | Dedicated HMAC secret for TikTok bridge URLs; falls back to `BETTER_AUTH_SECRET` when unset — set it everywhere for key separation (src) | **yes** |
 | `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` / `INSTAGRAM_REDIRECT_URI` | yes (Instagram) | all | Instagram OAuth (src) | **yes** |
 | `STRIPE_SECRET_KEY` | yes (billing) | per-env | Live keys prod, `sk_test_*` preview (src) | **yes** |
 | `STRIPE_WEBHOOK_SECRET` | yes (billing) | per-env | Webhook signature (src) | **yes** |

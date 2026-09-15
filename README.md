@@ -47,8 +47,8 @@ npm run dev:tunnel   # ngrok http 3000 — the ngrok agent must be running
 ### Ship it
 
 ```
-feature/fix/chore/staging → local testing → commit → push (no Preview)
-→ GitHub Pull Request → review → merge main
+dev (active development) → local testing → commit → push (no Preview)
+→ GitHub Pull Request (dev → main) → review → merge main
 → automatic Vercel Production (postvia.online)
 ```
 
@@ -269,8 +269,8 @@ environment.
   [`docs/local-development.md`](docs/local-development.md)), which proxies to
   `localhost:3000`. It never replaces Production. Real social testing
   guide: [`docs/local-social-dev.md`](docs/local-social-dev.md).
-- Flow: feature/fix/chore/staging branch → local testing → commit →
-  push (**no Vercel Preview is built**) → GitHub Pull Request → review →
+- Flow: `dev` (active development) → local testing → commit →
+  push (**no Vercel Preview is built**) → GitHub Pull Request (`dev` → `main`) → review →
   merge to `main` → **automatic Vercel Production deployment** of `main`
   (`postvia.online`). Vercel Preview is not part of daily development.
 - Vercel Preview is NOT a required step of daily development and must NOT

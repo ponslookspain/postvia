@@ -9,7 +9,7 @@ const THREADS_SHORTCODE_ALPHABET =
 const SIXTY_FOUR = BigInt(64);
 const ZERO = BigInt(0);
 
-export function toThreadsShortcode(postId: string): string {
+function toThreadsShortcode(postId: string): string {
   let id = BigInt(postId);
   let shortcode = "";
   while (id > ZERO) {
