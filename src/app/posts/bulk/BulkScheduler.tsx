@@ -19,6 +19,7 @@ import {
   BULK_MAX_VIDEOS,
   BULK_TIMEZONES,
   buildBulkPostBody,
+  bulkTextLimit,
   computeBulkSchedule,
   partitionDuplicateAdds,
   shouldAcceptRunRequest,
@@ -31,6 +32,7 @@ import {
 import { bulkItemOperationId, newOperationId } from "@/lib/idempotency";
 import { reportError } from "@/lib/diagnostics";
 import { getPlan, type PlanId } from "@/lib/plans";
+import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
