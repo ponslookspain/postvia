@@ -135,10 +135,13 @@ function uploadFileToPost(
         // Step 2: official Vercel Blob client upload for private stores.
         // The SDK is imported lazily so its chunk stays out of the
         // composer's initial bundle until a file is actually uploaded.
-        let storedPathname = pathname;
+        // The reserved pathname is the server truth (signed scope +
+        // webhook registration key): the SDK echo is ignored so a
+        // re-encoded/non-ASCII echo can never desync registration polling
+        // from the stored object.
         try {
           const { uploadPresigned } = await import("@vercel/blob/client");
-          const uploaded = await uploadPresigned(pathname, file, {
+          await uploadPresigned(pathname, file, {
             access: "private",
             handleUploadUrl: "/api/media/upload",
             clientPayload: JSON.stringify({
@@ -151,7 +154,6 @@ function uploadFileToPost(
             onUploadProgress: ({ percentage }) =>
               onProgress(Math.min(100, Math.round(percentage))),
           });
-          storedPathname = uploaded.pathname || pathname;
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Unknown upload error";
@@ -162,9 +164,7 @@ function uploadFileToPost(
 
         // Step 3: the server registers the Media row from the verified
         // blob.upload-completed webhook; wait for it before publishing.
-        resolve(
-          await waitForMediaRegistration({ postId, pathname: storedPathname })
-        );
+        resolve(await waitForMediaRegistration({ postId, pathname }));
       } catch {
         resolve("Unable to upload this file. Please try again.");
       }

@@ -362,7 +362,11 @@ export function BulkScheduler({
     const { pathname } = (await prepRes.json()) as { pathname: string };
     try {
       const { uploadPresigned } = await import("@vercel/blob/client");
-      const uploaded = await uploadPresigned(pathname, file, {
+      // The reserved pathname is the server truth (signed scope +
+      // webhook registration key): the SDK echo is ignored so a
+      // re-encoded/non-ASCII echo can never desync registration polling
+      // from the stored object.
+      await uploadPresigned(pathname, file, {
         access: "private",
         handleUploadUrl: "/api/media/upload",
         clientPayload: JSON.stringify({
@@ -379,11 +383,7 @@ export function BulkScheduler({
       // Bytes are stored; now waiting on the server webhook to register
       // the Media row — a distinct, visible stage.
       onRegistering?.();
-      return await waitForMediaRegistration({
-        postId,
-        pathname: uploaded.pathname || pathname,
-        signal,
-      });
+      return await waitForMediaRegistration({ postId, pathname, signal });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown upload error";
       return `Upload failed: ${message}`;

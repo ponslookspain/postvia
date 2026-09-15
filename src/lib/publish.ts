@@ -11,8 +11,9 @@ import {
   xMediaCategoryForMime,
 } from "@/lib/social/x";
 import {
-  ThreadsApiError,
   ThreadsProvider,
+  ensureFreshThreadsToken,
+  isThreadsAuthError,
   monitorThreadsContainer,
   publishThreadsMedia,
   threadsErrorMessage,
@@ -543,8 +544,23 @@ async function executeThreadsTarget(
     return failedOutcome(target, message);
   }
 
+  // Refresh before any container exists: a terminal refresh failure is a
+  // plain retryable failure (no container to drop, mirroring X).
+  let accessToken: string;
+  try {
+    accessToken = await ensureFreshThreadsToken({
+      id: account.id,
+      accessToken: account.accessToken,
+      expiresAt: account.expiresAt,
+    });
+  } catch (error) {
+    const message = threadsErrorMessage(error);
+    await updateTargetFailure(post.id, target.id, message);
+    return failedOutcome(target, message);
+  }
+
   const outcome = await publishThreadsMedia(
-    account.accessToken,
+    accessToken,
     {
       threadsUserId: account.externalId,
       text: effective.text,
@@ -1166,9 +1182,28 @@ export async function resumeThreadsTarget(
   // (a short budget only reports "processing" and retries next tick —
   // never a duplicate — but the generous budget settles faster).
   const video = target.post.media.some((item) => item.type === "VIDEO");
+  let accessToken: string;
+  try {
+    accessToken = await ensureFreshThreadsToken(account);
+  } catch (error) {
+    // Terminal refresh failure (expired/revoked): fail with reconnect
+    // guidance. Anything else stays pending below.
+    if (isThreadsAuthError(error)) {
+      await prisma.postTarget.update({
+        where: { id: targetId },
+        data: {
+          status: "FAILED",
+          externalJobId: null,
+          errorMessage: threadsErrorMessage(error),
+        },
+      });
+      return "failed";
+    }
+    return "pending";
+  }
   try {
     const outcome = await monitorThreadsContainer(
-      account.accessToken,
+      accessToken,
       {
         threadsUserId: account.externalId,
         containerId: target.externalJobId,
@@ -1201,13 +1236,10 @@ export async function resumeThreadsTarget(
     return "pending";
   } catch (error) {
     // Mirror the TikTok/Instagram resume: only terminal auth failures fail
-    // the target (and drop the container id). Transient blips keep the id
-    // so the next tick resumes polling the same container.
-    const message = error instanceof Error ? error.message : "";
-    if (
-      error instanceof ThreadsApiError ||
-      /token|session|revoked|http 40[13]\b/i.test(message)
-    ) {
+    // the target (and drop the container id). Transient blips — transport
+    // errors, rate limits, Meta 5xx — keep the id so the next tick resumes
+    // polling the same container instead of forcing a fresh one.
+    if (isThreadsAuthError(error)) {
       await prisma.postTarget.update({
         where: { id: targetId },
         data: {

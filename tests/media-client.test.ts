@@ -340,6 +340,36 @@ describe("completed upload validation (webhook -> media row input)", () => {
     });
     assert.equal(outcome.ok, false);
   });
+
+  test("raw non-ASCII blob pathname is rejected (signed-scope mismatch class)", () => {
+    // Exact shape of the observed production failure: the stored object
+    // key carries the raw Cyrillic/CJK filename instead of the reserved
+    // ASCII slug, so it must never validate — even with a valid payload
+    // for the same user/post scope.
+    for (const raw of [
+      `media/alice/post1/${"f".repeat(32)}-Снимок_экрана_2026-09-07_055429.png`,
+      `media/alice/post1/${"f".repeat(32)}-Запись_экрана_2026-09-10_192139.mp4`,
+      `media/alice/post1/${"f".repeat(32)}-屏幕截图.png`,
+    ]) {
+      const outcome = validateCompletedUpload({
+        blob: {
+          pathname: raw,
+          url: "https://example/x",
+          contentType: "image/png",
+        },
+        tokenPayloadRaw: tokenPayload,
+        size: 1024,
+      });
+      assert.equal(outcome.ok, false, `must reject '${raw}'`);
+    }
+  });
+
+  test("CJK filenames slug to ASCII reservation but keep display name", () => {
+    const pathname = makeBlobPathname("alice", "post1", "屏幕截图 2026.png");
+    assert.ok(isAscii(pathname));
+    assert.ok(validateReservedPathname(pathname, "alice", "post1"));
+    assert.equal(sanitizeFilename("屏幕截图 2026.png"), "屏幕截图_2026.png");
+  });
 });
 
 describe("signed URL generation (Threads image publishing)", () => {

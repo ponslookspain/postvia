@@ -262,7 +262,9 @@ export type CompletedUploadOutcome =
 /**
  * Pure validation of a completed-upload event before it becomes a row:
  * - the tokenPayload (server-issued) determines user/post/filename,
- * - the stored pathname must stay inside `media/{userId}/{postId}/`,
+ * - the stored pathname must be a pathname this server reserved
+ *   (strict reserved-path check, not a prefix match, so a re-encoded or
+ *   non-ASCII pathname can never validate),
  * - the actual stored content type + size must pass media policy.
  */
 export function validateCompletedUpload(input: {
@@ -274,7 +276,7 @@ export function validateCompletedUpload(input: {
   if (!parsed.ok) return parsed;
   const { userId, postId, filename } = parsed.data;
 
-  if (!input.blob.pathname.startsWith(`media/${userId}/${postId}/`)) {
+  if (!validateReservedPathname(input.blob.pathname, userId, postId)) {
     return {
       ok: false,
       error: "Uploaded blob path does not match the authorized scope",
