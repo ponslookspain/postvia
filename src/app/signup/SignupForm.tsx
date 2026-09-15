@@ -24,7 +24,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 
-export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
+export function SignupForm({
+  plan = null,
+  googleEnabled = true,
+}: {
+  plan?: PlanId | null;
+  googleEnabled?: boolean;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -130,9 +136,16 @@ export function SignupForm({ plan = null }: { plan?: PlanId | null }) {
           </FieldGroup>
         </form>
 
-        <FieldSeparator>Or continue with</FieldSeparator>
+        {googleEnabled && (
+          <>
+            <FieldSeparator>Or continue with</FieldSeparator>
 
-        <GoogleButton newUserCallbackURL="/post-auth" callbackURL="/post-auth" />
+            <GoogleButton
+              newUserCallbackURL="/post-auth"
+              callbackURL="/post-auth"
+            />
+          </>
+        )}
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}

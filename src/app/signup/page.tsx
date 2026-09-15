@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, isGoogleOAuthConfigured } from "@/lib/auth";
 import { parsePlanParam } from "@/lib/plans";
 import { SignupForm } from "./SignupForm";
 
@@ -17,5 +17,7 @@ export default async function SignupPage({
   const plan =
     typeof params.plan === "string" ? parsePlanParam(params.plan) : null;
 
-  return <SignupForm plan={plan} />;
+  return (
+    <SignupForm plan={plan} googleEnabled={isGoogleOAuthConfigured()} />
+  );
 }

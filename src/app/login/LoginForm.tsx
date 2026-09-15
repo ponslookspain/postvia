@@ -28,9 +28,11 @@ import { Spinner } from "@/components/ui/spinner";
 export function LoginForm({
   deleted = false,
   passwordChanged = false,
+  googleEnabled = true,
 }: {
   deleted?: boolean;
   passwordChanged?: boolean;
+  googleEnabled?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -269,9 +271,16 @@ export function LoginForm({
           </FieldGroup>
         </form>
 
-        <FieldSeparator>Or continue with</FieldSeparator>
+        {googleEnabled && (
+          <>
+            <FieldSeparator>Or continue with</FieldSeparator>
 
-        <GoogleButton newUserCallbackURL="/post-auth" callbackURL="/post-auth" />
+            <GoogleButton
+              newUserCallbackURL="/post-auth"
+              callbackURL="/post-auth"
+            />
+          </>
+        )}
 
         <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}

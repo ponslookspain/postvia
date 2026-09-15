@@ -6,6 +6,19 @@ const nextConfig: NextConfig = {
   // hostname to fetch Next.js dev resources (/_next/hmr, React Refresh).
   // Dev-server-only setting — production behavior is unchanged.
   allowedDevOrigins: ["lavish-passion-dipped.ngrok-free.dev"],
+  // Single canonical host: www.postvia.online 308-redirects to the apex.
+  // The rule only matches the www host, so Preview/local hostnames are
+  // untouched. Kills the www-vs-apex session/origin split class entirely.
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.postvia.online" }],
+        destination: "https://postvia.online/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {
