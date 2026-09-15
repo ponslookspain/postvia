@@ -51,8 +51,8 @@ LOCAL EDIT
   feature branches, never directly on `main`.
 - **GitHub PR** — the review gate. No code reaches `main` without an
   accepted Pull Request + review.
-- **Production** — served at `postvia.online`, released manually after a
-  merged PR. Never automatic.
+- **Production** — served at `postvia.online`, deployed automatically on
+  every merge to `main` (no manual step).
 
 ## Standard daily workflow
 

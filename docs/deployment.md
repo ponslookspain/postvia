@@ -86,6 +86,16 @@ The database carries **no `_prisma_migrations` history** (created with
     INTEGER`. Verified read-only afterwards: enum holds
     `ACTIVE,CANCELED,PAST_DUE,UNPAID`, the column is `integer NULL`, and
     `migrate diff` against production prints an empty migration.
+  - Shipped in-repo, apply + verify before relying on them (a missing
+    column once caused bare dashboard/create 500s — P2022):
+    `20260914000000_otp_onboarding` (`User.onboardingCompleted`,
+    `User.selectedPlan` + backfill),
+    `20260914000001_post_idempotency_key` (`Post.clientOperationId`
+    nullable + unique index; NULLs stay distinct, no backfill needed),
+    `20260915000000_batch2_indexes` (planner-only: `Subscription`
+    Stripe-id lookups, `Post` user/date ranges, `Account`/`Session`
+    user scoping). After applying, re-run the read-only `migrate diff`
+    check above — it must print an empty migration.
 
 Never: `migrate reset`, destructive SQL, touching other databases,
 deleting the Neon project. Production data changes go through app flows

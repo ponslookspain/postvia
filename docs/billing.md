@@ -4,9 +4,9 @@
 
 | Plan | Price | Accounts (total) | Posts/month | Bulk |
 |---|---|---|---|---|
-| Free | $0 | 1 | 15 | no |
-| Growth | $20 | 5 | 300 | ≤10 videos |
-| Scale | $50 | unlimited | unlimited | ≤10 videos |
+| Free | €0 | 1 | 15 | no |
+| Growth | €20 | 5 | 300 | ≤10 videos |
+| Scale | €50 | unlimited | unlimited | ≤10 videos |
 
 No `Subscription` row means active Free. `applyPeriodRules`
 (`src/lib/entitlements.ts`): `CANCELED` → Free; `UNPAID` → Free with an

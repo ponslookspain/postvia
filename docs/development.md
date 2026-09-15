@@ -1,12 +1,17 @@
 # Development
 
+> Setup paths: [`local-development.md`](local-development.md) is canonical
+> (Neon `development` branch, ngrok, Blob, OAuth, smoke tests). This file
+> keeps the script reference, testing contracts, and ops helpers.
+
 ## Local setup
 
 ```bash
 npm install
-# .env: DATABASE_URL_POSTGRES_PRISMA_URL (local Postgres),
-# BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, provider keys,
-# RESEND_API_KEY, BLOB keys, ABUSE_HASH_PEPPER (dev fallback ok), ADMIN_EMAILS
+# .env.local: DATABASE_URL_POSTGRES_PRISMA_URL (Neon `development` branch —
+# never production), BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID/SECRET, provider
+# keys, RESEND_API_KEY, BLOB keys, ABUSE_HASH_PEPPER, ADMIN_EMAILS.
+# See local-development.md (canonical) and docs/environment.md.
 npx prisma db push   # empty/dev databases only — never production
 npm run dev          # http://localhost:3000
 ```
@@ -38,7 +43,7 @@ those outside local testing.
 | `npm run build` | `prisma generate` + `next build` |
 | `npm run lint` / `typecheck` | eslint / `tsc --noEmit` |
 | `npm test` | full `node --test` suite (unit, fake stores — no DB writes except `AbuseEvent` telemetry; point at an isolated DB via `.env` if needed) |
-| `npm run test:pg` | **real-PostgreSQL concurrency suite** (`tests/abuse-pg-concurrency.test.ts`). Requires `PG_INTEGRATION=1`, an **isolated** `DATABASE_URL_POSTGRES_PRISMA_URL`, `ABUSE_HASH_PEPPER`, `ABUSE_ENFORCEMENT=enforce`. **Never production.** Skips without `PG_INTEGRATION=1` |
+| `npm run test:pg` | **real-PostgreSQL concurrency suite** (`tests/abuse-pg-concurrency.test.ts`, `tests/billing-pg-concurrency.test.ts`). Requires `PG_INTEGRATION=1`, an **isolated** `DATABASE_URL_POSTGRES_PRISMA_URL`, `ABUSE_HASH_PEPPER`, `ABUSE_ENFORCEMENT=enforce`. **Never production.** Skips without `PG_INTEGRATION=1`. CI runs it once; repeat locally (≥3×) for timing-sensitive races |
 | `db:generate` / `db:push` / `db:seed` | Prisma client / push (dev) / seed |
 | `reset:data(:check)` | `scripts/reset-data.ts` data reset helper |
 
@@ -50,11 +55,11 @@ those outside local testing.
   suites (`post-limits`, `social-accounts-multi`, `entitlements`, `plans`,
   `billing-*`, provider tests, `sentry-scrub`, …).
 - PG concurrency: `test:pg` covers same-signal resolve storms, merge
-  convergence/idempotence, last-slot (25-way), rollback + retry, mixed
-  success/failure, social ownership (20-way), risk preservation, delete/
+  convergence/idempotence, last-slot races, rollback + retry, mixed
+  success/failure, social ownership races, risk preservation, delete/
   recreate, email recycle, device isolation, P2021/transient classification,
-  OAuth floods, expiry-reset races, DB invariants. Run **≥3×** — races are
-  timing-sensitive.
+  OAuth floods, expiry-reset races, DB invariants. Repeat locally (≥3×) —
+  races are timing-sensitive; CI runs the suite once per PR.
 - Conventions: `AbuseStores`/`QuotaClaimStore`/`SocialAccountStore` are
   injected so tests run without a DB; when adding a store method, update
   **all three** fake implementations (`abuse-identity`,
