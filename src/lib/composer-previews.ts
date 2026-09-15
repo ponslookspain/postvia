@@ -1,5 +1,8 @@
 import type { Platform } from "@prisma/client";
-import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
+import {
+  getImplementedPlatforms,
+  getPlatformCapabilities,
+} from "@/lib/platforms/capabilities";
 import { validateTargetMedia } from "@/lib/platforms/overrides";
 import type { MediaKind } from "@/lib/media";
 import { validateMediaInput } from "@/lib/media";
@@ -57,15 +60,11 @@ export function countCharacters(text: string): number {
 }
 
 /**
- * Display order of the platform switcher. Tabs cover platforms, never
- * individual accounts.
+ * Display order of the platform switcher, from the single capability
+ * registry (E1). Tabs cover platforms, never individual accounts.
  */
-export const PREVIEW_PLATFORM_ORDER: readonly Platform[] = [
-  "X",
-  "THREADS",
-  "INSTAGRAM",
-  "TIKTOK",
-];
+export const PREVIEW_PLATFORM_ORDER: readonly Platform[] =
+  getImplementedPlatforms().map((caps) => caps.platform);
 
 export type PreviewTarget = {
   platform: Platform;

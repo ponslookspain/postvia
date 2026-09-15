@@ -19,6 +19,26 @@ export type PlatformCapabilities = {
   label: string;
   implemented: boolean;
   supportsText: boolean;
+  /**
+   * Display/tab order across the app (composer switcher, account lists,
+   * post filters). Lower first. Matches the historical order
+   * (X, Threads, Instagram, TikTok); unimplemented stubs sort last.
+   */
+  order: number;
+  /**
+   * Accounts-page connect metadata. Present only for connectable
+   * (implemented) platforms; derived lists (AccountsContent, post
+   * filters) build on it instead of parallel hardcoded tables.
+   */
+  connect?: {
+    /** Display name (may differ from the short label, e.g. "X (Twitter)"). */
+    name: string;
+    blurb: string;
+    connectLabel: string;
+    connectEndpoint: string;
+    disconnectEndpoint: string;
+    multi: boolean;
+  };
   media: {
     image: boolean;
     video: boolean;
@@ -60,6 +80,15 @@ const THREADS: PlatformCapabilities = {
   label: "Threads",
   implemented: true,
   supportsText: true,
+  order: 1,
+  connect: {
+    name: "Threads",
+    blurb: "Text posts and replies on Threads",
+    connectLabel: "Connect Threads",
+    connectEndpoint: "/api/auth/threads/connect",
+    disconnectEndpoint: "/api/accounts/threads",
+    multi: true,
+  },
   // Conscious product scope (NOT an API gap): the official Threads API
   // also supports carousel posts (media_type=CAROUSEL + children, 2+
   // items). Postvia publishes single-media posts only; multi-file
@@ -82,6 +111,15 @@ const X: PlatformCapabilities = {
   label: "X",
   implemented: true,
   supportsText: true,
+  order: 0,
+  connect: {
+    name: "X (Twitter)",
+    blurb: "Short posts on X",
+    connectLabel: "Connect X",
+    connectEndpoint: "/api/auth/x/connect",
+    disconnectEndpoint: "/api/accounts/x",
+    multi: true,
+  },
   // Media via the X API v2 chunked upload (INIT → APPEND → FINALIZE →
   // STATUS) with the same user-context Bearer token: up to 4 photos,
   // 1 GIF, or 1 video attached as media_ids on POST /2/tweets.
@@ -115,6 +153,15 @@ const TIKTOK: PlatformCapabilities = {
   platform: "TIKTOK",
   label: "TikTok",
   implemented: true,
+  order: 3,
+  connect: {
+    name: "TikTok",
+    blurb: "Vertical video on TikTok",
+    connectLabel: "Connect TikTok",
+    connectEndpoint: "/api/auth/tiktok/connect",
+    disconnectEndpoint: "/api/accounts/tiktok",
+    multi: true,
+  },
   // TikTok Direct Post requires media: exactly one video OR 1..4 photos
   // (Postvia global limit; the TikTok API itself allows up to 35).
   supportsText: false,
@@ -185,6 +232,15 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     platform: "INSTAGRAM",
     label: "Instagram",
     implemented: true,
+    order: 2,
+    connect: {
+      name: "Instagram",
+      blurb: "Photos and reels on Instagram",
+      connectLabel: "Connect Instagram",
+      connectEndpoint: "/api/auth/instagram/connect",
+      disconnectEndpoint: "/api/accounts/instagram",
+      multi: true,
+    },
     // Conscious product scope (NOT an API gap): the official Content
     // Publishing API also supports carousels (CAROUSEL + up to 10
     // children), stories (STORIES), and alt_text on images. Postvia's MVP
@@ -210,6 +266,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     platform: "FACEBOOK",
     label: "Facebook",
     implemented: false,
+    order: 99,
     supportsText: true,
     media: { image: true, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
@@ -218,6 +275,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     platform: "LINKEDIN",
     label: "LinkedIn",
     implemented: false,
+    order: 99,
     supportsText: true,
     media: { image: true, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
@@ -226,6 +284,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     platform: "YOUTUBE",
     label: "YouTube",
     implemented: false,
+    order: 99,
     supportsText: false,
     media: { image: false, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
@@ -234,6 +293,7 @@ const REGISTRY: Record<Platform, PlatformCapabilities> = {
     platform: "PINTEREST",
     label: "Pinterest",
     implemented: false,
+    order: 99,
     supportsText: false,
     media: { image: true, video: true, maxItems: 1, supportsMixedMedia: false, supportsMultipleVideos: false },
     fields: [],
@@ -246,4 +306,16 @@ export function getPlatformCapabilities(platform: Platform): PlatformCapabilitie
 
 export function getCapabilitiesRegistry(): readonly PlatformCapabilities[] {
   return Object.values(REGISTRY);
+}
+
+/**
+ * Connectable platforms in display order. Single source for every
+ * platform list in the app (accounts page, post filters, composer
+ * switcher, preview order) — adding a platform means adding one
+ * registry entry, not editing each list.
+ */
+export function getImplementedPlatforms(): PlatformCapabilities[] {
+  return Object.values(REGISTRY)
+    .filter((caps) => caps.implemented)
+    .sort((a, b) => a.order - b.order);
 }

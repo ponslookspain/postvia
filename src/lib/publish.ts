@@ -20,7 +20,12 @@ import {
   THREADS_PUBLISH_IMAGE_TTL_MS,
   THREADS_PUBLISH_VIDEO_TTL_MS,
 } from "@/lib/social/threads";
-import type { PublishMedia, SocialProvider } from "@/lib/social/provider";
+import type { PublishMedia } from "@/lib/social/provider";
+import type { Platform } from "@prisma/client";
+import {
+  getDispatchEntry,
+  type PlatformDispatch,
+} from "@/lib/platforms/providers";
 import {
   isTiktokAuthErrorCode,
   TiktokApiError,
@@ -95,18 +100,41 @@ export async function publishTargetsInParallel<T extends { id: string }>(
   return Promise.allSettled(targets.map((target) => publishTarget(target)));
 }
 
-function getProvider(platform: string): SocialProvider {
-  switch (platform) {
-    case "X":
-      return new XProvider();
-    case "THREADS":
-      return new ThreadsProvider();
-    case "INSTAGRAM":
-      return new InstagramProvider();
-    default:
-      throw new Error(`Unsupported platform: ${platform}`);
-  }
-}
+/**
+ * Single publish/resume dispatch table (E1 platform registry).
+ * Every implemented platform resolves here; unknown platforms throw
+ * `UnknownPlatformError`, which `publishPostTargets` converts into a
+ * failed target via its settled-result handling (same as the old
+ * `Unsupported platform` throw). Adding a platform means adding one
+ * entry — never editing dispatch code.
+ */
+export const PLATFORM_DISPATCH: Partial<Record<Platform, PlatformDispatch>> = {
+  X: {
+    createProvider: () => new XProvider(),
+    execute: (post, target, account, effective) =>
+      executeXTarget(post, target, account, effective.text),
+    resume: (targetId) => resumeXTarget(targetId),
+  },
+  THREADS: {
+    createProvider: () => new ThreadsProvider(),
+    execute: (post, target, account, effective) =>
+      executeThreadsTarget(post, target, account, effective),
+    resume: (targetId) => resumeThreadsTarget(targetId),
+  },
+  INSTAGRAM: {
+    createProvider: () => new InstagramProvider(),
+    execute: (post, target, account, effective) =>
+      executeInstagramTarget(post, target, account, effective),
+    resume: (targetId) => resumeInstagramTarget(targetId),
+  },
+  TIKTOK: {
+    // No generic provider: TikTok publishes only through its custom
+    // Direct Post pipeline (see executeTiktokTarget).
+    execute: (post, target, account, effective) =>
+      executeTiktokTarget(post, target, account, effective),
+    resume: (targetId) => resumeTiktokTarget(targetId),
+  },
+};
 
 export function threadsMediaTtlMs(kind: MediaKind): number {
   return kind === "VIDEO"
@@ -138,7 +166,7 @@ export async function chooseThreadsMedia(
   }
 }
 
-type PublishPost = {
+export type PublishPost = {
   id: string;
   userId: string;
   text: string;
@@ -152,7 +180,7 @@ type PublishPost = {
   }[];
 };
 
-type PublishTarget = {
+export type PublishTarget = {
   id: string;
   platform: string;
   status: string;
@@ -161,7 +189,7 @@ type PublishTarget = {
   externalJobId: string | null;
 };
 
-type PublishAccount = {
+export type PublishAccount = {
   id: string;
   userId: string;
   platform: string;
@@ -307,53 +335,11 @@ async function executeTargetPublish(
   }
   const effective = resolveEffectiveTargetContent(post.text, overrideValidation.overrides);
 
-  if (target.platform === "TIKTOK") {
-    return executeTiktokTarget(post, target, account, effective);
-  }
-  if (target.platform === "INSTAGRAM") {
-    return executeInstagramTarget(post, target, account, effective);
-  }
-  if (target.platform === "THREADS") {
-    return executeThreadsTarget(post, target, account, effective);
-  }
-  if (target.platform === "X") {
-    return executeXTarget(post, target, account, effective.text);
-  }
-
-  const resolvedMedia = await resolveTargetMedia(post, target, caps);
-  if (resolvedMedia.error) {
-    await updateTargetFailure(post.id, target.id, resolvedMedia.error);
-    return failedOutcome(target, resolvedMedia.error);
-  }
-
-  const provider = getProvider(target.platform);
-  const result = await provider.publishPost(
-    account.accessToken,
-    effective.text,
-    account.externalId,
-    resolvedMedia.media
-  );
-  if (!result.success) {
-    const error = result.error || "Publication failed";
-    await updateTargetFailure(post.id, target.id, error);
-    return failedOutcome(target, error);
-  }
-
-  await prisma.postTarget.update({
-    where: { id: target.id },
-    data: {
-      status: "PUBLISHED",
-      externalPostId: result.externalPostId,
-      publishedAt: new Date(),
-      errorMessage: null,
-    },
-  });
-  return {
-    ok: true,
-    externalPostId: result.externalPostId,
-    username: account.username,
-    platform: target.platform,
-  };
+  // Single dispatch table (E1): every implemented platform resolves
+  // here. Unknown platforms throw UnknownPlatformError, which surfaces
+  // as a failed target through publishPostTargets' settled handling.
+  const entry = getDispatchEntry(PLATFORM_DISPATCH, target.platform);
+  return entry.execute(post, target, account, effective);
 }
 
 /**
@@ -1293,6 +1279,19 @@ export async function resumeXTarget(
 }
 
 /**
+ * Pure resume routing behind the dispatch table: returns the platform's
+ * resume function, or null when there is nothing jobbed to resume
+ * (unknown platform, missing id). Unit-testable without a database;
+ * `resumeJobTarget` is the DB-backed wrapper.
+ */
+export function resolveResumeEntry(
+  platform: string | null | undefined
+): ((targetId: string) => Promise<"complete" | "failed" | "pending" | "skip">) | null {
+  if (!platform) return null;
+  return PLATFORM_DISPATCH[platform as Platform]?.resume ?? null;
+}
+
+/**
  * Scheduler dispatch: resolve a stale PUBLISHING target by its own job,
  * routing to the right platform resume. Non-job targets return "skip" so
  * the standard stale-recovery resets them as before.
@@ -1304,16 +1303,11 @@ export async function resumeJobTarget(
     where: { id: targetId },
     select: { platform: true },
   });
-  if (platform?.platform === "INSTAGRAM") {
-    return resumeInstagramTarget(targetId);
-  }
-  if (platform?.platform === "THREADS") {
-    return resumeThreadsTarget(targetId);
-  }
-  if (platform?.platform === "X") {
-    return resumeXTarget(targetId);
-  }
-  return resumeTiktokTarget(targetId);
+  // Single dispatch table (E1): unknown platforms explicitly skip
+  // instead of falling through to TikTok resume.
+  const resume = resolveResumeEntry(platform?.platform);
+  if (!resume) return "skip";
+  return resume(targetId);
 }
 
 async function finalizePostStatus(postId: string, fallback: AggregatePostStatus): Promise<PublishOutcome> {

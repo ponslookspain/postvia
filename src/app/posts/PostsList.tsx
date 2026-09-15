@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PostRowMenu } from "./PostRowMenu";
+import { getImplementedPlatforms } from "@/lib/platforms/capabilities";
 
 export type PostListItem = {
   id: string;
@@ -35,7 +36,11 @@ export type PostListItem = {
   media: { id: string; type: string }[];
 };
 
-const PLATFORM_OPTIONS = ["X", "THREADS", "TIKTOK", "INSTAGRAM"] as const;
+// Platform filter options from the single capability registry (E1),
+// in shared registry order. Labels render as before (X stays "X").
+const PLATFORM_OPTIONS: readonly string[] = getImplementedPlatforms().map(
+  (caps) => caps.platform
+);
 
 function toDate(iso: string | null): Date | null {
   if (!iso) return null;

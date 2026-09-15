@@ -19,16 +19,11 @@ import type {
   ConnectedAccount,
   TargetOverrideState,
 } from "./types";
-
-const PLATFORM_NAMES: Record<string, string> = {
-  THREADS: "Threads",
-  X: "X",
-  INSTAGRAM: "Instagram",
-  TIKTOK: "TikTok",
-};
+import type { Platform } from "@prisma/client";
+import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
 
 function platformName(platform: string): string {
-  return PLATFORM_NAMES[platform] ?? platform;
+  return getPlatformCapabilities(platform as Platform)?.label ?? platform;
 }
 
 /**
