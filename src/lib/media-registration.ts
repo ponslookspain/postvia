@@ -6,25 +6,10 @@
  * Abort stops client polling only; the server webhook keeps processing.
  * `fetchStatus` is injectable for deterministic tests.
  */
+import { sleepAbortable as sleep } from "@/lib/sleep";
 
 export const MEDIA_REGISTER_TIMEOUT_MS = 20_000;
 export const MEDIA_REGISTER_POLL_MS = 500;
-
-function sleep(ms: number, signal?: AbortSignal): Promise<"slept" | "aborted"> {
-  if (signal?.aborted) return Promise.resolve("aborted");
-  if (ms <= 0) return Promise.resolve("slept");
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve("slept");
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      resolve("aborted");
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
 
 export async function waitForMediaRegistration(input: {
   postId: string;

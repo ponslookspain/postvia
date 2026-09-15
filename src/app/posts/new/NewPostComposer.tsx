@@ -48,6 +48,7 @@ import {
   type ScheduleFlowDenial,
 } from "@/lib/composer-media";
 import { createSingleFlight, newOperationId } from "@/lib/idempotency";
+import { reportError } from "@/lib/diagnostics";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -165,7 +166,10 @@ function uploadFileToPost(
         // Step 3: the server registers the Media row from the verified
         // blob.upload-completed webhook; wait for it before publishing.
         resolve(await waitForMediaRegistration({ postId, pathname }));
-      } catch {
+      } catch (error) {
+        reportError("composer-client", "upload file failed", error, {
+          postId,
+        });
         resolve("Unable to upload this file. Please try again.");
       }
     })();
@@ -714,7 +718,8 @@ export default function NewPostComposer({
       // Terminal success: the next explicit save is a new operation.
       // Failures keep the key so a retry replays onto the same draft.
       rotateOperationId();
-    } catch {
+    } catch (error) {
+      reportError("composer-client", "save draft failed", error);
       toast.add({
         title: "Unable to save draft",
         description: "Please try again.",
@@ -851,7 +856,8 @@ export default function NewPostComposer({
       // Every failure path above keeps the key, so confirming again
       // replays onto the same draft instead of creating a second post.
       rotateOperationId();
-    } catch {
+    } catch (error) {
+      reportError("composer-client", "schedule failed", error);
       setScheduleError("Failed to schedule post. Please try again.");
     } finally {
       setScheduling(false);
@@ -978,7 +984,10 @@ export default function NewPostComposer({
       // The post now exists server-side regardless of the publish outcome;
       // the next explicit publish is a new operation with a new key.
       rotateOperationId();
-    } catch {
+    } catch (error) {
+      reportError("composer-client", "publish failed", error, {
+        platform,
+      });
       setPublishResult({
         ok: false,
         platform,

@@ -1,15 +1,12 @@
 /**
- * Shared OTP rate-limit UX helpers (client-safe).
+ * Shared OTP rate-limit UX helpers (server-safe: pure functions only).
  *
- * Dependency-free except React for the countdown hook: never import
- * server modules (abuse.ts, otp.ts, prisma) here. The server remains the
- * sole limiter; these helpers only format and count down the
- * `retryAfterSeconds` the API already returned.
+ * Never import server modules (abuse.ts, otp.ts, prisma) here. The server
+ * remains the sole limiter; these helpers only format the
+ * `retryAfterSeconds` the API already returned. The countdown hook lives
+ * in `@/hooks/use-otp-retry-countdown` (client boundary) so importing
+ * these formatters never drags React into server code.
  */
-
-"use client";
-
-import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Machine-readable code returned ONLY by POST /api/auth/otp/request. */
 export const OTP_RATE_LIMITED_CODE = "RATE_LIMITED" as const;
@@ -58,51 +55,4 @@ export function formatOtpRateLimitMessage(retryAfterSeconds: number): string {
   }
   const rounded = Math.round(hours);
   return `Too many codes requested. Please try again in about ${rounded} hours.`;
-}
-
-/**
- * Countdown for a server-provided retry delay.
- *
- * - Client convenience only: the next request is still server-gated.
- * - May vanish on page refresh — that is expected.
- * - Returns the live `remaining` plus a `start()` to arm it.
- */
-export function useOtpRetryCountdown(): {
-  remaining: number;
-  start: (seconds: number) => void;
-} {
-  const [remaining, setRemaining] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const clear = useCallback(() => {
-    if (timerRef.current !== null) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const start = useCallback(
-    (seconds: number) => {
-      const normalized = normalizeRetryAfterSeconds(seconds) ?? 60;
-      clear();
-      setRemaining(normalized);
-      timerRef.current = setInterval(() => {
-        setRemaining((current) => {
-          if (current <= 1) {
-            if (timerRef.current !== null) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
-            }
-            return 0;
-          }
-          return current - 1;
-        });
-      }, 1000);
-    },
-    [clear]
-  );
-
-  useEffect(() => clear, [clear]);
-
-  return { remaining, start };
 }

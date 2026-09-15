@@ -1,4 +1,5 @@
 import type { Platform } from "@prisma/client";
+import { sleepAbortable as sleep } from "@/lib/sleep";
 
 /**
  * Stage E: client-side publish polling extracted from NewPostComposer.
@@ -91,22 +92,6 @@ export function publishPhaseLabel(progress: PollProgress | null): string {
   const decided = progress.publishedTargets + progress.failedTargets;
   if (decided >= progress.totalTargets) return "Finishing…";
   return `Publishing… ${progress.publishedTargets}/${progress.totalTargets} published`;
-}
-
-function sleep(ms: number, signal?: AbortSignal): Promise<"slept" | "aborted"> {
-  if (signal?.aborted) return Promise.resolve("aborted");
-  if (ms <= 0) return Promise.resolve("slept");
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve("slept");
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      resolve("aborted");
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
 }
 
 export async function pollPostSettled(input: {

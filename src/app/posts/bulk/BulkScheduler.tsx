@@ -29,6 +29,7 @@ import {
   type BulkCapabilityIssue,
 } from "@/lib/bulk-schedule";
 import { bulkItemOperationId, newOperationId } from "@/lib/idempotency";
+import { reportError } from "@/lib/diagnostics";
 import { getPlan, type PlanId } from "@/lib/plans";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
@@ -386,6 +387,7 @@ export function BulkScheduler({
       return await waitForMediaRegistration({ postId, pathname, signal });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown upload error";
+      reportError("bulk-client", "upload video failed", error, { postId });
       return `Upload failed: ${message}`;
     }
   }
@@ -427,7 +429,8 @@ export function BulkScheduler({
         return false;
       }
       postId = created.id;
-    } catch {
+    } catch (error) {
+      reportError("bulk-client", "create bulk post failed", error);
       patchItem(item.key, { status: "failed", error: "Unable to create this post. Please try again." });
       return false;
     }

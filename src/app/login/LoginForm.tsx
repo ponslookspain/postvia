@@ -12,8 +12,8 @@ import {
   OTP_RATE_LIMITED_CODE,
   formatOtpRateLimitMessage,
   normalizeRetryAfterSeconds,
-  useOtpRetryCountdown,
 } from "@/lib/otp-rate-limit";
+import { useOtpRetryCountdown } from "@/hooks/use-otp-retry-countdown";
 import { Button } from "@/components/ui/button";
 import {
   Field,

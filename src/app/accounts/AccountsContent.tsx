@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { reportError } from "@/lib/diagnostics";
 
 interface PlatformAccount {
   id: string;
@@ -200,6 +201,12 @@ export default function AccountsContent({
       });
       setConnecting(null);
     } catch (error) {
+      // Aborts are user-visible timeouts, not faults: report only real failures.
+      if (!(error instanceof DOMException && error.name === "AbortError")) {
+        reportError("accounts-client", "connect failed", error, {
+          platform: config.platform,
+        });
+      }
       setMessage({
         text:
           error instanceof DOMException && error.name === "AbortError"
@@ -235,7 +242,10 @@ export default function AccountsContent({
         await res.json().catch(() => null);
         setMessage({ text: "Unable to disconnect the account. Please try again.", error: true });
       }
-    } catch {
+    } catch (error) {
+      reportError("accounts-client", "disconnect failed", error, {
+        accountId: account.id,
+      });
       setMessage({ text: "Unable to disconnect the account. Please try again.", error: true });
     } finally {
       setDisconnecting(null);

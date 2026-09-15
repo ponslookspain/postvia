@@ -16,6 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { toast } from "@/components/ui/toast";
+import { reportError } from "@/lib/diagnostics";
 import {
   addMonths,
   bucketCalendarPosts,
@@ -268,7 +269,10 @@ export function CalendarView({
         type: "success",
       });
       router.refresh();
-    } catch {
+    } catch (error) {
+      reportError("calendar-client", "move post failed", error, {
+        postId,
+      });
       toast.add({
         title: "Unable to move this post",
         description: "Please try again.",

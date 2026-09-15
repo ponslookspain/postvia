@@ -354,7 +354,8 @@ export async function registerCompletedUpload(payload: {
     throw new Error(outcome.error);
   }
 
-  const existing = await prisma.media.findFirst({
+  // `@@unique([pathname])`: the true unique lookup (Batch 2 pattern).
+  const existing = await prisma.media.findUnique({
     where: { pathname: meta.pathname },
     select: { id: true },
   });

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { reportError } from "@/lib/diagnostics";
 import type { ConnectedAccount, TiktokCreatorInfo } from "./types";
 
 /**
@@ -18,22 +19,40 @@ export function useTikTokCreatorInfo(selectedAccounts: ConnectedAccount[]) {
   const [creatorInfoAttempt, setCreatorInfoAttempt] = useState(0);
   const requestedCreatorInfo = useRef<Set<string>>(new Set());
 
+  // Stable identity for the selection: parent renders hand down a fresh
+  // array every time, so depending on the array itself would re-run the
+  // effect (and its fetch loop) on every render. The sorted id list only
+  // changes when the actual selection changes; retries still flow through
+  // creatorInfoAttempt.
+  const selectionKey = selectedAccounts
+    .map((account) => `${account.platform}:${account.id}`)
+    .sort()
+    .join(",");
+  const tiktokAccountIds = useMemo(
+    () =>
+      selectedAccounts
+        .filter((account) => account.platform === "TIKTOK")
+        .map((account) => account.id),
+    // Keyed on selectionKey (not the array identity) by design — see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectionKey]
+  );
+
   useEffect(() => {
-    for (const account of selectedAccounts) {
-      if (account.platform !== "TIKTOK") continue;
-      if (requestedCreatorInfo.current.has(account.id)) continue;
-      requestedCreatorInfo.current.add(account.id);
+    for (const accountId of tiktokAccountIds) {
+      if (requestedCreatorInfo.current.has(accountId)) continue;
+      requestedCreatorInfo.current.add(accountId);
       fetch(
-        `/api/social/tiktok/creator-info?accountId=${encodeURIComponent(account.id)}`
+        `/api/social/tiktok/creator-info?accountId=${encodeURIComponent(accountId)}`
       )
         .then(async (response) => {
           if (response.ok) {
             const info =
               (await response.json()) as TiktokCreatorInfo | null;
-            setCreatorInfos((current) => ({ ...current, [account.id]: info }));
+            setCreatorInfos((current) => ({ ...current, [accountId]: info }));
             setCreatorInfoErrors((current) => {
               const next = { ...current };
-              delete next[account.id];
+              delete next[accountId];
               return next;
             });
           } else {
@@ -44,22 +63,25 @@ export function useTikTokCreatorInfo(selectedAccounts: ConnectedAccount[]) {
               typeof data?.error === "string"
                 ? data.error
                 : "TikTok posting options are unavailable right now.";
-            setCreatorInfos((current) => ({ ...current, [account.id]: null }));
+            setCreatorInfos((current) => ({ ...current, [accountId]: null }));
             setCreatorInfoErrors((current) => ({
               ...current,
-              [account.id]: message,
+              [accountId]: message,
             }));
           }
         })
-        .catch(() => {
-          setCreatorInfos((current) => ({ ...current, [account.id]: null }));
+        .catch((error: unknown) => {
+          reportError("composer-client", "tiktok creator-info failed", error, {
+            accountId,
+          });
+          setCreatorInfos((current) => ({ ...current, [accountId]: null }));
           setCreatorInfoErrors((current) => ({
             ...current,
-            [account.id]: "Could not reach TikTok. Check your connection and retry.",
+            [accountId]: "Could not reach TikTok. Check your connection and retry.",
           }));
         });
     }
-  }, [selectedAccounts, creatorInfoAttempt]);
+  }, [tiktokAccountIds, creatorInfoAttempt]);
 
   function retryCreatorInfo(accountId: string) {
     requestedCreatorInfo.current.delete(accountId);

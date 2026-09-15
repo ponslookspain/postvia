@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
+import { reportError } from "@/lib/diagnostics";
 
 interface Post {
   id: string;
@@ -131,7 +132,10 @@ async function startBackgroundAction(
       started: false,
       error: "Unable to start publishing. Please try again.",
     };
-  } catch {
+  } catch (error) {
+    reportError("post-client", "start background publish failed", error, {
+      path,
+    });
     return { started: false, error: "Unable to start publishing. Please try again." };
   }
 }
@@ -300,7 +304,8 @@ export default function PostDetailPage({
       const data = await res.json();
       setPost((prev) => ({ ...prev, text: data.text }));
       setEditing(false);
-    } catch {
+    } catch (error) {
+      reportError("post-client", "save post failed", error, { postId: id });
       toast.add({
         title: "Unable to save changes",
         description: "Please try again.",
@@ -317,7 +322,8 @@ export default function PostDetailPage({
       const res = await fetch(`/api/posts/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       router.push("/posts");
-    } catch {
+    } catch (error) {
+      reportError("post-client", "delete post failed", error, { postId: id });
       toast.add({
         title: "Unable to delete post",
         description: "Please try again.",
@@ -366,7 +372,11 @@ export default function PostDetailPage({
         ...prev,
         media: prev.media.filter((m) => m.id !== mediaId),
       }));
-    } catch {
+    } catch (error) {
+      reportError("post-client", "delete media failed", error, {
+        postId: id,
+        mediaId,
+      });
       toast.add({
         title: "Unable to delete media",
         description: "Please try again.",
@@ -437,7 +447,8 @@ export default function PostDetailPage({
       setPost((prev) => ({ ...prev, ...data }));
       setRescheduleOpen(false);
       return true;
-    } catch {
+    } catch (error) {
+      reportError("post-client", "reschedule failed", error, { postId: id });
       setRescheduleError("Unable to save the new time. Please try again.");
       return false;
     } finally {
