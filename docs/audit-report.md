@@ -4,10 +4,34 @@ Branch: `chore/production-hardening`. Source of truth is the code. Each item lis
 
 Decision labels: KEEP / OPTIMIZE / REFACTOR / REMOVE / REPLACE / DOCUMENT.
 
+## Reconciliation (2026-09-15, verified against working tree + Vercel)
+
+The following items were verified as resolved in the current tree and are
+marked `RESOLVED` inline below: **1** (`src/app/api/health/route.ts`
+live, `{"ok":true,"db":"ok"}` on Production), **2**
+(`.github/workflows/ci.yml` exists with typecheck/lint/tests/build +
+isolated-PG job), **7** (`AccountsContent.tsx:181-192` checks `res.ok`
+with `AbortController` timeout), **10–11**
+(`src/lib/publish-poll.ts`, `src/lib/media-registration.ts` shared
+helpers exist), **12** (six segment `error.tsx`:
+accounts/billing/calendar/settings/posts/posts/[id]), **34**
+(`totalLabel()` derived from live state, `AccountsContent.tsx:252-260`).
+All other items keep their original status — nothing else in this file
+was re-verified.
+
+Branch note: `origin/main` has been rewritten since this report — the
+old production merge commit `ed976c4` no longer exists locally
+(`git cat-file` fails) and `fix/scheduling-bulk-idempotency` (24 commits)
+plus `chore/production-hardening` are NOT ancestors of `origin/main`.
+Production currently serves orphan commit `ed976c4`; the next merge to
+`main` redeploys from the new lineage. `origin/staging/auth-otp` and
+`origin/production-tiktok-legal-email` ARE merged into `origin/main` and
+are safe to delete.
+
 ## A. Production blockers
 
-1. **No health endpoint** — SEVERITY: HIGH — `src/app/api/**` (39 routes, none for health). Blocks load-balancer/uptime monitoring and deploy smoke automation. Solution: add `GET /api/health` (liveness + light `SELECT 1`, safe public JSON). Risk: low. **Blocks production: yes (observability).** Decision: OPTIMIZE (add).
-2. **No CI** — SEVERITY: HIGH — repo root (no `.github/`). PRs can merge without typecheck/lint/tests/build. Solution: add `.github/workflows/ci.yml` with `npm ci / prisma validate+generate / typecheck / lint / tests / build` plus isolated-PG `test:pg` job and `npm audit`. Risk: low. **Blocks: yes.** Decision: OPTIMIZE (add).
+1. **No health endpoint** — SEVERITY: HIGH — `src/app/api/**` (39 routes, none for health). Blocks load-balancer/uptime monitoring and deploy smoke automation. Solution: add `GET /api/health` (liveness + light `SELECT 1`, safe public JSON). Risk: low. **Blocks production: yes (observability).** Decision: OPTIMIZE (add). **Status (2026-09-15): RESOLVED** — `src/app/api/health/route.ts` exists and Production returns `{"ok":true,"db":"ok"}`.
+2. **No CI** — SEVERITY: HIGH — repo root (no `.github/`). PRs can merge without typecheck/lint/tests/build. Solution: add `.github/workflows/ci.yml` with `npm ci / prisma validate+generate / typecheck / lint / tests / build` plus isolated-PG `test:pg` job and `npm audit`. Risk: low. **Blocks: yes.** Decision: OPTIMIZE (add). **Status (2026-09-15): RESOLVED** — `.github/workflows/ci.yml` exists (pr/typecheck/lint/tests/build + isolated-PG `test:pg` + non-blocking audit).
 3. **Daily cron vs scheduling promise** — SEVERITY: HIGH — `vercel.json`, `src/lib/scheduling.ts`, `src/app/api/cron/publish-scheduled/route.ts`. Hobby `0 3 * * *` means scheduled posts can publish up to ~24h late. Solution: DOCUMENT paid-plan requirement; keep best-effort overdue/stale recovery; fix UX copy to not promise minute precision. Risk: low (docs + copy only). **Blocks: yes (expectation).** Decision: DOCUMENT.
 
 ## B. Security
@@ -15,15 +39,15 @@ Decision labels: KEEP / OPTIMIZE / REFACTOR / REMOVE / REPLACE / DOCUMENT.
 4. **OAuth callback ownership + duplicate external account** — SEVERITY: HIGH — `src/app/api/auth/*/callback/route.ts`, `src/lib/social-accounts.ts:createSocialAccountRaceSafe`. Current code converges via `@@unique([platform, externalId])` and checks `account_in_use`. KEEP behavior; verify no regression. Risk of change: high if touched. **Blocks: yes if broken.** Decision: KEEP + tests.
 5. **TikTok bridge HMAC oracle** — SEVERITY: MEDIUM — `src/app/api/tiktok/media/[id]/route.ts`, `src/lib/tiktok-media-bridge.ts`. Generic 404 avoids oracle — correct. KEEP. Risk: high if touched. Decision: KEEP.
 6. **Blob pathname authorization** — SEVERITY: HIGH — `src/lib/media-upload.ts:validateReservedPathname`, `src/app/api/media/**`. Server mints `media/{userId}/{postId}/…`, validates scope on prepare/upload/status. KEEP. Decision: KEEP.
-7. **`handleConnect` missing `res.ok` check** — SEVERITY: MEDIUM — `src/app/accounts/AccountsContent.tsx:181`. `await res.json()` without status check can throw/misroute on 500. Solution: check `res.ok`, handle non-JSON, add timeout abort. Risk: low. Decision: REFACTOR.
+7. **`handleConnect` missing `res.ok` check** — SEVERITY: MEDIUM — `src/app/accounts/AccountsContent.tsx:181`. `await res.json()` without status check can throw/misroute on 500. Solution: check `res.ok`, handle non-JSON, add timeout abort. Risk: low. Decision: REFACTOR. **Status (2026-09-15): RESOLVED** — `AccountsContent.tsx:181-192` uses `AbortController` timeout and checks `res.ok` before routing.
 8. **Stripe webhook must stay authoritative** — SEVERITY: CRITICAL — `src/lib/stripe.ts`, `src/app/billing/page.tsx`, `src/app/api/billing/webhook/route.ts`. Page already reconciles via guarded writer and never grants from `?checkout=success`. KEEP. Decision: KEEP.
 9. **Admin gates** — SEVERITY: HIGH — `src/app/api/billing/change|_cancel`, `src/app/api/admin/billing-override`. `isAdminEmail` server-side only. KEEP. Decision: KEEP.
 
 ## C. Reliability
 
-10. **Duplicate publish-poll implementations** — SEVERITY: MEDIUM — `src/lib/publish-poll.ts` vs `src/app/posts/[id]/PostDetailClient.tsx:76-98`. Same 2s/330s contract; detail version lacks AbortSignal/progress. Solution: reuse `pollPostSettled` in detail client. Risk: low. Decision: REFACTOR.
-11. **Duplicate `waitForMediaRegistration`** — SEVERITY: MEDIUM — `src/app/posts/new/NewPostComposer.tsx:110` vs `src/app/posts/bulk/BulkScheduler.tsx:141`. Verbatim 20s/500ms loops, no abort. Solution: extract `src/lib/media-registration.ts` shared helper with AbortSignal + injected fetch; use in both. Risk: low. Decision: REFACTOR.
-12. **No segment `error.tsx`** — SEVERITY: MEDIUM — `src/app/**/error.tsx` missing (only `global-error.tsx`). Server throws bubble to root boundary. Solution: add scoped `error.tsx` for posts/billing/accounts/settings/calendar. Risk: low. Decision: OPTIMIZE.
+10. **Duplicate publish-poll implementations** — SEVERITY: MEDIUM — `src/lib/publish-poll.ts` vs `src/app/posts/[id]/PostDetailClient.tsx:76-98`. Same 2s/330s contract; detail version lacks AbortSignal/progress. Solution: reuse `pollPostSettled` in detail client. Risk: low. Decision: REFACTOR. **Status (2026-09-15): RESOLVED** — shared `src/lib/publish-poll.ts` exists.
+11. **Duplicate `waitForMediaRegistration`** — SEVERITY: MEDIUM — `src/app/posts/new/NewPostComposer.tsx:110` vs `src/app/posts/bulk/BulkScheduler.tsx:141`. Verbatim 20s/500ms loops, no abort. Solution: extract `src/lib/media-registration.ts` shared helper with AbortSignal + injected fetch; use in both. Risk: low. Decision: REFACTOR. **Status (2026-09-15): RESOLVED** — shared `src/lib/media-registration.ts` exists.
+12. **No segment `error.tsx`** — SEVERITY: MEDIUM — `src/app/**/error.tsx` missing (only `global-error.tsx`). Server throws bubble to root boundary. Solution: add scoped `error.tsx` for posts/billing/accounts/settings/calendar. Risk: low. Decision: OPTIMIZE. **Status (2026-09-15): RESOLVED** — six segment boundaries exist (accounts, billing, calendar, settings, posts, posts/[id]).
 13. **Bulk run no global abort / unmount leak** — SEVERITY: MEDIUM — `BulkScheduler.tsx` sequential `for...of`. Solution: AbortController + `runningRef` guard (composer already has Cancel). Risk: low. Decision: OPTIMIZE.
 14. **Calendar concurrent drops unguarded** — SEVERITY: LOW — `CalendarView.tsx:227`. Single `droppingId`; parallel drops can interleave. Solution: ignore new drops while one is in flight. Risk: low. Decision: OPTIMIZE.
 15. **Billing duplicate error blocks** — SEVERITY: LOW — `BillingSection.tsx:356` + `:509` render same `error`. Solution: keep single error surface. Risk: low. Decision: REFACTOR.
@@ -69,7 +93,7 @@ Decision labels: KEEP / OPTIMIZE / REFACTOR / REMOVE / REPLACE / DOCUMENT.
 ## K. Frontend
 
 33. **Landing all-client + intervals** — SEVERITY: LOW — `src/components/landing/*`. Animation-driven; acceptable. Decision: KEEP.
-34. **Accounts `totalLabel` drift hack** — SEVERITY: LOW — `AccountsContent.tsx:242` uses `Math.max(initialTotal, liveTotal)`. Solution: derive from live state directly. Risk: low. Decision: REFACTOR.
+34. **Accounts `totalLabel` drift hack** — SEVERITY: LOW — `AccountsContent.tsx:242` uses `Math.max(initialTotal, liveTotal)`. Solution: derive from live state directly. Risk: low. Decision: REFACTOR. **Status (2026-09-15): RESOLVED** — `totalLabel()` derives from live state (`AccountsContent.tsx:252-260`).
 35. **Detail poll has no timeout UI / abort** — SEVERITY: LOW — covered by item 10 fix (shared helper surfaces timeout/aborted). Decision: REFACTOR.
 
 ## L. Developer experience
