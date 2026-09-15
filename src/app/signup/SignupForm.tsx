@@ -98,7 +98,7 @@ export function SignupForm({
 
         <form onSubmit={(e) => void handleSubmit(e)}>
           <FieldGroup>
-            <Field>
+            <Field data-invalid={error ? true : undefined}>
               <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 id="email"
@@ -107,6 +107,7 @@ export function SignupForm({
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={error ? true : undefined}
                 aria-describedby="signup-legal"
               />
             </Field>

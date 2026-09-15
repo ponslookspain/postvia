@@ -133,7 +133,7 @@ export function PublishCard({
           </Alert>
         )}
         {schedulingForX && !scheduleMode && (
-          <FieldDescription>
+          <FieldDescription id="x-schedule-note">
             Scheduling is available for Threads. Publish to X is available now.
           </FieldDescription>
         )}
@@ -165,6 +165,9 @@ export function PublishCard({
               schedulingForX
                 ? "Scheduling for X is not available yet. Use Threads."
                 : "Schedule this post"
+            }
+            aria-describedby={
+              schedulingForX && !scheduleMode ? "x-schedule-note" : undefined
             }
             className="w-full"
           >

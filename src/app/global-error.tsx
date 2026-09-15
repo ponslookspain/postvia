@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
+import { Button } from "@/components/ui/button";
 
 // Root error boundary: catches render failures for the whole app.
 // Hardcoded strings only — providers above may have crashed.
@@ -26,13 +27,9 @@ export default function GlobalError({
           <p className="text-sm text-muted-foreground">
             Please try again. If the problem continues, come back later.
           </p>
-          <button
-            type="button"
-            onClick={() => reset()}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >
+          <Button type="button" onClick={() => reset()}>
             Try again
-          </button>
+          </Button>
         </main>
       </body>
     </html>
