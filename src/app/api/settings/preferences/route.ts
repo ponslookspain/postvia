@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_SETTINGS } from "@/lib/abuse";
 
 const DEFAULT_PREFERENCES = {
   emailNotifications: true,
@@ -35,6 +36,21 @@ export async function PATCH(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Flood gate before the preferences write (shared settings scope).
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "settings-write",
+        userMax: WRITE_LIMIT_SETTINGS,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     const body = await request.json().catch(() => null);

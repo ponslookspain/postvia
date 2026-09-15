@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_MEDIA_PREPARE } from "@/lib/abuse";
 import { reserveUploadPathname } from "@/lib/media-upload";
 
 export async function POST(request: NextRequest) {
@@ -20,6 +21,20 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await getApiUser();
+    if (
+      user &&
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "media-prepare",
+        userMax: WRITE_LIMIT_MEDIA_PREPARE,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
+    }
     const result = await reserveUploadPathname({
       user,
       postId: typeof body.postId === "string" ? body.postId : "",

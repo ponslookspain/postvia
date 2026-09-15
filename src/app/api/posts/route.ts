@@ -15,8 +15,10 @@ import {
   liveQuotaStore,
 } from "@/lib/entitlements";
 import {
+  gateWriteRequest,
   getAbusePepper,
   isAbuseEnforcementEnabled,
+  WRITE_LIMIT_POSTS_CREATE,
 } from "@/lib/abuse";
 import { createFreePostAtomic, makeTxQuotaStore } from "@/lib/free-post-kernel";
 import { createPostIdempotent } from "@/lib/post-create";
@@ -92,6 +94,22 @@ export async function POST(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Flood gate before any expensive work (quota ledgers, inserts).
+    // Generous: bulk batches and retry storms stay far below it.
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "posts-create",
+        userMax: WRITE_LIMIT_POSTS_CREATE,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     // Plan gate: monthly post quota is enforced server-side, per created

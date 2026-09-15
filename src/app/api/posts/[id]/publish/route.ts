@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_PUBLISH } from "@/lib/abuse";
 import { publishPostTargets } from "@/lib/publish";
 import { reportError } from "@/lib/diagnostics";
 
@@ -11,7 +12,7 @@ import { reportError } from "@/lib/diagnostics";
 export const maxDuration = 300;
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -19,6 +20,22 @@ export async function POST(
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Flood gate before provider work starts. Generous: manual retries
+    // stay far below it; the entitlement gate still decides allow/deny.
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "publish",
+        userMax: WRITE_LIMIT_PUBLISH,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     // Ownership + publishability check in one light query; the full post

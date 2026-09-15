@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_ONBOARDING } from "@/lib/abuse";
 import { prisma } from "@/lib/prisma";
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 
@@ -16,6 +17,21 @@ export async function POST(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    // Flood gate before the user write. Generous: onboarding completes
+    // once per account; only scripting trips this.
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "onboarding",
+        userMax: WRITE_LIMIT_ONBOARDING,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
     const body = await request.json().catch(() => null);
     const name = typeof body?.name === "string" ? body.name.trim() : "";

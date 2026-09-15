@@ -2043,6 +2043,83 @@ export async function gateOAuthCallback(input: {
 }
 
 /**
+ * Conservative per-user flood buckets for authenticated write paths.
+ * Monthly quotas already bound total volume; these buckets bound *rate*
+ * (compute/DB/provider burn from scripting). Limits sit far above any
+ * legitimate flow (bulk = 10 items/batch, humans click slowly) and only
+ * trigger on floods. Same failure policy as the OAuth gates: disabled
+ * mode allows, misconfiguration denies, transient errors allow with a
+ * log line. Quota/entitlement semantics are untouched.
+ */
+export const WRITE_PATH_WINDOW_MS = 60 * 60_000;
+export const WRITE_LIMIT_POSTS_CREATE = 100;
+export const WRITE_LIMIT_MEDIA_PREPARE = 200;
+export const WRITE_LIMIT_CHECKOUT = 10;
+export const WRITE_LIMIT_PORTAL = 10;
+export const WRITE_LIMIT_ONBOARDING = 20;
+export const WRITE_LIMIT_SETTINGS = 30;
+export const WRITE_LIMIT_PUBLISH = 60;
+export const WRITE_LIMIT_RETRY = 60;
+/** Shared IP bucket is an order of magnitude roomier (NAT safety). */
+export const WRITE_PATH_IP_MULTIPLIER = 10;
+
+/**
+ * Authenticated write-path flood gate: dual persistent buckets (per-IP
+ * then per-user, same shape as gateOAuthCallback). Returns true when the
+ * request may proceed.
+ */
+export async function gateWriteRequest(input: {
+  request: Request;
+  userId: string;
+  scope: string;
+  userMax: number;
+  windowMs?: number;
+  stores?: AbuseStores;
+  pepper?: string;
+  nowMs?: number;
+  disabled?: boolean;
+}): Promise<boolean> {
+  try {
+    if (input.disabled ?? isAbuseDisabled()) return true;
+    const stores = input.stores ?? liveAbuseStores;
+    const pepper = input.pepper ?? getAbusePepper();
+    const nowMs = input.nowMs ?? Date.now();
+    const windowMs = input.windowMs ?? WRITE_PATH_WINDOW_MS;
+    const ip = getClientIp(input.request);
+    if (ip) {
+      const ipAllowed = await checkAbuseRate({
+        scope: `${input.scope}-ip`,
+        keyHash: hashRateKey([`${input.scope}-ip`, ip, dayKey(nowMs)], pepper),
+        max: input.userMax * WRITE_PATH_IP_MULTIPLIER,
+        windowMs,
+        stores,
+        nowMs,
+      });
+      if (!ipAllowed) return false;
+    }
+    return await checkAbuseRate({
+      scope: `${input.scope}-user`,
+      keyHash: hashRateKey([`${input.scope}-user`, input.userId], pepper),
+      max: input.userMax,
+      windowMs,
+      stores,
+      nowMs,
+    });
+  } catch (error) {
+    if (isFailClosedAbuseError(error)) {
+      reportError("abuse", "write gate misconfigured, denying", error, {
+        userId: input.userId,
+      });
+      return false;
+    }
+    reportError("abuse", "write rate gate failed", error, {
+      userId: input.userId,
+    });
+    return true;
+  }
+}
+
+/**
  * Sets the first-party device cookie when absent. Supplementary signal
  * only: it strengthens matching but never decides alone.
  */

@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_RETRY } from "@/lib/abuse";
 import { publishPostTargets } from "@/lib/publish";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { STALE_PUBLISHING_MS } from "@/lib/scheduling";
@@ -21,6 +22,21 @@ export async function POST(
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Flood gate before provider work starts (same contract as publish).
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "retry",
+        userMax: WRITE_LIMIT_RETRY,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     const retryGate = canRetry(

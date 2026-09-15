@@ -11,6 +11,7 @@ import {
   type StripePrices,
 } from "@/lib/stripe";
 import { toPlanId, type DbPlan } from "@/lib/entitlements";
+import { gateWriteRequest, WRITE_LIMIT_CHECKOUT } from "@/lib/abuse";
 import type { PlanId } from "@/lib/plans";
 import { reportError } from "@/lib/diagnostics";
 
@@ -320,6 +321,22 @@ export async function handleCheckout(input: {
 export async function POST(request: NextRequest) {
   try {
     const user = await getApiUser();
+    // Flood gate before Stripe work starts. Generous: human-initiated
+    // checkouts and double-click retries stay far below it.
+    if (
+      user &&
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "billing-checkout",
+        userMax: WRITE_LIMIT_CHECKOUT,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
+    }
     let body: unknown;
     try {
       body = await request.json();

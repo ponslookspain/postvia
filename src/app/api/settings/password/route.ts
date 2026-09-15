@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth, getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_SETTINGS } from "@/lib/abuse";
 import { prisma } from "@/lib/prisma";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -64,6 +65,22 @@ export async function POST(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Flood gate before password work (shared settings scope; also
+    // throttles online guessing against changePassword).
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "settings-write",
+        userMax: WRITE_LIMIT_SETTINGS,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     const body = await request.json().catch(() => null);
