@@ -4,6 +4,7 @@ import {
   CircleCheckIcon,
   ClapperboardIcon,
   OctagonXIcon,
+  TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -21,11 +22,12 @@ export type BulkVideoStatus =
   | "failed";
 
 /**
- * One video row for the unified batch list (upload + review merged).
- * Shows identity, size, live progress/status, the scheduled time once
- * the schedule is computable, and wrapped per-file errors — never
- * truncated-only. Presentational only: slots, uploads, schedule math
- * and removal rules stay in BulkScheduler.
+ * One media row for the unified batch list (upload + review merged).
+ * Shows identity, a real thumbnail for images, size, live
+ * progress/status, the scheduled time once the schedule is computable,
+ * and wrapped per-file errors — never truncated-only. Presentational
+ * only: slots, uploads, schedule math and removal rules stay in
+ * BulkScheduler.
  */
 export function BulkVideoRow({
   name,
@@ -34,7 +36,10 @@ export function BulkVideoRow({
   progress,
   error,
   problems,
+  problemPlatforms,
   timeLabel,
+  previewUrl,
+  isVideo,
   running,
   onRemove,
 }: {
@@ -44,7 +49,10 @@ export function BulkVideoRow({
   progress: number;
   error: string | null;
   problems: string[];
+  problemPlatforms: string[];
   timeLabel: string | null;
+  previewUrl: string | null;
+  isVideo: boolean;
   running: boolean;
   onRemove: () => void;
 }) {
@@ -54,7 +62,12 @@ export function BulkVideoRow({
         aria-hidden="true"
         className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground"
       >
-        <ClapperboardIcon className="size-5" />
+        {!isVideo && previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={previewUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <ClapperboardIcon className="size-5" />
+        )}
         {status === "scheduled" && (
           <span className="absolute inset-0 flex items-center justify-center bg-primary/70">
             <CircleCheckIcon className="size-5 text-primary-foreground" />
@@ -88,11 +101,31 @@ export function BulkVideoRow({
             {error}
           </span>
         )}
-        {problems.map((message) => (
-          <span key={message} className="mt-0.5 block text-xs text-destructive">
-            {message}
-          </span>
-        ))}
+        {problems.length > 0 && (
+          <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5">
+            <TriangleAlertIcon
+              aria-hidden="true"
+              className="mt-0.5 size-3.5 shrink-0 text-warning"
+            />
+            <div className="min-w-0">
+              <p className="text-xs font-medium">
+                Not available on {problemPlatforms.join(", ") || "selected accounts"}
+              </p>
+              <details className="mt-0.5 text-xs text-muted-foreground">
+                <summary className="cursor-pointer rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+                  Why
+                </summary>
+                <ul className="mt-1 flex flex-col gap-0.5">
+                  {problems.map((message) => (
+                    <li key={message} className="break-words">
+                      {message}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </div>
+          </div>
+        )}
       </span>
       {status === "scheduled" ? (
         <Badge variant="secondary" className="shrink-0">

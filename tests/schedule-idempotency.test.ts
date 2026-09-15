@@ -245,13 +245,26 @@ describe("bulk detailed capability validation", () => {
     assert.ok(issues.every((issue) => /100 MB/.test(issue.message)));
   });
 
-  test("non-video files are rejected for every account", () => {
+  test("image files are validated per account like video", () => {
     const issues = validateBulkVideoForAccountsDetailed(
       { name: "photo.jpg", mimeType: "image/jpeg", size: 1024 },
       [threads]
     );
-    assert.equal(issues.length, 1);
-    assert.match(issues[0].message, /only video files/i);
+    assert.equal(issues.length, 0);
+  });
+
+  test("png photo is rejected for TikTok but accepted for Threads", () => {
+    const threadsIssues = validateBulkVideoForAccountsDetailed(
+      { name: "photo.png", mimeType: "image/png", size: 1024 },
+      [threads]
+    );
+    assert.equal(threadsIssues.length, 0);
+    const tiktokIssues = validateBulkVideoForAccountsDetailed(
+      { name: "photo.png", mimeType: "image/png", size: 1024 },
+      [tiktok]
+    );
+    assert.equal(tiktokIssues.length, 1);
+    assert.match(tiktokIssues[0].message, /photo\.png.*TikTok/i);
   });
 
   test("mov passes TikTok but fails Threads with an attributed message", () => {

@@ -1,11 +1,12 @@
 /**
  * Pure bulk-scheduling helpers.
  *
- * Bulk Video Scheduling creates one ordinary scheduled Post per video
- * through the existing endpoints (POST /api/posts, media upload pipeline,
- * PATCH scheduledAt). No second publishing engine, no extra cron, no
- * transcoding: everything below is schedule math, validation and payload
- * shaping. Timezone handling is DST-aware via Intl wall-time round-trips.
+ * Bulk Video Scheduling creates one ordinary scheduled Post per file
+ * (image or video) through the existing endpoints (POST /api/posts,
+ * media upload pipeline, PATCH scheduledAt). No second publishing
+ * engine, no extra cron, no transcoding: everything below is schedule
+ * math, validation and payload shaping. Timezone handling is DST-aware
+ * via Intl wall-time round-trips.
  */
 
 import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
@@ -310,23 +311,10 @@ export function validateBulkVideoForAccountsDetailed(
     }
     return issues;
   }
-  if (global.kind !== "VIDEO") {
-    for (const account of accounts) {
-      const caps = getPlatformCapabilities(account.platform);
-      issues.push({
-        accountId: account.id,
-        platform: account.platform,
-        platformLabel: caps.label,
-        fileName: file.name,
-        message: `${file.name} — ${caps.label}: only video files are accepted in a bulk batch.`,
-      });
-    }
-    return issues;
-  }
   for (const account of accounts) {
     const caps = getPlatformCapabilities(account.platform);
     const result = validateTargetMedia(caps, [
-      { type: "VIDEO", mimeType: file.mimeType, size: file.size },
+      { type: global.kind, mimeType: file.mimeType, size: file.size },
     ]);
     if (!result.ok) {
       issues.push({
