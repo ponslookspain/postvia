@@ -14,4 +14,9 @@ as of the current tree; if anything disagrees with the code, the code wins.
 - [Deployment](deployment.md) — Vercel, Neon, migrations, rollback, smoke tests
 - [Security](security.md) — secrets, cookies, CSRF, rate limiting, PII, admin, DB
 - [Development](development.md) — local setup, scripts, testing
+- [Auth UI](auth-ui.md) — signup, OTP, onboarding, login, Google, settings screens
+- [Local development](local-development.md) — canonical env, ngrok, DB, Blob, OAuth, smoke tests
+- [Local social development](local-social-dev.md) — real-account social/OAuth testing flow
+- [Workflow](workflow.md) — development/release process contract
+- [Design system](design-system.md) — implemented visual language, tokens, components
 - [Audit report](audit-report.md) — production hardening findings (A–Q) and KEEP/OPTIMIZE/… decisions

@@ -59,8 +59,9 @@ Vercel Preview is not part of daily development. Checks before commit:
 ## Stack
 
 - **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
-- **Styling:** Tailwind CSS v4, shadcn/ui (`base-nova` style, Neutral base color)
-  on Base UI primitives, Lucide icons, Geist Sans / Geist Mono via `next/font`
+- **Styling:** Tailwind CSS v4, shadcn/ui (`base-maia` style, Neutral base color)
+  on Base UI primitives, Lucide icons, Inter body + DM Sans headings
+  (`--font-sans` / `--font-heading`; Geist variables retained, not primary)
 - **Database:** PostgreSQL via Prisma 6
 - **Auth:** Better Auth — email/password, Google OAuth, email verification
   (Resend)
@@ -72,9 +73,10 @@ Vercel Preview is not part of daily development. Checks before commit:
 
 Implemented and connectable via OAuth: **Threads, X, TikTok, Instagram**.
 `Facebook`, `LinkedIn`, `YouTube`, `Pinterest` exist in the Prisma enum but
-are not implemented yet. Platform behavior is capability-driven
-(`src/lib/platforms/capabilities.ts`), so adding a platform does not require
-composer changes. Current media support: Threads — text / 1 image / 1 video;
+are not implemented yet. Validation and preview rules are capability-driven
+(`src/lib/platforms/capabilities.ts` + `src/lib/platforms/overrides.ts`),
+but UI lists, icons, provider dispatch and resume paths still need
+per-platform wiring (see `docs/social-integrations.md`). Current media support: Threads — text / 1 image / 1 video;
 X — text / up to 4 photos / 1 GIF / 1 video; TikTok — 1 video or 1–4 photos
 (JPEG/WebP, own title required); Instagram — 1 JPEG photo or 1 MP4 Reel.
 See [`docs/social-integrations.md`](docs/social-integrations.md) for the
@@ -140,9 +142,9 @@ full matrix, retry/idempotency semantics, and portal requirements.
   cron tick in capped batches. Post and media deletion remove their blobs
   eagerly.
 
-## Billing / Plans (test mode)
+## Billing / Plans
 
-- Plans: Free ($0), Growth ($20), Scale ($50). Single source of truth:
+- Plans: Free (€0), Growth (€20), Scale (€50). Single source of truth:
   `src/lib/plans.ts` (prices, features, entitlements) — never duplicated.
 - Limits: Free `{1 account total, 15 posts/month, no bulk}`,
   Growth `{5 accounts total, 300/month, 10-video bulk}`, Scale `{unlimited
@@ -201,18 +203,21 @@ invariants and the fail-open/fail-closed matrix:
 
 ## Design system
 
-- Nova neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
-  only, dark mode via `.dark` overrides, no hardcoded palette values.
+- Maia neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
+  only, light mode primary with `.dark` overrides, no hardcoded palette values.
 - Shared components (`src/components`): `PageHeader`, `StatusBadge`,
-  `AuthShell`, `MobileTopBar`, plus shadcn/ui primitives in
+  `AuthShell`, `MobileTopBar`, `PageContainer` (`max-w-3xl/5xl/6xl`,
+  `px-4 py-6 md:px-8 md:py-10`), plus shadcn/ui primitives in
   `src/components/ui` (Base UI only — no Radix).
 - Conventions: `FieldGroup` + `Field` forms with `data-invalid` /
   `aria-invalid`, `Card` sections with full header composition, `Alert` for
-  callouts, `Empty` for empty states, Base UI `toast` (not `alert()`), `Gap`
-  spacing (no `space-*`), `size-*` for square elements, `cn()` for
-  conditionals, Lucide icons with `data-icon` inside buttons.
-- Responsive: `max-w-5xl/3xl/6xl` containers with `p-4 md:p-8`, sidebar on
-  desktop + top bar navigation on mobile.
+  callouts, `Empty`/`StateBlock` for empty/error/loading states, Base UI
+  `toast` (not `alert()`), `gap-*` utilities (no `space-*`), `size-*` for
+  square elements, `cn()` for conditionals, Lucide icons with `data-icon`
+  inside buttons.
+- Responsive: sidebar on desktop + top bar navigation on mobile
+  (`MobileTopBar`, `MobileComposerBar` with safe-area padding).
+- Full contract: [`docs/design-system.md`](docs/design-system.md).
 
 ## Getting started
 
@@ -244,8 +249,8 @@ npm run build      # prisma generate + next build
 npm run start      # start production server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # node --test suite (839 unit tests, fake stores)
-npm run test:pg    # real-PostgreSQL concurrency suite (18 tests) —
+npm test           # node --test suite (unit tests, fake stores)
+npm run test:pg    # real-PostgreSQL concurrency suite —
                    # needs PG_INTEGRATION=1 + isolated test DB, never prod
 ```
 

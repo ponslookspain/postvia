@@ -5,11 +5,11 @@ PostgreSQL (Neon project `postvia-db`) via Prisma 6. Schema:
 `DATABASE_URL_POSTGRES_PRISMA_URL`.
 The database carries **no `_prisma_migrations` history** (created with
 `prisma db push`); later changes ship as additive migration SQL under
-`prisma/migrations/` (abuse event, billing guards, OTP/onboarding,
-post idempotency key) applied as DDL. `prisma migrate diff --from-url
---to-schema-datamodel` must be empty apart from known optimization-only
-deltas (currently: missing `SocialAccount_userId_idx` — planner-only,
-harmless).
+`prisma/migrations/` (abuse event, billing guards, OTP/onboarding, post
+idempotency key, Batch 2 hot-path indexes) applied as DDL.
+`prisma migrate diff --from-url <prod-url> --to-schema-datamodel` must be
+empty; CI enforces the same invariant offline via
+`scripts/check-migrations.ts` (throwaway shadow DB, never production).
 
 ## Topology: one database per environment, never per user
 
@@ -33,8 +33,8 @@ or destructive DDL against `main`/Production.
 | Model | Key fields | Relations / deletion |
 |---|---|---|
 | `User` | `email @unique`, `emailVerified`, `name`, `image?` (no role column — admin is the `ADMIN_EMAILS` allowlist, see [Auth](auth.md)) | parent of everything below |
-| `Account` (Better Auth) | `providerId` (`credential`/`google`), `accountId`, tokens, `password?` | `userId → User Cascade`; `@@index([providerId, accountId])` |
-| `Session` | `token @unique`, `expiresAt`, ip/UA | `→ User Cascade` |
+| `Account` (Better Auth) | `providerId` (`credential`/`google`), `accountId`, tokens, `password?` | `userId → User Cascade`; `@@index([providerId, accountId])`, `@@index([userId])` |
+| `Session` | `token @unique`, `expiresAt`, ip/UA | `→ User Cascade`; `@@index([userId])` |
 | `Verification` | `identifier`, `value`, `expiresAt` | standalone; `@@index([identifier])` |
 | `UserPreferences` | `userId @unique`, notification flags | `→ User Cascade` |
 
@@ -42,8 +42,8 @@ or destructive DDL against `main`/Production.
 
 | Model | Notes |
 |---|---|
-| `Post` | `userId → User` (**no** `onDelete` — plain relation; account deletion removes posts explicitly in the route transaction). `status: PostStatus`, `scheduledAt/publishedAt`, `clientOperationId String? @unique` (idempotency key — a missing column once caused bare 500s on create; see migration `20260914000001`). Indexes: `[userId,status]`, `[status,scheduledAt]`, `[status,updatedAt]` |
-| `PostTarget` | `postId → Post Cascade`; `socialAccountId → SocialAccount SetNull`; `@@index([postId, socialAccountId, externalJobId])` |
+| `Post` | `userId → User` (**no** `onDelete` — plain relation; account deletion removes posts explicitly in the route transaction). `status: PostStatus`, `scheduledAt/publishedAt`, `clientOperationId String? @unique` (idempotency key — a missing column once caused bare 500s on create; see migration `20260914000001`). Indexes: `[userId,status]`, `[status,scheduledAt]`, `[status,updatedAt]`, `[userId,createdAt]` (quota/monthly count), `[userId,scheduledAt]` + `[userId,publishedAt]` (calendar ranges) |
+| `PostTarget` | `postId → Post Cascade`; `socialAccountId → SocialAccount SetNull`; single-column `@@index([postId])`, `@@index([socialAccountId])`, `@@index([externalJobId])` |
 | `Media` | `userId → User Cascade`, `postId → Post Cascade`; `@@unique([pathname])` (concurrent completions collapse via P2002) |
 | `SocialAccount` | `userId → User Cascade`; `@@unique([userId,platform,externalId])` **and** `@@unique([platform,externalId])` (one external account → one PostVia owner, DB-enforced); `@@index([userId,platform])` |
 
@@ -53,7 +53,7 @@ No `ScheduledPost` model exists — scheduling is `Post.scheduledAt` + `status`.
 
 | Model | Notes |
 |---|---|
-| `Subscription` | `userId @unique`; `plan: FREE/GROWTH/SCALE`, `status: ACTIVE/CANCELED/PAST_DUE`, `currentPeriodEnd?`, `cancelAtPeriodEnd`, Stripe ids; `→ User Cascade`. Written **only** by the Stripe webhook (or admin test routes) |
+| `Subscription` | `userId @unique`; `plan: FREE/GROWTH/SCALE`, `status: ACTIVE/CANCELED/PAST_DUE/UNPAID`, `currentPeriodEnd?`, `cancelAtPeriodEnd`, Stripe ids (`stripeCustomerId`, `stripeSubId`, both indexed for webhook/reconciliation lookups); `→ User Cascade`. Written **only** by the Stripe webhook (or admin test routes) |
 | `BillingTestOverride` | `userId @unique`; admin-only sandbox (`BYPASS`/`ENFORCEMENT`); consulted only for admin emails; `→ User Cascade` |
 | `StripeEvent` | `eventId @unique` webhook idempotency ledger; never read for billing state |
 
