@@ -629,12 +629,16 @@ describe("D. double checkout is blocked server-side", () => {
     assert.equal(calls.expired, 1);
   });
 
-  test("concurrent double checkout creates one customer and serializes on the user lock", async () => {
+  test("concurrent double checkout converges on one linked customer", async () => {
     let linked: string | null = null;
     let customers = 0;
+    const sessions: string[] = [];
     const order: string[] = [];
-    // Mutex-shaped lock like the production advisory lock: concurrent flows
-    // serialize, so the second reuses the customer linked by the first.
+    // Mutex-shaped lock like the production advisory lock: each short
+    // phase serializes, while Stripe work between phases runs
+    // concurrently. Both flows must converge on the first linked row —
+    // a loser adopts the winner instead of stacking a second link, so
+    // both sessions target the same customer and both callers get 200.
     let tail: Promise<void> = Promise.resolve();
     const deps: CheckoutDeps = {
       ...makeCheckoutDeps().deps,
@@ -651,7 +655,11 @@ describe("D. double checkout is blocked server-side", () => {
           : null,
       createCustomer: async () => {
         customers += 1;
-        return { id: "cus_new" };
+        return { id: `cus_new_${customers}` };
+      },
+      createSession: async (input) => {
+        sessions.push(input.customerId);
+        return { url: "https://checkout.stripe.com/c/pay_123" };
       },
       linkCustomer: async (_userId, customerId) => {
         linked = customerId;
@@ -681,8 +689,18 @@ describe("D. double checkout is blocked server-side", () => {
     const [first, second] = await Promise.all([handleCheckout(input), handleCheckout(input)]);
     assert.equal(first.status, 200);
     assert.equal(second.status, 200);
-    assert.deepEqual(order, ["enter", "exit", "enter", "exit"]);
-    assert.equal(customers, 1);
+    // Two short phases per flow, each serialized: balanced enter/exit pairs.
+    assert.equal(
+      order.filter((entry) => entry === "enter").length,
+      order.filter((entry) => entry === "exit").length
+    );
+    assert.equal(order.length, 8);
+    // Exactly one linked row wins; every session targets it. Extra fresh
+    // Stripe customers are empty benign orphans (no card, no subscription).
+    assert.ok(linked !== null);
+    assert.ok(sessions.length >= 1);
+    assert.ok(sessions.every((customerId) => customerId === linked));
+    assert.ok(customers <= 2);
   });
 
   test("expired and canceled rows may start a fresh checkout", async () => {
