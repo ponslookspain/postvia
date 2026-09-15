@@ -31,7 +31,7 @@ export function MediaGrid({
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <section aria-labelledby="composer-media">
-      <div className="mb-3 flex items-start justify-between gap-4">
+      <div className="mb-2 flex items-start justify-between gap-4">
         <div>
           <h2
             id="composer-media"
@@ -55,7 +55,7 @@ export function MediaGrid({
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
-              className="h-28 w-full flex-col gap-1.5 border-dashed py-4"
+              className="h-20 w-full flex-col gap-1 border-dashed py-3"
             >
               <ImagePlusIcon data-icon="inline-start" />
               Add media
@@ -67,7 +67,7 @@ export function MediaGrid({
             <div className="flex flex-wrap items-start gap-3">
               {media.map((item) => (
             <div key={item.key} className="flex flex-col gap-1.5">
-              <div className="relative size-28 overflow-hidden rounded-md border bg-muted">
+              <div className="relative size-24 overflow-hidden rounded-md border bg-muted">
                 {item.kind === "IMAGE" ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -113,21 +113,21 @@ export function MediaGrid({
                   </Button>
                 )}
               </div>
-              <p className="w-28 truncate text-xs text-muted-foreground">
+              <p className="w-24 truncate text-xs text-muted-foreground">
                 {item.name} · {formatFileSize(item.size)}
               </p>
               {item.status === "done" && (
-                <p className="w-28 text-xs text-muted-foreground">Uploaded</p>
+                <p className="w-24 text-xs text-muted-foreground">Uploaded</p>
               )}
               {item.status === "error" && item.error && (
-                <p className="w-28 text-xs text-destructive">{item.error}</p>
+                <p className="w-24 text-xs text-destructive">{item.error}</p>
               )}
               {item.status === "error" && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="w-28"
+                  className="w-24"
                   disabled={!canRetry || disabled}
                   title={
                     canRetry
@@ -148,7 +148,7 @@ export function MediaGrid({
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={disabled}
-                  className="h-28 w-28 flex-col border-dashed"
+                  className="h-24 w-24 flex-col border-dashed"
                 >
                   <ImagePlusIcon data-icon="inline-start" />
                   Add media

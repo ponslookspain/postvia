@@ -7,7 +7,7 @@ import {
   CalendarClockIcon,
   CircleCheckIcon,
   ExternalLinkIcon,
-  FileTextIcon,
+  EyeIcon,
   HourglassIcon,
   OctagonXIcon,
   PencilIcon,
@@ -25,8 +25,6 @@ import {
   firstBlockingPreviewError,
   hasBlockingFileIssues,
   hasBlockingPreviewErrors,
-  PREVIEW_PLATFORM_ORDER,
-  resolvePreviewTarget,
 } from "@/lib/composer-previews";
 import {
   pollPostSettled,
@@ -57,24 +55,17 @@ import { EmptyBlock } from "@/components/StateBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { toast } from "@/components/ui/toast";
-import { AccountList } from "./_components/AccountList";
-import { MediaGrid } from "./_components/MediaGrid";
-import { PreviewCard } from "./_components/PreviewCard";
-import { PlatformSwitcher } from "./_components/PlatformSwitcher";
+import { ChannelStrip } from "./_components/ChannelStrip";
+import { ChannelCustomizer } from "./_components/ChannelCustomizer";
+import { ComposerCard } from "./_components/ComposerCard";
+import { PreviewRail } from "./_components/PreviewRail";
 import { PublishCard } from "./_components/PublishCard";
 import { MobileComposerBar } from "./_components/MobileComposerBar";
 import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
@@ -236,9 +227,12 @@ export default function NewPostComposer({
   );
   const [scheduleMode, setScheduleMode] = useState(false);
   const [xScheduleHint, setXScheduleHint] = useState(false);
-  const [previewPlatform, setPreviewPlatform] = useState<Platform | null>(
-    null
-  );
+  const [previewSheetOpen, setPreviewSheetOpen] = useState(false);
+  // Single-open accordion state for the preview rail. `false` collapses
+  // everything; `null` follows the automatic default below.
+  const [expandedPreviewId, setExpandedPreviewId] = useState<
+    string | false | null
+  >(null);
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -331,43 +325,41 @@ export default function NewPostComposer({
       size: item.size,
     })),
   });
-  const previewTarget = resolvePreviewTarget(
-    selectedAccounts.map((account) => ({
-      platform: account.platform,
-      accountId: account.id,
-    })),
-    previewPlatform
-  );
-  const activePreviewModel =
-    previewModels.find(
-      (model) => model.accountId === previewTarget?.accountId
-    ) ?? null;
-  const previewTabs = (() => {
-    const byPlatform = new Map<
-      Platform,
-      { platform: Platform; label: string; hint: string }
-    >();
-    for (const account of selectedAccounts) {
-      const siblings = selectedAccounts.filter(
-        (item) => item.platform === account.platform
-      );
-      byPlatform.set(account.platform, {
-        platform: account.platform,
-        label:
-          previewModels.find((model) => model.platform === account.platform)
-            ?.label ?? account.platform,
-        hint:
-          siblings.length > 1
-            ? `${siblings.length} accounts`
-            : `@${siblings[0]?.username ?? account.username}`,
-      });
-    }
-    return [...byPlatform.values()].sort(
-      (a, b) =>
-        PREVIEW_PLATFORM_ORDER.indexOf(a.platform) -
-        PREVIEW_PLATFORM_ORDER.indexOf(b.platform)
+  // One rail item per selected account, in selection order. Read-only
+  // presentation data only — gating and override state stay untouched.
+  const railItems = previewModels.map((model) => {
+    const account = accounts.find((item) => item.id === model.accountId);
+    const override = targetOverrides[model.accountId];
+    return {
+      model,
+      identityLabel: model.label,
+      identityUsername: account?.username ?? "",
+      customText:
+        account?.platform === "TIKTOK" ? override?.title : override?.text,
+      hasOverride: Boolean(override),
+    };
+  });
+  // Effective accordion expansion: an explicit choice wins when its
+  // account is still selected, otherwise the first blocking-error
+  // preview opens, else the first preview. Stale ids after deselect
+  // fall back to the default instead of leaving everything shut.
+  const railAccountIds = railItems.map((item) => item.model.accountId);
+  const autoExpandedId =
+    railItems.find((item) => item.model.validation.errors.length > 0)
+      ?.model.accountId ??
+    railItems[0]?.model.accountId ??
+    null;
+  const effectiveExpandedId =
+    expandedPreviewId === false
+      ? null
+      : expandedPreviewId !== null && railAccountIds.includes(expandedPreviewId)
+        ? expandedPreviewId
+        : autoExpandedId;
+  function togglePreviewExpanded(accountId: string) {
+    setExpandedPreviewId(
+      effectiveExpandedId === accountId ? false : accountId
     );
-  })();
+  }
   // Quota is known upfront from props: an exhausted plan disables every
   // submit path before any request, with the reason shown in the Publish
   // card. The server 403 stays as defense-in-depth.
@@ -512,6 +504,22 @@ export default function NewPostComposer({
       const next = { ...current };
       delete next[accountId];
       return next;
+    });
+  }
+
+  /**
+   * Opens the per-channel editor in the center workspace for the given
+   * account and scrolls it into view. Used by the read-only preview
+   * rail (and the mobile preview sheet) instead of editing in place.
+   */
+  function handleCustomize(accountId: string) {
+    setCustomizingIds((current) =>
+      current.includes(accountId) ? current : [...current, accountId]
+    );
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`customize-${accountId}`)
+        ?.scrollIntoView({ block: "start" });
     });
   }
 
@@ -1218,78 +1226,39 @@ export default function NewPostComposer({
   }
 
   return (
-    <PageContainer size="wide">
-      <PageHeader
-        title="Create post"
-        description="Write once, publish to every selected channel."
-        actions={
-          selectedAccountIds.length > 0 ? (
-            <Badge variant="secondary">
+    <div className="mx-auto w-full max-w-[88rem] px-4 py-6 md:px-8 md:py-10">
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Create post
+          </h1>
+          <p className="mt-1 max-w-[68ch] text-sm leading-5 text-muted-foreground">
+            Write once, publish to every selected channel.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {selectedAccountIds.length > 0 && (
+            <Badge variant="secondary" className="tabular-nums">
               <UsersIcon data-icon="inline-start" />
               {selectedAccountIds.length} selected
             </Badge>
-          ) : undefined
-        }
-      />
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPreviewSheetOpen(true)}
+            className="lg:hidden"
+          >
+            <EyeIcon data-icon="inline-start" />
+            Preview
+          </Button>
+        </div>
+      </div>
 
-      <div className="grid items-start gap-8 lg:grid-cols-3">
-        <div className="flex min-w-0 flex-col gap-8 lg:col-span-2">
-          <section aria-labelledby="composer-content">
-            <div className="mb-3 flex items-start justify-between gap-4">
-              <div>
-                <h2
-                  id="composer-content"
-                  className="text-lg font-medium tracking-tight"
-                >
-                  Post content
-                </h2>
-                <p className="mt-1 max-w-[60ch] text-sm leading-5 text-muted-foreground">
-                  Used by every selected platform unless customized — except
-                  TikTok, which posts its own title instead
-                </p>
-              </div>
-              <Badge
-                variant={hasOverLimit ? "destructive" : "secondary"}
-                className="shrink-0 tabular-nums"
-              >
-                {charCount} chars
-              </Badge>
-            </div>
-            <div>
-              <Field data-invalid={hasOverLimit || undefined}>
-                <FieldLabel htmlFor="composer-text" className="sr-only">
-                  Post content
-                </FieldLabel>
-                <Textarea
-                  id="composer-text"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="Write something worth publishing..."
-                  rows={8}
-                  aria-invalid={hasOverLimit || undefined}
-                  className="min-h-48 text-[15px] leading-relaxed"
-                />
-                  {hasOverLimit ? (
-                    <FieldError>
-                      Too long for{" "}
-                      {previews
-                        .filter((preview) => preview.overLimit)
-                        .map(
-                          (preview) => `${preview.label} (${preview.maxLength})`
-                        )
-                        .join(", ")}
-                      . Shorten the text or use Customize in the preview below.
-                    </FieldError>
-                  ) : (
-                    <FieldDescription>
-                      Keep it short — each platform has its own character limit.
-                    </FieldDescription>
-                  )}
-                </Field>
-              </div>
-          </section>
-
-          <AccountList
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <ChannelStrip
             accounts={accounts}
             selectedAccountIds={selectedAccountIds}
             targetOverrides={targetOverrides}
@@ -1298,7 +1267,16 @@ export default function NewPostComposer({
             onToggle={toggleAccountSelection}
           />
 
-          <MediaGrid
+          <ComposerCard
+            text={text}
+            onTextChange={setText}
+            charCount={charCount}
+            hasOverLimit={hasOverLimit}
+            overLimitLabels={previews
+              .filter((preview) => preview.overLimit)
+              .map(
+                (preview) => `${preview.label} (${preview.maxLength})`
+              )}
             media={media}
             maxMedia={MAX_MEDIA}
             disabled={saving || publishing || scheduling}
@@ -1309,153 +1287,83 @@ export default function NewPostComposer({
             onRetry={(key) => void retryFailedMedia(key)}
           />
 
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-8 lg:sticky lg:top-6 lg:self-start">
-          <section aria-label="Preview" className="order-2 lg:order-1">
-            <div className="mb-3 flex items-center justify-between gap-4">
-              <h2 className="text-lg font-medium tracking-tight">Preview</h2>
-              {previews.length > 0 && (
-                <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {previews.length} selected
-                </p>
-              )}
-            </div>
-            <div>
-              {previews.length === 0 || !activePreviewModel || !previewTarget ? (
-                <Empty>
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <FileTextIcon />
-                    </EmptyMedia>
-                    <EmptyTitle>No previews yet</EmptyTitle>
-                    <EmptyDescription>
-                      Select a platform above to see how your post will look.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <PlatformSwitcher
-                    tabs={previewTabs}
-                    active={previewTarget.platform}
-                    onSelect={setPreviewPlatform}
-                  />
-                  <PreviewCard
-                    key={activePreviewModel.accountId}
-                    model={activePreviewModel}
-                    userName={userName}
-                    media={media}
-                    customText={
-                      activePreviewModel.platform === "TIKTOK"
-                        ? targetOverrides[activePreviewModel.accountId]?.title
-                        : targetOverrides[activePreviewModel.accountId]?.text
-                    }
-                    customDescription={
-                      activePreviewModel.platform === "TIKTOK"
-                        ? targetOverrides[activePreviewModel.accountId]
-                            ?.description
-                        : undefined
-                    }
-                    hasOverride={Boolean(
-                      targetOverrides[activePreviewModel.accountId]
-                    )}
-                    overrideSettings={
-                      targetOverrides[activePreviewModel.accountId]?.settings ??
-                      {}
-                    }
-                    isCustomizing={customizingIds.includes(
-                      activePreviewModel.accountId
-                    )}
-                    creatorInfo={
-                      creatorInfos[activePreviewModel.accountId]
-                    }
-                    creatorInfoError={
-                      creatorInfoErrors[activePreviewModel.accountId]
-                    }
-                    showTikTokTitleHint={
-                      activePreviewModel.platform === "TIKTOK" &&
-                      !targetOverrides[activePreviewModel.accountId]?.title &&
-                      (activePreviewModel.tiktokMode !== "photo" ||
-                        !targetOverrides[activePreviewModel.accountId]
-                          ?.description)
-                    }
-                    disabled={saving || publishing || scheduling}
-                    onCustomTextChange={(value) =>
-                      updateOverride(
-                        activePreviewModel.accountId,
-                        activePreviewModel.platform === "TIKTOK"
-                          ? { title: value }
-                          : { text: value }
-                      )
-                    }
-                    onCustomDescriptionChange={(value) =>
-                      updateOverride(activePreviewModel.accountId, {
-                        description: value,
-                      })
-                    }
-                    onSettings={(patch) =>
-                      updateOverride(activePreviewModel.accountId, {
-                        settings: patch,
-                      })
-                    }
-                    onRetryCreatorInfo={() =>
-                      retryCreatorInfo(activePreviewModel.accountId)
-                    }
-                    onOpenAccounts={() => router.push("/accounts")}
-                    onUseGlobal={() =>
-                      clearTargetOverride(activePreviewModel.accountId)
-                    }
-                    onDone={() =>
-                      setCustomizingIds((current) =>
-                        current.filter(
-                          (id) => id !== activePreviewModel.accountId
-                        )
-                      )
-                    }
-                    onCustomize={() =>
-                      setCustomizingIds((current) => [
-                        ...current,
-                        activePreviewModel.accountId,
-                      ])
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          </section>
-
-          <div className="order-1 lg:order-2">
-          <PublishCard
-            quotaBlocked={quotaBlocked}
-            quotaError={quotaError}
-            quotaUpgradeTo={quota.upgradeTo}
-            schedulingForX={schedulingForX}
-            scheduleMode={scheduleMode}
-            scheduleDate={scheduleDate}
-            scheduleTime={scheduleTime}
-            xScheduleHint={xScheduleHint}
-            publishing={publishing}
-            publishProgress={publishProgress}
-            canSave={canSave}
-            canPublish={canPublish}
-            publishBlockedReason={publishBlockedReason}
-            saving={saving}
-            scheduling={scheduling}
-            onSaveDraft={handleSaveDraft}
-            onScheduleClick={handleScheduleClick}
-            onPublish={handlePublish}
-            onAbort={() => publishAbortRef.current?.abort()}
-            onDismissXHint={() => setXScheduleHint(false)}
+          <ChannelCustomizer
+            selectedAccounts={selectedAccounts}
+            previewModels={previewModels}
+            targetOverrides={targetOverrides}
+            customizingIds={customizingIds}
+            creatorInfos={creatorInfos}
+            creatorInfoErrors={creatorInfoErrors}
+            disabled={saving || publishing || scheduling}
+            onExpand={handleCustomize}
+            onCollapse={(accountId) =>
+              setCustomizingIds((current) =>
+                current.filter((id) => id !== accountId)
+              )
+            }
+            onClearOverride={clearTargetOverride}
+            onCustomTextChange={(accountId, targetPlatform, value) =>
+              updateOverride(
+                accountId,
+                targetPlatform === "TIKTOK" ? { title: value } : { text: value }
+              )
+            }
+            onCustomDescriptionChange={(accountId, value) =>
+              updateOverride(accountId, { description: value })
+            }
+            onSettings={(accountId, patch) =>
+              updateOverride(accountId, { settings: patch })
+            }
+            onRetryCreatorInfo={retryCreatorInfo}
+            onOpenAccounts={() => router.push("/accounts")}
           />
+
+          <div className="lg:sticky lg:top-4 lg:z-20">
+            <PublishCard
+              quotaBlocked={quotaBlocked}
+              quotaError={quotaError}
+              quotaUpgradeTo={quota.upgradeTo}
+              schedulingForX={schedulingForX}
+              scheduleMode={scheduleMode}
+              scheduleDate={scheduleDate}
+              scheduleTime={scheduleTime}
+              xScheduleHint={xScheduleHint}
+              publishing={publishing}
+              publishProgress={publishProgress}
+              canSave={canSave}
+              canPublish={canPublish}
+              publishBlockedReason={publishBlockedReason}
+              saving={saving}
+              scheduling={scheduling}
+              onSaveDraft={handleSaveDraft}
+              onScheduleClick={handleScheduleClick}
+              onPublish={handlePublish}
+              onAbort={() => publishAbortRef.current?.abort()}
+              onDismissXHint={() => setXScheduleHint(false)}
+            />
           </div>
         </div>
+
+        <aside className="hidden min-w-0 lg:block" aria-label="Preview rail">
+          <div className="sticky top-6">
+            <PreviewRail
+              items={railItems}
+              userName={userName}
+              media={media}
+              disabled={saving || publishing || scheduling}
+              expandedId={effectiveExpandedId}
+              onToggleExpand={togglePreviewExpanded}
+              onCustomize={handleCustomize}
+            />
+          </div>
+        </aside>
+
       </div>
 
       {scheduleMode && !schedulingForX ? (
         <ScheduleDialog
           open
-          scheduleDate={scheduleDate}
+        scheduleDate={scheduleDate}
         scheduleTime={scheduleTime}
         scheduledIso={scheduledIso}
         scheduleError={scheduleError}
@@ -1488,6 +1396,28 @@ export default function NewPostComposer({
         onOpenDraft={(postId) => router.push(`/posts/${postId}`)}
         />
       ) : null}
+      <Sheet open={previewSheetOpen} onOpenChange={setPreviewSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+          <SheetHeader className="px-1 pb-3 text-left">
+            <SheetTitle>Preview</SheetTitle>
+            <SheetDescription>
+              How your post will look on the selected channel.
+            </SheetDescription>
+          </SheetHeader>
+          <PreviewRail
+            items={railItems}
+            userName={userName}
+            media={media}
+            disabled={saving || publishing || scheduling}
+            expandedId={effectiveExpandedId}
+            onToggleExpand={togglePreviewExpanded}
+            onCustomize={(accountId) => {
+              setPreviewSheetOpen(false);
+              handleCustomize(accountId);
+            }}
+          />
+        </SheetContent>
+      </Sheet>
       {/* Spacer so the fixed mobile bar never covers content. */}
       <div aria-hidden="true" className="h-20 lg:hidden" />
       <MobileComposerBar
@@ -1501,6 +1431,6 @@ export default function NewPostComposer({
         onScheduleClick={handleScheduleClick}
         onPublish={handlePublish}
       />
-    </PageContainer>
+    </div>
   );
 }

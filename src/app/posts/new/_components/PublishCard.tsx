@@ -81,7 +81,7 @@ export function PublishCard({
   const hasSchedule = scheduleDate !== "" || scheduleTime !== "";
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-4">
         <CardTitle>Publish</CardTitle>
         <CardDescription>
           Save a draft, schedule it, or publish right away.
