@@ -1,5 +1,8 @@
 import type { Platform } from "@prisma/client";
-import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
+import {
+  getImplementedPlatforms,
+  getPlatformCapabilities,
+} from "@/lib/platforms/capabilities";
 import { validateTargetMedia } from "@/lib/platforms/overrides";
 import type { MediaKind } from "@/lib/media";
 import { validateMediaInput } from "@/lib/media";
@@ -57,15 +60,11 @@ export function countCharacters(text: string): number {
 }
 
 /**
- * Display order of the platform switcher. Tabs cover platforms, never
- * individual accounts.
+ * Display order of the platform switcher, from the single capability
+ * registry (E1). Tabs cover platforms, never individual accounts.
  */
-export const PREVIEW_PLATFORM_ORDER: readonly Platform[] = [
-  "X",
-  "THREADS",
-  "INSTAGRAM",
-  "TIKTOK",
-];
+export const PREVIEW_PLATFORM_ORDER: readonly Platform[] =
+  getImplementedPlatforms().map((caps) => caps.platform);
 
 export type PreviewTarget = {
   platform: Platform;
@@ -131,10 +130,10 @@ export function buildComposerPreviews(
   return accounts.map((account) => {
     const caps = getPlatformCapabilities(account.platform);
     const override = overrideByAccount.get(account.id);
-    // TikTok publishes its own title only: global text must never leak
-    // into the TikTok preview as a title. Missing title renders empty so
-    // the title-missing validation stays visible.
-    const text = account.platform === "TIKTOK" ? (override ?? "") : (override ?? globalText);
+    // One common Content field: the global text is the default TikTok
+    // caption/title too (TikTok's title is API-optional). An explicit
+    // override still wins per account.
+    const text = override ?? globalText;
     const maxLength = textLimit(account.platform);
     return {
       accountId: account.id,
@@ -452,12 +451,10 @@ export function buildComposerPreviewModel(
           : hasImage
             ? "photo"
             : "unknown";
-    // Platform rule: TikTok publishes its title only — global text must
-    // never leak into the TikTok preview as a title.
-    const text =
-      account.platform === "TIKTOK"
-        ? (override ?? "")
-        : (base?.text ?? input.globalText);
+    // One common Content field: global text is the default TikTok
+    // caption/title (TikTok's title is API-optional); an explicit
+    // override still wins per account.
+    const text = override ?? base?.text ?? input.globalText;
     // Photo titles are short (90); the video caption keeps the 2200 gate.
     const maxLength =
       account.platform === "TIKTOK" && tiktokMode === "photo"
@@ -516,31 +513,28 @@ export function buildComposerPreviewModel(
         message: `Exceeds the ${maxLength} character limit for ${caps.label}`,
       });
     }
-    if (account.platform === "TIKTOK" && tiktokMode === "photo") {
-      if (text.length === 0 && description.length === 0) {
-        errors.push({
-          code: "tiktok-title-missing",
-          message:
-            "TikTok photo posts need a title or a description — customize it for TikTok",
-        });
-      }
-      if (descriptionOverLimit) {
-        errors.push({
-          code: "tiktok-description-over-limit",
-          message: `Exceeds the ${descriptionMaxLength} character limit for the TikTok description`,
-        });
-      }
-    } else if (account.platform === "TIKTOK" && text.length === 0) {
+    // TikTok's title/description are API-optional and default to the
+    // global text, so empty text is never a blocking error here — only
+    // over-limit values block. (An empty global post still cannot be
+    // submitted: canSubmitComposer requires text.)
+    if (
+      account.platform === "TIKTOK" &&
+      tiktokMode === "photo" &&
+      descriptionOverLimit
+    ) {
       errors.push({
-        code: "tiktok-title-missing",
-        message: "TikTok posts require a title — customize it for TikTok",
+        code: "tiktok-description-over-limit",
+        message: `Exceeds the ${descriptionMaxLength} character limit for the TikTok description`,
       });
     }
     errors.push(...mediaIssues);
-    if (text.length === 0 && account.platform !== "TIKTOK") {
+    if (text.length === 0) {
       warnings.push({
         code: "content-empty",
-        message: `Post text is empty for ${caps.label}`,
+        message:
+          account.platform === "TIKTOK"
+            ? `TikTok caption will be empty for ${caps.label}`
+            : `Post text is empty for ${caps.label}`,
       });
     }
 
@@ -567,7 +561,7 @@ export function buildComposerPreviewModel(
       description,
       descriptionMaxLength,
       tiktokMode,
-      inheritsGlobal: !customized && account.platform !== "TIKTOK",
+      inheritsGlobal: !customized,
     };
   });
 }

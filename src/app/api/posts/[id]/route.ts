@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { deleteBlobs } from "@/lib/blob";
+import { runPostDeleteFlow } from "@/lib/delete-resources";
 import { resolveScheduledAtUpdate } from "@/lib/schedule";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
@@ -209,27 +210,38 @@ export async function DELETE(
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    if (existing.media.length > 0) {
-      try {
-        await deleteBlobs(existing.media.map((m) => m.pathname));
-      } catch {
-        return NextResponse.json(
-          { error: "Failed to delete media" },
-          { status: 500 }
-        );
-      }
-    }
-
     // Quota invariant: deleting a post never touches the PostUsage ledger,
     // so create/delete loops cannot refill the monthly quota. The deleted
-    // unit stays consumed — fail-closed by design.
-    // Atomic ownership: scoped deleteMany + count check (not delete-by-id
-    // after a separate read).
-    const deleted = await prisma.post.deleteMany({
-      where: { id, userId: user.id },
+    // unit stays consumed — fail-closed by design. Deletion runs DB-first
+    // (see runPostDeleteFlow): leftover bytes are sweepable orphans,
+    // never rows pointing at missing blobs.
+    const outcome = await runPostDeleteFlow({
+      postId: id,
+      userId: user.id,
+      mediaPathnames: existing.media.map((m) => m.pathname),
+      deletePostRow: async (postId, userId) => {
+        // Atomic ownership: scoped deleteMany + count check.
+        const deleted = await prisma.post.deleteMany({
+          where: { id: postId, userId },
+        });
+        return deleted.count > 0 ? "deleted" : "missing";
+      },
+      deleteBlobs,
     });
-    if (deleted.count === 0) {
+    if (outcome.outcome === "not-found") {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
+    if (outcome.outcome === "blobs-failed") {
+      return NextResponse.json(
+        { error: "Failed to delete media" },
+        { status: 500 }
+      );
+    }
+    if (outcome.outcome === "failed") {
+      return NextResponse.json(
+        { error: "Failed to delete post" },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ ok: true });

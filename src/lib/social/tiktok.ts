@@ -16,8 +16,9 @@ export const TIKTOK_CAPTION_MAX_LENGTH = 2200;
  * Photo post limits from the TikTok Content Posting API reference
  * (`/v2/post/publish/content/init/` Post Info Object, photo flow):
  * title is a short photo title, description carries the caption body.
- * Both are optional per TikTok — Postvia requires at least one of them
- * so an empty photo post can never be published by accident.
+ * Both are optional per TikTok; callers fall back to the global post
+ * text first, so empty text only reaches the gates below for textless
+ * posts.
  */
 export const TIKTOK_PHOTO_TITLE_MAX_LENGTH = 90;
 export const TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH = 4000;
@@ -667,7 +668,7 @@ export function resolveTiktokPostInfo(input: {
   const { settings, creatorInfo } = input;
   const title = input.title.trim();
   if (!title) {
-    return { error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback." };
+    return { error: "TikTok video has no caption text. Provide a title." };
   }
   if (Array.from(title).length > TIKTOK_CAPTION_MAX_LENGTH) {
     return { error: `TikTok title exceeds the ${TIKTOK_CAPTION_MAX_LENGTH} character limit.` };
@@ -708,7 +709,8 @@ export function resolveTiktokPostInfo(input: {
  * Duet/stitch and video cover timestamp are video-only and must never
  * be sent for PHOTO (invalid_param risk). Unlike video, the photo
  * endpoint splits text into a short title (<=90) and a description
- * (<=4000); at least one of them must be present.
+ * (<=4000); both are API-optional. Callers fall back to the global post
+ * text first, so this gate only fires for textless posts.
  */
 export function resolveTiktokPhotoPostInfo(input: {
   title: string;
@@ -720,7 +722,7 @@ export function resolveTiktokPhotoPostInfo(input: {
   const title = input.title.trim();
   const description = (input.description ?? "").trim();
   if (!title && !description) {
-    return { error: "TikTok photo posts need a title or a description. Add one — the global post text is never used as a fallback." };
+    return { error: "TikTok photo post has no text. Add post text, a custom title, or a description." };
   }
   if (Array.from(title).length > TIKTOK_PHOTO_TITLE_MAX_LENGTH) {
     return { error: `TikTok photo title exceeds the ${TIKTOK_PHOTO_TITLE_MAX_LENGTH} character limit.` };
@@ -877,7 +879,7 @@ export async function publishTiktokDirectVideo(
   if (!input.title || input.title.trim().length === 0) {
     return {
       state: "invalid",
-      error: "TikTok posts require a title. Add a TikTok title — the global post text is never used as a fallback.",
+      error: "TikTok video has no caption text. Provide a title.",
     };
   }
 
@@ -995,7 +997,7 @@ export async function publishTiktokDirectPhoto(
   ) {
     return {
       state: "invalid",
-      error: "TikTok photo posts need a title or a description. Add one — the global post text is never used as a fallback.",
+      error: "TikTok photo post has no text. Add post text, a custom title, or a description.",
     };
   }
 

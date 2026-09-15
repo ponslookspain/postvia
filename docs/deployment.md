@@ -2,20 +2,10 @@
 
 ## Local development
 
-Primary loop — no Vercel involved:
-
-```bash
-npm install
-npm run dev          # http://localhost:3000 (main dev server)
-npm run dev:tunnel   # ngrok http 3000 → permanent dev HTTPS, only when a
-                     # public HTTPS origin is needed (OAuth/integration tests)
-```
-
-Local gates before every commit: `npx prisma validate` →
-`npx prisma generate` → `npx tsc --noEmit` → `npm test` →
-`npm run test:pg` (isolated PG, never production) → `npm run build`.
-Social/OAuth integration testing through the tunnel:
-[`docs/local-social-dev.md`](local-social-dev.md).
+Local loop lives in [`docs/local-development.md`](local-development.md)
+(canonical: env, ngrok, DB, Blob, OAuth, smoke tests); scripts and
+testing contracts in [`docs/development.md`](development.md). No Vercel
+involved locally.
 
 ## GitHub / PR flow
 
@@ -88,6 +78,8 @@ The database carries **no `_prisma_migrations` history** (created with
     `migrate diff` against production prints an empty migration.
   - Shipped in-repo, apply + verify before relying on them (a missing
     column once caused bare dashboard/create 500s — P2022):
+    `20260913000000_abuse_event` (`AbuseEvent` telemetry table + both
+    indexes; best-effort writes, never blocks enforcement),
     `20260914000000_otp_onboarding` (`User.onboardingCompleted`,
     `User.selectedPlan` + backfill),
     `20260914000001_post_idempotency_key` (`Post.clientOperationId`

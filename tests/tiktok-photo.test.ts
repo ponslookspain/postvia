@@ -378,7 +378,7 @@ describe("TikTok photo support", () => {
       assert.deepEqual(d.saved, ["PUB-PHOTO-4"]);
     });
 
-    test("missing title is invalid before creator-info", async () => {
+    test("missing title and description is invalid before creator-info", async () => {
       const d = deps();
       const result = await tiktok.publishTiktokDirectPhoto(
         "AT-1",

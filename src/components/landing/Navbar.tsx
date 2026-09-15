@@ -5,12 +5,12 @@ import Link from "next/link";
 import { MenuIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 const links = [
   { href: "#how", label: "How it works" },
@@ -75,13 +75,13 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
           <MenuIcon aria-hidden="true" />
         </Button>
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Menu</DialogTitle>
-            <DialogDescription>Go to a section of Postvia.</DialogDescription>
-          </DialogHeader>
-          <nav aria-label="Mobile" className="flex flex-col gap-1">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="right">
+          <SheetHeader>
+            <SheetTitle>Menu</SheetTitle>
+            <SheetDescription>Go to a section of Postvia.</SheetDescription>
+          </SheetHeader>
+          <nav aria-label="Mobile" className="flex flex-col gap-1 px-6">
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -93,7 +93,7 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               </Link>
             ))}
           </nav>
-          <div className="flex flex-col gap-2 border-t border-border pt-4">
+          <div className="flex flex-col gap-2 border-t border-border px-6 pt-4 pb-6">
             {isLoggedIn ? (
               <Button nativeButton={false} render={<Link href="/dashboard" />}>
                 Dashboard
@@ -113,8 +113,8 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               </>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </header>
   );
 }

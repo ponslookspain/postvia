@@ -50,7 +50,10 @@ export function PageContainer({
 
 /**
  * Stack of major page sections. Replaces ad-hoc `flex flex-col gap-10`
- * wrappers so every page breathes on the same 2.5rem rhythm.
+ * wrappers so every page breathes on the same 2.5rem rhythm. The gap
+ * lives in a class (not an inline style) so individual pages may pass
+ * a denser `gap-*` via className without affecting other pages —
+ * the default rendering is unchanged.
  */
 export function PageSections({
   className,
@@ -62,8 +65,7 @@ export function PageSections({
   return (
     <div
       data-slot="page-sections"
-      className={cn("flex flex-col gap-10", className)}
-      style={{ gap: "var(--section-gap)" }}
+      className={cn("flex flex-col gap-[var(--section-gap)]", className)}
     >
       {children}
     </div>

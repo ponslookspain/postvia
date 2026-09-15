@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser, type AuthUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_PORTAL } from "@/lib/abuse";
 import {
   getStripeClient,
   isStripeConfigured,
@@ -94,6 +95,21 @@ export async function handlePortal(input: {
 export async function POST(request: NextRequest) {
   try {
     const user = await getApiUser();
+    // Flood gate before Stripe work starts (same contract as checkout).
+    if (
+      user &&
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "billing-portal",
+        userMax: WRITE_LIMIT_PORTAL,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
+    }
     return await handlePortal({
       user,
       origin: new URL(request.url).origin,

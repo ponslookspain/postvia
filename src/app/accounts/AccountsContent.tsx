@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { reportError } from "@/lib/diagnostics";
+import { getImplementedPlatforms } from "@/lib/platforms/capabilities";
 
 interface PlatformAccount {
   id: string;
@@ -50,44 +51,28 @@ interface PlatformConfig {
   multi: boolean;
 }
 
-const PLATFORMS: PlatformConfig[] = [
-  {
-    platform: "THREADS",
-    name: "Threads",
-    blurb: "Text posts and replies on Threads",
-    connectLabel: "Connect Threads",
-    connectEndpoint: "/api/auth/threads/connect",
-    disconnectEndpoint: "/api/accounts/threads",
-    multi: true,
-  },
-  {
-    platform: "X",
-    name: "X (Twitter)",
-    blurb: "Short posts on X",
-    connectLabel: "Connect X",
-    connectEndpoint: "/api/auth/x/connect",
-    disconnectEndpoint: "/api/accounts/x",
-    multi: true,
-  },
-  {
-    platform: "TIKTOK",
-    name: "TikTok",
-    blurb: "Vertical video on TikTok",
-    connectLabel: "Connect TikTok",
-    connectEndpoint: "/api/auth/tiktok/connect",
-    disconnectEndpoint: "/api/accounts/tiktok",
-    multi: true,
-  },
-  {
-    platform: "INSTAGRAM",
-    name: "Instagram",
-    blurb: "Photos and reels on Instagram",
-    connectLabel: "Connect Instagram",
-    connectEndpoint: "/api/auth/instagram/connect",
-    disconnectEndpoint: "/api/accounts/instagram",
-    multi: true,
-  },
-];
+/**
+ * Connectable platforms, derived from the single capability registry
+ * (E1) instead of a parallel hardcoded table. Same entries; order now
+ * follows the shared registry order (X, Threads, Instagram, TikTok).
+ * Adding a registry entry with `connect` metadata surfaces it here.
+ */
+const PLATFORMS: PlatformConfig[] = getImplementedPlatforms().flatMap(
+  (caps) =>
+    caps.connect
+      ? [
+          {
+            platform: caps.platform,
+            name: caps.connect.name,
+            blurb: caps.connect.blurb,
+            connectLabel: caps.connect.connectLabel,
+            connectEndpoint: caps.connect.connectEndpoint,
+            disconnectEndpoint: caps.connect.disconnectEndpoint,
+            multi: caps.connect.multi,
+          },
+        ]
+      : []
+);
 
 function getSearchParamMessage(searchParams: URLSearchParams): {
   text: string;

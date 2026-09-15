@@ -2,11 +2,13 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   applyPeriodRules,
+  buildBillingView,
   canBulkSchedule,
   canConnectAccount,
   canCreatePost,
   canRetry,
   canUseCalendar,
+  canUseFeature,
   getDisplayPostsUsed,
   getRemainingQuota,
   getUpgradeTarget,
@@ -17,7 +19,7 @@ import {
   toPlanIdSafe,
   type EffectiveSubscription,
 } from "../src/lib/entitlements";
-import { getPlan } from "../src/lib/plans";
+import { FEATURE_KEYS, getPlan, type FeatureKey } from "../src/lib/plans";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-09-12T12:00:00Z").getTime();
@@ -371,5 +373,61 @@ describe("isAdminEmail", () => {
     assert.equal(isAdminEmail(null), false);
     delete process.env.ADMIN_EMAILS;
     assert.equal(isAdminEmail("boss@example.com"), false);
+  });
+});
+
+describe("billing feature registry (E3 single gate)", () => {
+  test("FEATURE_KEYS covers every boolean entitlement", () => {
+    assert.deepEqual([...FEATURE_KEYS], ["calendar", "bulk", "retryReschedule"]);
+    const keys: readonly FeatureKey[] = FEATURE_KEYS;
+    assert.equal(keys.length, 3);
+  });
+
+  test("canUseFeature matches the legacy per-feature gates exactly", () => {
+    for (const plan of ["free", "growth", "scale"] as const) {
+      assert.deepEqual(canUseFeature(eff(plan), "calendar"), canUseCalendar(eff(plan)));
+      assert.deepEqual(canUseFeature(eff(plan), "retryReschedule"), canRetry(eff(plan)));
+    }
+    // Denial messages preserved verbatim.
+    const denied = canUseFeature(eff("free", { entitlements: { ...getPlan("free").entitlements, calendar: false } }), "calendar");
+    assert.equal(denied.ok, false);
+    if (!denied.ok) {
+      assert.equal(denied.code, "UPGRADE_REQUIRED");
+      assert.equal(denied.reason, "The content calendar is not included in this plan.");
+    }
+    // Bypass grants every feature.
+    const bypassed = eff("free", { bypass: true });
+    for (const key of FEATURE_KEYS) {
+      assert.deepEqual(canUseFeature(bypassed, key), { ok: true });
+    }
+  });
+
+  test("buildBillingView assembles the documented view model", () => {
+    const view = buildBillingView({
+      effective: eff("growth", {
+        currentPeriodEnd: new Date("2026-10-01T00:00:00Z"),
+      }),
+      usage: usage(7, { THREADS: 2, X: 1 }),
+      subscription: {
+        plan: "GROWTH",
+        status: "ACTIVE",
+        currentPeriodEnd: new Date("2026-10-01T00:00:00Z"),
+        cancelAtPeriodEnd: false,
+        stripeCustomerId: "cus_1",
+        stripeSubId: "sub_1",
+      },
+      checkoutResult: null,
+    });
+    assert.equal(view.plan, "growth");
+    assert.equal(view.status, "ACTIVE");
+    assert.equal(view.price, 20);
+    assert.equal(view.period, "month");
+    assert.equal(view.currentPeriodEnd, "2026-10-01T00:00:00.000Z");
+    assert.equal(view.postsUsed, 7);
+    assert.equal(view.postsLimit, 300);
+    assert.equal(view.totalAccounts, 3);
+    assert.equal(view.accountsLimit, 5);
+    assert.equal(view.checkoutPending, false);
+    assert.equal(view.hasBillingCustomer, true);
   });
 });

@@ -15,8 +15,10 @@ import {
   liveQuotaStore,
 } from "@/lib/entitlements";
 import {
+  gateWriteRequest,
   getAbusePepper,
   isAbuseEnforcementEnabled,
+  WRITE_LIMIT_POSTS_CREATE,
 } from "@/lib/abuse";
 import { createFreePostAtomic, makeTxQuotaStore } from "@/lib/free-post-kernel";
 import { createPostIdempotent } from "@/lib/post-create";
@@ -33,6 +35,11 @@ import {
   isValidBulkOperationId,
   normalizeOperationId,
 } from "@/lib/idempotency";
+import {
+  createdBeforeWhere,
+  paginateByCursor,
+  parseListPagination,
+} from "@/lib/pagination";
 
 /**
  * Replay lookup by the globally unique idempotency key, then ownership
@@ -70,15 +77,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const posts = await prisma.post.findMany({
+    // Cursor pagination (B6): bounded pages instead of the full history.
+    // Response is an envelope `{ posts, nextCursor }` — no in-repo
+    // consumers existed when this shipped, so no compatibility shim.
+    const { limit, cursor } = parseListPagination({
+      limit: request.nextUrl.searchParams.get("limit"),
+      cursor: request.nextUrl.searchParams.get("cursor"),
+    });
+    let cursorWhere: Prisma.PostWhereInput = {};
+    if (cursor) {
+      const anchor = await prisma.post.findUnique({
+        where: { id: cursor },
+        select: { userId: true, createdAt: true },
+      });
+      if (!anchor || anchor.userId !== user.id) {
+        return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
+      }
+      cursorWhere = createdBeforeWhere(anchor.createdAt, cursor);
+    }
+
+    const rows = await prisma.post.findMany({
       where: {
         userId: user.id,
         ...(status ? { status: status as "DRAFT" } : {}),
+        ...cursorWhere,
       },
-      orderBy: { createdAt: "desc" },
-      include: { targets: true },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+      include: {
+        targets: true,
+        media: { take: 1, select: { id: true, type: true } },
+        _count: { select: { media: true } },
+      },
     });
-    return NextResponse.json(posts);
+    const { page, nextCursor } = paginateByCursor(rows, limit);
+    return NextResponse.json({ posts: page, nextCursor });
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch posts" },
@@ -92,6 +125,22 @@ export async function POST(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Flood gate before any expensive work (quota ledgers, inserts).
+    // Generous: bulk batches and retry storms stay far below it.
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "posts-create",
+        userMax: WRITE_LIMIT_POSTS_CREATE,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     // Plan gate: monthly post quota is enforced server-side, per created

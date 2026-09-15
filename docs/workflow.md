@@ -44,7 +44,8 @@ LOCAL EDIT
 - **ngrok tunnel** — `npm run dev:tunnel` (`ngrok http 3000`). Used ONLY
   when an external public HTTPS origin is needed (OAuth callbacks, social
   integration testing — see `docs/local-social-dev.md`). The permanent
-  development URL `https://lavish-passion-dipped.ngrok-free.dev` proxies
+  development URL `https://<NGROK_HOST>` (operator hostname, current value
+  in `.env.local` — see `docs/local-development.md`) proxies
   to `localhost:3000`; the ngrok agent must be running. It never replaces
   Production.
 - **Git** — versions the project. Development happens on `staging/*` /

@@ -410,7 +410,7 @@ describe("TikTok social layer", () => {
       }
     });
 
-    test("missing title fails BEFORE creator-info (no global fallback)", async () => {
+    test("missing title fails BEFORE creator-info", async () => {
       const d = deps();
       const result = await tiktok.publishTiktokDirectVideo(
         "AT-1",
@@ -620,7 +620,7 @@ describe("TikTok social layer", () => {
       maxVideoPostDurationSec: 300,
     };
 
-    test("missing title is invalid and never falls back", () => {
+    test("missing title is invalid", () => {
       const result = tiktok.resolveTiktokPostInfo({
         title: "   ",
         settings: {},

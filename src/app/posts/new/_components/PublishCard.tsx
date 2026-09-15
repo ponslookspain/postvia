@@ -20,7 +20,7 @@ import {
 import { FieldDescription } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
-import { parseDateKey } from "./ScheduleDatePicker";
+import { parseDateKey } from "@/lib/schedule-date";
 import type { PlanId } from "@/lib/plans";
 import {
   formatElapsed,
@@ -81,7 +81,7 @@ export function PublishCard({
   const hasSchedule = scheduleDate !== "" || scheduleTime !== "";
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-4">
         <CardTitle>Publish</CardTitle>
         <CardDescription>
           Save a draft, schedule it, or publish right away.
@@ -133,7 +133,7 @@ export function PublishCard({
           </Alert>
         )}
         {schedulingForX && !scheduleMode && (
-          <FieldDescription>
+          <FieldDescription id="x-schedule-note">
             Scheduling is available for Threads. Publish to X is available now.
           </FieldDescription>
         )}
@@ -165,6 +165,9 @@ export function PublishCard({
               schedulingForX
                 ? "Scheduling for X is not available yet. Use Threads."
                 : "Schedule this post"
+            }
+            aria-describedby={
+              schedulingForX && !scheduleMode ? "x-schedule-note" : undefined
             }
             className="w-full"
           >

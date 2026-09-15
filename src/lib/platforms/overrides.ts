@@ -1,5 +1,5 @@
 import type { Platform } from "@prisma/client";
-import type { MediaKind } from "@/lib/media";
+import { isMediaKind, type MediaKind } from "@/lib/media";
 import {
   getPlatformCapabilities,
   type CapabilityField,
@@ -229,6 +229,19 @@ function checkMediaStructure(
   return null;
 }
 
+/**
+ * Single kind-support check behind the capability flags (E2): replaces
+ * the parallel IMAGE/VIDEO if-pair so a new kind extends one predicate,
+ * not every call site. Unknown values fail closed.
+ */
+export function supportsMediaKind(
+  caps: PlatformCapabilities,
+  kind: unknown
+): boolean {
+  if (!isMediaKind(kind)) return false;
+  return kind === "IMAGE" ? caps.media.image : caps.media.video;
+}
+
 function formatMegabytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
   return Number.isInteger(mb) ? String(mb) : mb.toFixed(1);
@@ -283,11 +296,13 @@ if (!caps.implemented) {
       return { ok: false, error: `${caps.label} publishing is not implemented yet` };
     }
     for (const item of media) {
-      if (item.type === "IMAGE" && !caps.media.image) {
-        return { ok: false, error: `${caps.label} does not support image media yet` };
-      }
-      if (item.type === "VIDEO" && !caps.media.video) {
-        return { ok: false, error: `${caps.label} does not support video media yet` };
+      if (!supportsMediaKind(caps, item.type)) {
+        const noun = isMediaKind(item.type)
+          ? item.type === "IMAGE"
+            ? "image"
+            : "video"
+          : "image or video";
+        return { ok: false, error: `${caps.label} does not support ${noun} media yet` };
       }
       if (caps.media.mimeTypes && !caps.media.mimeTypes.includes(item.mimeType)) {
         return {

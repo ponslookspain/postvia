@@ -36,6 +36,31 @@ export function Section({
 }
 
 /**
+ * Single h2 contract for every section title (E4): SectionHeader and
+ * FormSection render this instead of duplicating the class string, so
+ * the title scale can never drift between the two systems. Zero visual
+ * change — same element, same classes.
+ */
+export function SectionTitle({
+  id,
+  children,
+  className,
+}: {
+  id?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <h2
+      id={id}
+      className={cn("text-lg leading-7 font-medium tracking-tight", className)}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/**
  * Section title row: 18px medium title, 14px muted description,
  * trailing actions or meta. Left-aligned; actions wrap underneath
  * the title on 375px screens instead of squeezing beside it.
@@ -58,12 +83,7 @@ export function SectionHeader({
   return (
     <div className={cn("mb-4", className)}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h2
-          id={id}
-          className="text-lg leading-7 font-medium tracking-tight"
-        >
-          {title}
-        </h2>
+        <SectionTitle id={id}>{title}</SectionTitle>
         <div className="flex shrink-0 flex-wrap items-center gap-2 text-sm">
           {meta}
           {actions}
@@ -114,12 +134,7 @@ export function FormSection({
       aria-labelledby={labelledBy}
       className={cn("min-w-0", className)}
     >
-      <h2
-        id={labelledBy}
-        className="text-lg leading-7 font-medium tracking-tight"
-      >
-        {title}
-      </h2>
+      <SectionTitle id={labelledBy}>{title}</SectionTitle>
       {description && (
         <p className="mt-1 mb-4 max-w-[68ch] text-sm leading-5 text-muted-foreground">
           {description}

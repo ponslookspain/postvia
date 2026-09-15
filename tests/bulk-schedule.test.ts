@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   BULK_MAX_VIDEOS,
   buildBulkPostBody,
+  bulkTextLimit,
   computeBulkSchedule,
   partitionDuplicateAdds,
   shouldAcceptRunRequest,
@@ -226,5 +227,33 @@ describe("buildBulkPostBody", () => {
         { accountId: "a2", overrides: null },
       ],
     });
+  });
+});
+
+describe("bulkTextLimit", () => {
+  test("text platforms use their capability ceiling", () => {
+    assert.equal(bulkTextLimit("X", { hasVideo: true, hasImage: false }), 280);
+    assert.equal(
+      bulkTextLimit("THREADS", { hasVideo: false, hasImage: true }),
+      500
+    );
+    assert.equal(
+      bulkTextLimit("INSTAGRAM", { hasVideo: true, hasImage: false }),
+      2200
+    );
+  });
+
+  test("tiktok video keeps the 2200 caption ceiling", () => {
+    assert.equal(
+      bulkTextLimit("TIKTOK", { hasVideo: true, hasImage: false }),
+      2200
+    );
+  });
+
+  test("tiktok photo narrows to the 90 title cap (no description in bulk)", () => {
+    assert.equal(
+      bulkTextLimit("TIKTOK", { hasVideo: false, hasImage: true }),
+      90
+    );
   });
 });

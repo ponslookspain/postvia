@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_RETRY } from "@/lib/abuse";
 import { publishPostTargets } from "@/lib/publish";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { STALE_PUBLISHING_MS } from "@/lib/scheduling";
@@ -21,6 +22,21 @@ export async function POST(
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Flood gate before provider work starts (same contract as publish).
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "retry",
+        userMax: WRITE_LIMIT_RETRY,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     const retryGate = canRetry(
@@ -72,8 +88,10 @@ export async function POST(
       : post.targets.find((t) => t.status === "FAILED");
 
     if (!target && isStalePublishing) {
+      // Atomic ownership via the post relation: only this user's targets
+      // reset, even if the row changed since the read above.
       await prisma.postTarget.updateMany({
-        where: { postId: id, status: "PUBLISHING", externalJobId: null },
+        where: { postId: id, post: { userId: user.id }, status: "PUBLISHING", externalJobId: null },
         data: { status: "PENDING", errorMessage: null },
       });
       const refreshed = await prisma.post.findFirst({
@@ -95,9 +113,11 @@ export async function POST(
     // PUBLISHING with no live function behind it. PUBLISHED targets are
     // never re-published: publishPostTargets only claims PENDING/FAILED
     // targets, and a target-level atomic claim is taken inside it.
+    // Atomic ownership: same TOCTOU rationale as the publish claim.
     const claim = await prisma.post.updateMany({
       where: {
         id,
+        userId: user.id,
         OR: [
           { status: { in: ["FAILED", "PARTIALLY_PUBLISHED"] } },
           { status: "PUBLISHING", updatedAt: { lt: staleCutoff } },

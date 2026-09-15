@@ -1,5 +1,19 @@
 export type MediaKind = "IMAGE" | "VIDEO";
 
+/**
+ * Authoritative media-kind registry (E2). Exactly one list of kinds;
+ * per-kind global policy stays in MEDIA_LIMITS below (single source —
+ * `MEDIA_KIND_META` derives from it, never duplicates it). Adding a
+ * kind (audio, carousel, document) starts here; platform policies and
+ * overrides consume it instead of parallel unions/booleans.
+ */
+export const MEDIA_KINDS: readonly MediaKind[] = ["IMAGE", "VIDEO"];
+
+/** Type guard for unknown values (DB rows, API input, webhook payloads). */
+export function isMediaKind(value: unknown): value is MediaKind {
+  return value === "IMAGE" || value === "VIDEO";
+}
+
 export const MEDIA_LIMITS: {
   IMAGE: { maxBytes: number; mimeTypes: readonly string[] };
   VIDEO: { maxBytes: number; mimeTypes: readonly string[] };
@@ -23,6 +37,33 @@ export function detectMediaKind(mimeType: string): MediaKind | null {
 export function formatMaxMegabytes(kind: MediaKind): string {
   return String(MEDIA_LIMITS[kind].maxBytes / (1024 * 1024));
 }
+
+export type MediaKindMeta = {
+  kind: MediaKind;
+  /** Singular noun for messages ("image"/"video"). */
+  noun: string;
+  maxBytes: number;
+  mimeTypes: readonly string[];
+};
+
+/**
+ * Per-kind metadata derived from MEDIA_LIMITS (never duplicated).
+ * Declared after MEDIA_LIMITS so module init order is safe.
+ */
+export const MEDIA_KIND_META: Record<MediaKind, MediaKindMeta> = {
+  IMAGE: {
+    kind: "IMAGE",
+    noun: "image",
+    maxBytes: MEDIA_LIMITS.IMAGE.maxBytes,
+    mimeTypes: MEDIA_LIMITS.IMAGE.mimeTypes,
+  },
+  VIDEO: {
+    kind: "VIDEO",
+    noun: "video",
+    maxBytes: MEDIA_LIMITS.VIDEO.maxBytes,
+    mimeTypes: MEDIA_LIMITS.VIDEO.mimeTypes,
+  },
+};
 
 export type MediaValidation =
   | { ok: true; kind: MediaKind }

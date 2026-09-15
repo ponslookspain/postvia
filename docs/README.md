@@ -19,4 +19,4 @@ as of the current tree; if anything disagrees with the code, the code wins.
 - [Local social development](local-social-dev.md) — real-account social/OAuth testing flow
 - [Workflow](workflow.md) — development/release process contract
 - [Design system](design-system.md) — implemented visual language, tokens, components
-- [Audit report](audit-report.md) — production hardening findings (A–Q) and KEEP/OPTIMIZE/… decisions
+- [Audit report (archived 2026-09-15)](audit-report.md) — historical hardening findings (A–Q); resolved items marked `RESOLVED` inline, the rest not re-verified — do not quote as current issues

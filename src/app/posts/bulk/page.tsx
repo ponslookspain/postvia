@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function BulkPostsPage() {
   const user = await requireUser();
 
-  // Only accounts whose platform can publish video are offered: anything
+  // Only accounts whose platform can publish media are offered: anything
   // else could never produce a valid bulk item (capability registry).
   const registry = getCapabilitiesRegistry();
   const videoCapable = new Set(

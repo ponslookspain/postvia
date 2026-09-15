@@ -2,12 +2,17 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   detectMediaKind,
+  isMediaKind,
+  MEDIA_KIND_META,
+  MEDIA_KINDS,
+  MEDIA_LIMITS,
   validateMediaInput,
   sanitizeFilename,
   makeBlobPathname,
   resolveThreadsMediaPolicy,
-  MEDIA_LIMITS,
 } from "../src/lib/media";
+import { supportsMediaKind } from "../src/lib/platforms/overrides";
+import { getPlatformCapabilities } from "../src/lib/platforms/capabilities";
 
 describe("detectMediaKind", () => {
   test("recognizes allowed image MIME types", () => {
@@ -109,6 +114,43 @@ describe("makeBlobPathname", () => {
     const a = makeBlobPathname("user-1", "post-1", "photo.jpg");
     const b = makeBlobPathname("user-1", "post-1", "photo.jpg");
     assert.notEqual(a, b);
+  });
+});
+
+describe("MEDIA_KINDS registry (E2 single source)", () => {
+  test("lists exactly the two supported kinds", () => {
+    assert.deepEqual([...MEDIA_KINDS], ["IMAGE", "VIDEO"]);
+  });
+
+  test("metadata derives from MEDIA_LIMITS without duplication", () => {
+    for (const kind of MEDIA_KINDS) {
+      assert.equal(MEDIA_KIND_META[kind].maxBytes, MEDIA_LIMITS[kind].maxBytes);
+      assert.deepEqual(
+        [...MEDIA_KIND_META[kind].mimeTypes],
+        [...MEDIA_LIMITS[kind].mimeTypes]
+      );
+    }
+    assert.equal(MEDIA_KIND_META.IMAGE.noun, "image");
+    assert.equal(MEDIA_KIND_META.VIDEO.noun, "video");
+  });
+
+  test("isMediaKind guards unknown values fail-closed", () => {
+    assert.equal(isMediaKind("IMAGE"), true);
+    assert.equal(isMediaKind("VIDEO"), true);
+    assert.equal(isMediaKind("AUDIO"), false);
+    assert.equal(isMediaKind("image"), false);
+    assert.equal(isMediaKind(null), false);
+    assert.equal(isMediaKind(undefined), false);
+  });
+
+  test("supportsMediaKind mirrors the capability flags per platform", () => {
+    const threads = getPlatformCapabilities("THREADS");
+    assert.equal(supportsMediaKind(threads, "IMAGE"), true);
+    assert.equal(supportsMediaKind(threads, "VIDEO"), true);
+    assert.equal(supportsMediaKind(threads, "AUDIO"), false);
+    const youtube = getPlatformCapabilities("YOUTUBE");
+    assert.equal(supportsMediaKind(youtube, "IMAGE"), false);
+    assert.equal(supportsMediaKind(youtube, "VIDEO"), true);
   });
 });
 

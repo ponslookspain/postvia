@@ -23,6 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PostRowMenu } from "./PostRowMenu";
+import { getImplementedPlatforms } from "@/lib/platforms/capabilities";
+import { POST_PAGE_DEFAULT } from "@/lib/pagination";
 
 export type PostListItem = {
   id: string;
@@ -33,9 +35,15 @@ export type PostListItem = {
   publishedAt: string | null;
   targets: { id: string; platform: string }[];
   media: { id: string; type: string }[];
+  /** Total attached files (only the thumbnail row loads per post). */
+  mediaCount: number;
 };
 
-const PLATFORM_OPTIONS = ["X", "THREADS", "TIKTOK", "INSTAGRAM"] as const;
+// Platform filter options from the single capability registry (E1),
+// in shared registry order. Labels render as before (X stays "X").
+const PLATFORM_OPTIONS: readonly string[] = getImplementedPlatforms().map(
+  (caps) => caps.platform
+);
 
 function toDate(iso: string | null): Date | null {
   if (!iso) return null;
@@ -73,29 +81,83 @@ function MediaThumb({ post }: { post: PostListItem }) {
           />
         </span>
       )}
-      {post.media.length > 1 && (
+      {post.mediaCount > 1 && (
         <span className="absolute right-1 bottom-1 rounded-md bg-foreground/80 px-1.5 py-0.5 text-[11px] font-medium text-primary-foreground tabular-nums">
-          +{post.media.length - 1}
+          +{post.mediaCount - 1}
         </span>
       )}
     </span>
   );
 }
 
+/**
+ * Normalize one API list row into PostListItem shape. Defensive: the
+ * endpoint returns full Prisma rows (extra fields ignored), and anything
+ * misshapen is dropped instead of crashing the list.
+ */
+function normalizeListItem(row: unknown): PostListItem | null {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return null;
+  const r = row as Record<string, unknown>;
+  if (typeof r.id !== "string") return null;
+  const text = typeof r.text === "string" ? r.text : "";
+  const status = typeof r.status === "string" ? r.status : "DRAFT";
+  const iso = (value: unknown): string | null =>
+    typeof value === "string" ? value : null;
+  const targets = Array.isArray(r.targets)
+    ? r.targets.flatMap((t): { id: string; platform: string }[] => {
+        if (!t || typeof t !== "object" || Array.isArray(t)) return [];
+        const o = t as Record<string, unknown>;
+        return typeof o.id === "string" && typeof o.platform === "string"
+          ? [{ id: o.id, platform: o.platform }]
+          : [];
+      })
+    : [];
+  const media = Array.isArray(r.media)
+    ? r.media.flatMap((m): { id: string; type: string }[] => {
+        if (!m || typeof m !== "object" || Array.isArray(m)) return [];
+        const o = m as Record<string, unknown>;
+        return typeof o.id === "string" && typeof o.type === "string"
+          ? [{ id: o.id, type: o.type }]
+          : [];
+      })
+    : [];
+  const count = (r._count as { media?: unknown } | undefined)?.media;
+  return {
+    id: r.id,
+    text,
+    status,
+    createdAt: iso(r.createdAt) ?? new Date(0).toISOString(),
+    scheduledAt: iso(r.scheduledAt),
+    publishedAt: iso(r.publishedAt),
+    targets,
+    media,
+    mediaCount: typeof count === "number" ? count : media.length,
+  };
+}
+
 export function PostsList({
-  posts,
+  posts: initialPosts,
   statusFilter,
+  initialNextCursor,
+  total,
 }: {
   posts: PostListItem[];
   statusFilter: string;
+  initialNextCursor: string | null;
+  total: number;
 }) {
   const [query, setQuery] = useState("");
   const [platform, setPlatform] = useState<string>("all");
   const [sort, setSort] = useState<string>("newest");
+  // Accumulated pages (keyed remount per statusFilter keeps this fresh).
+  const [items, setItems] = useState<PostListItem[]>(initialPosts);
+  const [cursor, setCursor] = useState<string | null>(initialNextCursor);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = posts.filter((post) => {
+    const filtered = items.filter((post) => {
       if (q && !post.text.toLowerCase().includes(q)) return false;
       if (
         platform !== "all" &&
@@ -107,7 +169,45 @@ export function PostsList({
     });
     if (sort === "oldest") return [...filtered].reverse();
     return filtered;
-  }, [posts, query, platform, sort]);
+  }, [items, query, platform, sort]);
+
+  async function handleLoadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    setLoadError(null);
+    try {
+      const params = new URLSearchParams({
+        limit: String(POST_PAGE_DEFAULT),
+        cursor,
+      });
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      const res = await fetch(`/api/posts?${params.toString()}`);
+      const data = (await res.json().catch(() => null)) as {
+        posts?: unknown;
+        nextCursor?: unknown;
+      } | null;
+      if (!res.ok || !data || !Array.isArray(data.posts)) {
+        throw new Error("bad page");
+      }
+      const fresh = data.posts.flatMap((row): PostListItem[] => {
+        const item = normalizeListItem(row);
+        return item ? [item] : [];
+      });
+      setItems((current) => {
+        const seen = new Set(current.map((post) => post.id));
+        return [...current, ...fresh.filter((post) => !seen.has(post.id))];
+      });
+      setCursor(
+        typeof data.nextCursor === "string" && data.nextCursor.length > 0
+          ? data.nextCursor
+          : null
+      );
+    } catch {
+      setLoadError("Couldn't load more posts. Try again.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const toolbarActive = query.trim() !== "" || platform !== "all";
 
@@ -328,6 +428,29 @@ export function PostsList({
               </li>
             ))}
           </ul>
+          {cursor || items.length < total ? (
+            <div className="flex flex-col items-center gap-2 py-6">
+              <p className="text-sm text-muted-foreground tabular-nums">
+                Showing {items.length} of {total} posts
+              </p>
+              {cursor ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleLoadMore()}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </Button>
+                  {loadError && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {loadError}
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
     </div>

@@ -11,12 +11,12 @@ import { isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Popover,
   PopoverContent,
@@ -103,15 +103,15 @@ export function MobileTopBar({
         </Popover>
       </div>
 
-      <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Menu</DialogTitle>
-            <DialogDescription>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left">
+          <SheetHeader>
+            <SheetTitle>Menu</SheetTitle>
+            <SheetDescription>
               Go to a section of Postvia.
-            </DialogDescription>
-          </DialogHeader>
-          <nav aria-label="Primary" className="flex flex-col gap-1">
+            </SheetDescription>
+          </SheetHeader>
+          <nav aria-label="Primary" className="flex flex-col gap-1 px-6">
             {navItems.map((item) => {
               const active = isActivePath(pathname, item.href);
               const Icon = item.icon;
@@ -134,7 +134,7 @@ export function MobileTopBar({
               );
             })}
           </nav>
-          <div className="flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 border-t border-border px-6 pt-3 pb-6 text-xs text-muted-foreground">
             <Link
               href="/terms"
               onClick={() => setMenuOpen(false)}
@@ -151,8 +151,8 @@ export function MobileTopBar({
               Privacy
             </Link>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </header>
   );
 }

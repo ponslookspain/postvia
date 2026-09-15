@@ -1,5 +1,7 @@
 import type { PublishOutcome } from "@/lib/publish";
 import { selectPublishableTargetIds } from "@/lib/publish";
+import { NextRequest, NextResponse } from "next/server";
+import { reportError } from "@/lib/diagnostics";
 
 const AUTH_PREFIX = "Bearer ";
 
@@ -35,6 +37,33 @@ export function isCronAuthorized(authHeader: string | null): boolean {
     diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
   }
   return diff === 0;
+}
+
+/**
+ * Shared cron route wrapper (E5): Bearer auth gate + generic 500 envelope
+ * with diagnostics. Route handlers pass only their work function; GET and
+ * POST share it (Vercel Cron uses GET, manual triggers use POST). A
+ * handler failure can never leak internals — the raw cause stays in
+ * diagnostics.
+ */
+export function withCron(
+  handler: (request: NextRequest) => Promise<NextResponse>
+): {
+  GET: (request: NextRequest) => Promise<NextResponse>;
+  POST: (request: NextRequest) => Promise<NextResponse>;
+} {
+  const wrapped = async (request: NextRequest): Promise<NextResponse> => {
+    if (!isCronAuthorized(request.headers.get("authorization"))) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      return await handler(request);
+    } catch (error) {
+      reportError("cron", "cron handler failed", error);
+      return NextResponse.json({ error: "Cron run failed" }, { status: 500 });
+    }
+  };
+  return { GET: wrapped, POST: wrapped };
 }
 
 export type StoredPostTarget = {

@@ -6,6 +6,7 @@ import {
   MAX_MEDIA_PER_POST,
   sanitizeFilename,
   validateMediaInput,
+  type MediaKind,
 } from "@/lib/media";
 import {
   deleteBlobs,
@@ -258,7 +259,7 @@ export type CompletedUploadOutcome =
         filename: string;
         mimeType: string;
         size: number;
-        type: "IMAGE" | "VIDEO";
+        type: MediaKind;
       };
     }
   | { ok: false; error: string };

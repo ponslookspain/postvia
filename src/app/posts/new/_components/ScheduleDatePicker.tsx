@@ -9,22 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/** Local "yyyy-MM-dd" key without UTC shifts (noon avoids DST edges). */
-function toDateKey(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-export function parseDateKey(value: string): Date | undefined {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!match) return undefined;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
-  return Number.isNaN(date.getTime()) ? undefined : date;
-}
+import { parseDateKey, toDateKey } from "@/lib/schedule-date";
 
 /**
  * Schedule date field. A real calendar in a popover instead of a native

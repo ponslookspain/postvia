@@ -1,6 +1,10 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { getPlatformCapabilities } from "../src/lib/platforms/capabilities";
+import {
+  getCapabilitiesRegistry,
+  getImplementedPlatforms,
+  getPlatformCapabilities,
+} from "../src/lib/platforms/capabilities";
 import {
   resolveEffectiveTargetContent,
   validateTargetMedia,
@@ -150,5 +154,36 @@ describe("capability media validation", () => {
     ]);
     assert.equal(result.ok, false);
     if (!result.ok) assert.match(result.error, /not implemented/);
+  });
+});
+
+describe("implemented platform derivation (E1 single registry)", () => {
+  test("exactly the four launched platforms, in shared display order", () => {
+    const implemented = getImplementedPlatforms();
+    assert.deepEqual(
+      implemented.map((caps) => caps.platform),
+      ["X", "THREADS", "INSTAGRAM", "TIKTOK"]
+    );
+  });
+
+  test("every registry entry has a stable order; stubs sort last", () => {
+    for (const caps of getCapabilitiesRegistry()) {
+      assert.equal(typeof caps.order, "number");
+    }
+    const stubs = getCapabilitiesRegistry().filter((caps) => !caps.implemented);
+    assert.ok(stubs.length > 0);
+    for (const stub of stubs) {
+      assert.ok(stub.order >= 90);
+      assert.equal(stub.connect, undefined);
+    }
+  });
+
+  test("every implemented platform carries connect metadata", () => {
+    for (const caps of getImplementedPlatforms()) {
+      assert.ok(caps.connect, `${caps.platform} needs connect metadata`);
+      assert.equal(typeof caps.connect?.connectEndpoint, "string");
+      assert.equal(typeof caps.connect?.disconnectEndpoint, "string");
+      assert.equal(typeof caps.connect?.connectLabel, "string");
+    }
   });
 });

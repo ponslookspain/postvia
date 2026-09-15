@@ -50,8 +50,8 @@ those outside local testing.
 ## Testing
 
 - Unit/adversarial: `tests/abuse-identity.test.ts` (in-memory stores with
-  row-lock-like atomicity), `tests/abuse-adversarial.test.ts` (36-scenario
-  attacker matrix + snapshot-transaction kernel tests), plus per-module
+  row-lock-like atomicity), `tests/abuse-adversarial.test.ts` (numbered
+  attacker-matrix scenarios + snapshot-transaction kernel tests), plus per-module
   suites (`post-limits`, `social-accounts-multi`, `entitlements`, `plans`,
   `billing-*`, provider tests, `sentry-scrub`, …).
 - PG concurrency: `test:pg` covers same-signal resolve storms, merge

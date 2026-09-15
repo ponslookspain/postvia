@@ -164,12 +164,12 @@ describe("capability-driven preview metadata", () => {
 });
 
 describe("tiktok title contract", () => {
-  test("tiktok preview never uses global text as title", () => {
-    // Production contract: TikTok publishes its own title only. The
-    // legacy preview must render empty (not global text) until a title
-    // override is set, matching buildComposerPreviewModel.
+  test("tiktok preview uses global text as the caption", () => {
+    // One common Content field: the global text is the default TikTok
+    // caption (TikTok's title is API-optional). An explicit override
+    // still wins per account.
     const previews = buildComposerPreviews([TIKTOK], GLOBAL, []);
-    assert.equal(previews[0].text, "");
+    assert.equal(previews[0].text, GLOBAL);
     assert.equal(previews[0].customized, false);
     assert.equal(previews[0].maxLength, 2200);
   });
@@ -182,37 +182,33 @@ describe("tiktok title contract", () => {
     assert.equal(previews[0].customized, true);
   });
 
-  test("empty tiktok title counts as no override", () => {
+  test("empty tiktok title falls back to global text", () => {
     const previews = buildComposerPreviews([TIKTOK], GLOBAL, [
       overrideFor("acc-tiktok", ""),
     ]);
-    assert.equal(previews[0].text, "");
+    assert.equal(previews[0].text, GLOBAL);
     assert.equal(previews[0].customized, false);
   });
 
-  test("global text change never leaks into the tiktok preview", () => {
+  test("global text change flows into the tiktok preview", () => {
     const previews = buildComposerPreviews([TIKTOK], "totally different global", []);
-    assert.equal(previews[0].text, "");
+    assert.equal(previews[0].text, "totally different global");
   });
 });
 
 describe("blocking preview errors gate Publish now", () => {
   const photoMedia = [{ type: "IMAGE" as const, mimeType: "image/jpeg" }];
 
-  test("tiktok photo without title/description blocks publish", () => {
+  test("tiktok photo with global text needs no override", () => {
     const models = buildComposerPreviewModel({
       accounts: [TIKTOK],
       globalText: GLOBAL,
       overrides: [],
       media: photoMedia,
     });
-    const codes = models[0].validation.errors.map((issue) => issue.code);
-    assert.ok(codes.includes("tiktok-title-missing"));
-    assert.equal(hasBlockingPreviewErrors(models), true);
-    assert.ok(
-      (firstBlockingPreviewError(models) ?? "").length > 0,
-      "a message is surfaced next to the disabled button"
-    );
+    assert.equal(models[0].text, GLOBAL);
+    assert.equal(hasBlockingPreviewErrors(models), false);
+    assert.equal(firstBlockingPreviewError(models), null);
   });
 
   test("tiktok photo with a title no longer blocks publish", () => {
@@ -305,21 +301,21 @@ describe("composer preview model", () => {
     assert.equal(x?.source, "global");
   });
 
-  test("tiktok without title never shows global text as title", () => {
+  test("tiktok uses global text as the caption", () => {
     const [tiktok] = buildComposerPreviewModel({
       accounts: [TIKTOK],
       globalText: GLOBAL,
       overrides: [],
       media: [{ type: "VIDEO", mimeType: "video/mp4" }],
     });
-    assert.equal(tiktok?.text, "");
+    assert.equal(tiktok?.text, GLOBAL);
     assert.equal(tiktok?.source, "global");
     assert.equal(tiktok?.customized, false);
     assert.equal(tiktok?.contentKey, "title");
-    assert.equal(tiktok?.validation.valid, false);
+    assert.equal(tiktok?.validation.valid, true);
     assert.deepEqual(
       tiktok?.validation.errors.map((issue) => issue.code),
-      ["tiktok-title-missing"]
+      []
     );
   });
 
@@ -544,14 +540,15 @@ describe("composer preview model", () => {
     assert.equal(threads?.inheritsGlobal, true);
   });
 
-  test("tiktok without title inherits nothing", () => {
+  test("tiktok without override inherits global content", () => {
     const [tiktok] = buildComposerPreviewModel({
       accounts: [TIKTOK],
       globalText: GLOBAL,
       overrides: [],
       media: [{ type: "VIDEO", mimeType: "video/mp4" }],
     });
-    assert.equal(tiktok?.inheritsGlobal, false);
+    assert.equal(tiktok?.text, GLOBAL);
+    assert.equal(tiktok?.inheritsGlobal, true);
   });
 });
 

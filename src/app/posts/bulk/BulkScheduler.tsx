@@ -87,6 +87,8 @@ type BulkItem = {
    */
   slot: number;
   file: File;
+  /** Local thumbnail URL for image items (revoked on remove/unmount). */
+  previewUrl: string | null;
   progress: number;
   status: ItemStatus;
   error?: string;
@@ -172,8 +174,17 @@ export function BulkScheduler({
     return batchIdRef.current;
   }
 
+  const itemsRef = useRef<BulkItem[]>([]);
   useEffect(() => {
-    return () => abortRef.current?.abort();
+    itemsRef.current = items;
+  }, [items]);
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      for (const item of itemsRef.current) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      }
+    };
   }, []);
   const [configError, setConfigError] = useState<string | null>(null);
   const [finished, setFinished] = useState(false);
@@ -211,12 +222,14 @@ export function BulkScheduler({
   // plus the global file gate (size/type). Fully attributed per file and
   // per account BEFORE any upload starts: "clip.mp4 — X: <reason>".
   // Keyed by item key so two items sharing a filename stay independent.
-  const { bulkIssues, fileProblems }: {
+  const { bulkIssues, fileProblems, problemPlatforms }: {
     bulkIssues: BulkCapabilityIssue[];
     fileProblems: Map<string, string[]>;
+    problemPlatforms: Map<string, string[]>;
   } = useMemo(() => {
     const all: BulkCapabilityIssue[] = [];
     const problems = new Map<string, string[]>();
+    const platforms = new Map<string, string[]>();
     for (const item of items) {
       const issues = validateBulkVideoForAccountsDetailed(
         { name: item.file.name, mimeType: item.file.type, size: item.file.size },
@@ -228,9 +241,12 @@ export function BulkScheduler({
           item.key,
           issues.map((issue) => issue.message)
         );
+        platforms.set(item.key, [
+          ...new Set(issues.map((issue) => issue.platformLabel)),
+        ]);
       }
     }
-    return { bulkIssues: all, fileProblems: problems };
+    return { bulkIssues: all, fileProblems: problems, problemPlatforms: platforms };
   }, [items, selectedAccounts]);
 
   const doneCount = items.filter((item) => item.status === "scheduled").length;
@@ -240,28 +256,36 @@ export function BulkScheduler({
   ).length;
 
   function appendFiles(files: File[]) {
-    // Slots are assigned outside the state updater (updaters must stay
-    // pure and may re-run); gaps from room-capping are harmless.
+    // Slots and preview URLs are assigned outside the state updater
+    // (updaters must stay pure and may re-run); gaps from room-capping
+    // are harmless. Preview URLs are revoked on remove/unmount.
     const withSlots = files.map((file) => ({
       file,
       slot: slotCounterRef.current++,
+      previewUrl: file.type.startsWith("image/")
+        ? URL.createObjectURL(file)
+        : null,
     }));
     setItems((prev) => {
       const room = batchCap - prev.length;
       const capped = withSlots.slice(0, Math.max(0, room));
       if (files.length > capped.length) {
+        for (const skipped of withSlots.slice(capped.length)) {
+          if (skipped.previewUrl) URL.revokeObjectURL(skipped.previewUrl);
+        }
         toast.add({
           title: "Batch is full",
-          description: `A batch holds at most ${batchCap} videos.`,
+          description: `A batch holds at most ${batchCap} files.`,
           type: "warning",
         });
       }
       return [
         ...prev,
-        ...capped.map(({ file, slot }) => ({
+        ...capped.map(({ file, slot, previewUrl }) => ({
           key: nextItemKey(),
           slot,
           file,
+          previewUrl,
           progress: 0,
           status: "queued" as const,
         })),
@@ -274,10 +298,10 @@ export function BulkScheduler({
     const accepted: File[] = [];
     for (const file of files) {
       const validation = validateMediaInput(file.type, file.size);
-      if (!validation.ok || validation.kind !== "VIDEO") {
+      if (!validation.ok) {
         toast.add({
           title: "File skipped",
-          description: `${file.name}: ${!validation.ok ? validation.error : "Only video files are accepted here."}`,
+          description: `${file.name}: ${validation.error}`,
           type: "warning",
         });
         continue;
@@ -331,7 +355,11 @@ export function BulkScheduler({
   }
 
   function removeItem(key: string) {
-    setItems((prev) => prev.filter((item) => item.key !== key));
+    setItems((prev) => {
+      const item = prev.find((entry) => entry.key === key);
+      if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      return prev.filter((entry) => entry.key !== key);
+    });
   }
 
   function patchItem(key: string, patch: Partial<BulkItem>) {
@@ -438,7 +466,7 @@ export function BulkScheduler({
     }
     patchItem(item.key, { postId });
 
-    // 2. Upload the video through the standard secure pipeline.
+    // 2. Upload the file through the standard secure pipeline.
     patchItem(item.key, { status: "uploading", progress: 0 });
     const uploadError = await uploadOneVideo(
       postId,
@@ -604,8 +632,8 @@ export function BulkScheduler({
     return (
       <PageContainer size="wide">
         <PageHeader
-          title="Bulk video scheduling"
-          description="Upload several videos and schedule one post per video, spaced by a fixed interval. Publishing runs on the regular schedule engine."
+          title="Bulk scheduling"
+          description="Upload images or videos and schedule one post per file, spaced by a fixed interval. Publishing runs on the regular schedule engine."
         />
         <Card>
           <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center sm:py-14">
@@ -617,10 +645,10 @@ export function BulkScheduler({
             </span>
             <div className="flex max-w-md flex-col gap-1.5">
               <h2 className="text-xl font-semibold tracking-tight text-balance">
-                No video accounts connected
+                No media accounts connected
               </h2>
               <p className="text-sm leading-relaxed text-pretty text-muted-foreground">
-                Connect a profile that supports video to schedule a batch.
+                Connect a profile that supports media to schedule a batch.
               </p>
             </div>
             <Button
@@ -644,8 +672,8 @@ export function BulkScheduler({
     return (
       <PageContainer size="wide">
         <PageHeader
-          title="Bulk video scheduling"
-          description="Upload several videos and schedule one post per video, spaced by a fixed interval. Publishing runs on the regular schedule engine."
+          title="Bulk scheduling"
+          description="Upload images or videos and schedule one post per file, spaced by a fixed interval. Publishing runs on the regular schedule engine."
         />
         <Card>
           <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center sm:py-14">
@@ -660,7 +688,7 @@ export function BulkScheduler({
                 Bulk scheduling needs a bigger plan
               </h2>
               <p className="text-sm leading-relaxed text-pretty text-muted-foreground">
-                Bulk video scheduling is not included in your current plan.
+                Bulk scheduling is not included in your current plan.
                 {upgradeName
                   ? ` Upgrade to ${upgradeName} to unlock it.`
                   : " Manage your plan to unlock it."}
@@ -683,11 +711,11 @@ export function BulkScheduler({
   return (
     <PageContainer size="wide">
       <PageHeader
-        title="Bulk video scheduling"
-        description="Upload several videos and schedule one post per video, spaced by a fixed interval. Publishing runs on the regular schedule engine."
+        title="Bulk scheduling"
+        description="Upload images or videos and schedule one post per file, spaced by a fixed interval. Publishing runs on the regular schedule engine."
         actions={
           <Badge variant="secondary" className="tabular-nums">
-            {items.length}/{batchCap} videos
+            {items.length}/{batchCap} files
           </Badge>
         }
       />
@@ -736,13 +764,13 @@ export function BulkScheduler({
       <PageSections className="gap-8">
         <div className="grid items-start gap-5 lg:grid-cols-3">
           <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
-        <section aria-labelledby="bulk-videos">
+        <section aria-labelledby="bulk-media">
           <Card size="sm">
             <CardHeader>
-              <CardTitle>Videos</CardTitle>
+              <CardTitle>Media</CardTitle>
               <CardDescription>
-                MP4, WebM or MOV, up to {batchCap} per batch. Each file is
-                uploaded separately with its own progress.
+                Images or video, up to {batchCap} files per batch. Each
+                file is uploaded separately with its own progress.
               </CardDescription>
               <CardAction>
                 <Badge variant="secondary" className="tabular-nums">
@@ -760,9 +788,9 @@ export function BulkScheduler({
                   className="h-20 w-full flex-col gap-1 border-dashed py-3"
                 >
                   <UploadIcon data-icon="inline-start" />
-                  Add videos
+                  Add media
                   <span className="text-xs font-normal text-muted-foreground">
-                    Video files, up to {batchCap} per batch
+                    Images or video, up to {batchCap} files per batch
                   </span>
                 </Button>
               ) : (
@@ -776,11 +804,14 @@ export function BulkScheduler({
                       progress={item.progress}
                       error={item.error ?? null}
                       problems={fileProblems.get(item.key) ?? []}
+                      problemPlatforms={problemPlatforms.get(item.key) ?? []}
                       timeLabel={
                         schedule.length > 0
                           ? formatInZone(schedule[index] ?? "", timeZone)
                           : null
                       }
+                      previewUrl={item.previewUrl}
+                      isVideo={!item.file.type.startsWith("image/")}
                       running={running}
                       onRemove={() => removeItem(item.key)}
                     />
@@ -796,7 +827,7 @@ export function BulkScheduler({
                   className="h-14 w-full flex-row gap-1.5 border-dashed"
                 >
                   <UploadIcon data-icon="inline-start" />
-                  Add more videos
+                  Add more media
                 </Button>
               )}
               {pendingDupes.length > 0 && (
@@ -836,7 +867,7 @@ export function BulkScheduler({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov"
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.mp4,.m4v,.webm,.mov"
                 multiple
                 className="hidden"
                 onChange={(e) => {
@@ -1063,7 +1094,7 @@ export function BulkScheduler({
               <CardTitle>Batch</CardTitle>
               <CardDescription>
                 {items.length === 0
-                  ? "Add videos to build the schedule."
+                  ? "Add media to build the schedule."
                   : startIso
                     ? `First post ${formatInZone(startIso, timeZone)}.`
                     : "Choose a start date and time."}
@@ -1072,7 +1103,7 @@ export function BulkScheduler({
             <CardContent className="flex flex-col gap-3">
               <dl className="flex flex-col gap-2 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Videos</dt>
+                  <dt className="text-muted-foreground">Media</dt>
                   <dd className="font-medium tabular-nums">
                     {items.length}/{batchCap}
                   </dd>

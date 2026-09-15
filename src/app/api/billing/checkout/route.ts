@@ -11,6 +11,7 @@ import {
   type StripePrices,
 } from "@/lib/stripe";
 import { toPlanId, type DbPlan } from "@/lib/entitlements";
+import { gateWriteRequest, WRITE_LIMIT_CHECKOUT } from "@/lib/abuse";
 import type { PlanId } from "@/lib/plans";
 import { reportError } from "@/lib/diagnostics";
 
@@ -47,7 +48,7 @@ export type CheckoutDeps = {
    * stacking a second completable one.
    */
   expireOpenSessions: (customerId: string) => Promise<void>;
-  /** Serializes concurrent checkouts for one user (tabs, double-click). */
+  /** Serializes one short DB-critical section per user (tabs, double-click). */
   withLock: <T>(userId: string, fn: () => Promise<T>) => Promise<T>;
 };
 
@@ -138,13 +139,16 @@ const liveDeps: CheckoutDeps = {
     }
   },
   withLock: async (userId, fn) => {
-    // Serializes concurrent checkouts for one user across instances.
-    // xact-scoped advisory lock: held for one low-frequency checkout flow.
+    // Per-phase serialisation across instances: one short transaction
+    // holding a transaction-scoped advisory lock. The lock is held only
+    // for DB reads/writes inside fn — never across Stripe network calls
+    // (which run between phases), so pool connections are never parked
+    // on third-party latency. Cross-phase races converge by re-check
+    // (see handleCheckout): fail-closed, never double-granting.
     // Fail-closed: any transaction failure (lock acquisition or commit)
-    // surfaces 500 without ever re-running fn(), so the flow can never
-    // execute twice and mint two customers/sessions. The user retries
-    // explicitly; Stripe-side guards plus open-session expiry keep the
-    // retry safe.
+    // surfaces 500 without ever re-running fn(), so a phase can never
+    // execute twice and mint two rows. The user retries explicitly;
+    // Stripe-side guards plus open-session expiry keep the retry safe.
     return await prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(
         "SELECT pg_advisory_xact_lock(hashtext($1))",
@@ -182,13 +186,19 @@ function portalRedirect() {
  * Starts a Stripe Checkout session for Growth/Scale. Authenticated users
  * only; never writes plan state (the webhook owns Subscription writes).
  *
- * Double-subscription guards (all server-side, never UI-only):
- * - the whole flow runs under a per-user advisory lock (tabs, double-click,
- *   network retry serialize instead of racing);
+ * DB serialization stays in short transactions; Stripe network calls run
+ * OUTSIDE any transaction so pool connections are never parked on
+ * third-party latency. Cross-phase races converge by re-check:
+ * - the whole flow never runs under one lock (tabs, double-click and
+ *   network retries pass through the same phase gates instead);
  * - a stored live paid stake (active/past-due/unpaid/cancelling, or any
- *   unexpired stripeSubId) routes to the Customer Portal;
- * - a live Stripe stake for the customer routes to the portal even when the
- *   webhook has not landed yet;
+ *   unexpired stripeSubId) routes to the Customer Portal, re-checked
+ *   after customer creation and before session creation;
+ * - a live Stripe stake for the customer routes to the portal even when
+ *   the webhook has not landed yet;
+ * - concurrent customer creation converges: the first linked row wins and
+ *   the loser adopts it (its own fresh Stripe customer stays an empty,
+ *   benign orphan — no card, no subscription);
  * - prior open Checkout Sessions are expired before a fresh one is created,
  *   so a retried checkout replaces the pending session instead of stacking
  *   a second completable one.
@@ -237,55 +247,96 @@ export async function handleCheckout(input: {
   const email = input.user.email;
   const plan = input.plan;
   const origin = input.origin;
-  return input.deps.withLock(userId, async () => {
+  // Phase 1 — serialized read in a short transaction. No Stripe calls:
+  // decides portal vs proceed and whether a customer exists yet.
+  const pre = await input.deps.withLock(userId, async () => {
     const existing = await input.deps.findSubscription(userId);
     if (hasLivePaidStake(existing)) {
+      return { verdict: "portal" as const };
+    }
+    return {
+      verdict: "proceed" as const,
+      customerId: existing?.stripeCustomerId ?? null,
+    };
+  });
+  if (pre.verdict === "portal") {
+    return portalRedirect();
+  }
+  let customerId = pre.customerId;
+  if (customerId) {
+    const live = await input.deps.listSubscriptionsByCustomer(customerId);
+    if (live.some((sub) => isLiveStripeSubscriptionStatus(sub.status))) {
       return portalRedirect();
     }
-    let customerId = existing?.stripeCustomerId ?? null;
-    if (customerId) {
-      const live = await input.deps.listSubscriptionsByCustomer(customerId);
-      if (live.some((sub) => isLiveStripeSubscriptionStatus(sub.status))) {
-        return portalRedirect();
-      }
-    } else {
-      const customer = await input.deps.createCustomer({
-        email,
-        userId,
-      });
-      customerId = customer.id;
-      await input.deps.linkCustomer(userId, customerId);
-    }
-    await input.deps.expireOpenSessions(customerId);
-    const session = await input.deps.createSession({
-      customerId,
-      priceId: plan === "growth" ? prices.growth : prices.scale,
+  } else {
+    const customer = await input.deps.createCustomer({
+      email,
       userId,
-      successUrl: `${origin}/billing?checkout=success`,
-      cancelUrl: `${origin}/billing?checkout=cancelled`,
     });
-    if (!session.url || !isStripeRedirectUrl(session.url)) {
-      reportError(
-        "billing",
-        "checkout returned an untrusted url",
-        new Error("untrusted checkout url"),
-        {
-          userId,
-          plan,
-        }
-      );
-      return NextResponse.json(
-        { error: "Failed to start checkout" },
-        { status: 502 }
-      );
+    // Phase 2 — serialized re-check in a short transaction before
+    // anything is linked. A concurrent flow that linked first wins and
+    // this flow adopts the winner instead of stacking a second row.
+    const linked = await input.deps.withLock(userId, async () => {
+      const fresh = await input.deps.findSubscription(userId);
+      if (hasLivePaidStake(fresh)) {
+        return { verdict: "portal" as const };
+      }
+      if (fresh?.stripeCustomerId && fresh.stripeCustomerId !== customer.id) {
+        return { verdict: "proceed" as const, customerId: fresh.stripeCustomerId };
+      }
+      await input.deps.linkCustomer(userId, customer.id);
+      return { verdict: "proceed" as const, customerId: customer.id };
+    });
+    if (linked.verdict === "portal") {
+      return portalRedirect();
     }
-    return NextResponse.json({ url: session.url });
+    customerId = linked.customerId;
+  }
+  await input.deps.expireOpenSessions(customerId);
+  const session = await input.deps.createSession({
+    customerId,
+    priceId: plan === "growth" ? prices.growth : prices.scale,
+    userId,
+    successUrl: `${origin}/billing?checkout=success`,
+    cancelUrl: `${origin}/billing?checkout=cancelled`,
   });
+  if (!session.url || !isStripeRedirectUrl(session.url)) {
+    reportError(
+      "billing",
+      "checkout returned an untrusted url",
+      new Error("untrusted checkout url"),
+      {
+        userId,
+        plan,
+      }
+    );
+    return NextResponse.json(
+      { error: "Failed to start checkout" },
+      { status: 502 }
+    );
+  }
+  return NextResponse.json({ url: session.url });
 }
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getApiUser();
+    // Flood gate before Stripe work starts. Generous: human-initiated
+    // checkouts and double-click retries stay far below it.
+    if (
+      user &&
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "billing-checkout",
+        userMax: WRITE_LIMIT_CHECKOUT,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
+    }
     let body: unknown;
     try {
       body = await request.json();
