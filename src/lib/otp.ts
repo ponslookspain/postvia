@@ -23,6 +23,7 @@ import {
 } from "@/lib/abuse";
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 import { reportError } from "@/lib/diagnostics";
+import { EmailNotConfiguredError, isEmailConfigured } from "@/lib/email";
 import { parsePlanParam } from "@/lib/plans";
 import {
   OTP_SEND_COOLDOWN_SECONDS,
@@ -83,7 +84,7 @@ export type OtpRequestResult =
   | {
       ok: false;
       error: string;
-      status: 400 | 429;
+      status: 400 | 429 | 500;
       code?: typeof OTP_RATE_LIMITED_CODE;
       retryAfterSeconds?: number;
     };
@@ -114,6 +115,20 @@ export async function requestOtp(input: {
       ok: false,
       error: "Disposable email addresses are not supported",
       status: 400,
+    };
+  }
+
+  // Fail fast when no mail provider is configured: never burn rate quota,
+  // never create a User, and never report success when no code can be sent.
+  // Production keeps its hard failure; local dev gets an actionable message.
+  if (!isEmailConfigured()) {
+    const local =
+      process.env.NODE_ENV !== "production" &&
+      process.env.VERCEL_ENV !== "production";
+    return {
+      ok: false,
+      error: new EmailNotConfiguredError(local).message,
+      status: 500,
     };
   }
 
@@ -224,8 +239,12 @@ export async function requestOtp(input: {
       headers: await headers(),
     });
   } catch (error) {
-    // Never log the address (PII). Surface a generic failure.
+    // Never log the address (PII). A config error (key removed mid-flight)
+    // keeps its explicit message; everything else stays generic.
     logErrorDiagnostic("auth", "otp send failed", error);
+    if (error instanceof EmailNotConfiguredError) {
+      return { ok: false, error: error.message, status: 500 };
+    }
     return { ok: false, error: "Failed to send code. Please try again.", status: 400 };
   }
   return { ok: true };

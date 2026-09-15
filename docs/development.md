@@ -11,6 +11,25 @@ npx prisma db push   # empty/dev databases only — never production
 npm run dev          # http://localhost:3000
 ```
 
+## Local OTP email setup
+
+Signup/login codes are sent via Resend. Without a key, requesting a code
+fails loudly instead of pretending it was sent:
+
+```bash
+# .env.local (values only — never commit)
+RESEND_API_KEY=re_...
+# Optional sender override (default: Postvia <hello@postvia.online>):
+# EMAIL_FROM=Postvia <hello@postvia.online>
+```
+
+Then restart the dev server — OTP emails arrive normally. Without the key
+the UI reports `Email sending is not set up locally…` (HTTP 500, no rate
+quota consumed, no user created). No-key automated testing instead: set
+`OTP_E2E_DEBUG=1` + `OTP_DEBUG_TOKEN` and read codes via
+`POST /api/auth/otp/debug` (see `scripts/e2e-otp-check.ts`); never set
+those outside local testing.
+
 ## Scripts
 
 | Script | Purpose |

@@ -111,6 +111,27 @@ export class VerificationEmailError extends Error {
   }
 }
 
+/**
+ * Missing RESEND_API_KEY. Subclass so callers can distinguish "not
+ * configured" from transient send failures without message matching.
+ * The local message names only the env var and file — never secrets.
+ */
+export class EmailNotConfiguredError extends VerificationEmailError {
+  constructor(local: boolean) {
+    super(
+      local
+        ? "Email sending is not set up locally. Add RESEND_API_KEY to .env.local and restart the dev server."
+        : "Email service is not configured. Please try again later."
+    );
+    this.name = "EmailNotConfiguredError";
+  }
+}
+
+/** True when a Resend client can be constructed (key present). */
+export function isEmailConfigured(env: EnvLike = process.env as EnvLike): boolean {
+  return !!env.RESEND_API_KEY;
+}
+
 /** OTP type as passed by the Better Auth emailOTP plugin. */
 export type OtpType =
   | "sign-in"
@@ -200,18 +221,16 @@ export async function sendOtpEmail(
   const env = options?.env ?? (process.env as EnvLike);
   const resend = options?.client ?? getResend(env);
   if (!resend) {
-    // Same discipline as the link mail: never log recipient or secret.
+    // OTP must never report success when nothing was sent: unlike the
+    // legacy link flow (which stays dev-skip by design), a skipped OTP
+    // would strand the user on /verify-otp with no code. Fail loudly in
+    // every environment. Never log recipient or secret.
     logErrorDiagnostic(
       "email",
-      "RESEND_API_KEY not set — skipping OTP email",
+      "RESEND_API_KEY not set — refusing OTP email",
       new Error("Missing RESEND_API_KEY")
     );
-    if (isProductionEnv(env)) {
-      throw new VerificationEmailError(
-        "Email service is not configured. Please try again later."
-      );
-    }
-    return;
+    throw new EmailNotConfiguredError(!isProductionEnv(env));
   }
   const { html, text } = renderOtpEmail(input.otp, {
     expiresInMinutes: options?.expiresInMinutes ?? 10,
