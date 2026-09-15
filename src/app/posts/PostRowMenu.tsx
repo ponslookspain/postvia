@@ -36,7 +36,15 @@ import { reportError } from "@/lib/diagnostics";
  * Only existing endpoints are used: detail page, retry, delete.
  * There is no duplicate endpoint, so Duplicate is intentionally absent.
  */
-export function PostRowMenu({ id, status }: { id: string; status: string }) {
+export function PostRowMenu({
+  id,
+  status,
+  onDeleted,
+}: {
+  id: string;
+  status: string;
+  onDeleted?: (id: string) => void;
+}) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -80,6 +88,7 @@ export function PostRowMenu({ id, status }: { id: string; status: string }) {
       toast.add({ title: "Post deleted", type: "success" });
       setDeleteOpen(false);
       setMenuOpen(false);
+      onDeleted?.(id);
       router.refresh();
     } catch (error) {
       reportError("posts-client", "delete post failed", error, { postId: id });
