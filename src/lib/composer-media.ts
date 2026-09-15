@@ -52,10 +52,18 @@ export function planMediaAdd(args: {
 }): MediaAddPlan {
   const accepted: { file: MediaFileLike; kind: MediaKind }[] = [];
   const rejected: { name: string; error: string }[] = [];
+  const tiktokSelected = args.accounts.some(
+    (account) =>
+      account.platform === "TIKTOK" &&
+      args.selectedAccountIds.includes(account.id)
+  );
   for (const file of args.files) {
     const validation = validateMediaInput(file.type, file.size);
     if (!validation.ok) {
-      rejected.push({ name: file.name, error: validation.error });
+      rejected.push({
+        name: file.name,
+        error: withTiktokSizeHint(validation.error, file, tiktokSelected),
+      });
       continue;
     }
     accepted.push({ file, kind: validation.kind });
@@ -181,6 +189,31 @@ export function isComposerDirty(input: {
   return current.some((id, index) => id !== initial[index]);
 }
 
+/**
+ * Accurate platform guidance at the global image gate: TikTok photos
+ * support up to 20 MB JPEG/WebP at the API, but the shared 10 MB upload
+ * ceiling binds first (raising it is a separate infra decision). When a
+ * TikTok target is selected, say so explicitly instead of letting the
+ * generic limit read as a TikTok rejection.
+ */
+const TIKTOK_PHOTO_MAX_BYTES = 20 * 1024 * 1024;
+
+function withTiktokSizeHint(
+  error: string,
+  file: MediaFileLike,
+  tiktokSelected: boolean
+): string {
+  if (
+    tiktokSelected &&
+    (file.type === "image/jpeg" || file.type === "image/webp") &&
+    file.size > 10 * 1024 * 1024 &&
+    file.size <= TIKTOK_PHOTO_MAX_BYTES
+  ) {
+    return `${error} TikTok supports photos up to 20 MB, but uploads here are currently limited to 10 MB — use a smaller file.`;
+  }
+  return error;
+}
+
 /** Upload parallelism: faster batches without hammering the webhook. */
 export const MEDIA_UPLOAD_CONCURRENCY = 2;
 
@@ -248,9 +281,15 @@ export function canSubmitComposer(input: {
   quotaBlocked: boolean;
   /** Per-target preview validation errors (e.g. missing TikTok title). */
   previewError?: boolean;
+  /**
+   * TikTok photo description present while global text is empty: a
+   * description-only photo post is publishable (the server accepts empty
+   * text for TikTok-description targets), so it counts as content.
+   */
+  descriptionPresent?: boolean;
 }): boolean {
   return (
-    input.textPresent &&
+    (input.textPresent || input.descriptionPresent === true) &&
     !input.overLimit &&
     !input.mediaError &&
     input.hasSelection &&

@@ -324,7 +324,29 @@ if (!caps.implemented) {
  * `mediaCount` may be absent on legacy callers — then only the text check
  * runs and media rules stay with the publish flow.
  */
-export function validateCreatePostContent(input: {
+
+/**
+ * Empty global text is valid only as a TikTok-description post: every
+ * target must be TikTok and at least one must carry a non-empty title or
+ * description override (the photo flow publishes description-only).
+ * Anything else keeps the historical "Text is required" rejection.
+ */
+export function allowsEmptyPostText(input: {
+  platforms: readonly Platform[];
+  contents: readonly unknown[];
+}): boolean {
+  if (input.platforms.length === 0) return false;
+  if (!input.platforms.every((platform) => platform === "TIKTOK")) {
+    return false;
+  }
+  return input.contents.some((content) => {
+    const normalized = normalizeTiktokContent(content);
+    return (
+      normalized.title.trim().length > 0 ||
+      normalized.description.trim().length > 0
+    );
+  });
+}export function validateCreatePostContent(input: {
   text: string;
   mediaCount: number | null;
   platforms: readonly Platform[];

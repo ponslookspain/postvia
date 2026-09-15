@@ -277,7 +277,11 @@ export default function NewPostComposer({
   const hasOverLimit = previews.some((preview) => preview.overLimit);
   const mediaErrors = buildComposerMediaErrors(
     selectedAccounts,
-    media.map((item) => ({ type: item.kind, mimeType: item.file.type }))
+    media.map((item) => ({
+      type: item.kind,
+      mimeType: item.file.type,
+      size: item.file.size,
+    }))
   );
   const hasMediaError = mediaErrors.length > 0;
   // Stage 2B: single-preview presentation model. Derived from the same
@@ -360,8 +364,18 @@ export default function NewPostComposer({
   const publishBlockedReason = hasBlockingPreviewError
     ? firstBlockingPreviewError(previewModels)
     : null;
+  // Description-only TikTok photo posts carry no global text: a
+  // non-empty photo description counts as content for submit gating
+  // (the server accepts empty text for TikTok-description targets).
+  const descriptionPresent = previewModels.some(
+    (model) =>
+      model.platform === "TIKTOK" &&
+      model.tiktokMode === "photo" &&
+      model.description.trim().length > 0
+  );
   const canSave = canSubmitComposer({
     textPresent: text.trim().length > 0,
+    descriptionPresent,
     overLimit: hasOverLimit,
     mediaError: hasMediaError || hasBlockingFileIssue,
     hasSelection: selectedAccountIds.length > 0,
@@ -370,6 +384,7 @@ export default function NewPostComposer({
   });
   const canPublish = canSubmitComposer({
     textPresent: text.trim().length > 0,
+    descriptionPresent,
     overLimit: hasOverLimit,
     mediaError: hasMediaError || hasBlockingFileIssue,
     hasSelection: selectedAccountIds.length > 0,
@@ -1424,7 +1439,9 @@ export default function NewPostComposer({
         savedId={savedId}
         scheduling={scheduling}
         canSave={canSave}
-        textPresent={text.trim().length > 0}
+        // Content present: global text or a TikTok photo description
+        // (description-only posts schedule like text posts).
+        textPresent={text.trim().length > 0 || descriptionPresent}
         overLimit={hasOverLimit}
         mediaError={hasMediaError || hasBlockingFileIssue}
         hasSelection={selectedAccountIds.length > 0}

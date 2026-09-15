@@ -5,7 +5,10 @@ import { deleteBlobs } from "@/lib/blob";
 import { resolveScheduledAtUpdate } from "@/lib/schedule";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
-import { validateTargetMedia } from "@/lib/platforms/overrides";
+import {
+  validateCreatePostContent,
+  validateTargetMedia,
+} from "@/lib/platforms/overrides";
 
 async function findOwnedPost(id: string, userId: string) {
   return prisma.post.findFirst({
@@ -85,6 +88,16 @@ export async function PATCH(
           { error: "Text is required" },
           { status: 400 }
         );
+      }
+      // Same per-platform text-length contract as POST /api/posts: an edit
+      // must not save text the targets could never publish.
+      const textCheck = validateCreatePostContent({
+        text: body.text.trim(),
+        mediaCount: null,
+        platforms: existing.targets.map((target) => target.platform),
+      });
+      if (!textCheck.ok) {
+        return NextResponse.json({ error: textCheck.error }, { status: 400 });
       }
       data.text = body.text.trim();
     }

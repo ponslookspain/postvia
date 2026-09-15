@@ -22,6 +22,7 @@ import { createFreePostAtomic, makeTxQuotaStore } from "@/lib/free-post-kernel";
 import { createPostIdempotent } from "@/lib/post-create";
 import { reportError } from "@/lib/diagnostics";
 import {
+  allowsEmptyPostText,
   validateCreatePostContent,
   validateTargetAccountSelection,
   validateTargetOverrides,
@@ -159,9 +160,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!text || typeof text !== "string" || text.trim().length === 0) {
+    if (typeof text !== "string") {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
     }
+    // Empty global text is accepted only for TikTok-description targets
+    // (verified after overrides are validated below): every other
+    // platform still requires text, enforced there.
+    const trimmedText = text.trim();
 
     const requestedAccountIds = Array.isArray(accountIds)
       ? [...new Set(accountIds.filter((id: unknown): id is string => typeof id === "string"))]
@@ -209,7 +214,7 @@ export async function POST(request: NextRequest) {
     const mediaCount =
       typeof rawMediaCount === "number" ? rawMediaCount : null;
     const content = validateCreatePostContent({
-      text: text.trim(),
+      text: trimmedText,
       mediaCount,
       platforms: selectedAccounts.map((account) => account.platform),
     });
@@ -269,6 +274,28 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Empty global text is valid only as a TikTok-description post (see
+    // allowsEmptyPostText): every other platform still requires text.
+    if (trimmedText.length === 0) {
+      const contents = targets.map((target) => {
+        const raw = target.overrides as unknown;
+        return typeof raw === "object" && raw !== null
+          ? (raw as { content?: unknown }).content
+          : undefined;
+      });
+      if (
+        !allowsEmptyPostText({
+          platforms: targets.map((target) => target.platform),
+          contents,
+        })
+      ) {
+        return NextResponse.json(
+          { error: "Text is required" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Atomic Free creation kernel (authoritative for Free): the monthly
     // allowance belongs to the abuse identity shared by every linked user,
     // so new accounts cannot mint fresh Free quota. Identity claim +
@@ -307,7 +334,7 @@ export async function POST(request: NextRequest) {
             tx.post.create({
               data: {
                 userId: user.id,
-                text: text.trim(),
+                text: trimmedText,
                 status: isScheduled ? "SCHEDULED" : "DRAFT",
                 scheduledAt: scheduledAtDate,
                 publishedAt: null,
@@ -324,7 +351,7 @@ export async function POST(request: NextRequest) {
             prisma.post.create({
               data: {
                 userId: user.id,
-                text: text.trim(),
+                text: trimmedText,
                 status: isScheduled ? "SCHEDULED" : "DRAFT",
                 scheduledAt: scheduledAtDate,
                 publishedAt: null,
@@ -376,7 +403,7 @@ export async function POST(request: NextRequest) {
     const paidPeriod = getPeriodKey();
     const paidInsertBase = {
       userId: user.id,
-      text: text.trim(),
+      text: trimmedText,
       status: isScheduled ? "SCHEDULED" : "DRAFT",
       scheduledAt: scheduledAtDate,
       publishedAt: null,

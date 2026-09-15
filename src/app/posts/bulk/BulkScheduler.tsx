@@ -486,9 +486,41 @@ export function BulkScheduler({
     }
     if (fileProblems.size > 0) {
       setConfigError(
-        "Some videos are not supported by the selected accounts. Remove them or change accounts."
+        "Some files are not supported by the selected accounts. Remove them or change accounts."
       );
       return;
+    }
+    // The shared text must fit every selected platform (TikTok photo
+    // posts narrow to the 90-character title cap). Server re-validates;
+    // this fails fast before any draft exists. Empty text fails here too:
+    // bulk carries no per-target overrides, so a description-only post is
+    // impossible and the server would 400 every item after creating
+    // doomed drafts.
+    {
+      const trimmed = text.trim();
+      if (trimmed.length === 0) {
+        setConfigError("Add post text before starting the batch.");
+        return;
+      }
+      const hasVideo = items.some((item) =>
+        item.file.type.startsWith("video/")
+      );
+      const hasImage = items.some((item) =>
+        item.file.type.startsWith("image/")
+      );
+      for (const account of selectedAccounts) {
+        const limit = bulkTextLimit(account.platform, {
+          hasVideo,
+          hasImage,
+        });
+        if (Array.from(trimmed).length > limit) {
+          const label = getPlatformCapabilities(account.platform).label;
+          setConfigError(
+            `Post text is too long for ${label} (max ${limit} characters). Shorten it or remove that account.`
+          );
+          return;
+        }
+      }
     }
     if (startIso === null) {
       setConfigError("Choose a valid start date and time.");
