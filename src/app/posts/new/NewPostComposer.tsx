@@ -76,6 +76,16 @@ import { useTikTokCreatorInfo } from "./_components/useTikTokCreatorInfo";
  * bundle even though the dialog opens only on explicit click. Rendered
  * conditionally so the chunk fetches on first open; the dialog is fully
  * controlled so remounting loses no state.
+ *
+ * C6 bundle verdict (measured 2026-09-15, Next.js 16.3.4 production
+ * build): /posts/new initial client JS is 508.3 KB in 17 chunks with
+ * this split vs 582.6 KB in 16 chunks with a static import (-74.3 KB,
+ * -12.8%, deferred to first dialog open). date-fns stays server-only
+ * (dashboard analytics); lucide-react ships per-icon (unused icons
+ * absent from all chunks); no dependency was added for optimization.
+ * Retained as-is: /posts/bulk renders the same picker inline on first
+ * paint, so the library must stay initial there — lazy-loading it
+ * would harm UX. No further split is justified by measurement.
  */
 const ScheduleDialog = dynamic(
   () =>
