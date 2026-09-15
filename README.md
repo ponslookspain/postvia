@@ -79,7 +79,8 @@ single registry (`src/lib/platforms/capabilities.ts` +
 dispatch table, derived UI lists, display order); validation and preview
 rules read that registry (see `docs/social-integrations.md`). Current media support: Threads — text / 1 image / 1 video;
 X — text / up to 4 photos / 1 GIF / 1 video; TikTok — 1 video or 1–4 photos
-(JPEG/WebP, own title required); Instagram — 1 JPEG photo or 1 MP4 Reel.
+(JPEG/WebP; global post text is the default caption, with optional
+per-target title/description overrides); Instagram — 1 JPEG photo or 1 MP4 Reel.
 See [`docs/social-integrations.md`](docs/social-integrations.md) for the
 full matrix, retry/idempotency semantics, and portal requirements.
 
@@ -96,8 +97,8 @@ full matrix, retry/idempotency semantics, and portal requirements.
   status/platform/media preview, drag & drop rescheduling via the posts
   API, unscheduled drafts panel, viewer-timezone bucketing)
 - `/posts/new` — multi-target composer: global text with per-account
-  overrides (TikTok uses its own title, never the global text), platform
-  switcher with a single platform-aware preview (X/Threads/Instagram/TikTok
+  overrides (TikTok uses global post text as the default caption, with
+  optional per-target title/description overrides), platform switcher with a single platform-aware preview (X/Threads/Instagram/TikTok
   mock posts), structured per-platform validation with stable issue codes,
   per-platform character limits and remaining counters, media attach
   (images + MP4/WebM/MOV video, per-file retry, concurrent uploads),
@@ -155,11 +156,10 @@ full matrix, retry/idempotency semantics, and portal requirements.
   winner. Bulk batches attest their size server-side per item.
 - New users pick a plan during onboarding (Free → dashboard, paid →
   `/billing` for checkout); the choice is stored server-side
-  (`User.selectedPlan`, never localStorage/`?plan=`). No `Subscription`
-  row → active Free.
+  (`User.selectedPlan`, never localStorage/`?plan=`). No `Subscription` row → active Free.
 - Data: `Subscription` row per user (plan, status, period end,
   cancel-at-periodEnd, Stripe fields reserved). No row → active Free.
-  Downgrades and expirations never delete data; only new actions are gated.
+- Downgrades and expirations never delete data; only new actions are gated.
 - Enforcement lives in `src/lib/entitlements.ts` and is applied
   server-side: `POST /api/posts` (monthly quota → 403 `UPGRADE_REQUIRED`),
   OAuth callbacks (global total account quota, reconnects exempt), retry +
