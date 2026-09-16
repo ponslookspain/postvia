@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MenuIcon } from "lucide-react";
+import { MenuIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 
 const links = [
   { href: "#product", label: "Product" },
@@ -91,12 +92,12 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
           <MenuIcon aria-hidden="true" />
         </Button>
       </div>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right">
-          <SheetHeader>
-            <SheetTitle>Menu</SheetTitle>
-            <SheetDescription>Go to a section of Postvia.</SheetDescription>
-          </SheetHeader>
+      <Drawer open={open} onOpenChange={setOpen} direction="right">
+        <DrawerContent className="w-3/4 sm:max-w-sm">
+          <DrawerHeader>
+            <DrawerTitle>Menu</DrawerTitle>
+            <DrawerDescription>Go to a section of Postvia.</DrawerDescription>
+          </DrawerHeader>
           <nav aria-label="Mobile" className="flex flex-col gap-1 px-6">
             {links.map((link) => (
               <Link
@@ -129,8 +130,18 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               </>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+          <DrawerClose>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-4 right-4"
+              aria-label="Close menu"
+            >
+              <XIcon aria-hidden="true" />
+            </Button>
+          </DrawerClose>
+        </DrawerContent>
+      </Drawer>
     </header>
   );
 }

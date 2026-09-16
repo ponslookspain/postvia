@@ -481,7 +481,8 @@ export default async function DashboardPage({
                   description="Publishing failed or is still running"
                   meta={
                     <Badge
-                      variant="destructive"
+                      color="error"
+                      variant="soft"
                       aria-label={`${attentionPosts.length} posts need attention`}
                     >
                       {attentionPosts.length}

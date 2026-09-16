@@ -68,7 +68,7 @@ export function CalendarBulk() {
                   <h3 className="font-heading text-base font-medium">
                     This week
                   </h3>
-                  <Badge variant="secondary">Content calendar</Badge>
+                  <Badge variant="soft">Content calendar</Badge>
                 </div>
                 <ul className="mt-4 flex flex-col gap-2">
                   {week.map((entry) => (

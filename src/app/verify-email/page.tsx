@@ -37,7 +37,7 @@ export default async function VerifyEmailPage({
       <div className="flex flex-col gap-4">
         {errorTitle ? (
           <>
-            <Alert variant="destructive">
+            <Alert color="error" variant="outline">
               <TriangleAlertIcon />
               <AlertTitle>Verification failed</AlertTitle>
               <AlertDescription>
@@ -48,7 +48,7 @@ export default async function VerifyEmailPage({
           </>
         ) : (
           <>
-            <Alert>
+            <Alert color="neutral" variant="outline">
               <CircleCheckIcon />
               <AlertTitle>Verified</AlertTitle>
               <AlertDescription>

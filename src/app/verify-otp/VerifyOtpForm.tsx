@@ -147,7 +147,7 @@ export function VerifyOtpForm({
     >
       <div className="flex flex-col gap-4">
         {error && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>
               {resendRateLimited ? "Too many code requests" : "Verification failed"}
@@ -160,7 +160,7 @@ export function VerifyOtpForm({
           </Alert>
         )}
         {resendNote && (
-          <Alert>
+          <Alert color="neutral" variant="outline">
             <MailCheckIcon />
             <AlertTitle>Code sent</AlertTitle>
             <AlertDescription>{resendNote}</AlertDescription>

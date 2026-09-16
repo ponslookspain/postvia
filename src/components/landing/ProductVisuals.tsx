@@ -33,7 +33,7 @@ export function AccountsVisual() {
       <div aria-hidden="true">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 md:px-5">
           <p className="text-[15px] font-medium">Social accounts</p>
-          <Badge variant="secondary">Official OAuth</Badge>
+          <Badge variant="soft">Official OAuth</Badge>
         </div>
         <ul className="divide-y divide-border">
           {accountRows.map((row) => (
@@ -138,7 +138,7 @@ export function ComposerVisual() {
                     {row.detail}
                   </span>
                 </span>
-                <Badge variant="secondary" className="shrink-0">
+                <Badge variant="soft" className="shrink-0">
                   {row.tag}
                 </Badge>
               </li>

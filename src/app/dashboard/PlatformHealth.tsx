@@ -61,11 +61,11 @@ export function PlatformHealth({ rows }: { rows: PlatformHealthRow[] }) {
             )}
           </div>
           {row.expired ? (
-            <Badge variant="destructive" className="shrink-0">
+            <Badge color="error" variant="soft" className="shrink-0">
               Expired
             </Badge>
           ) : (
-            <Badge variant="secondary" className="shrink-0 tabular-nums">
+            <Badge variant="soft" className="shrink-0 tabular-nums">
               {row.successRate === null
                 ? "Connected"
                 : `${row.successRate}% success`}

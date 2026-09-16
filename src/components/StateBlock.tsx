@@ -60,7 +60,7 @@ export function ErrorBlock({
   className?: string;
 }) {
   return (
-    <Alert variant="destructive" className={className}>
+    <Alert color="error" variant="outline" className={className}>
       <TriangleAlertIcon />
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>

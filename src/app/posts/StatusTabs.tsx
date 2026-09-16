@@ -34,14 +34,14 @@ export function StatusTabs({ value }: { value: string }) {
           <TabsTrigger
             key={option}
             value={option}
-            render={
-              <Link
-                href={statusHref(option)}
-                aria-current={value === option ? "page" : undefined}
-              />
-            }
+            asChild
           >
-            {option === "all" ? "All" : formatStatusLabel(option)}
+            <Link
+              href={statusHref(option)}
+              aria-current={value === option ? "page" : undefined}
+            >
+              {option === "all" ? "All" : formatStatusLabel(option)}
+            </Link>
           </TabsTrigger>
         ))}
       </TabsList>

@@ -52,7 +52,7 @@ export function OnboardingForm({ initialName = "" }: { initialName?: string }) {
       <form onSubmit={(e) => void handleSubmit(e)}>
         <FieldGroup>
           {error && (
-            <Alert variant="destructive">
+            <Alert color="error" variant="outline">
               <TriangleAlertIcon />
               <AlertTitle>Something went wrong</AlertTitle>
               <AlertDescription>{error}</AlertDescription>

@@ -63,7 +63,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
+import { TextArea } from "@/components/ui/text-area";
 import { toast } from "@/components/ui/toast";
 import { ChannelStrip } from "../new/_components/ChannelStrip";
 import { ScheduleDatePicker } from "../new/_components/ScheduleDatePicker";
@@ -708,7 +708,7 @@ export function BulkScheduler({
         title="Bulk scheduling"
         description="Upload images or videos and schedule one post per file, spaced by a fixed interval. Publishing runs on the regular schedule engine."
         actions={
-          <Badge variant="secondary" className="tabular-nums">
+          <Badge variant="soft" className="tabular-nums">
             {items.length}/{batchCap} files
           </Badge>
         }
@@ -767,7 +767,7 @@ export function BulkScheduler({
                 file is uploaded separately with its own progress.
               </CardDescription>
               <CardAction>
-                <Badge variant="secondary" className="tabular-nums">
+                <Badge variant="soft" className="tabular-nums">
                   {items.length}/{batchCap}
                 </Badge>
               </CardAction>
@@ -825,7 +825,7 @@ export function BulkScheduler({
                 </Button>
               )}
               {pendingDupes.length > 0 && (
-                <Alert>
+                <Alert color="neutral" variant="outline">
                   <TriangleAlertIcon />
                   <AlertTitle>Video already in this batch</AlertTitle>
                   <AlertDescription>
@@ -886,7 +886,7 @@ export function BulkScheduler({
                 <FieldLabel htmlFor="bulk-text" className="sr-only">
                   Post text
                 </FieldLabel>
-                <Textarea
+                <TextArea
                   id="bulk-text"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -1046,7 +1046,7 @@ export function BulkScheduler({
                 </Field>
               </div>
               {fileProblems.size > 0 && (
-                <Alert>
+                <Alert color="neutral" variant="outline">
                   <TriangleAlertIcon className="text-warning" />
                   <AlertTitle>Unsupported combination</AlertTitle>
                   <AlertDescription>
@@ -1069,7 +1069,7 @@ export function BulkScheduler({
                 </Alert>
               )}
               {configError && (
-                <Alert>
+                <Alert color="neutral" variant="outline">
                   <TriangleAlertIcon className="text-warning" />
                   <AlertTitle>Cannot start batch</AlertTitle>
                   <AlertDescription>{configError}</AlertDescription>
@@ -1157,7 +1157,7 @@ export function BulkScheduler({
                 </Button>
               )}
               {finished && !allDone && (
-                <Alert>
+                <Alert color="neutral" variant="outline">
                   <AlertTitle>Batch partially scheduled</AlertTitle>
                   <AlertDescription>
                     {doneCount} of {items.length} posts scheduled. Retry the

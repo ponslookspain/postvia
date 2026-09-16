@@ -44,7 +44,7 @@ export function MediaGrid({
             videos up to 100 MB.
           </p>
         </div>
-        <Badge variant="secondary" className="shrink-0 tabular-nums">
+        <Badge variant="soft" className="shrink-0 tabular-nums">
           {media.length}/{maxMedia}
         </Badge>
       </div>
@@ -97,7 +97,7 @@ export function MediaGrid({
                 )}
                 {item.status === "error" && (
                   <div className="absolute inset-0 flex items-center justify-center bg-destructive/40">
-                    <Badge variant="destructive">Failed</Badge>
+                    <Badge color="error" variant="soft">Failed</Badge>
                   </div>
                 )}
                 {item.status !== "uploading" && (

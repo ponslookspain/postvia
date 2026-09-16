@@ -125,7 +125,7 @@ export function HeroVisual() {
                 </span>
               ))}
             </div>
-            <Badge variant="secondary" className="shrink-0">
+            <Badge variant="soft" className="shrink-0">
               3 posts this week
             </Badge>
           </div>

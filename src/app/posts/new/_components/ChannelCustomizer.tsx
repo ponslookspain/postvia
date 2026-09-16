@@ -133,7 +133,7 @@ export function ChannelCustomizer({
                       </span>
                     </p>
                     {hasOverride && (
-                      <Badge variant="secondary" className="shrink-0">
+                      <Badge variant="soft" className="shrink-0">
                         Customized
                       </Badge>
                     )}

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./utility.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -99,6 +100,105 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Radian foundation bridge.
+   Direction is strictly one-way:
+     PostVIA token → Radian alias → future Radian component.
+   No PostVIA token value is changed here; this block only adds the
+   Radian semantic names that utility.css + registry components expect
+   but that do not exist in the PostVIA layer above.
+   - Structural tokens (primary/bg/fills/fg/border/elevation/sidebar)
+     alias PostVIA tokens, so the current indigo/monochrome design stays.
+   - Hue families (success/error/warning/info sub-tokens) point at the
+     Radian OKLCH palette from utility.css, mirroring the official
+     Radian globals.css recipe.
+   - Aliases use var() references, so the .dark overrides of the PostVIA
+     source tokens below apply automatically; no separate .dark block.
+   - --color-stroke is intentionally absent: stock Radian does not define
+     it either (upstream gap, see accordion table variant). */
+@theme {
+  /* primary family → PostVIA signal/indigo */
+  --color-primary-fg: var(--primary-foreground);
+  --color-primary-text: var(--primary);
+  --color-primary-border: var(--primary);
+  --color-primary-hover: var(--primary);
+  --color-primary-accent: var(--accent);
+  --color-primary-focus: var(--ring);
+
+  /* success sub-tokens → Radian emerald palette (base --color-success
+     stays PostVIA, mapped above) */
+  --color-success-fg: var(--color-emerald-fg);
+  --color-success-accent: var(--color-emerald-accent);
+  --color-success-focus: var(--color-emerald-focus);
+  --color-success-border: var(--color-emerald-border);
+  --color-success-hover: var(--color-emerald-hover);
+  --color-success-text: var(--success);
+
+  /* error family → PostVIA destructive + Radian red palette */
+  --color-error: var(--destructive);
+  --color-error-fg: var(--color-red-fg);
+  --color-error-accent: var(--color-red-accent);
+  --color-error-focus: var(--color-red-focus);
+  --color-error-border: var(--color-red-border);
+  --color-error-hover: var(--color-red-hover);
+  --color-error-text: var(--destructive);
+
+  /* warning sub-tokens → Radian amber palette (base --color-warning
+     stays PostVIA, mapped above) */
+  --color-warning-fg: var(--color-amber-fg);
+  --color-warning-accent: var(--color-amber-accent);
+  --color-warning-focus: var(--color-amber-focus);
+  --color-warning-border: var(--color-amber-border);
+  --color-warning-hover: var(--color-amber-hover);
+  --color-warning-text: var(--warning);
+
+  /* info family → Radian light-blue palette (no PostVIA counterpart) */
+  --color-info: var(--color-light-blue);
+  --color-info-fg: var(--color-light-blue-fg);
+  --color-info-accent: var(--color-light-blue-accent);
+  --color-info-focus: var(--color-light-blue-focus);
+  --color-info-border: var(--color-light-blue-border);
+  --color-info-hover: var(--color-light-blue-hover);
+  --color-info-text: var(--color-light-blue-text);
+
+  /* surfaces → PostVIA */
+  --color-bg: var(--background);
+  --color-fill1: var(--muted);
+  --color-fill2: var(--accent);
+  --color-fill3: var(--accent);
+  --color-fill4: var(--muted);
+  --color-fg: var(--foreground);
+  --color-fg-secondary: var(--muted-foreground);
+  --color-fg-tertiary: var(--muted-foreground);
+  --color-fg-disabled: var(--muted-foreground);
+  --color-fg-inverse: var(--background);
+
+  /* translucent surfaces → mixes of PostVIA ink (recipe mirrors Radian) */
+  --color-alpha: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --color-soft: var(--accent);
+  --color-soft-alpha: color-mix(in oklch, var(--foreground) 8%, transparent);
+  --color-fill1-alpha: color-mix(in oklch, var(--foreground) 4%, transparent);
+  --color-fill2-alpha: color-mix(in oklch, var(--foreground) 8%, transparent);
+  --color-fill3-alpha: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --color-fill4-alpha: color-mix(in oklch, var(--foreground) 16%, transparent);
+
+  /* elevation → PostVIA card surface */
+  --color-elevation-negative: var(--muted);
+  --color-elevation-level1: var(--card);
+  --color-elevation-level2: var(--card);
+
+  /* inverse pair follows the theme (light: white/black, dark: flipped) */
+  --color-white-inverse: var(--background);
+  --color-black-inverse: var(--foreground);
+
+  /* sidebar short names missing from the PostVIA layer above */
+  --color-sidebar-fg: var(--sidebar-foreground);
+  --color-sidebar-accent-fg: var(--sidebar-accent-foreground);
+
+  /* typography compat: Radian --font-body tracks PostVIA sans stack.
+     No webfont added, no visual change. */
+  --font-body: var(--font-sans);
 }
 
 body {

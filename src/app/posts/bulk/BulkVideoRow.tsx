@@ -128,11 +128,11 @@ export function BulkVideoRow({
         )}
       </span>
       {status === "scheduled" ? (
-        <Badge variant="secondary" className="shrink-0">
+        <Badge variant="soft" className="shrink-0">
           Scheduled
         </Badge>
       ) : status === "failed" ? (
-        <Badge variant="destructive" className="shrink-0">
+        <Badge color="error" variant="soft" className="shrink-0">
           Failed
         </Badge>
       ) : running || status !== "queued" ? (

@@ -30,10 +30,8 @@ import { toast } from "@/components/ui/toast";
 import { reportError } from "@/lib/diagnostics";
 
 /**
- * Row actions behind a single menu trigger (shadcn DropdownMenu pattern
- * rebuilt on the installed Popover primitive — dropdown-menu would pull
- * in radix-ui, a new third-party dependency, so it stays out).
- * Only existing endpoints are used: detail page, retry, delete.
+ * Row actions behind a single menu trigger built on the Popover
+ * primitive. Only existing endpoints are used: detail page, retry, delete.
  * There is no duplicate endpoint, so Duplicate is intentionally absent.
  */
 export function PostRowMenu({

@@ -1,31 +1,171 @@
 "use client"
 
-import { Switch as SwitchPrimitive } from "@base-ui/react/switch"
+import * as React from "react"
+import * as SwitchPrimitive from "@radix-ui/react-switch"
+import { type VariantProps, cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
-function Switch({
-  className,
-  size = "default",
-  ...props
-}: SwitchPrimitive.Root.Props & {
-  size?: "sm" | "default"
-}) {
-  return (
-    <SwitchPrimitive.Root
-      data-slot="switch"
-      data-size={size}
-      className={cn(
-        "peer group/switch relative inline-flex shrink-0 items-center rounded-full border border-transparent transition-all outline-none group-has-[:focus-visible]/field-label:border-transparent group-has-[:focus-visible]/field-label:ring-0 after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-input/80 data-disabled:cursor-not-allowed data-disabled:opacity-50",
-        className
-      )}
-      {...props}
-    >
-      <SwitchPrimitive.Thumb
-        data-slot="switch-thumb"
-        className="pointer-events-none block rounded-full bg-background ring-0 transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] dark:data-checked:bg-primary-foreground group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:data-unchecked:translate-x-0 dark:data-unchecked:bg-foreground"
-      />
-    </SwitchPrimitive.Root>
-  )
+// Context Types
+export type SwitchContextType = { permanent?: boolean }
+export type SwitchWrapperProps = React.HTMLAttributes<HTMLDivElement> &
+	SwitchContextType
+export type SwitchProps = React.ComponentProps<typeof SwitchPrimitive.Root> &
+	VariantProps<typeof switchVariants> & { thumbClassName?: string }
+export type SwitchIndicatorProps = React.HTMLAttributes<HTMLSpanElement> &
+	VariantProps<typeof switchIndicatorVariants>
+
+// Context
+const SwitchContext = React.createContext<SwitchContextType>({
+	permanent: false,
+})
+
+// Switch Variants
+const switchVariants = cva(
+	`
+  relative peer inline-flex shrink-0 cursor-pointer items-center rounded-full transition-colors 
+  focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg 
+  disabled:cursor-not-allowed disabled:opacity-50 bg-fill2-alpha
+  aria-invalid:border aria-invalid:border-error aria-invalid:ring-error
+  [[data-invalid=true]_&]:border [[data-invalid=true]_&]:border-error [[data-invalid=true]_&]:ring-error
+  `,
+	{
+		variants: {
+			shape: {
+				pill: "rounded-full",
+				square: "rounded-md",
+			},
+			size: {
+				"20": "w-8.5 h-5",
+				"24": "w-10.5 h-6",
+				"32": "w-14 h-8",
+			},
+			permanent: {
+				true: "bg-fill3",
+				false: "data-[state=checked]:bg-primary",
+			},
+		},
+		defaultVariants: {
+			shape: "pill",
+			permanent: false,
+			size: "24",
+		},
+	}
+)
+
+// Thumb Variants
+const switchThumbVariants = cva(
+	`
+  pointer-events-none bg-white shadow-lg ring-0 transition-transform 
+  data-[state=unchecked]:translate-x-[3px]
+  rtl:data-[state=unchecked]:-translate-x-[3px]
+  rtl:data-[state=checked]:-translate-x-[calc(100%-3px)]
+  flex items-center justify-center
+  `,
+	{
+		variants: {
+			shape: {
+				pill: "rounded-full",
+				square: "rounded-sm",
+			},
+			size: {
+				"20": "size-3.5 data-[state=checked]:translate-x-4",
+				"24": "size-4.5 data-[state=checked]:translate-x-5",
+				"32": "size-6 data-[state=checked]:translate-x-7",
+			},
+		},
+		defaultVariants: {
+			shape: "pill",
+			size: "24",
+		},
+	}
+)
+
+// Indicator Variants (used for styling only)
+const switchIndicatorVariants = cva(
+	"flex items-center justify-center w-full h-full text-[10px] font-medium transition-all duration-200 select-none",
+	{
+		variants: {
+			state: {
+				on: "text-primary",
+				off: "text-fg-secondary",
+			},
+		},
+		defaultVariants: {
+			state: "off",
+		},
+	}
+)
+
+// Hook
+function useSwitch() {
+	const context = React.useContext(SwitchContext)
+	if (!context) {
+		throw new Error("SwitchIndicator must be used within a Switch component")
+	}
+	return context
 }
 
-export { Switch }
+// Wrapper
+function SwitchWrapper({
+	className,
+	children,
+	permanent = false,
+	...props
+}: SwitchWrapperProps) {
+	return (
+		<SwitchContext.Provider value={{ permanent: permanent ?? false }}>
+			<div
+				data-slot="switch-wrapper"
+				className={cn("relative inline-flex items-center", className)}
+				{...props}>
+				{children}
+			</div>
+		</SwitchContext.Provider>
+	)
+}
+
+// Switch Root + Thumb (indicator inside)
+function Switch({
+	className,
+	thumbClassName = "",
+	shape,
+	size,
+	children,
+	...props
+}: SwitchProps) {
+	const context = useSwitch()
+	const permanent = context?.permanent ?? false
+
+	return (
+		<SwitchPrimitive.Root
+			data-slot="switch"
+			className={cn(switchVariants({ shape, size, permanent }), className)}
+			{...props}>
+			<SwitchPrimitive.Thumb
+				className={cn(switchThumbVariants({ shape, size }), thumbClassName)}>
+				{children} {/* Indicator will render here */}
+			</SwitchPrimitive.Thumb>
+		</SwitchPrimitive.Root>
+	)
+}
+
+// Indicator (text or icon inside thumb)
+function SwitchIndicator({
+	className,
+	state,
+	children,
+	...props
+}: SwitchIndicatorProps) {
+	return (
+		<span
+			data-slot="switch-indicator"
+			data-state={state}
+			className={cn(switchIndicatorVariants({ state }), className)}
+			{...props}>
+			{children}
+		</span>
+	)
+}
+
+// Export
+export { Switch, SwitchIndicator, SwitchWrapper }

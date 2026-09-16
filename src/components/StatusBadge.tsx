@@ -38,14 +38,16 @@ export function StatusDot({
   );
 }
 
-const BADGE_VARIANT = {
-  DRAFT: "outline",
-  SCHEDULED: "outline",
-  PUBLISHING: "secondary",
-  PUBLISHED: "secondary",
-  PARTIALLY_PUBLISHED: "secondary",
-  FAILED: "destructive",
-} as const;
+// PostVIA → Radian mapping: quiet outline shells, soft neutral fills,
+// Failed keeps the error tint.
+const BADGE_STYLE: Record<string, { variant: "outline" | "soft"; color?: "error" }> = {
+  DRAFT: { variant: "outline" },
+  SCHEDULED: { variant: "outline" },
+  PUBLISHING: { variant: "soft" },
+  PUBLISHED: { variant: "soft" },
+  PARTIALLY_PUBLISHED: { variant: "soft" },
+  FAILED: { variant: "soft", color: "error" },
+};
 
 export function StatusBadge({
   status,
@@ -54,11 +56,11 @@ export function StatusBadge({
   status: string;
   className?: string;
 }) {
+  const style = BADGE_STYLE[status] ?? { variant: "outline" as const };
   return (
     <Badge
-      variant={
-        BADGE_VARIANT[status as keyof typeof BADGE_VARIANT] ?? "outline"
-      }
+      variant={style.variant}
+      color={style.color}
       className={cn(
         status === "SCHEDULED" &&
           "border-signal/30 bg-signal/10 text-signal dark:text-signal",

@@ -149,7 +149,7 @@ export function LoginForm({
     >
       <div className="flex flex-col gap-4">
         {oauthAccountNotLinked && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>Account not linked</AlertTitle>
             <AlertDescription>
@@ -160,7 +160,7 @@ export function LoginForm({
         )}
 
         {oauthFailed && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>Sign-in failed</AlertTitle>
             <AlertDescription>
@@ -170,7 +170,7 @@ export function LoginForm({
         )}
 
         {error && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>
               {otpRateLimited ? "Too many code requests" : "Sign-in failed"}
@@ -184,7 +184,7 @@ export function LoginForm({
         )}
 
         {(deleted || passwordChanged) && (
-          <Alert>
+          <Alert color="neutral" variant="outline">
             <AlertDescription>
               {deleted
                 ? "Your account has been deleted."
@@ -194,7 +194,7 @@ export function LoginForm({
         )}
 
         {emailNotVerified && (
-          <Alert>
+          <Alert color="neutral" variant="outline">
             <AlertTitle>Email not verified</AlertTitle>
             <AlertDescription>
               Your email address has not been verified yet.{" "}

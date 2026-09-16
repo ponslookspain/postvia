@@ -131,7 +131,7 @@ export function ScheduleDialog({
             </FieldDescription>
           )}
           {scheduleError && (
-            <Alert variant="destructive">
+            <Alert color="error" variant="outline">
               <TriangleAlertIcon />
               <AlertTitle>Cannot schedule</AlertTitle>
               <AlertDescription>{scheduleError}</AlertDescription>

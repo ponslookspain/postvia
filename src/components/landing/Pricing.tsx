@@ -58,7 +58,7 @@ export function Pricing() {
                   <h3 className="font-heading text-base font-medium">
                     {plan.name}
                   </h3>
-                  {plan.highlighted && <Badge>Most popular</Badge>}
+                  {plan.highlighted && <Badge variant="strong" color="primary">Most popular</Badge>}
                 </div>
                 <p className="mt-4">
                   <span className="font-heading text-4xl font-semibold tracking-tight tabular-nums">

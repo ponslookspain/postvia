@@ -32,7 +32,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
+import { Divider } from "@/components/ui/divider";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 
@@ -42,7 +42,7 @@ type Message = { type: "success" | "error"; text: string } | null;
 
 function FormAlert({ message }: { message: NonNullable<Message> }) {
   return (
-    <Alert variant={message.type === "error" ? "destructive" : "default"}>
+    <Alert color={message.type === "error" ? "error" : "neutral"} variant="outline">
       {message.type === "error" && <TriangleAlertIcon />}
       <AlertTitle>
         {message.type === "error" ? "Something went wrong" : "Saved"}
@@ -367,7 +367,7 @@ export function SettingsClient({
                     <span className="flex items-center gap-2">
                       Email
                       {emailVerified && (
-                        <Badge variant="secondary">Verified</Badge>
+                        <Badge variant="soft">Verified</Badge>
                       )}
                     </span>
                   </FieldLabel>
@@ -428,13 +428,13 @@ export function SettingsClient({
                   </span>
                 </span>
                 <Badge
-                  variant={hasPassword ? "secondary" : "outline"}
+                  variant={hasPassword ? "soft" : "outline"}
                   className="shrink-0"
                 >
                   {hasPassword ? "Connected" : "Not set"}
                 </Badge>
               </div>
-              <Separator />
+              <Divider />
               <div className="flex min-h-11 items-center gap-3">
                 <span
                   aria-hidden="true"
@@ -451,7 +451,7 @@ export function SettingsClient({
                   </span>
                 </span>
                 <Badge
-                  variant={hasGoogle ? "secondary" : "outline"}
+                  variant={hasGoogle ? "soft" : "outline"}
                   className="shrink-0"
                 >
                   {hasGoogle ? "Connected" : "Not connected"}
@@ -591,7 +591,7 @@ export function SettingsClient({
                     }
                   />
                 </Field>
-                <Separator />
+                <Divider />
                 <Field orientation="horizontal" className="min-h-11">
                   <FieldDescription className="flex-1">
                     <span className="block text-sm font-medium text-foreground">

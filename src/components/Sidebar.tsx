@@ -10,7 +10,7 @@ import type { PlanId } from "@/lib/plans";
 import { isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Divider } from "@/components/ui/divider";
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -112,15 +112,15 @@ function SidebarShell({
                     <SidebarMenuButton
                       isActive={isActive}
                       tooltip={item.label}
-                      render={
-                        <Link
-                          href={item.href}
-                          aria-current={isActive ? "page" : undefined}
-                        />
-                      }
+                      asChild
                     >
-                      <Icon aria-hidden="true" />
-                      <span>{item.label}</span>
+                      <Link
+                        href={item.href}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -186,7 +186,7 @@ function SidebarShell({
         )}
         {!collapsed && (
           <>
-            <Separator className="my-3" />
+            <Divider className="my-3" />
             <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
               <Link
                 href="/terms"

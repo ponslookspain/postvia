@@ -83,7 +83,7 @@ export function SignupForm({
     >
       <div className="flex flex-col gap-4">
         {error && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>
               {rateLimited ? "Too many code requests" : "Something went wrong"}

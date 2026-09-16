@@ -59,8 +59,8 @@ Vercel Preview is not part of daily development. Checks before commit:
 ## Stack
 
 - **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
-- **Styling:** Tailwind CSS v4, shadcn/ui (`base-maia` style, Neutral base color)
-  on Base UI primitives, Lucide icons, Inter body + DM Sans headings
+- **Styling:** Tailwind CSS v4, Radian UI on Radix UI primitives,
+  Lucide icons, Inter body + DM Sans headings
   (`--font-sans` / `--font-heading`; Geist variables retained, not primary)
 - **Database:** PostgreSQL via Prisma 6
 - **Auth:** Better Auth — email/password, Google OAuth, email verification
@@ -204,16 +204,17 @@ invariants and the fail-open/fail-closed matrix:
 
 ## Design system
 
-- Maia neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
+- Neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
   only, light mode primary with `.dark` overrides, no hardcoded palette values.
 - Shared components (`src/components`): `PageHeader`, `StatusBadge`,
   `AuthShell`, `MobileTopBar`, `PageContainer` (`max-w-3xl/5xl/6xl`,
-  `px-4 py-6 md:px-8 md:py-10`), plus shadcn/ui primitives in
-  `src/components/ui` (Base UI only — no Radix).
+  `px-4 py-6 md:px-8 md:py-10`), plus Radian UI primitives in
+  `src/components/ui` (Radix UI) and PostVIA custom components
+  (`Field` forms, `Toast` notifications).
 - Conventions: `FieldGroup` + `Field` forms with `data-invalid` /
   `aria-invalid`, `Card` sections with full header composition, `Alert` for
-  callouts, `Empty`/`StateBlock` for empty/error/loading states, Base UI
-  `toast` (not `alert()`), `gap-*` utilities (no `space-*`), `size-*` for
+  callouts, `Empty`/`StateBlock` for empty/error/loading states, custom
+  `Toast` (not `alert()`), `gap-*` utilities (no `space-*`), `size-*` for
   square elements, `cn()` for conditionals, Lucide icons with `data-icon`
   inside buttons.
 - Responsive: sidebar on desktop + top bar navigation on mobile

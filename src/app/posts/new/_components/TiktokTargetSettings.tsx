@@ -179,7 +179,7 @@ export function TiktokTargetSettings({
           )}
         </>
       ) : (
-        <Alert>
+        <Alert color="neutral" variant="outline">
           <TriangleAlertIcon />
           <AlertTitle>
             {isTikTokReconnectNeeded(creatorInfoError)

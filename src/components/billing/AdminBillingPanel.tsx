@@ -170,7 +170,7 @@ export function AdminBillingPanel() {
           </details>
         )}
         {error && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>Something went wrong</AlertTitle>
             <AlertDescription>{error}</AlertDescription>

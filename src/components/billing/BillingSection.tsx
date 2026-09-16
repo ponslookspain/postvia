@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
+import { Divider } from "@/components/ui/divider";
 import { ErrorBlock } from "@/components/StateBlock";
 import { Section, SectionHeader } from "@/components/Section";
 import { CheckIcon } from "lucide-react";
@@ -253,7 +253,7 @@ export function BillingSection({
             {initial.plan === "free" &&
               initial.postsLimit !== null &&
               initial.postsUsed >= initial.postsLimit && (
-                <Alert>
+                <Alert color="neutral" variant="outline">
                   <AlertTitle>
                     You&apos;ve reached your {initial.postsLimit} free posts
                     this month.
@@ -267,7 +267,7 @@ export function BillingSection({
                 </Alert>
               )}
             <div>
-              <Separator />
+              <Divider />
               <dl className="flex flex-col">
                 <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
                   <dt className="text-muted-foreground">Connected accounts</dt>
@@ -277,7 +277,7 @@ export function BillingSection({
                       : `${initial.totalAccounts} of ${initial.accountsLimit}`}
                   </dd>
                 </div>
-                <Separator />
+                <Divider />
                 <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
                   <dt className="text-muted-foreground">Billing period</dt>
                   <dd className="font-medium">
@@ -285,10 +285,10 @@ export function BillingSection({
                   </dd>
                 </div>
               </dl>
-              <Separator />
+              <Divider />
             </div>
             {initial.status === "CANCELLING" && periodEnd && (
-              <Alert>
+              <Alert color="neutral" variant="outline">
                 <AlertTitle>Canceling on {periodEnd}</AlertTitle>
                 <AlertDescription>
                   Full access until then; afterwards the Free plan applies.
@@ -296,7 +296,7 @@ export function BillingSection({
               </Alert>
             )}
             {initial.checkoutResult === "cancelled" && (
-              <Alert>
+              <Alert color="neutral" variant="outline">
                 <AlertTitle>Checkout canceled</AlertTitle>
                 <AlertDescription>
                   No charge was made. You can subscribe any time.
@@ -304,7 +304,7 @@ export function BillingSection({
               </Alert>
             )}
             {initial.checkoutPending && (
-              <Alert>
+              <Alert color="neutral" variant="outline">
                 <AlertTitle>Payment processing</AlertTitle>
                 <AlertDescription>
                   Your checkout is confirming with the payment provider. Your
@@ -314,7 +314,7 @@ export function BillingSection({
               </Alert>
             )}
             {(initial.status === "PAST_DUE" || initial.status === "UNPAID") && (
-              <Alert>
+              <Alert color="neutral" variant="outline">
                 <AlertTitle>Payment needs attention</AlertTitle>
                 <AlertDescription>
                   Update your payment method to keep your plan. Your posts
@@ -323,7 +323,7 @@ export function BillingSection({
               </Alert>
             )}
             {(initial.status === "CANCELED" || initial.status === "EXPIRED") && (
-              <Alert>
+              <Alert color="neutral" variant="outline">
                 <AlertTitle>
                   {initial.status === "CANCELED" ? "Subscription canceled" : "Subscription expired"}
                 </AlertTitle>
@@ -410,11 +410,11 @@ export function BillingSection({
                   <div className="flex flex-wrap items-center gap-2">
                     <CardTitle>{plan.name}</CardTitle>
                     {recommended && (
-                      <Badge className="border-signal/30 bg-signal/10 text-signal">
+                      <Badge variant="strong" color="primary" className="border-signal/30 bg-signal/10 text-signal">
                         Recommended
                       </Badge>
                     )}
-                    {current && <Badge variant="secondary">Current</Badge>}
+                    {current && <Badge variant="soft">Current</Badge>}
                   </div>
                   <CardDescription>{plan.description}</CardDescription>
                 </CardHeader>

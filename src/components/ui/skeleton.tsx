@@ -1,13 +1,17 @@
 import { cn } from "@/lib/utils"
 
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="skeleton"
-      className={cn("animate-pulse rounded-xl bg-muted", className)}
-      {...props}
-    />
-  )
+type SkeletonProps = React.ComponentProps<"div">
+
+function Skeleton({ className, ...props }: SkeletonProps) {
+	return (
+		<div
+		data-slot="skeleton"
+		// PostVIA compat: preserve the previous default rounding. Explicit
+		// rounded-* in className still wins via tailwind-merge.
+		className={cn("bg-fill2 animate-pulse rounded-xl", className)}
+			{...props}></div>
+	)
 }
+Skeleton.displayName = "Skeleton"
 
 export { Skeleton }

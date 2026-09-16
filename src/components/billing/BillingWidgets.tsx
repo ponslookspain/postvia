@@ -38,10 +38,11 @@ export function PlanBadge({
 }) {
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <Badge variant="secondary">{getPlan(plan).name}</Badge>
+      <Badge variant="soft">{getPlan(plan).name}</Badge>
       {status && status !== "ACTIVE" && (
         <Badge
-          variant={status === "PAST_DUE" || status === "UNPAID" ? "destructive" : "outline"}
+          color={status === "PAST_DUE" || status === "UNPAID" ? "error" : undefined}
+          variant={status === "PAST_DUE" || status === "UNPAID" ? "soft" : "outline"}
         >
           {statusLabel(status)}
         </Badge>

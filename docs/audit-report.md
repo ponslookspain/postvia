@@ -121,7 +121,14 @@ are safe to delete.
 
 ## O. Dependency cleanup
 
-43. No unused production dependency found with reference proof in this pass (`@base-ui/react`, `better-auth`, `prisma`, `stripe`, `resend`, `@vercel/blob`, `@sentry/nextjs`, `lucide-react`, `class-variance-authority`, `tw-animate-css` all referenced). `shadcn` CLI is dev-only and correct. Decision: KEEP all; revisit with bundle analysis only if needed.
+43. Historical note (this entry predates the UI migration and is kept
+for the record): at audit time no unused production dependency was
+found and the previous UI toolkit's CLI was dev-only. Current
+architecture: the previous toolkit is fully removed (no dependency,
+CLI, config, or UI code); primitives are Radian UI on Radix UI, plus
+PostVIA custom `Field`/`Toast`. `@base-ui/react` remains only for the
+custom `Toast`. Decision: KEEP all; revisit with bundle analysis only
+if needed.
 
 ## P. Legal / privacy
 

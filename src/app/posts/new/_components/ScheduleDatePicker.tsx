@@ -35,32 +35,30 @@ export function ScheduleDatePicker({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            id={id}
-            disabled={disabled}
-            className="w-full justify-start font-normal"
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          id={id}
+          disabled={disabled}
+          className="w-full justify-start font-normal"
+        >
+          <CalendarIcon
+            data-icon="inline-start"
+            aria-hidden="true"
+            className="text-muted-foreground"
           />
-        }
-      >
-        <CalendarIcon
-          data-icon="inline-start"
-          aria-hidden="true"
-          className="text-muted-foreground"
-        />
-        <span className={selected ? undefined : "text-muted-foreground"}>
-          {selected
-            ? selected.toLocaleDateString("en-GB", {
-                weekday: "short",
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })
-            : "Pick a date"}
-        </span>
+          <span className={selected ? undefined : "text-muted-foreground"}>
+            {selected
+              ? selected.toLocaleDateString("en-GB", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "Pick a date"}
+          </span>
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
         <Calendar

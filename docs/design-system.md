@@ -5,10 +5,11 @@ no proposals — only what the code does today.
 
 ## Base
 
-- **shadcn/ui, `base-maia` style** (preset `b2M7vIBmaW`), Tailwind v4,
-  Base UI primitives, Lucide icons, `cn()` for conditional classes.
-- `components.json` pins the style; do not hand-edit generated
-  primitives — change them only through the shadcn CLI.
+- **Radian UI** (`default` style, `components.json`), Tailwind v4,
+  Radix UI primitives, Lucide icons, `cn()` for conditional classes.
+- `components.json` pins the Radian configuration (paths, aliases,
+  icon library); primitives live in `src/components/ui`, PostVIA
+  custom components (`Field`, `Toast`, avatar extensions) beside them.
 
 ## Color philosophy
 
@@ -33,14 +34,15 @@ no proposals — only what the code does today.
 
 - Base `--radius: 0.875rem`. Cards `rounded-2xl`, inner content
   `rounded-xl`, small controls `rounded-lg/md`, **buttons always
-  fully rounded pills** (preset geometry).
+  fully rounded pills** (PostVIA geometry, preserved through migration).
 - Never add arbitrary radius values.
 
 ## Buttons (rule)
 
-- Use the Maia `Button` API exactly as installed: `default / outline /
+- Use the `Button` API exactly as installed: `default / outline /
   secondary / ghost / destructive / link`, sizes `default / xs / sm /
-  lg`, icon sizes `icon / icon-xs / icon-sm / icon-lg`.
+  lg`, icon sizes `icon / icon-xs / icon-sm / icon-lg` (Radian
+  implementation underneath, PostVIA-compatible props on top).
 - **No separate button sizing system.** Do not add `size` props,
   `h-*`/`min-h-*`, paddings or radii to individual buttons to make
   them match each other; do not add global button CSS.
@@ -52,8 +54,8 @@ no proposals — only what the code does today.
 
 - `FieldGroup + Field + FieldLabel`, validation via `data-invalid` on
    the `Field` and `aria-invalid` on the control. Native date/time
-   inputs keep their functional borders. Filter collections use the
-   Maia `Tabs` primitive (`ui/tabs.tsx`, URL-driven links), not
+    inputs keep their functional borders. Filter collections use the
+    Radian `Tabs` primitive (`ui/tabs.tsx`, URL-driven links), not
    hand-rolled strips; plain underline treatments remain for inline
    text links only.
 
@@ -63,15 +65,15 @@ no proposals — only what the code does today.
   (header/title/description/content/footer composition). It is **not**
   the default layout primitive: major areas are canvas sections
   separated by whitespace; lists use hairline `divide-y` rows.
-- No shadows except true floating UI (popover/dialog/sheet/toast).
+- No shadows except true floating UI (popover/dialog/drawer/toast).
 - Shadows, gradients and decorative borders are out.
 
 ## Navigation / sidebar
 
-- Official shadcn sidebar primitive (`ui/sidebar.tsx`,
-  `ui/tooltip.tsx`, `ui/sheet.tsx`, `hooks/use-mobile.ts`):
+- Radian sidebar primitive (`ui/sidebar.tsx`,
+  `ui/tooltip.tsx`, `ui/drawer.tsx`, `hooks/use-mobile.ts`):
   `SidebarProvider`, icon-collapsible rail (`16rem` / `3rem`), tooltips
-  in collapsed mode, keyboard toggle, mobile Sheet.
+  in collapsed mode, keyboard toggle, mobile Drawer.
 - App content (`Sidebar`, `MobileTopBar`, `nav-items.ts`) is Postvia's
   own: flat routes, `aria-current`, avatar + sign-out + plan upsell.
   No `inset` variant, no demo nav data.
@@ -86,7 +88,7 @@ no proposals — only what the code does today.
 
 - Month timetable grid (fixed geometry, drag-to-reschedule, overflow
   popover, dots on mobile, drafts rail). Scheduling date uses the
-  shadcn `Calendar` in a `Popover` (`ui/calendar.tsx`,
+  Radian `Calendar` in a `Popover` (`ui/calendar.tsx`,
   `ScheduleDatePicker.tsx`); time stays a native time input.
   `react-day-picker` + `date-fns` are the only UI-adjacent runtime
   dependencies and belong to that component.
@@ -96,7 +98,7 @@ no proposals — only what the code does today.
 - Large gaps between major sections, medium between groups, tight
   inside controls. Content never touches container edges.
 - Mobile gets its own hierarchy (stacked sections, fixed composer
-  action bar, sheet navigation) — never a squeezed desktop layout.
+  action bar, drawer navigation) — never a squeezed desktop layout.
 
 ## Accessibility (as implemented)
 
@@ -126,8 +128,8 @@ no proposals — only what the code does today.
 
 ## Hard rules
 
-1. No new global design tokens without necessity — extend the Maia
-   system instead of forking it.
+1. No new global design tokens without necessity — extend the Radian
+   + PostVIA token system instead of forking it.
 2. No second button sizing system, ever.
 3. No Magic UI / decorative animation libraries.
 4. No raw status/brand hex values in components — semantic tokens or

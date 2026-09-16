@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MenuIcon } from "lucide-react";
+import { MenuIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
@@ -11,12 +11,13 @@ import { isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import {
   Popover,
   PopoverContent,
@@ -73,18 +74,15 @@ export function MobileTopBar({
           <p className="text-base font-semibold tracking-tight">postvia</p>
         </div>
         <Popover>
-          <PopoverTrigger
-            aria-label="Account menu"
-            render={
-              <button
-                type="button"
-                className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              />
-            }
-          >
-            <Avatar>
-              <AvatarFallback>{initial}</AvatarFallback>
-            </Avatar>
+          <PopoverTrigger asChild aria-label="Account menu">
+            <button
+              type="button"
+              className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Avatar>
+                <AvatarFallback>{initial}</AvatarFallback>
+              </Avatar>
+            </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-60">
             <p className="truncate text-sm font-medium">{userName}</p>
@@ -103,14 +101,14 @@ export function MobileTopBar({
         </Popover>
       </div>
 
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left">
-          <SheetHeader>
-            <SheetTitle>Menu</SheetTitle>
-            <SheetDescription>
+      <Drawer open={menuOpen} onOpenChange={setMenuOpen} direction="left">
+        <DrawerContent className="w-3/4 sm:max-w-sm">
+          <DrawerHeader>
+            <DrawerTitle>Menu</DrawerTitle>
+            <DrawerDescription>
               Go to a section of Postvia.
-            </SheetDescription>
-          </SheetHeader>
+            </DrawerDescription>
+          </DrawerHeader>
           <nav aria-label="Primary" className="flex flex-col gap-1 px-6">
             {navItems.map((item) => {
               const active = isActivePath(pathname, item.href);
@@ -151,8 +149,18 @@ export function MobileTopBar({
               Privacy
             </Link>
           </div>
-        </SheetContent>
-      </Sheet>
+          <DrawerClose>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-4 right-4"
+              aria-label="Close menu"
+            >
+              <XIcon aria-hidden="true" />
+            </Button>
+          </DrawerClose>
+        </DrawerContent>
+      </Drawer>
     </header>
   );
 }

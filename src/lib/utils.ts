@@ -1,4 +1,11 @@
-export { cn } from "cn";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+// Local class-name merger (replaces the `cn` package): conditional join
+// via clsx, Tailwind conflict resolution via tailwind-merge.
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export const X_POST_CHAR_LIMIT = 280;
 export const THREADS_POST_CHAR_LIMIT = 500;

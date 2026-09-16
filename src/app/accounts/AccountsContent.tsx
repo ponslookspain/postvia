@@ -280,7 +280,7 @@ export default function AccountsContent({
           className="mb-6"
         />
       ) : message ? (
-        <Alert className="mb-6">
+        <Alert color="neutral" variant="outline" className="mb-6">
           <AlertTitle>Accounts</AlertTitle>
           <AlertDescription>{message.text}</AlertDescription>
         </Alert>
@@ -311,12 +311,12 @@ export default function AccountsContent({
                     </div>
                     {connected ? (
                       hasExpired ? (
-                        <Badge variant="destructive" className="shrink-0">
+                        <Badge color="error" variant="soft" className="shrink-0">
                           <StatusDot status="FAILED" />
                           Expired
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="shrink-0">
+                        <Badge variant="soft" className="shrink-0">
                           <StatusDot status="PUBLISHED" />
                           Connected
                         </Badge>

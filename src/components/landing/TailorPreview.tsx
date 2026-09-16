@@ -62,7 +62,7 @@ export function TailorPreview() {
           <Reveal>
             <Card>
               <CardContent className="p-6 md:p-8">
-                <Badge variant="secondary">Shared caption</Badge>
+                <Badge variant="soft">Shared caption</Badge>
                 <p className="mt-4 font-heading text-xl leading-relaxed text-pretty md:text-2xl">
                   “Morning launch is live — our biggest update yet. Here is
                   everything that changed and why it matters for your week.”
@@ -85,7 +85,7 @@ export function TailorPreview() {
                 <span className="flex items-center gap-2">
                   <PlatformIcon platform={version.platform} />
                   <span className="text-sm font-medium">{version.label}</span>
-                  <Badge variant="secondary" className="ml-auto">
+                  <Badge variant="soft" className="ml-auto">
                     Adapted
                   </Badge>
                 </span>
