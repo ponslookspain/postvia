@@ -7,7 +7,12 @@ import { TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { GoogleButton } from "@/components/GoogleButton";
 import { AuthShell } from "@/components/AuthShell";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import {
   OTP_RATE_LIMITED_CODE,
   formatOtpRateLimitMessage,
@@ -151,68 +156,78 @@ export function LoginForm({
         {oauthAccountNotLinked && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>Account not linked</AlertTitle>
-            <AlertDescription>
-              This Google account is not linked to an existing account. Please
-              sign in with your email and password first.
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>Account not linked</AlertTitle>
+              <AlertDescription>
+                This Google account is not linked to an existing account. Please
+                sign in with your email and password first.
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
 
         {oauthFailed && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>Sign-in failed</AlertTitle>
-            <AlertDescription>
-              Google sign-in failed. Please try again.
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>Sign-in failed</AlertTitle>
+              <AlertDescription>
+                Google sign-in failed. Please try again.
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
 
         {error && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>
-              {otpRateLimited ? "Too many code requests" : "Sign-in failed"}
-            </AlertTitle>
-            <AlertDescription aria-live="polite">
-              {otpRateLimited && otpRetryRemaining > 0
-                ? formatOtpRateLimitMessage(otpRetryRemaining)
-                : error}
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>
+                {otpRateLimited ? "Too many code requests" : "Sign-in failed"}
+              </AlertTitle>
+              <AlertDescription aria-live="polite">
+                {otpRateLimited && otpRetryRemaining > 0
+                  ? formatOtpRateLimitMessage(otpRetryRemaining)
+                  : error}
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
 
         {(deleted || passwordChanged) && (
           <Alert color="neutral" variant="outline">
-            <AlertDescription>
-              {deleted
-                ? "Your account has been deleted."
-                : "Password changed. Please sign in again."}
-            </AlertDescription>
+            <AlertContent>
+              <AlertDescription>
+                {deleted
+                  ? "Your account has been deleted."
+                  : "Password changed. Please sign in again."}
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
 
         {emailNotVerified && (
           <Alert color="neutral" variant="outline">
-            <AlertTitle>Email not verified</AlertTitle>
-            <AlertDescription>
-              Your email address has not been verified yet.{" "}
-              {resendSuccess ? (
-                <>Verification email sent. Check your inbox.</>
-              ) : (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  onClick={() => void handleResendVerification()}
-                  disabled={resending}
-                  className="h-auto p-0 text-sm"
-                >
-                  {resending ? "Sending..." : "Resend verification email"}
-                </Button>
-              )}
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>Email not verified</AlertTitle>
+              <AlertDescription>
+                Your email address has not been verified yet.{" "}
+                {resendSuccess ? (
+                  <>Verification email sent. Check your inbox.</>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => void handleResendVerification()}
+                    disabled={resending}
+                    className="h-auto p-0 text-sm"
+                  >
+                    {resending ? "Sending..." : "Resend verification email"}
+                  </Button>
+                )}
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
 

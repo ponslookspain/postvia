@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { TriangleAlertIcon } from "lucide-react";
 import { AuthShell } from "@/components/AuthShell";
 import { PLANS, type PlanId } from "@/lib/plans";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -54,8 +59,10 @@ export function OnboardingForm({ initialName = "" }: { initialName?: string }) {
           {error && (
             <Alert color="error" variant="outline">
               <TriangleAlertIcon />
-              <AlertTitle>Something went wrong</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertContent>
+                <AlertTitle>Something went wrong</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </AlertContent>
             </Alert>
           )}
           <Field>

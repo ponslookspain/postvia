@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { CalendarClockIcon, TriangleAlertIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -133,8 +138,10 @@ export function ScheduleDialog({
           {scheduleError && (
             <Alert color="error" variant="outline">
               <TriangleAlertIcon />
-              <AlertTitle>Cannot schedule</AlertTitle>
-              <AlertDescription>{scheduleError}</AlertDescription>
+              <AlertContent>
+                <AlertTitle>Cannot schedule</AlertTitle>
+                <AlertDescription>{scheduleError}</AlertDescription>
+              </AlertContent>
             </Alert>
           )}
           {scheduleError &&

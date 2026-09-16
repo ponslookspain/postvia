@@ -3,7 +3,12 @@ import { CircleCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { getSessionUser } from "@/lib/auth";
 import { ResendVerificationForm } from "./ResendVerificationForm";
 import { AuthShell } from "@/components/AuthShell";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +44,12 @@ export default async function VerifyEmailPage({
           <>
             <Alert color="error" variant="outline">
               <TriangleAlertIcon />
-              <AlertTitle>Verification failed</AlertTitle>
-              <AlertDescription>
-                Request a new verification link below.
-              </AlertDescription>
+              <AlertContent>
+                <AlertTitle>Verification failed</AlertTitle>
+                <AlertDescription>
+                  Request a new verification link below.
+                </AlertDescription>
+              </AlertContent>
             </Alert>
             <ResendVerificationForm />
           </>
@@ -50,10 +57,12 @@ export default async function VerifyEmailPage({
           <>
             <Alert color="neutral" variant="outline">
               <CircleCheckIcon />
-              <AlertTitle>Verified</AlertTitle>
-              <AlertDescription>
-                You can now continue to your account.
-              </AlertDescription>
+              <AlertContent>
+                <AlertTitle>Verified</AlertTitle>
+                <AlertDescription>
+                  You can now continue to your account.
+                </AlertDescription>
+              </AlertContent>
             </Alert>
             <Button
               nativeButton={false}

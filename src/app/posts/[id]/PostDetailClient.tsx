@@ -20,7 +20,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -499,8 +504,10 @@ export default function PostDetailPage({
       {post.status === "FAILED" && post.errorMessage && (
         <Alert color="error" variant="outline" className="mb-6">
           <TriangleAlertIcon />
-          <AlertTitle>Publication failed</AlertTitle>
-          <AlertDescription>{post.errorMessage}</AlertDescription>
+          <AlertContent>
+            <AlertTitle>Publication failed</AlertTitle>
+            <AlertDescription>{post.errorMessage}</AlertDescription>
+          </AlertContent>
         </Alert>
       )}
 
@@ -832,8 +839,10 @@ export default function PostDetailPage({
             {rescheduleError && (
               <Alert color="error" variant="outline">
                 <TriangleAlertIcon />
-                <AlertTitle>Cannot save time</AlertTitle>
-                <AlertDescription>{rescheduleError}</AlertDescription>
+                <AlertContent>
+                  <AlertTitle>Cannot save time</AlertTitle>
+                  <AlertDescription>{rescheduleError}</AlertDescription>
+                </AlertContent>
               </Alert>
             )}
           </FieldGroup>
