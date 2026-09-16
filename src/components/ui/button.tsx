@@ -66,25 +66,25 @@ const buttonVariants = cva(
 				variant: "strong",
 				color: "info",
 				className:
-					"bg-info font-medium text-white hover:bg-info-hover focus-visible:ring-info focus-visible:outline-none",
+					"bg-info font-medium text-info-fg hover:bg-info-hover focus-visible:ring-info focus-visible:outline-none",
 			},
 			{
 				variant: "strong",
 				color: "success",
 				className:
-					"bg-success font-medium text-white hover:bg-success-hover focus-visible:ring-success focus-visible:outline-none",
+					"bg-success font-medium text-success-fg hover:bg-success-hover focus-visible:ring-success focus-visible:outline-none",
 			},
 			{
 				variant: "strong",
 				color: "error",
 				className:
-					"bg-error font-medium text-white hover:bg-error-hover focus-visible:ring-error focus-visible:outline-none",
+					"bg-error font-medium text-error-fg hover:bg-error-hover focus-visible:ring-error focus-visible:outline-none",
 			},
 			{
 				variant: "strong",
 				color: "warning",
 				className:
-					"bg-warning font-medium text-white hover:bg-warning-hover focus-visible:ring-warning focus-visible:outline-none",
+					"bg-warning font-medium text-warning-fg hover:bg-warning-hover focus-visible:ring-warning focus-visible:outline-none",
 			},
 			{
 				variant: "strong",
@@ -296,8 +296,8 @@ const POSTVIA_SIZE_MAP = {
 	"icon-lg": "44",
 } as const
 
-// Per-size PostVIA contract preserved on top of Radian geometry:
-// pill radius, data-icon inline-start/end padding, icon-only squares.
+// Legacy size contract on top of Radian geometry: data-icon
+// inline-start/end padding, icon-only squares. Radius is Radian's.
 const POSTVIA_SIZE_FIXES: Record<PostVIAButtonSize, string> = {
 	default:
 		"has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
@@ -335,15 +335,16 @@ function Button({
 	const mapped = POSTVIA_VARIANT_MAP[variant]
 	const classes = cn(
 		// Preserved PostVIA base contract (previous implementation).
-		"shrink-0 border border-transparent bg-clip-padding select-none active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40",
+		"shrink-0 border border-transparent bg-clip-padding select-none active:not-aria-[haspopup]:translate-y-px aria-invalid:border-error aria-invalid:ring-[3px] aria-invalid:ring-error/20 dark:aria-invalid:border-error/50 dark:aria-invalid:ring-error/40",
 		buttonVariants({
 			variant: mapped.variant,
 			size: POSTVIA_SIZE_MAP[size],
 			color: mapped.color,
 			loading,
 		}),
-		// Preserved PostVIA geometry + icon contract.
-		"rounded-4xl",
+		// Radian geometry: per-size radius comes from buttonVariants above
+		// (28/32 → rounded-md, 36+ → rounded-lg). Pill is opt-in via
+		// className="rounded-full", never the default.
 		"[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 		"aria-expanded:bg-muted aria-expanded:text-foreground",
 		"disabled:opacity-50",

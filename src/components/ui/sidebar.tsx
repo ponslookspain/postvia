@@ -132,8 +132,8 @@ export const sidebarMenuButtonVariants = cva(
 	{
 		variants: {
 			variant: {
-				strong:
-					"text-sidebar-fg focus-visible:ring-primary-focus focus-visible:outline-none data-[active=true]:bg-primary! data-[active=true]:text-white  data-[active=true]:[&>svg]:stroke-white",
+			strong:
+				"text-sidebar-fg focus-visible:ring-primary-focus focus-visible:outline-none data-[active=true]:bg-primary! data-[active=true]:text-primary-fg  data-[active=true]:[&>svg]:stroke-primary-fg",
 				soft: "text-sidebar-fg focus-visible:ring-primary-focus focus-visible:outline-none data-[active=true]:bg-primary-accent! data-[active=true]:text-primary-text [&>svg]:text-fg-secondary data-[active=true]:[&>svg]:stroke-primary-text",
 				neutral:
 					"text-sidebar-fg rounded-md data-[active=true]:bg-sidebar-accent!",

@@ -81,19 +81,18 @@ const alertVariants = cva(
 				variant: "strong",
 				className: "bg-primary text-primary-fg",
 			},
-			{ color: "info", variant: "strong", className: "bg-info text-white" },
-			{
-				color: "warning",
-				variant: "strong",
-				className:
-					"bg-warning text-warning-fg [&_[data-slot=alert-title]]:text-black",
-			},
-			{ color: "error", variant: "strong", className: "bg-error text-white" },
-			{
-				color: "success",
-				variant: "strong",
-				className: "bg-success text-white",
-			},
+			{ color: "info", variant: "strong", className: "bg-info text-info-fg" },
+		{
+			color: "warning",
+			variant: "strong",
+			className: "bg-warning text-warning-fg",
+		},
+		{ color: "error", variant: "strong", className: "bg-error text-error-fg" },
+		{
+			color: "success",
+			variant: "strong",
+			className: "bg-success text-success-fg",
+		},
 
 			// Soft-outline variants
 			{

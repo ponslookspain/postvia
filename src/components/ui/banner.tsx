@@ -26,7 +26,7 @@ const bannerVariants = cva(
 				warning: "",
 			},
 			variant: {
-				strong: "[&_[data-slot=banner-close]]:text-white",
+				strong: "[&_[data-slot=banner-close]]:text-[current]",
 				soft: "[&_[data-slot=banner-close]]:text-[current] [&_[data-slot=banner-title]]:text-fg [&_[data-slot=banner-description]]:text-fg",
 				outline:
 					"border border-soft border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-fg-secondary [&_[data-slot=banner-title]]:text-fg [&_[data-slot=banner-description]]:text-fg-secondary",
@@ -68,24 +68,23 @@ const bannerVariants = cva(
 				variant: "strong",
 				className: "bg-black-inverse text-white-inverse",
 			},
-			{
-				color: "primary",
-				variant: "strong",
-				className: "bg-primary text-white",
-			},
-			{ color: "info", variant: "strong", className: "bg-info text-white" },
-			{
-				color: "warning",
-				variant: "strong",
-				className:
-					"bg-warning text-warning-fg [&_[data-slot=banner-title]]:text-black",
-			},
-			{ color: "error", variant: "strong", className: "bg-error text-white" },
-			{
-				color: "success",
-				variant: "strong",
-				className: "bg-success text-white",
-			},
+		{
+			color: "primary",
+			variant: "strong",
+			className: "bg-primary text-primary-fg",
+		},
+		{ color: "info", variant: "strong", className: "bg-info text-info-fg" },
+		{
+			color: "warning",
+			variant: "strong",
+			className: "bg-warning text-warning-fg",
+		},
+		{ color: "error", variant: "strong", className: "bg-error text-error-fg" },
+		{
+			color: "success",
+			variant: "strong",
+			className: "bg-success text-success-fg",
+		},
 
 			// Outline
 			{

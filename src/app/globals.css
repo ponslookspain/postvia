@@ -5,12 +5,36 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* ——— Canonical surfaces & foreground.
+     Values are held on these names (used across pages as
+     bg-background, text-foreground, border-border, ...); the Radian
+     short names (bg, fill1-4, fg-*) alias them in the @theme block. ——— */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
   --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* ——— PostVIA brand. Contract decision: keep the brand indigo instead
+     of the Radian default violet-blue (#623DF5). ——— */
   --primary: oklch(0.488 0.243 264.376);
   --primary-foreground: oklch(0.97 0.014 254.604);
-  --destructive: oklch(0.577 0.245 27.325);
+
+  /* ——— Canonical status hues.
+     --error holds the value; --destructive is a compat alias for the
+     legacy name still used by pages (variant="destructive",
+     text-destructive, ...). Do not fork new error names.
+     --success/--warning bases stay PostVIA Moss/Honey per contract
+     (dispatch-desk: status hues live only in dots/badges); their
+     sub-tokens map to the Radian emerald/amber palettes below. ——— */
+  --error: oklch(0.577 0.245 27.325);
+  --destructive: var(--error);
   --success: oklch(0.55 0.15 150);
   --warning: oklch(0.62 0.15 75);
   /* Postvia dispatch-desk tokens. One signal color only: signal aliases
@@ -20,27 +44,17 @@
      Signal #2E3BEB · Moss #15803D · Honey #B54708 · Ember #C81E1E */
   --signal: var(--primary);
   --signal-foreground: var(--primary-foreground);
-  /* Layout scale. Pages: narrow 48rem (forms), default 64rem (lists),
-     wide 76rem (calendar, composer). Section rhythm is 2.5rem. */
+  /* Layout scale (product tokens, not Radian). Pages: narrow 48rem
+     (forms), default 64rem (lists), wide 76rem (calendar, composer).
+     Section rhythm is 2.5rem. */
   --page-narrow: 48rem;
   --page-default: 64rem;
   --page-wide: 76rem;
   --section-gap: 2.5rem;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
   --radius: 0.875rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
@@ -50,8 +64,6 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
 }
 
 @theme inline {
@@ -63,6 +75,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-destructive: var(--destructive);
+  --color-error: var(--error);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-signal: var(--signal);
@@ -78,11 +91,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-accent-foreground: var(--accent-foreground);
@@ -102,21 +110,28 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Radian foundation bridge.
-   Direction is strictly one-way:
-     PostVIA token → Radian alias → future Radian component.
-   No PostVIA token value is changed here; this block only adds the
-   Radian semantic names that utility.css + registry components expect
-   but that do not exist in the PostVIA layer above.
-   - Structural tokens (primary/bg/fills/fg/border/elevation/sidebar)
-     alias PostVIA tokens, so the current indigo/monochrome design stays.
-   - Hue families (success/error/warning/info sub-tokens) point at the
-     Radian OKLCH palette from utility.css, mirroring the official
-     Radian globals.css recipe.
-   - Aliases use var() references, so the .dark overrides of the PostVIA
-     source tokens below apply automatically; no separate .dark block.
-   - --color-stroke is intentionally absent: stock Radian does not define
-     it either (upstream gap, see accordion table variant). */
+/* Radian semantic contract.
+   Canonical source: https://radianui.com/docs/fundamentals/colors.md
+   (bg/fill1-4, fg ramp, border ramp, primary/success/error/warning/info
+   families, elevation, white/black-inverse) + the 17-hue OKLCH palette in
+   utility.css. Values below are confirmed against those docs except where
+   a KNOWN GAP is noted — gaps must be resolved with designer values,
+   never invented ad hoc.
+   Direction:
+     PostVIA value holders (:root above) → Radian names (here) → components.
+   Aliases use var() so the .dark overrides below apply automatically.
+   KNOWN GAPS (no visual change until a designer decides):
+     - primary-hover/border/accent reuse the base/accent/ring instead of
+       hue-matched steps (docs: hover #7655F6, border #9981f8,
+       accent #ECE8FC pastel).
+     - fill2/fill3 collapse to --accent, fill1/fill4 to --muted (docs
+       define four distinct steps: #F9F9FA/#F4F4F6/#E9E9EC/#DEDEE3).
+     - fg-secondary/tertiary/disabled share --muted-foreground.
+     - success/warning bases stay PostVIA Moss/Honey by product decision;
+       only their sub-tokens use the Radian emerald/amber palettes.
+   --color-stroke is intentionally absent: stock Radian does not define
+   it either. chart-* tokens were removed: unused anywhere in src and not
+   part of the Radian color system. */
 @theme {
   /* primary family → PostVIA signal/indigo */
   --color-primary-fg: var(--primary-foreground);
@@ -135,14 +150,13 @@
   --color-success-hover: var(--color-emerald-hover);
   --color-success-text: var(--success);
 
-  /* error family → PostVIA destructive + Radian red palette */
-  --color-error: var(--destructive);
+  /* error family → canonical --error + Radian red palette */
   --color-error-fg: var(--color-red-fg);
   --color-error-accent: var(--color-red-accent);
   --color-error-focus: var(--color-red-focus);
   --color-error-border: var(--color-red-border);
   --color-error-hover: var(--color-red-hover);
-  --color-error-text: var(--destructive);
+  --color-error-text: var(--error);
 
   /* warning sub-tokens → Radian amber palette (base --color-warning
      stays PostVIA, mapped above) */
@@ -228,15 +242,11 @@ body {
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --error: oklch(0.704 0.191 22.216);
+  --destructive: var(--error);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.623 0.214 259.815);
@@ -257,9 +267,11 @@ body {
   html {
     @apply font-sans;
   }
-  /* Postvia type scale (Geist Sans only, left-aligned):
+  /* Postvia type scale (Inter body + DM Sans headings, left-aligned):
      page title 24/32 semibold tight · section title 18/28 medium ·
-     body 14/20 · meta 12/16 muted. Descriptions cap at 68ch. */
+     body 14/20 · meta 12/16 muted. Descriptions cap at 68ch.
+     Radian H1-H6/body/label specs: NOT CONFIRMED (typography playground
+     values are not published as text); do not invent a scale here. */
   ::selection {
     background: color-mix(in oklch, var(--signal) 18%, transparent);
   }

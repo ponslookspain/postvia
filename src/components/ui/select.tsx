@@ -72,9 +72,9 @@ const selectTriggerVariants = cva(
 			size: {
 				"28": "gap-0.5 h-7 px-2 py-1.5 text-[13px] rounded-md",
 				"32": "gap-0.5 h-8 px-2 py-1.5 text-sm rounded-md",
-				// PostVIA compat: previous Trigger was a h-9 pill
-				// (rounded-4xl). Only the default size is adjusted.
-				"36": "gap-1 h-9 px-2.5 py-2 text-sm rounded-4xl",
+			// Radian default: h-9 follows the standard radius progression
+			// (36 → rounded-lg).
+			"36": "gap-1 h-9 px-2.5 py-2 text-sm rounded-lg",
 				"40": "gap-1 h-10 px-3 py-2.5 text-sm rounded-lg",
 				"44": "gap-1 h-11 px-3 py-2.5 text-base rounded-lg",
 				"48": "gap-1 h-12 px-3.5 py-3 text-base rounded-lg",

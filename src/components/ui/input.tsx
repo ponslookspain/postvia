@@ -29,10 +29,9 @@ const inputVariants = cva(
 			size: {
 				"28": "h-7 text-[13px] px-2 rounded-md file:pe-1.5 file:me-1.5",
 				"32": "h-8 text-sm px-2 rounded-md file:pe-3 file:me-3",
-				// PostVIA compat: previous Input was a h-9 pill (rounded-4xl,
-				// px-3). Only the default size is adjusted; other sizes stay
-				// stock Radian.
-				"36": "h-9 text-sm px-3 rounded-4xl file:pe-2.5 file:me-2.5",
+			// Radian default: h-9 follows the standard radius progression
+			// (36 → rounded-lg, like 40/44/48).
+			"36": "h-9 text-sm px-3 rounded-lg file:pe-2.5 file:me-2.5",
 				"40": "h-10 text-sm px-3 rounded-lg file:pe-3 file:me-3",
 				"44": "h-11 text-base px-3 rounded-lg file:pe-3.5 file:me-3.5",
 				"48": "h-12 text-base px-3.5 rounded-lg file:pe-3.5 file:me-3.5",
