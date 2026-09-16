@@ -219,7 +219,7 @@ function MediaHero({
                   onClick={() => onRemove(item.id)}
                   disabled={deletingMediaId === item.id}
                   aria-label={`Remove ${item.filename}`}
-                  className="absolute -top-1.5 -right-1.5 size-6 rounded-full shadow-sm"
+                  className="absolute -top-1.5 -right-1.5 size-6 shadow-sm"
                 >
                   {deletingMediaId === item.id ? (
                     <Spinner data-icon="inline-start" />

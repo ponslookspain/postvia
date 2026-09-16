@@ -107,7 +107,7 @@ export function MediaGrid({
                     size="icon-sm"
                     onClick={() => onRemove(item.key)}
                     aria-label={`Remove ${item.name}`}
-                    className="absolute top-1.5 right-1.5 size-6 rounded-full"
+                    className="absolute top-1.5 right-1.5 size-6"
                   >
                     <XIcon />
                   </Button>

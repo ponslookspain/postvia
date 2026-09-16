@@ -21,7 +21,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
   SidebarRail,
   SidebarTrigger,
   useSidebar,
@@ -31,32 +30,17 @@ export function Sidebar({
   userName,
   userEmail,
   plan,
-  className,
-}: {
-  userName: string;
-  userEmail: string;
-  plan: PlanId;
-  className?: string;
-}) {
-  // Provider lives here (not in AppShell) so the shell layout and the
-  // mobile experience stay untouched. The wrapper carries AppShell's
-  // responsive visibility; md:w-auto keeps it from claiming row width.
-  return (
-    <SidebarProvider className={cn("hidden w-auto md:flex", className)}>
-      <SidebarShell userName={userName} userEmail={userEmail} plan={plan} />
-    </SidebarProvider>
-  );
-}
-
-function SidebarShell({
-  userName,
-  userEmail,
-  plan,
 }: {
   userName: string;
   userEmail: string;
   plan: PlanId;
 }) {
+  // Canonical Radian structure (radianui.com/docs/components/sidebar):
+  // SidebarProvider lives in AppShell and wraps both this Sidebar and
+  // SidebarInset as direct children, so the peer-data-[variant=inset]
+  // styles on SidebarInset resolve. No visibility classes here — the
+  // primitive hides itself on mobile (hidden md:block / hidden md:flex
+  // + Drawer branch) and sizes via its own --sidebar-width gap.
   const pathname = usePathname();
   const router = useRouter();
   const { state } = useSidebar();
@@ -86,7 +70,7 @@ function SidebarShell({
   }
 
   return (
-    <SidebarPrimitive collapsible="icon">
+    <SidebarPrimitive variant="inset" collapsible="icon">
       <SidebarHeader className="flex-row items-center justify-between gap-2 border-b border-border px-4 py-3.5">
         {collapsed ? (
           <p aria-hidden="true" className="font-heading text-lg font-semibold tracking-tight">

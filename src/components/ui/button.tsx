@@ -20,12 +20,12 @@ const buttonVariants = cva(
 				"smooth-inverted": "",
 			},
 			size: {
-				"28": "[&>svg]:size-4 text-[13px] leading-4.5 px-1 rounded-md",
-				"32": "[&>svg]:size-4.5 text-sm px-1 rounded-md",
-				"36": "[&>svg]:size-5 text-sm px-1 rounded-lg",
-				"40": "[&>svg]:size-5 text-sm px-1 rounded-lg",
-				"44": "[&>svg]:size-5 text-base px-1 rounded-lg",
-				"48": "[&>svg]:size-6 text-base px-1 rounded-lg",
+				"28": "[&>svg]:size-4 text-[13px] leading-4.5 px-1 rounded-full",
+				"32": "[&>svg]:size-4.5 text-sm px-1 rounded-full",
+				"36": "[&>svg]:size-5 text-sm px-1 rounded-full",
+				"40": "[&>svg]:size-5 text-sm px-1 rounded-full",
+				"44": "[&>svg]:size-5 text-base px-1 rounded-full",
+				"48": "[&>svg]:size-6 text-base px-1 rounded-full",
 			},
 			loading: {
 				true: "",
@@ -342,9 +342,9 @@ function Button({
 			color: mapped.color,
 			loading,
 		}),
-		// Radian geometry: per-size radius comes from buttonVariants above
-		// (28/32 → rounded-md, 36+ → rounded-lg). Pill is opt-in via
-		// className="rounded-full", never the default.
+		// PostVIA geometry (design-system.md): buttons are always fully
+		// rounded pills. Radius lives in the size variants above
+		// (rounded-full on every size), never as a per-call className.
 		"[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 		"aria-expanded:bg-muted aria-expanded:text-foreground",
 		"disabled:opacity-50",
