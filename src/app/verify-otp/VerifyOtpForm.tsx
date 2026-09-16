@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { MailCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { AuthShell } from "@/components/AuthShell";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import {
   OTP_RATE_LIMITED_CODE,
   formatOtpRateLimitMessage,
@@ -149,21 +154,25 @@ export function VerifyOtpForm({
         {error && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>
-              {resendRateLimited ? "Too many code requests" : "Verification failed"}
-            </AlertTitle>
-            <AlertDescription aria-live="polite">
-              {resendRateLimited && resendRetryRemaining > 0
-                ? formatOtpRateLimitMessage(resendRetryRemaining)
-                : error}
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>
+                {resendRateLimited ? "Too many code requests" : "Verification failed"}
+              </AlertTitle>
+              <AlertDescription aria-live="polite">
+                {resendRateLimited && resendRetryRemaining > 0
+                  ? formatOtpRateLimitMessage(resendRetryRemaining)
+                  : error}
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
         {resendNote && (
           <Alert color="neutral" variant="outline">
             <MailCheckIcon />
-            <AlertTitle>Code sent</AlertTitle>
-            <AlertDescription>{resendNote}</AlertDescription>
+            <AlertContent>
+              <AlertTitle>Code sent</AlertTitle>
+              <AlertDescription>{resendNote}</AlertDescription>
+            </AlertContent>
           </Alert>
         )}
         <form onSubmit={(e) => void handleVerify(e)}>

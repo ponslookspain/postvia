@@ -7,7 +7,12 @@ import {
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -90,36 +95,42 @@ export function PublishCard({
       <CardContent className="flex flex-col gap-3">
         {(quotaBlocked || quotaError) && (
           <Alert color="neutral" variant="outline">
-            <AlertTitle>Monthly post limit reached</AlertTitle>
-            <AlertDescription>
-              <UpgradeCta
-                reason={
-                  quotaError?.reason ??
-                  "This plan includes a fixed number of posts per month."
-                }
-                upgradeTo={quotaError?.upgradeTo ?? quotaUpgradeTo}
-              />
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>Monthly post limit reached</AlertTitle>
+              <AlertDescription>
+                <UpgradeCta
+                  reason={
+                    quotaError?.reason ??
+                    "This plan includes a fixed number of posts per month."
+                  }
+                  upgradeTo={quotaError?.upgradeTo ?? quotaUpgradeTo}
+                />
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
         {schedulingForX && scheduleMode && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>Scheduling unavailable</AlertTitle>
-            <AlertDescription>
-              Scheduling for X is not available yet. Choose Threads to schedule
-              a post.
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>Scheduling unavailable</AlertTitle>
+              <AlertDescription>
+                Scheduling for X is not available yet. Choose Threads to schedule
+                a post.
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
         {schedulingForX && xScheduleHint && !scheduleMode && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>Scheduling unavailable</AlertTitle>
-            <AlertDescription>
-              Scheduling for X is not available yet. Select a Threads account
-              to schedule, or publish to X now.
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>Scheduling unavailable</AlertTitle>
+              <AlertDescription>
+                Scheduling for X is not available yet. Select a Threads account
+                to schedule, or publish to X now.
+              </AlertDescription>
+            </AlertContent>
             <Button
               type="button"
               variant="ghost"
@@ -140,8 +151,10 @@ export function PublishCard({
         {publishBlockedReason && !publishing && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>Complete required fields</AlertTitle>
-            <AlertDescription>{publishBlockedReason}</AlertDescription>
+            <AlertContent>
+              <AlertTitle>Complete required fields</AlertTitle>
+              <AlertDescription>{publishBlockedReason}</AlertDescription>
+            </AlertContent>
           </Alert>
         )}
         {/* Rail action stack; on mobile the fixed bottom bar owns these actions. */}

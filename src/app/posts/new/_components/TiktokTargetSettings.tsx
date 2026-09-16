@@ -1,7 +1,12 @@
 "use client";
 
 import { RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -181,33 +186,35 @@ export function TiktokTargetSettings({
       ) : (
         <Alert color="neutral" variant="outline">
           <TriangleAlertIcon />
-          <AlertTitle>
-            {isTikTokReconnectNeeded(creatorInfoError)
-              ? "Reconnect TikTok to set options"
-              : "TikTok options unavailable"}
-          </AlertTitle>
-          <AlertDescription>
-            {isTikTokReconnectNeeded(creatorInfoError)
-              ? "TikTok access expired or was revoked. Reconnect the account to change privacy and interaction settings."
-              : "Could not load this account's TikTok options. Publishing needs live TikTok settings — retry before posting."}
-          </AlertDescription>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {isTikTokReconnectNeeded(creatorInfoError) ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onOpenAccounts}
-              >
-                Open accounts
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-                <RotateCcwIcon data-icon="inline-start" />
-                Retry
-              </Button>
-            )}
-          </div>
+          <AlertContent>
+            <AlertTitle>
+              {isTikTokReconnectNeeded(creatorInfoError)
+                ? "Reconnect TikTok to set options"
+                : "TikTok options unavailable"}
+            </AlertTitle>
+            <AlertDescription>
+              {isTikTokReconnectNeeded(creatorInfoError)
+                ? "TikTok access expired or was revoked. Reconnect the account to change privacy and interaction settings."
+                : "Could not load this account's TikTok options. Publishing needs live TikTok settings — retry before posting."}
+            </AlertDescription>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {isTikTokReconnectNeeded(creatorInfoError) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenAccounts}
+                >
+                  Open accounts
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+                  <RotateCcwIcon data-icon="inline-start" />
+                  Retry
+                </Button>
+              )}
+            </div>
+          </AlertContent>
         </Alert>
       )}
     </>

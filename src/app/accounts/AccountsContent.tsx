@@ -9,7 +9,12 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusDot } from "@/components/StatusBadge";
 import { ErrorBlock } from "@/components/StateBlock";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -283,8 +288,10 @@ export default function AccountsContent({
         />
       ) : message ? (
         <Alert color="neutral" variant="outline" className="mb-6">
-          <AlertTitle>Accounts</AlertTitle>
-          <AlertDescription>{message.text}</AlertDescription>
+          <AlertContent>
+            <AlertTitle>Accounts</AlertTitle>
+            <AlertDescription>{message.text}</AlertDescription>
+          </AlertContent>
         </Alert>
       ) : null}
 

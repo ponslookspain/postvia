@@ -5,7 +5,12 @@ import { InfoIcon, UsersIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { EmptyBlock } from "@/components/StateBlock";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Avatar, AvatarBadge, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -168,14 +173,16 @@ export function ChannelStrip({
       {mediaErrors.length > 0 && (
         <Alert color="neutral" variant="outline" className="mt-3">
           <InfoIcon />
-          <AlertTitle>Media requirements</AlertTitle>
-          <AlertDescription>
-            <ul className="flex list-disc flex-col gap-1 pl-4">
-              {mediaErrors.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          </AlertDescription>
+          <AlertContent>
+            <AlertTitle>Media requirements</AlertTitle>
+            <AlertDescription>
+              <ul className="flex list-disc flex-col gap-1 pl-4">
+                {mediaErrors.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </AlertContent>
         </Alert>
       )}
     </section>

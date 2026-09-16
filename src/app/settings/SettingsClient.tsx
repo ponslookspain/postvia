@@ -6,7 +6,12 @@ import { AtSignIcon, KeyRoundIcon, TriangleAlertIcon } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,10 +49,12 @@ function FormAlert({ message }: { message: NonNullable<Message> }) {
   return (
     <Alert color={message.type === "error" ? "error" : "neutral"} variant="outline">
       {message.type === "error" && <TriangleAlertIcon />}
-      <AlertTitle>
-        {message.type === "error" ? "Something went wrong" : "Saved"}
-      </AlertTitle>
-      <AlertDescription>{message.text}</AlertDescription>
+      <AlertContent>
+        <AlertTitle>
+          {message.type === "error" ? "Something went wrong" : "Saved"}
+        </AlertTitle>
+        <AlertDescription>{message.text}</AlertDescription>
+      </AlertContent>
     </Alert>
   );
 }
