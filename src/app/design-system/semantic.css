@@ -1,0 +1,241 @@
+/* ============================================================================
+   PostVIA Design System — 2. SEMANTIC TOKENS
+   ----------------------------------------------------------------------------
+   THIS FILE IS THE CANONICAL SOURCE OF TRUTH for PostVIA colour, surface and
+   border meaning. Components and pages consume these names — via the Tailwind
+   utilities exposed in the `@theme inline` block at the bottom — and nothing
+   else. `compat-radian.css` is an alias layer on top of this file; it is
+   deliberately NOT canonical and must never hold a value of its own.
+
+   Two rules keep the layer honest:
+     1. A value is written down exactly once. Everything that shares it is a
+        `var()` alias, so a theme override reaches every consumer.
+     2. A name means one thing. There is no second `accent`, no second
+        `error`. If a new meaning is needed, it gets a new name.
+
+   Theming: `.dark` is applied to <html> by the blocking script in
+   `src/hooks/use-theme.ts` (dark is the product default, light is opt-in).
+   Because `:root` and `.dark` are therefore the SAME element, an alias such
+   as `--destructive: var(--error)` only has to be declared once — it resolves
+   against whichever `--error` is in effect. Aliases are listed in `:root`
+   only; `.dark` restates real values.
+   ========================================================================= */
+
+:root {
+	/* —— Background ————————————————————————————————————————————————————————
+	   The page canvas. Near-white in light, near-black in dark. */
+	--background: oklch(1 0 0);
+
+	/* —— Foreground ————————————————————————————————————————————————————————
+	   Ink on the canvas, and its quiet counterpart for metadata. */
+	--foreground: oklch(0.145 0 0);
+	--muted-foreground: oklch(0.556 0 0);
+
+	/* —— Muted ————————————————————————————————————————————————————————————
+	   The neutral fill: hovers, inset wells, disabled chrome. */
+	--muted: oklch(0.97 0 0);
+
+	/* —— Panel ————————————————————————————————————————————————————————————
+	   A block on the page. One shade off the canvas and carrying NO outline:
+	   blocks are separated by tone, not by a drawn box. `Card` renders on it.
+	   A block nested inside a panel goes the other way (`--background`) so it
+	   reads as inset rather than vanishing. */
+	--panel: oklch(0.974 0 0);
+	--panel-foreground: var(--foreground);
+
+	/* —— Surface ——————————————————————————————————————————————————————————
+	   Raised and floating surfaces. `card` is a block that may lift off the
+	   page; `popover` is genuinely floating UI (popover, dialog, drawer,
+	   toast, select menu) and is the only tier where a shadow is allowed. */
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.145 0 0);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.145 0 0);
+
+	/* —— Elevation ————————————————————————————————————————————————————————
+	   PostVIA elevates by TONE, not by shadow. The ladder below is the whole
+	   elevation system; `shadow-md` / `shadow-lg` are reserved for the
+	   floating tier and are applied by the primitives themselves. */
+	--elevation-sunken: var(--muted);
+	--elevation-surface: var(--panel);
+	--elevation-raised: var(--card);
+	--elevation-overlay: var(--popover);
+
+	/* —— Border ———————————————————————————————————————————————————————————
+	   `border` is the hairline used for structural splits (header from list,
+	   filter from results). An outline on a block is an ACCENT, never a
+	   default. `input` is the functional field edge; `ring` is the focus
+	   ring. The default border colour is applied in `@layer base`
+	   (`globals.css`) — never as an unlayered `*` rule, which would outrank
+	   and silently disable every `border-*` utility. */
+	--border: oklch(0.922 0 0);
+	--input: oklch(0.922 0 0);
+	--ring: oklch(0.708 0 0);
+
+	/* —— Primary ——————————————————————————————————————————————————————————
+	   One brand hue: crimson, reserved for primary actions. Held a step off
+	   `--error` in hue (~19 vs ~27) and lightness so a call to action never
+	   reads as a failure. Navigation never wears it. */
+	--primary: oklch(0.58 0.22 19);
+	--primary-foreground: oklch(0.985 0 0);
+
+	/* —— Status ———————————————————————————————————————————————————————————
+	   Status hues appear in dots and badges only, never as page decoration.
+	   `success` / `warning` are the PostVIA Moss and Honey values; `error`
+	   is the canonical failure hue; `info` is the blue the SCHEDULED state
+	   uses — deliberately not the brand hue, because a routine future-dated
+	   post must not look like an alert.
+	   Each `-foreground` is the legible ink on top of its filled hue. */
+	--success: oklch(0.55 0.15 150);
+	--success-foreground: oklch(1 0 0);
+	--warning: oklch(0.62 0.15 75);
+	--warning-foreground: oklch(0.445 0.087 78.294);
+	--error: oklch(0.577 0.245 27.325);
+	--error-foreground: oklch(1 0 0);
+	--info: oklch(0.61 0.203 255.637);
+	--info-foreground: oklch(1 0 0);
+
+	/* —— Navigation ———————————————————————————————————————————————————————
+	   The sidebar rail is a shade off the page so rail and content are told
+	   apart by tone rather than by a divider. `sidebar-accent` is the active
+	   nav pill: a quiet neutral fill, never the brand hue. */
+	--sidebar: oklch(0.985 0 0);
+	--sidebar-foreground: oklch(0.145 0 0);
+	--sidebar-primary: oklch(0.58 0.22 19);
+	--sidebar-primary-foreground: oklch(0.985 0 0);
+	--sidebar-accent: oklch(0.97 0 0);
+	--sidebar-accent-foreground: oklch(0.205 0 0);
+	--sidebar-border: oklch(0.922 0 0);
+	--sidebar-ring: oklch(0.708 0 0);
+
+	/* —— Legacy aliases ———————————————————————————————————————————————————
+	   Kept because call sites still use them. They are ALIASES, never
+	   values: each resolves to a canonical token above, so there is exactly
+	   one place to change. Do not add new names here.
+
+	   --destructive  legacy name for the failure hue. Prefer `--error`.
+	   --signal       legacy name for the brand hue, from the dispatch-desk
+	                  vocabulary. It is `--primary`; the SCHEDULED state it
+	                  once described now uses `--info` (see StatusBadge).
+	                  Prefer `--primary`.
+	   --accent       the neutral fill step. It carried a value identical to
+	                  `--muted` in both themes, so it is stated as an alias
+	                  rather than a second copy of the same colour.
+	   --secondary    quiet neutral button fill. No utility consumes it
+	                  today; retained so the Radian `secondary` surface and
+	                  the `soft/neutral` button variant keep a value. */
+	--destructive: var(--error);
+	--signal: var(--primary);
+	--signal-foreground: var(--primary-foreground);
+	--accent: var(--muted);
+	--accent-foreground: oklch(0.205 0 0);
+	--secondary: oklch(0.967 0.001 286.375);
+	--secondary-foreground: oklch(0.21 0.006 285.885);
+}
+
+.dark {
+	--background: oklch(0.145 0 0);
+	--foreground: oklch(0.985 0 0);
+	--muted-foreground: oklch(0.708 0 0);
+
+	--muted: oklch(0.269 0 0);
+
+	--panel: oklch(0.185 0 0);
+
+	--card: oklch(0.205 0 0);
+	--card-foreground: oklch(0.985 0 0);
+	--popover: oklch(0.205 0 0);
+	--popover-foreground: oklch(0.985 0 0);
+
+	--border: oklch(1 0 0 / 10%);
+	--input: oklch(1 0 0 / 15%);
+	--ring: oklch(0.556 0 0);
+
+	--primary: oklch(0.62 0.22 19);
+	--primary-foreground: oklch(0.985 0 0);
+
+	/* `success` / `warning` / `error` lift for contrast on the dark canvas.
+	   `info` keeps one value across both themes, matching the blue
+	   primitive it was taken from, and the `-foreground` inks stay legible
+	   on either — so neither is restated here. */
+	--success: oklch(0.72 0.15 150);
+	--warning: oklch(0.78 0.13 75);
+	--error: oklch(0.704 0.191 22.216);
+
+	--sidebar: oklch(0.205 0 0);
+	--sidebar-foreground: oklch(0.985 0 0);
+	--sidebar-primary: oklch(0.62 0.22 19);
+	--sidebar-primary-foreground: oklch(0.985 0 0);
+	--sidebar-accent: oklch(0.269 0 0);
+	--sidebar-accent-foreground: oklch(0.985 0 0);
+	--sidebar-border: oklch(1 0 0 / 10%);
+	--sidebar-ring: oklch(0.556 0 0);
+
+	/* Legacy aliases: see `:root`. Only the two that hold a real value need
+	   a dark counterpart. */
+	--accent-foreground: oklch(0.985 0 0);
+	--secondary: oklch(0.274 0.006 286.033);
+	--secondary-foreground: oklch(0.985 0 0);
+}
+
+/* ----------------------------------------------------------------------------
+   Tailwind exposure
+   ----------------------------------------------------------------------------
+   `@theme inline` so the utilities point straight at the tokens above and
+   pick up the `.dark` override without a second indirection. This block is
+   the complete list of PostVIA colour utilities; anything outside it is
+   either a foundation primitive or a Radian compatibility alias.
+-------------------------------------------------------------------------- */
+@theme inline {
+	/* Background · Foreground · Muted */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+
+	/* Panel · Surface */
+	--color-panel: var(--panel);
+	--color-panel-foreground: var(--panel-foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+
+	/* Border */
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	/* Primary */
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+
+	/* Success · Warning · Error · Info */
+	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-error: var(--error);
+	--color-error-foreground: var(--error-foreground);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
+
+	/* Navigation */
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+
+	/* Legacy aliases — see the `:root` block for what replaces each. */
+	--color-destructive: var(--destructive);
+	--color-signal: var(--signal);
+	--color-signal-foreground: var(--signal-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+}

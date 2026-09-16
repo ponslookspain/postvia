@@ -1,0 +1,118 @@
+/* ============================================================================
+   PostVIA Design System — 3. RADIAN COMPATIBILITY LAYER  (NOT CANONICAL)
+   ----------------------------------------------------------------------------
+   Every primitive in `src/components/ui` is a Radian implementation and is
+   written against Radian's own token vocabulary: `bg`, `fill1`-`fill4`, the
+   `fg` ramp, `<family>-fg/-text/-border/-hover/-accent/-focus`, `elevation-*`
+   and the `white/black-inverse` pair.
+
+   This file translates those names onto the canonical PostVIA tokens in
+   `semantic.css`. It exists so the primitives keep working; it is NOT the
+   source of truth and must never hold a colour value of its own. Every entry
+   is a `var()` pointing left, at PostVIA, or at a foundation primitive.
+
+   Direction of truth:
+       foundations.css  →  semantic.css  →  compat-radian.css  →  components
+                           ^^^^^^^^^^^^
+                           canonical
+
+   Reading this file as a design system will produce the wrong answer. Read
+   `semantic.css` and `docs/design-tokens.md`.
+
+   KNOWN GAPS — Radian defines distinct steps that PostVIA has not yet
+   decided on, so the alias collapses onto a neighbouring token. These are
+   recorded, not hidden; resolving one is a design decision with a visual
+   consequence, not a cleanup:
+     - `primary-hover` / `primary-border` / `primary-accent` reuse the base,
+       the base and `--accent` instead of hue-matched steps.
+     - `fill1`-`fill4` all resolve to the same neutral (`--muted`); Radian
+       defines four distinct steps.
+     - `fg-secondary` / `fg-tertiary` / `fg-disabled` share
+       `--muted-foreground`.
+     - `elevation-level2` has no distinct PostVIA value; `card` and `popover`
+       are the same colour in both themes today.
+     - `success` / `warning` bases stay the PostVIA Moss and Honey hues by
+       product decision; only their sub-steps borrow the Radian emerald and
+       amber ramps.
+   `--color-stroke` is intentionally absent — stock Radian does not define it
+   either.
+   ========================================================================= */
+
+@theme {
+	/* —— primary family → PostVIA brand ——————————————————————————————— */
+	--color-primary-fg: var(--primary-foreground);
+	--color-primary-text: var(--primary);
+	--color-primary-border: var(--primary);
+	--color-primary-hover: var(--primary);
+	--color-primary-accent: var(--accent);
+	--color-primary-focus: var(--ring);
+
+	/* —— success → PostVIA base + Radian emerald sub-steps ———————————— */
+	--color-success-fg: var(--success-foreground);
+	--color-success-text: var(--success);
+	--color-success-accent: var(--color-emerald-accent);
+	--color-success-focus: var(--color-emerald-focus);
+	--color-success-border: var(--color-emerald-border);
+	--color-success-hover: var(--color-emerald-hover);
+
+	/* —— error → PostVIA base + Radian red sub-steps —————————————————— */
+	--color-error-fg: var(--error-foreground);
+	--color-error-text: var(--error);
+	--color-error-accent: var(--color-red-accent);
+	--color-error-focus: var(--color-red-focus);
+	--color-error-border: var(--color-red-border);
+	--color-error-hover: var(--color-red-hover);
+
+	/* —— warning → PostVIA base + Radian amber sub-steps —————————————— */
+	--color-warning-fg: var(--warning-foreground);
+	--color-warning-text: var(--warning);
+	--color-warning-accent: var(--color-amber-accent);
+	--color-warning-focus: var(--color-amber-focus);
+	--color-warning-border: var(--color-amber-border);
+	--color-warning-hover: var(--color-amber-hover);
+
+	/* —— info → PostVIA base + Radian light-blue sub-steps ———————————— */
+	--color-info-fg: var(--info-foreground);
+	--color-info-text: var(--color-light-blue-text);
+	--color-info-accent: var(--color-light-blue-accent);
+	--color-info-focus: var(--color-light-blue-focus);
+	--color-info-border: var(--color-light-blue-border);
+	--color-info-hover: var(--color-light-blue-hover);
+
+	/* —— surfaces and the foreground ramp ————————————————————————————— */
+	--color-bg: var(--background);
+	--color-fill1: var(--muted);
+	--color-fill2: var(--accent);
+	--color-fill3: var(--accent);
+	--color-fill4: var(--muted);
+	--color-fg: var(--foreground);
+	--color-fg-secondary: var(--muted-foreground);
+	--color-fg-tertiary: var(--muted-foreground);
+	--color-fg-disabled: var(--muted-foreground);
+	--color-fg-inverse: var(--background);
+
+	/* —— translucent surfaces: mixes of PostVIA ink, Radian recipe ————— */
+	--color-alpha: color-mix(in oklch, var(--foreground) 12%, transparent);
+	--color-soft: var(--accent);
+	--color-soft-alpha: color-mix(in oklch, var(--foreground) 8%, transparent);
+	--color-fill1-alpha: color-mix(in oklch, var(--foreground) 4%, transparent);
+	--color-fill2-alpha: color-mix(in oklch, var(--foreground) 8%, transparent);
+	--color-fill3-alpha: color-mix(in oklch, var(--foreground) 12%, transparent);
+	--color-fill4-alpha: color-mix(in oklch, var(--foreground) 16%, transparent);
+
+	/* —— elevation → the PostVIA tone ladder —————————————————————————— */
+	--color-elevation-negative: var(--elevation-sunken);
+	--color-elevation-level1: var(--elevation-raised);
+	--color-elevation-level2: var(--elevation-raised);
+
+	/* —— inverse pair follows the theme (light: white/black, dark: flipped) */
+	--color-white-inverse: var(--background);
+	--color-black-inverse: var(--foreground);
+
+	/* —— sidebar short names —————————————————————————————————————————— */
+	--color-sidebar-fg: var(--sidebar-foreground);
+	--color-sidebar-accent-fg: var(--sidebar-accent-foreground);
+
+	/* —— typography: Radian body family tracks the PostVIA sans stack ——— */
+	--font-body: var(--font-sans);
+}

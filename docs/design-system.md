@@ -3,6 +3,29 @@
 Source of truth for the **implemented** visual language. No roadmaps,
 no proposals — only what the code does today.
 
+Companion document: [`design-tokens.md`](design-tokens.md) — the token
+inventory, the legacy-API mapping and the list of known gaps. This file is
+the *rules*; that one is the *parts*.
+
+## Canonical layer
+
+The design system is three files, imported in dependency order from
+`src/app/globals.css`:
+
+```
+src/app/design-system/foundations.css      1. raw scales
+src/app/design-system/semantic.css         2. CANONICAL PostVIA tokens
+src/app/design-system/compat-radian.css    3. Radian aliases — NOT canonical
+```
+
+`semantic.css` is the source of truth: background, surface, panel,
+foreground, muted, border, primary, success, warning, error, info,
+navigation, in both themes. `compat-radian.css` translates those tokens into
+Radian's vocabulary (`bg`, `fill1`-`fill4`, the `fg` ramp, `<family>-fg`…)
+so the primitives in `src/components/ui` keep working. It holds no values
+and is scheduled for removal; never read it as the design system, and never
+put a value in it.
+
 ## Base
 
 - **Radian UI** (`default` style, `components.json`), Tailwind v4,
@@ -70,7 +93,8 @@ no proposals — only what the code does today.
 ## Typography
 
 - Body **Inter** (`--font-sans`), headings **DM Sans**
-  (`--font-heading`); Geist variables retained but not primary.
+  (`--font-heading`), monospace **Geist Mono** (`--font-mono`) — declared
+  and available, not yet used by any call site.
 - Scale: page titles large/semibold, section titles medium, body
   14–15px relaxed, metadata 12–13px muted. Left-aligned, sentence
   case, no decorative serif, no single-word accent coloring.
@@ -209,8 +233,9 @@ no proposals — only what the code does today.
 
 ## Hard rules
 
-1. No new global design tokens without necessity — extend the Radian
-   + PostVIA token system instead of forking it.
+1. No new global design tokens without necessity — extend the canonical
+   layer (`src/app/design-system/semantic.css`) instead of forking it.
+   A new value goes there; a new alias goes nowhere.
 2. No second button sizing system, ever.
 3. No Magic UI / decorative animation libraries.
 4. No raw status/brand hex values in components — semantic tokens or

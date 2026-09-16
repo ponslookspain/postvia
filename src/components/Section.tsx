@@ -89,7 +89,7 @@ export function SectionHeader({
         </div>
       </div>
       {description && (
-        <p className="mt-1 max-w-[68ch] text-sm leading-5 text-muted-foreground">
+        <p className="mt-1 max-w-(--measure-prose) text-sm leading-5 text-muted-foreground">
           {description}
         </p>
       )}
