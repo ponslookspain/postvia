@@ -149,7 +149,7 @@ export function ComposerVisual() {
               <CalendarClockIcon className="size-3.5 text-muted-foreground" />
               Wed 09:00 · Europe/Madrid
             </p>
-            <span className="mt-2 flex h-8 items-center justify-center rounded-4xl bg-primary px-3 text-[13px] font-medium text-primary-foreground">
+            <span className="mt-2 flex h-8 items-center justify-center rounded-full bg-primary px-3 text-[13px] font-medium text-primary-foreground">
               Schedule
             </span>
           </div>
@@ -265,7 +265,7 @@ export function CalendarVisual() {
               <ChevronRightIcon className="size-4" />
             </span>
           </span>
-          <span className="rounded-4xl border border-border px-3 py-1 text-xs font-medium">
+          <span className="rounded-full border border-border px-3 py-1 text-xs font-medium">
             Today
           </span>
         </div>
@@ -288,7 +288,7 @@ export function CalendarVisual() {
                   key={di}
                   className={
                     "min-h-9 border-r border-border/70 p-0.5 last:border-r-0 sm:min-h-[4.5rem] sm:p-1" +
-                    (date.today ? " bg-signal/[0.06]" : "") +
+                    (date.today ? " bg-signal/10" : "") +
                     (date.dimmed ? " bg-muted/30" : "")
                   }
                 >

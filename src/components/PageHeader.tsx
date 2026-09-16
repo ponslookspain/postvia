@@ -22,12 +22,12 @@ export function PageHeader({
     <div
       data-slot="page-header"
       className={cn(
-        "mb-8 flex flex-wrap items-start justify-between gap-x-4 gap-y-3",
+        "mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3",
         className
       )}
     >
-      <div className="min-w-0 flex-1 basis-48">
-        <h1 className="text-2xl leading-8 font-semibold tracking-tight text-balance">
+      <div className="min-w-0 flex-1 basis-56">
+        <h1 className="font-heading text-2xl leading-8 font-semibold tracking-tight text-balance">
           {title}
         </h1>
         {description && (

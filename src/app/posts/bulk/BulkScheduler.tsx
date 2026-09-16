@@ -755,7 +755,7 @@ export function BulkScheduler({
         })}
       </ol>
 
-      <PageSections className="gap-8">
+      <PageSections>
         <div className="grid items-start gap-5 lg:grid-cols-3">
           <div className="flex min-w-0 flex-col gap-5 lg:col-span-2">
         <section aria-labelledby="bulk-media">
@@ -1033,7 +1033,7 @@ export function BulkScheduler({
                             className={cn(
                               "h-6 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40",
                               active
-                                ? "border-signal/60 bg-signal/[0.07] text-signal"
+                                ? "border-signal/30 bg-signal/10 text-signal"
                                 : "border-border bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground"
                             )}
                           >

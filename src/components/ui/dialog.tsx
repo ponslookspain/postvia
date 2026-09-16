@@ -3,8 +3,8 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { type VariantProps, cva } from "class-variance-authority"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
-// PostVIA adapt: Radian Button is not migrated yet, so the built-in close
-// uses the current Button API (ghost/icon-sm, same as the old Dialog).
+// Built-in close uses the shared Button (ghost/icon-sm); icons inherit
+// sizing and color from the Button, no overrides.
 import { Button } from "@/components/ui/button"
 
 type Backdrop = VariantProps<typeof dialogOverlayVariants>["backdrop"]

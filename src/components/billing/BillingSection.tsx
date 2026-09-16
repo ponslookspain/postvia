@@ -403,7 +403,7 @@ export function BillingSection({
                 key={plan.id}
                 className={cn(
                   "h-full",
-                  recommended && "border-signal/60 bg-signal/[0.04]"
+                  recommended && "border-signal/30 bg-signal/10"
                 )}
               >
                 <CardHeader>

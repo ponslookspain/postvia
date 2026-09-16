@@ -109,7 +109,7 @@ function DayPostChip({
       onDragStart={onDragStart}
       aria-label={`${post.text || "Untitled post"} (${post.status.toLowerCase()})`}
       className={cn(
-        "flex h-6 min-w-0 items-center gap-1.5 rounded-md bg-muted/70 px-1.5 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50",
+        "flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-transparent bg-fill2 px-1.5 outline-none transition-colors hover:border-border hover:bg-fill3 focus-visible:ring-2 focus-visible:ring-primary-focus",
         dimmed && "opacity-50"
       )}
     >
@@ -299,7 +299,7 @@ export function CalendarView({
         }
       />
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border border-border bg-card px-3 py-2">
         <div className="flex min-w-0 items-center gap-1">
           <Button
             variant="ghost"
@@ -311,7 +311,7 @@ export function CalendarView({
           >
             <ChevronLeftIcon />
           </Button>
-          <h2 className="min-w-0 truncate px-1 text-lg leading-7 font-semibold tracking-tight tabular-nums">
+          <h2 className="font-heading min-w-0 truncate px-1 text-lg leading-7 font-semibold tracking-tight tabular-nums">
             {title}
           </h2>
           <Button
@@ -334,9 +334,9 @@ export function CalendarView({
         </Button>
       </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section aria-label={`Posts in ${title}`}>
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border bg-border">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-2xl border border-border bg-border">
             {WEEKDAYS.map((day) => (
               <div
                 key={day}
@@ -366,10 +366,10 @@ export function CalendarView({
                   onDragLeave={() => setDropKey((current) => (current === key ? null : current))}
                   onDrop={(event) => void dropOnDay(key, event)}
                   className={cn(
-                    "flex h-20 flex-col gap-1 overflow-hidden bg-background p-1 sm:h-36 sm:p-1.5",
+                    "flex h-20 flex-col gap-1 overflow-hidden bg-card p-1 sm:h-36 sm:p-1.5",
                     !inMonth && "bg-muted/40 text-muted-foreground",
-                    isToday && "bg-primary/[0.05]",
-                    isOver && "bg-muted ring-2 ring-inset ring-ring/50"
+                    isToday && "bg-primary-accent",
+                    isOver && "bg-muted ring-2 ring-inset ring-primary-focus"
                   )}
                 >
                   <span
@@ -443,16 +443,16 @@ export function CalendarView({
           )}
         </section>
 
-        <aside aria-labelledby="drafts-heading" className="min-w-0">
+        <aside aria-labelledby="drafts-heading" className="min-w-0 rounded-2xl border border-border bg-card p-4">
           <div className="flex items-baseline justify-between gap-3">
             <h2
               id="drafts-heading"
-              className="text-[15px] leading-6 font-medium tracking-tight"
+              className="text-sm leading-6 font-medium tracking-tight"
             >
               Unscheduled drafts
             </h2>
             <p
-              className="shrink-0 text-xs text-muted-foreground tabular-nums"
+              className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground tabular-nums"
               aria-label={`${drafts.length} unscheduled drafts`}
             >
               {drafts.length}

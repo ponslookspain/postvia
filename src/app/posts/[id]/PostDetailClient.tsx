@@ -621,7 +621,7 @@ export default function PostDetailPage({
                             : ""}
                         </p>
                         {targetItem.errorMessage && (
-                          <p className="truncate text-xs text-destructive">
+                          <p className="truncate text-xs text-error-text">
                             Couldn&apos;t publish to{" "}
                             {formatPlatformName(targetItem.platform)}.
                           </p>

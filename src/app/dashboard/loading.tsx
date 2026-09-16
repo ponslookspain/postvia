@@ -5,12 +5,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function DashboardLoading() {
   return (
     <PageContainer aria-busy="true">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1 basis-48">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1 basis-56">
           <Skeleton className="h-8 w-40" />
           <Skeleton className="mt-2 h-4 w-64" />
         </div>
-        <Skeleton className="h-9 w-32 shrink-0 rounded-full" />
+        <Skeleton className="h-9 w-32 shrink-0 rounded-lg" />
       </div>
 
       <div className="flex flex-col" style={{ gap: "var(--section-gap)" }}>
@@ -24,13 +24,13 @@ export default function DashboardLoading() {
           ))}
         </div>
 
-        <div className="grid items-start gap-10 lg:grid-cols-3">
+        <div className="grid items-start gap-4 lg:grid-cols-3">
           <Skeleton className="h-56 w-full rounded-xl lg:col-span-2" />
           <div className="flex flex-col gap-1">
             <Skeleton className="mb-2 h-4 w-24" />
-            <Skeleton className="h-9 w-full rounded-full" />
-            <Skeleton className="h-9 w-full rounded-full" />
-            <Skeleton className="h-9 w-full rounded-full" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
           </div>
         </div>
 

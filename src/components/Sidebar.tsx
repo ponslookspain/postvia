@@ -87,13 +87,13 @@ function SidebarShell({
 
   return (
     <SidebarPrimitive collapsible="icon">
-      <SidebarHeader className="flex-row items-center justify-between border-b border-border p-4">
+      <SidebarHeader className="flex-row items-center justify-between gap-2 border-b border-border px-4 py-3.5">
         {collapsed ? (
-          <p aria-hidden="true" className="text-lg font-semibold tracking-tight">
+          <p aria-hidden="true" className="font-heading text-lg font-semibold tracking-tight">
             p
           </p>
         ) : (
-          <p className="text-lg font-semibold tracking-tight">postvia</p>
+          <p className="font-heading text-lg font-semibold tracking-tight">postvia</p>
         )}
         <SidebarTrigger
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -129,19 +129,19 @@ function SidebarShell({
           </SidebarGroupContent>
         </SidebarGroup>
         {plan === "free" && !collapsed && (
-          <div className="px-3 pb-1">
+          <div className="px-3 pt-1 pb-2">
             <Link
               href="/billing"
-              className="block rounded-lg border border-border bg-muted/40 p-3 outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="block rounded-xl border border-border bg-fill1 p-3 outline-none transition-colors hover:bg-fill2 focus-visible:ring-2 focus-visible:ring-primary-focus"
             >
-              <p className="flex items-center gap-1.5 text-sm font-medium">
+              <p className="flex items-center gap-1.5 text-sm leading-5 font-medium">
                 <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
                 Unlock more with Postvia
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 More posts, more accounts and Bulk scheduling.
               </p>
-              <p className="mt-2 text-xs font-medium underline underline-offset-4">
+              <p className="mt-2 text-xs leading-4 font-medium text-primary-text underline underline-offset-4">
                 View plans
               </p>
             </Link>
@@ -149,16 +149,16 @@ function SidebarShell({
         )}
       </SidebarContent>
       <SidebarFooter
-        className={cn("border-t border-border", collapsed ? "p-3" : "p-4")}
+        className={cn("border-t border-border", collapsed ? "p-2" : "p-3")}
       >
-        <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
+        <div className={cn("flex items-center gap-3 px-1", collapsed && "justify-center px-0")}>
           <Avatar>
             <AvatarFallback>{initial}</AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="min-w-0 flex-1 text-sm">
-              <p className="truncate font-medium">{userName}</p>
-              <p className="truncate text-xs text-muted-foreground">
+              <p className="truncate leading-5 font-medium">{userName}</p>
+              <p className="truncate text-xs leading-4 text-muted-foreground">
                 {userEmail}
               </p>
             </div>
@@ -171,7 +171,7 @@ function SidebarShell({
             onClick={() => void handleSignOut()}
             aria-label="Sign out"
             title="Sign out"
-            className="mt-3 w-full"
+            className="mt-2 w-full"
           >
             <LogOutIcon />
           </Button>
@@ -179,25 +179,26 @@ function SidebarShell({
           <Button
             variant="ghost"
             onClick={() => void handleSignOut()}
-            className="mt-3 w-full justify-start"
+            className="mt-2 w-full justify-start font-normal"
           >
+            <LogOutIcon data-icon="inline-start" />
             Sign out
           </Button>
         )}
         {!collapsed && (
           <>
-            <Divider className="my-3" />
-            <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
+            <Divider className="my-2.5" />
+            <div className="flex items-center gap-2 px-2 text-xs leading-4 text-muted-foreground">
               <Link
                 href="/terms"
-                className="transition-colors hover:text-foreground"
+                className="rounded-sm transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 Terms
               </Link>
               <span aria-hidden="true">&middot;</span>
               <Link
                 href="/privacy"
-                className="transition-colors hover:text-foreground"
+                className="rounded-sm transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 Privacy
               </Link>

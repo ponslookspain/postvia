@@ -615,9 +615,9 @@ export function SettingsClient({
         </section>
 
         <section aria-labelledby="settings-danger">
-          <Card className="border-destructive/30">
+          <Card className="border-error-border">
             <CardHeader>
-              <CardTitle className="text-destructive">Danger zone</CardTitle>
+              <CardTitle className="text-error-text">Danger zone</CardTitle>
               <CardDescription>
                 Permanently delete your account and all associated data
               </CardDescription>

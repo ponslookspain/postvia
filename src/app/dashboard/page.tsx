@@ -297,7 +297,7 @@ export default async function DashboardPage({
     { label: "Published", value: published, className: "text-primary", dotClassName: "bg-primary" },
     { label: "Scheduled", value: scheduled + publishing, className: "text-muted-foreground", dotClassName: "bg-muted-foreground/60" },
     { label: "Drafts", value: drafts, className: "text-muted-foreground/60", dotClassName: "bg-muted-foreground/40" },
-    { label: "Failed", value: failed, className: "text-destructive", dotClassName: "bg-destructive" },
+    { label: "Failed", value: failed, className: "text-error-text", dotClassName: "bg-error" },
   ];
 
   return (
@@ -306,7 +306,6 @@ export default async function DashboardPage({
         <PageHeader
           title={greetingFor(user.name)}
           description="Your publishing activity at a glance."
-          className="mb-6"
           actions={
             <Button
               nativeButton={false}
@@ -343,12 +342,12 @@ export default async function DashboardPage({
             }
           />
         ) : (
-          <PageSections className="gap-8">
+          <PageSections>
             <Section label="Publishing overview">
               <KpiStrip stats={stats} />
             </Section>
 
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid items-start gap-4 lg:grid-cols-3">
               <Card size="sm" className="min-w-0 lg:col-span-2">
                 <CardHeader>
                   <CardTitle>Activity</CardTitle>
@@ -489,24 +488,20 @@ export default async function DashboardPage({
                     </Badge>
                   }
                 />
-                <Card size="sm">
-                  <CardContent>
-                    <ul className="divide-y divide-border">
-                      {attentionPosts.map((post, index) => (
-                        <PostRow
-                          key={post.id}
-                          post={post}
-                          index={index}
-                          error={
-                            post.errorMessage ??
-                            post.targets.find((t) => t.errorMessage)
-                              ?.errorMessage
-                          }
-                        />
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+                <ul className="divide-y divide-border border-y border-border">
+                  {attentionPosts.map((post, index) => (
+                    <PostRow
+                      key={post.id}
+                      post={post}
+                      index={index}
+                      error={
+                        post.errorMessage ??
+                        post.targets.find((t) => t.errorMessage)
+                          ?.errorMessage
+                      }
+                    />
+                  ))}
+                </ul>
               </Section>
             )}
 
@@ -524,20 +519,16 @@ export default async function DashboardPage({
                     </Link>
                   }
                 />
-                <Card size="sm">
-                  <CardContent>
-                    <ul className="divide-y divide-border">
-                      {upcomingPosts.map((post, index) => (
-                        <PostRow
-                          key={post.id}
-                          post={post}
-                          index={index}
-                          large
-                        />
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+                <ul className="divide-y divide-border border-y border-border">
+                  {upcomingPosts.map((post, index) => (
+                    <PostRow
+                      key={post.id}
+                      post={post}
+                      index={index}
+                      large
+                    />
+                  ))}
+                </ul>
               </Section>
             )}
 
@@ -554,54 +545,52 @@ export default async function DashboardPage({
                   </Link>
                 }
               />
-              <Card size="sm">
-                <CardContent>
-                  <DashboardPostFilter q={q} status={statusFilter} />
-                  {recentPosts.length === 0 ? (
-                    isFiltered ? (
-                      <EmptyBlock
-                        icon={<PlusIcon />}
-                        title="No matching posts"
-                        description={
-                          q
-                            ? `Nothing matches “${q}”${statusFilter !== "all" ? ` with status ${formatStatusLabel(statusFilter).toLowerCase()}` : ""}.`
-                            : `No ${formatStatusLabel(statusFilter).toLowerCase()} posts yet.`
-                        }
-                        actions={
-                          <Button
-                            variant="outline"
-                            nativeButton={false}
-                            render={<Link href="/dashboard" />}
-                          >
-                            Clear filters
-                          </Button>
-                        }
-                      />
-                    ) : (
-                      <EmptyBlock
-                        icon={<PlusIcon />}
-                        title="No posts yet"
-                        description="Create your first post to get started."
-                        actions={
-                          <Button
-                            nativeButton={false}
-                            render={<Link href="/posts/new" />}
-                          >
-                            <PlusIcon data-icon="inline-start" />
-                            Create post
-                          </Button>
-                        }
-                      />
-                    )
+              <div className="border-y border-border">
+                <DashboardPostFilter q={q} status={statusFilter} />
+                {recentPosts.length === 0 ? (
+                  isFiltered ? (
+                    <EmptyBlock
+                      icon={<PlusIcon />}
+                      title="No matching posts"
+                      description={
+                        q
+                          ? `Nothing matches “${q}”${statusFilter !== "all" ? ` with status ${formatStatusLabel(statusFilter).toLowerCase()}` : ""}.`
+                          : `No ${formatStatusLabel(statusFilter).toLowerCase()} posts yet.`
+                      }
+                      actions={
+                        <Button
+                          variant="outline"
+                          nativeButton={false}
+                          render={<Link href="/dashboard" />}
+                        >
+                          Clear filters
+                        </Button>
+                      }
+                    />
                   ) : (
-                    <ul className="divide-y divide-border border-t border-border">
-                      {recentPosts.map((post, index) => (
-                        <PostRow key={post.id} post={post} index={index} />
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
+                    <EmptyBlock
+                      icon={<PlusIcon />}
+                      title="No posts yet"
+                      description="Create your first post to get started."
+                      actions={
+                        <Button
+                          nativeButton={false}
+                          render={<Link href="/posts/new" />}
+                        >
+                          <PlusIcon data-icon="inline-start" />
+                          Create post
+                        </Button>
+                      }
+                    />
+                  )
+                ) : (
+                  <ul className="divide-y divide-border border-t border-border">
+                    {recentPosts.map((post, index) => (
+                      <PostRow key={post.id} post={post} index={index} />
+                    ))}
+                  </ul>
+                )}
+              </div>
             </Section>
 
             <Section labelledBy="accounts-heading">
@@ -618,27 +607,26 @@ export default async function DashboardPage({
                   </Link>
                 }
               />
-              <Card size="sm">
-                <CardContent>
-                  <PlatformHealth rows={healthRows} />
-                  {expiredAccounts.length > 0 && (
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-                      <p className="text-xs text-muted-foreground">
-                        {expiredAccounts.length} connection
-                        {expiredAccounts.length === 1 ? "" : "s"} expired.
-                        Reconnect to keep publishing.
-                      </p>
-                      <Button
-                        variant="outline"
-                        nativeButton={false}
-                        render={<Link href="/accounts" />}
-                      >
-                        Reconnect
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="border-y border-border py-1">
+                <PlatformHealth rows={healthRows} />
+                {expiredAccounts.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3">
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {expiredAccounts.length} connection
+                      {expiredAccounts.length === 1 ? "" : "s"} expired.
+                      Reconnect to keep publishing.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      nativeButton={false}
+                      render={<Link href="/accounts" />}
+                    >
+                      Reconnect
+                    </Button>
+                  </div>
+                )}
+              </div>
             </Section>
           </PageSections>
         )}

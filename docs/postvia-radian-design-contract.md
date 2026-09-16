@@ -149,19 +149,21 @@ Radian spacing system values: `NOT CONFIRMED` beyond the standard Tailwind scale
 
 For each component: RADIAN DEFAULT = stock CVA + `cn` + Radix where present; POSTVIA CUSTOMIZATION = compat shims listed; CUSTOMIZATION TO REMOVE = legacy API/geometry at redesign.
 
-- **Button** (`button.tsx`): Radian `strong/soft/outline/ghost/link × primary/info/success/error/warning/neutral × 28–48`, `loading`, icon auto-size, focus rings. **[ALIGNED] visual shims removed**: `rounded-4xl` pill override, `text-white → *-fg` (4 compounds), `aria-invalid` destructive → error. **Kept (needed by 146 consumer call sites, page scope)**: `POSTVIA_VARIANT_MAP/SIZE_MAP/SIZE_FIXES`, `render/nativeButton` props, dead `glossy/smooth` variants (unused, harmless). `asChild` + `data-icon` kept.
-- **Input / Select**: **[ALIGNED]** size-36 pill exceptions removed (`rounded-lg`). TextArea `resize-none` default + Checkbox/Radio/Switch/Alert/Banner/Empty/Divider/Collapsible/Progress/Spinner/Skeleton: no visual change (already stock or value-identical `*-fg` fixes only).
-- **Badge**: full 17-hue `strong/outline/soft × 20/24/28` — KEEP as Radian reference implementation.
-- **Avatar**: stock + `AvatarBadge/Group/GroupCount` extension + default-32 compat — KEEP extension, document as product-specific.
-- **Card**: `Card/Header/Title/Description/Content/Footer/Action`; REMOVE `size` prop + `font-heading` title question (upstream heading scale `NOT CONFIRMED`); keep `rounded-2xl`/shadowless only by decision.
-- **Alert / Banner / Empty / Divider / Collapsible / Progress / Spinner / Skeleton**: stock; keep `EmptyContent` wrapper compat (`empty.tsx:115-116`); keep spinner-16 default.
-- **Dialog / Drawer / Popover / Tooltip / Tabs / Calendar**: stock shapes; Dialog close-button rides the Button migration; **[ALIGNED]** Calendar selected `text-white` → `text-primary-fg`, disabled-day `text-red-500` → `text-error-text`; rest KEEP.
+- **Button** (`button.tsx`): Radian `strong/soft/outline/ghost/link (+glossy/smooth stock API) × primary/info/success/error/warning/neutral × 28–48`, `loading`, icon auto-size, focus rings. **[ALIGNED components]**: cva verified stock; wrapper + `render/nativeButton` KEPT as thin compat (146 legacy call sites in pages; rewriting them is page scope). `data-icon` contract intact (set by consumers). Upstream `IconButton/CompactButton/ButtonGroup` NOT added (visuals NOT CONFIRMED; `icon/icon-*` sizes cover the need).
+- **Input / Select**: **[ALIGNED]** size-36 pill removed (foundation); this stage verified sizes/padding/radius/border/focus/disabled/placeholder/icons all stock. `w-fit` trigger base KEPT (pages pass `w-full`; upstream default NOT CONFIRMED). No changes.
+- **TextArea**: `resize-none` default KEPT (upstream default NOT CONFIRMED; flipping it would change composer behavior).
+- **Badge**: full 17-hue `strong/outline/soft × 20/24/28` — **[ALIGNED] verified stock**, no changes (all 23 consumers use standard API).
+- **Avatar**: stock + `AvatarBadge/Group/GroupCount` extension + default-32 — **[ALIGNED] verified; extensions KEPT** as product-specific.
+- **Card**: `Card/Header/Title/Description/Content/Footer/Action`; **[ALIGNED] `size` prop KEPT** (11 page call sites; upstream has none — removing it is page scope). Title `font-heading text-base` KEPT (within upstream `heading-6`/`text-base` variation).
+- **Alert / Banner / Empty / Divider / Collapsible / Progress / Spinner / Skeleton**: **[ALIGNED] verified stock** (+ `EmptyContent` compat kept, spinner-16 default kept, bare-icon 16px alert compat kept). No changes.
+- **Checkbox / RadioGroup / Switch**: **[ALIGNED] verified stock** (sizes, radius, selected, disabled, focus, indicators). Switch thumb `bg-white` is stock upstream, kept. No changes.
+- **Dialog / Drawer / Popover / Tooltip / Tabs / Calendar**: stock shapes; **[ALIGNED]** stale close-button comment fixed (uses shared Button ghost/icon-sm); Calendar/overlay colors done in foundation; rest verified, no changes.
 - **Sidebar**: full primitive set + resize/drawer/keyboard/tooltip — KEEP functionality; **[ALIGNED]** active `text-white`/`stroke-white` → `primary-fg` pair. Widths (16rem/3rem/18rem) stay product decisions: docs confirm CSS-var mechanism (`--sidebar-width`, `--sidebar-width-mobile`, resizable min 250 / max 500) but publish no absolute defaults — upstream 16.25/3.75rem claim remains NOT CONFIRMED. Trigger stays on legacy Button API (consumer scope).
 - Accessibility: preserve `data-slot` attributes, `Title` in overlays, `aria-*`/`data-[active|state]` selectors, `prefers-reduced-motion` guard. Composition via `asChild`/Slot kept.
 
 ## 8. PostVIA custom components (visual alignment only)
 
-- **Field** (`field.tsx`): server-action architecture stays; **no RHF migration**. Visual target: Radian label/description/error type (`text-sm`, `text-muted-foreground`, `text-destructive` + `role=alert`), focus `border-primary/ring`, `data-invalid` parity with control `aria-invalid`. `FieldGroup` rhythm kept.
+- **Field** (`field.tsx`): server-action architecture stays; **no RHF migration**. **[ALIGNED components]**: `FieldError` → Radian form-error pattern `text-xs font-normal text-error-text` (docs `components/input.md` “Error Input”); `role=alert`, dedup logic, `FieldDescription` (`text-sm`, product decision matching body size), label, spacing, focus, invalid parity all kept. `FieldGroup` rhythm kept.
 - **Toast** (`toast.tsx`): Base-UI architecture stays; **no Sonner migration**. Visual target: Radian overlay tokens (`bg-popover`, `rounded-2xl`, `shadow-lg`, `ring-ring/50`), type `text-sm/medium`, close/error icon colors; Button usages inside migrate with §7.
 
 ## 9. Sidebar contract
@@ -178,7 +180,7 @@ For each component: RADIAN DEFAULT = stock CVA + `cn` + Radix where present; POS
 
 ## 10. Form contract (visual spec)
 
-Spacing: `FieldSet gap-6` → `FieldGroup gap-7` → `Field gap-3` → `FieldContent gap-1`. Typography: `FieldLabel/Title text-sm/medium`, `FieldDescription text-sm muted`, `FieldError text-sm destructive + role=alert`. Colors: error `text-destructive/border-error/ring-error-focus`; focus `border-primary/ring-2`; disabled `opacity-50/text-fg-disabled`. Required/helper-text patterns: keep current `FieldDescription` + `FieldError` composition; required-marker style is a redesign detail (no invention here). Architecture unchanged (§8).
+Spacing: `FieldSet gap-6` → `FieldGroup gap-7` → `Field gap-3` → `FieldContent gap-1`. Typography: `FieldLabel/Title text-sm/medium`, `FieldDescription text-sm muted` (product decision), `FieldError text-xs error-text + role=alert` **[ALIGNED]**. Colors: error `text-destructive/border-error/ring-error-focus`; focus `border-primary/ring-2`; disabled `opacity-50/text-fg-disabled`. Required/helper-text patterns: keep current `FieldDescription` + `FieldError` composition; required-marker style is a redesign detail (no invention here). Architecture unchanged (§8).
 
 ## 11. Overlay contract
 
@@ -200,9 +202,9 @@ Radian approach (skill mapping): `Table` (+Header/Row/Cell), `DropdownMenu`, `Pa
 
 | Deviation | Verdict |
 |---|---|
-| Custom grid-table | REDESIGN — adopt `Table` or codify list as the pattern, one rule everywhere |
-| Bare `<button>` menus/inputs (`PostRowMenu.tsx:131,147`, `BulkScheduler.tsx:861,1027`, `ChannelStrip.tsx:115`, `MediaGrid.tsx:162`, `PostDetailClient.tsx:188,809,820`, `MobileTopBar.tsx:78`, landing/faq/how-it-works buttons) | REDESIGN — migrate to Button/Input/DropdownMenu per skill mapping |
-| Load-more + counts | REDESIGN — adopt `Pagination` or codify load-more deliberately |
+| Custom grid-table | **[ALIGNED patterns] KEEP until page stage, then ADOPT Radian `Table`** (`table` not installed; installing it now without redesigning the grid would fork two systems) |
+| Bare `<button>` menus/inputs (`PostRowMenu.tsx:131,147`, `BulkScheduler.tsx:861,1027`, `ChannelStrip.tsx:115`, `MediaGrid.tsx:162`, `PostDetailClient.tsx:188,809,820`, `MobileTopBar.tsx:78`, landing/faq/how-it-works buttons) | **[ALIGNED patterns] `PostRowMenu` migrated to `DropdownMenu`** (stock 0.3.8 `dropdown-menu` installed + `@radix-ui/react-dropdown-menu` dep; logic identical). Remaining bare buttons classified: avatar menu trigger (legitimate trigger-as-avatar) + bulk interval preset chips (segmented control, not a menu) + media/remove icon buttons (icon-only actions, no menu) — all KEEP with justification |
+| Load-more + counts | **[ALIGNED patterns] KEEP** load-more + “Showing N of M” (page-stage decision; no UX change without redesign) |
 | `divide-y` lists + `EmptyBlock/LoadingBlock/ErrorBlock` | KEEP as approved pattern if table is not adopted |
 | Email `<table>` in `src/lib/email.ts` | KEEP — email HTML, out of scope |
 
@@ -264,15 +266,17 @@ Per-token light/dark pairs live in `globals.css :root/.dark` and `utility.css .d
 | Button | Radian API + icon rule | Pill + `text-white` removed; legacy API maps kept (consumer scope) | button doc, `button.tsx` | COMPONENT |
 | Card/inputs/select/sidebar/overlays | Stock shapes | 36-pill + `text-white` sweep done; Card `size`/title + widths kept (consumer scope) | `ui/*` | COMPONENT |
 | Field/Toast | Visual parity only | Custom arch (kept) | Align visuals, no RHF/Sonner migration | `field.tsx`, `toast.tsx` | COMPONENT |
-| Data UI | Table/DropdownMenu/Pagination | Custom grids + bare buttons + load-more | Adopt or codify, migrate bare elements | skill mapping | PATTERN |
+| Data UI | Table/DropdownMenu/Pagination | Custom grids + bare buttons + load-more | `DropdownMenu` installed + `PostRowMenu` migrated; table/load-more decided for page stage | skill mapping, `dropdown-menu.tsx` | PATTERN |
+| Headers/toolbars/forms | PageHeader/Section/Tabs/Input/Select/Field compositions | Already single implementations (`PageHeader`, `Section`, `StatusTabs`, `DashboardPostFilter`, `Field*`) | **[ALIGNED patterns] verified canonical, no changes** (custom composer/month-nav/auth headers documented as variants) | pages audit | PATTERN |
+| Status/empty/loading/error | Badge+Dot, Empty, Skeleton, Alert | Single implementations (`StatusBadge`, `StateBlock`) | **[ALIGNED patterns] verified canonical, no changes** (status tints kept as product dialect) | `StatusBadge.tsx`, `StateBlock.tsx` | PATTERN |
 | Layout/shells | Blocks (signin/sidebar-*) | AppShell/PageContainer/Header/Section system | Codify narrow/default/wide; decide 88rem | skill §4, `layout/*` | PATTERN |
 | Pages | Block patterns | Per-page shells (§18) | Apply patterns, no independent redesign | pages audit | PAGE |
 
 ## 21. Redesign order
 
 1. FOUNDATION — **colors/tokens/radius/fg-sweep DONE** (this step). Remaining NOT CONFIRMED: Figma values, H1-H6 numeric specs, `heading-*/body-*` title utilities, hue-matched primary steps, distinct fill/fg steps.
-2. COMPONENT / BLOCKING — Button legacy-API migration (unblocks Dialog/Sidebar/Toast).
-3. COMPONENT / IMPORTANT — Card `size` prop + title font, Sidebar trigger API, remaining page-canvas `text-white`, `bg-black` inverse patch.
-4. PATTERN / IMPORTANT — Field/Toast visuals, overlay unification, data-UI rule (table vs list), empty/loading/error patterns.
+2. COMPONENT — **primitives verified/aligned, Button wrapper KEPT by decision** (this step). Legacy-API migration is page scope.
+3. COMPONENT / IMPORTANT — Card `size` prop (page scope), Sidebar trigger API (page scope), page-canvas `text-white`, `bg-black` inverse patch (page stage).
+4. PATTERN — **DONE** (this step): `DropdownMenu` installed, `PostRowMenu` migrated, headers/toolbars/forms/cards/status/empty/loading/error/overlays verified canonical, table + pagination + density decisions recorded.
 5. PAGE / IMPORTANT — composer, posts, calendar, accounts, settings, billing, auth in that dependency order.
 6. PAGE / OPTIONAL — landing/marketing uniques, preview canvases, Penpot sync last.

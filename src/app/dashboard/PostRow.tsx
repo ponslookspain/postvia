@@ -98,7 +98,7 @@ export function PostRow({
             <span>{formatPostDate(post)}</span>
           </span>
           {error && (
-            <span className="mt-1 block truncate text-xs text-destructive">
+            <span className="mt-1 block truncate text-xs text-error-text">
               Couldn&apos;t publish — open the post to review.
             </span>
           )}
@@ -107,7 +107,7 @@ export function PostRow({
           className={cn(
             "flex shrink-0 items-center gap-1 pt-0.5 text-sm transition-colors",
             post.status === "FAILED"
-              ? "font-medium text-destructive"
+              ? "font-medium text-error-text"
               : "text-muted-foreground group-hover:text-foreground"
           )}
         >

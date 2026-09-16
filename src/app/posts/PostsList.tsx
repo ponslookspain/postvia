@@ -242,11 +242,11 @@ export function PostsList({
   const toolbarActive = query.trim() !== "" || platform !== "all";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <div
         role="search"
         aria-label="Filter posts"
-        className="flex flex-col gap-2 md:flex-row md:items-center"
+        className="flex flex-col gap-2 rounded-xl border border-border bg-card p-2 md:flex-row md:items-center"
       >
         <div className="relative min-w-0 flex-1">
           <SearchIcon
@@ -359,10 +359,10 @@ export function PostsList({
           />
         )
       ) : (
-        <div>
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div
             aria-hidden="true"
-            className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border py-3 text-xs font-medium text-muted-foreground md:grid"
+            className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border bg-muted/40 px-4 py-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase md:grid"
           >
             <span>Media</span>
             <span>Content</span>
@@ -371,11 +371,11 @@ export function PostsList({
             <span>Date</span>
             <span className="sr-only">Actions</span>
           </div>
-          <ul className="divide-y divide-border border-b border-border">
+          <ul className="divide-y divide-border">
             {visible.map((post) => (
               <li
                 key={post.id}
-                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 py-4 md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4"
+                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4 md:px-4 md:py-3.5"
               >
                 <Link
                   href={`/posts/${post.id}`}
@@ -387,7 +387,7 @@ export function PostsList({
                 <div className="min-w-0">
                   <Link
                     href={`/posts/${post.id}`}
-                    className="block truncate text-[15px] leading-snug font-medium text-foreground outline-none hover:underline hover:underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring/50 md:line-clamp-2 md:whitespace-normal md:break-words md:hover:no-underline"
+                    className="block truncate text-sm leading-snug font-medium text-foreground outline-none hover:underline hover:underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring/50 md:line-clamp-2 md:whitespace-normal md:break-words md:hover:no-underline"
                   >
                     {post.text || "Untitled post"}
                   </Link>
@@ -463,21 +463,22 @@ export function PostsList({
             ))}
           </ul>
           {cursor || items.length < totalCount ? (
-            <div className="flex flex-col items-center gap-2 py-6">
-              <p className="text-sm text-muted-foreground tabular-nums">
+            <div className="flex flex-col items-center gap-2 border-t border-border bg-muted/30 px-4 py-5">
+              <p className="text-xs text-muted-foreground tabular-nums">
                 Showing {items.length} of {totalCount} posts
               </p>
               {cursor ? (
                 <>
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => void handleLoadMore()}
                     disabled={loadingMore}
                   >
                     {loadingMore ? "Loading…" : "Load more"}
                   </Button>
                   {loadError && (
-                    <p role="alert" className="text-sm text-destructive">
+                    <p role="alert" className="text-sm text-error-text">
                       {loadError}
                     </p>
                   )}

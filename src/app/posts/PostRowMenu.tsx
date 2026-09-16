@@ -10,7 +10,6 @@ import {
   RotateCcwIcon,
   Trash2Icon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,18 +20,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
 import { reportError } from "@/lib/diagnostics";
 
 /**
- * Row actions behind a single menu trigger built on the Popover
- * primitive. Only existing endpoints are used: detail page, retry, delete.
- * There is no duplicate endpoint, so Duplicate is intentionally absent.
+ * Row actions as a Radian DropdownMenu. Only existing endpoints are used:
+ * detail page, retry, delete. There is no duplicate endpoint, so
+ * Duplicate is intentionally absent.
  */
 export function PostRowMenu({
   id,
@@ -100,26 +100,18 @@ export function PostRowMenu({
     }
   }
 
-  const itemClassName =
-    "flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-sm outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted-foreground";
-
   return (
     <>
-      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-        <PopoverTrigger
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger
           aria-label={`Actions for post`}
           className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <MoreHorizontalIcon className="size-5" aria-hidden="true" />
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-52 p-1.5">
-          <div role="menu" aria-label="Post actions" className="flex flex-col">
-            <Link
-              href={`/posts/${id}`}
-              role="menuitem"
-              onClick={() => setMenuOpen(false)}
-              className={itemClassName}
-            >
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuItem asChild onClick={() => setMenuOpen(false)}>
+            <Link href={`/posts/${id}`}>
               {canEdit ? (
                 <PencilIcon aria-hidden="true" />
               ) : (
@@ -127,42 +119,34 @@ export function PostRowMenu({
               )}
               {canEdit ? "Edit" : "View"}
             </Link>
-            {canRetry && (
-              <button
-                type="button"
-                role="menuitem"
-                disabled={retrying}
-                onClick={() => void handleRetry()}
-                className={cn(itemClassName, "text-left disabled:opacity-50")}
-              >
-                {retrying ? (
-                  <Spinner data-icon="inline-start" aria-hidden="true" />
-                ) : (
-                  <RotateCcwIcon aria-hidden="true" />
-                )}
-                {retrying ? "Retrying…" : "Retry"}
-              </button>
-            )}
-            {canDelete && (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setDeleteOpen(true);
-                }}
-                className={cn(
-                  itemClassName,
-                  "text-destructive [&_svg]:text-destructive"
-                )}
-              >
-                <Trash2Icon aria-hidden="true" />
-                Delete
-              </button>
-            )}
-          </div>
-        </PopoverContent>
-      </Popover>
+          </DropdownMenuItem>
+          {canRetry && (
+            <DropdownMenuItem
+              disabled={retrying}
+              onSelect={() => void handleRetry()}
+            >
+              {retrying ? (
+                <Spinner data-icon="inline-start" aria-hidden="true" />
+              ) : (
+                <RotateCcwIcon aria-hidden="true" />
+              )}
+              {retrying ? "Retrying…" : "Retry"}
+            </DropdownMenuItem>
+          )}
+          {canDelete && (
+            <DropdownMenuItem
+              onSelect={() => {
+                setMenuOpen(false);
+                setDeleteOpen(true);
+              }}
+              className="text-error-text [&_svg]:text-error-text"
+            >
+              <Trash2Icon aria-hidden="true" />
+              Delete
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>

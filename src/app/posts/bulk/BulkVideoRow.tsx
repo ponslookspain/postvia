@@ -74,8 +74,8 @@ export function BulkVideoRow({
           </span>
         )}
         {status === "failed" && (
-          <span className="absolute inset-0 flex items-center justify-center bg-destructive/60">
-            <OctagonXIcon className="size-5 text-white" />
+          <span className="absolute inset-0 flex items-center justify-center bg-error/60">
+            <OctagonXIcon className="size-5 text-error-fg" />
           </span>
         )}
       </span>
@@ -97,7 +97,7 @@ export function BulkVideoRow({
           />
         )}
         {error && (
-          <span className="mt-0.5 block text-xs text-destructive">
+          <span className="mt-0.5 block text-xs text-error-text">
             {error}
           </span>
         )}

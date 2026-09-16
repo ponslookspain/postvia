@@ -59,8 +59,8 @@ export function MobileTopBar({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background md:hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md md:hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -71,7 +71,7 @@ export function MobileTopBar({
           >
             <MenuIcon />
           </Button>
-          <p className="text-base font-semibold tracking-tight">postvia</p>
+          <p className="font-heading text-base font-semibold tracking-tight">postvia</p>
         </div>
         <Popover>
           <PopoverTrigger asChild aria-label="Account menu">

@@ -20,7 +20,7 @@ export function InsightList({ insights }: { insights: Insight[] }) {
             {insight.variant === "attention" && (
               <TriangleAlertIcon
                 aria-hidden="true"
-                className="size-4 shrink-0 text-destructive"
+                className="size-4 shrink-0 text-error-text"
               />
             )}
             <span className="min-w-0">{insight.text}</span>

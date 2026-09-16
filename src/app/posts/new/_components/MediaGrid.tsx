@@ -85,7 +85,7 @@ export function MediaGrid({
                 )}
                 {item.status === "uploading" && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-foreground/60 p-2">
-                    <span className="text-xs font-medium text-white tabular-nums">
+                    <span className="text-xs font-medium text-fg-inverse tabular-nums">
                       {item.progress}%
                     </span>
                     <Progress
@@ -96,7 +96,7 @@ export function MediaGrid({
                   </div>
                 )}
                 {item.status === "error" && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-destructive/40">
+                  <div className="absolute inset-0 flex items-center justify-center bg-error/40">
                     <Badge color="error" variant="soft">Failed</Badge>
                   </div>
                 )}
@@ -120,7 +120,7 @@ export function MediaGrid({
                 <p className="w-24 text-xs text-muted-foreground">Uploaded</p>
               )}
               {item.status === "error" && item.error && (
-                <p className="w-24 text-xs text-destructive">{item.error}</p>
+                <p className="w-24 text-xs text-error-text">{item.error}</p>
               )}
               {item.status === "error" && (
                 <Button

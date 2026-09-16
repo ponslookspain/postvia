@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
  * reads the same at every size.
  *
  * Dots carry the hue; badge shells stay quiet (neutral outline) except
- * Failed, which uses the destructive tint. Signal indigo is reserved
+ * Failed, which uses the error tint. Signal indigo is reserved
  * for Scheduled, the only state that promises future action.
  */
 const DOT_CLASS: Record<string, string> = {
@@ -16,7 +16,7 @@ const DOT_CLASS: Record<string, string> = {
   PUBLISHING: "animate-pulse bg-warning",
   PUBLISHED: "bg-success",
   PARTIALLY_PUBLISHED: "bg-warning",
-  FAILED: "bg-destructive",
+  FAILED: "bg-error",
 };
 
 export function StatusDot({

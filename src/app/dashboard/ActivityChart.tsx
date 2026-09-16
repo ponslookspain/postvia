@@ -107,7 +107,7 @@ export function ActivityChart({ weeks }: { weeks: WeekBucket[] }) {
           Scheduled
         </span>
         <span className="flex items-center gap-1.5">
-          <span aria-hidden="true" className="size-2 rounded-full bg-destructive" />
+          <span aria-hidden="true" className="size-2 rounded-full bg-error" />
           Failed
         </span>
       </figcaption>

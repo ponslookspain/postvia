@@ -15,7 +15,7 @@ export async function AppShell({
     userEmail: user.email,
   });
   return (
-    <div className="min-h-screen md:flex">
+    <div className="min-h-screen bg-background text-foreground antialiased md:flex">
       <Sidebar
         userName={user.name}
         userEmail={user.email}
