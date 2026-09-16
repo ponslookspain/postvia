@@ -2,15 +2,32 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOutIcon, SparklesIcon } from "lucide-react";
-import { cn } from "cn";
+import {
+  ChevronsUpDownIcon,
+  LogOutIcon,
+  MoonIcon,
+  SparklesIcon,
+  SunIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
+import { useTheme } from "@/hooks/use-theme";
 import type { PlanId } from "@/lib/plans";
-import { isActivePath, navItems } from "@/components/nav-items";
+import { accountMenuItems, isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuDivider,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -21,7 +38,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
   SidebarRail,
   SidebarTrigger,
   useSidebar,
@@ -31,37 +47,23 @@ export function Sidebar({
   userName,
   userEmail,
   plan,
-  className,
-}: {
-  userName: string;
-  userEmail: string;
-  plan: PlanId;
-  className?: string;
-}) {
-  // Provider lives here (not in AppShell) so the shell layout and the
-  // mobile experience stay untouched. The wrapper carries AppShell's
-  // responsive visibility; md:w-auto keeps it from claiming row width.
-  return (
-    <SidebarProvider className={cn("hidden w-auto md:flex", className)}>
-      <SidebarShell userName={userName} userEmail={userEmail} plan={plan} />
-    </SidebarProvider>
-  );
-}
-
-function SidebarShell({
-  userName,
-  userEmail,
-  plan,
 }: {
   userName: string;
   userEmail: string;
   plan: PlanId;
 }) {
+  // Canonical Radian structure (radianui.com/docs/components/sidebar):
+  // SidebarProvider lives in AppShell and wraps both this Sidebar and
+  // SidebarInset as direct children, so the peer-data-[variant=inset]
+  // styles on SidebarInset resolve. No visibility classes here — the
+  // primitive hides itself on mobile (hidden md:block / hidden md:flex
+  // + Drawer branch) and sizes via its own --sidebar-width gap.
   const pathname = usePathname();
   const router = useRouter();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const initial = userName.trim().charAt(0).toUpperCase() || "U";
+  const { theme, setTheme } = useTheme();
 
   async function handleSignOut() {
     try {
@@ -86,14 +88,15 @@ function SidebarShell({
   }
 
   return (
-    <SidebarPrimitive collapsible="icon">
-      <SidebarHeader className="flex-row items-center justify-between border-b border-border p-4">
-        {collapsed ? (
-          <p aria-hidden="true" className="text-lg font-semibold tracking-tight">
-            p
-          </p>
-        ) : (
-          <p className="text-lg font-semibold tracking-tight">postvia</p>
+    <SidebarPrimitive variant="inset" collapsible="icon" theme="gray">
+      <SidebarHeader
+        className={cn(
+          "flex-row items-center border-b border-border py-3.5",
+          collapsed ? "justify-center px-1.5" : "justify-between gap-2 px-4"
+        )}
+      >
+        {!collapsed && (
+          <p className="font-heading text-lg font-semibold tracking-tight">postvia</p>
         )}
         <SidebarTrigger
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -103,7 +106,7 @@ function SidebarShell({
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {navItems.map((item) => {
                 const isActive = isActivePath(pathname, item.href);
                 const Icon = item.icon;
@@ -112,15 +115,16 @@ function SidebarShell({
                     <SidebarMenuButton
                       isActive={isActive}
                       tooltip={item.label}
-                      render={
-                        <Link
-                          href={item.href}
-                          aria-current={isActive ? "page" : undefined}
-                        />
-                      }
+                      className="rounded-full"
+                      asChild
                     >
-                      <Icon aria-hidden="true" />
-                      <span>{item.label}</span>
+                      <Link
+                        href={item.href}
+                        aria-current={isActive ? "page" : undefined}
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -129,19 +133,19 @@ function SidebarShell({
           </SidebarGroupContent>
         </SidebarGroup>
         {plan === "free" && !collapsed && (
-          <div className="px-3 pb-1">
+          <div className="px-3 pt-1 pb-2">
             <Link
               href="/billing"
-              className="block rounded-lg border border-border bg-muted/40 p-3 outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="block rounded-xl bg-bg p-3 outline-none transition-colors hover:bg-fill1 focus-visible:ring-2 focus-visible:ring-primary-focus"
             >
-              <p className="flex items-center gap-1.5 text-sm font-medium">
+              <p className="flex items-center gap-1.5 text-sm leading-5 font-medium">
                 <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
                 Unlock more with Postvia
               </p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 More posts, more accounts and Bulk scheduling.
               </p>
-              <p className="mt-2 text-xs font-medium underline underline-offset-4">
+              <p className="mt-2 text-xs leading-4 font-medium text-primary-text underline underline-offset-4">
                 View plans
               </p>
             </Link>
@@ -149,61 +153,101 @@ function SidebarShell({
         )}
       </SidebarContent>
       <SidebarFooter
-        className={cn("border-t border-border", collapsed ? "p-3" : "p-4")}
+        className={cn("border-t border-border", collapsed ? "p-2" : "p-3")}
       >
-        <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-          <Avatar>
-            <AvatarFallback>{initial}</AvatarFallback>
-          </Avatar>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 text-sm">
-              <p className="truncate font-medium">{userName}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {userEmail}
-              </p>
-            </div>
-          )}
-        </div>
-        {collapsed ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void handleSignOut()}
-            aria-label="Sign out"
-            title="Sign out"
-            className="mt-3 w-full"
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Account menu"
+            className={cn(
+              "flex w-full items-center rounded-lg outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-primary-focus",
+              collapsed ? "justify-center p-1" : "gap-2.5 px-1.5 py-1.5"
+            )}
           >
-            <LogOutIcon />
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            onClick={() => void handleSignOut()}
-            className="mt-3 w-full justify-start"
-          >
-            Sign out
-          </Button>
-        )}
-        {!collapsed && (
-          <>
-            <Separator className="my-3" />
-            <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
-              <Link
-                href="/terms"
-                className="transition-colors hover:text-foreground"
-              >
-                Terms
-              </Link>
-              <span aria-hidden="true">&middot;</span>
-              <Link
-                href="/privacy"
-                className="transition-colors hover:text-foreground"
-              >
-                Privacy
-              </Link>
+            <Avatar>
+              <AvatarFallback>{initial}</AvatarFallback>
+            </Avatar>
+            {!collapsed && (
+              <>
+                <div className="min-w-0 flex-1 text-left text-sm">
+                  <p className="truncate leading-5 font-medium">{userName}</p>
+                  <p className="truncate text-xs leading-4 text-muted-foreground">
+                    {userEmail}
+                  </p>
+                </div>
+                <ChevronsUpDownIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground"
+                />
+              </>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" side="top" className="w-56">
+            <div className="flex items-center gap-2.5 px-2 py-1.5">
+              <Avatar>
+                <AvatarFallback>{initial}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1 text-sm">
+                <p className="truncate leading-5 font-medium">{userName}</p>
+                <p className="truncate text-xs leading-4 text-muted-foreground">
+                  {userEmail}
+                </p>
+              </div>
             </div>
-          </>
-        )}
+            <DropdownMenuDivider />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                {theme === "dark" ? (
+                  <MoonIcon aria-hidden="true" />
+                ) : (
+                  <SunIcon aria-hidden="true" />
+                )}
+                Appearance
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuRadioGroup
+                  value={theme}
+                  onValueChange={(value) => setTheme(value as "light" | "dark")}
+                >
+                  <DropdownMenuRadioItem value="light">
+                    <SunIcon aria-hidden="true" />
+                    Light
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="dark">
+                    <MoonIcon aria-hidden="true" />
+                    Dark
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuDivider />
+            {accountMenuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <DropdownMenuItem key={item.href} asChild>
+                  <Link href={item.href}>
+                    <Icon aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuDivider />
+            <DropdownMenuItem asChild>
+              <Link href="/terms">Terms of Service</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/privacy">Privacy Policy</Link>
+            </DropdownMenuItem>
+            <DropdownMenuDivider />
+            <DropdownMenuItem
+              onSelect={() => void handleSignOut()}
+              className="text-error-text [&_svg]:text-error-text"
+            >
+              <LogOutIcon aria-hidden="true" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
       <SidebarRail />
     </SidebarPrimitive>

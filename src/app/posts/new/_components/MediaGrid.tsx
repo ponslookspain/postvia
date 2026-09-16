@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ErrorBlock } from "@/components/StateBlock";
-import { formatFileSize } from "./media-utils";
+import { formatFileSize } from "@/lib/media";
 import type { DraftMedia } from "./types";
 
 export function MediaGrid({
@@ -44,7 +44,7 @@ export function MediaGrid({
             videos up to 100 MB.
           </p>
         </div>
-        <Badge variant="secondary" className="shrink-0 tabular-nums">
+        <Badge variant="soft" className="shrink-0 tabular-nums">
           {media.length}/{maxMedia}
         </Badge>
       </div>
@@ -85,7 +85,7 @@ export function MediaGrid({
                 )}
                 {item.status === "uploading" && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-foreground/60 p-2">
-                    <span className="text-xs font-medium text-white tabular-nums">
+                    <span className="text-xs font-medium text-fg-inverse tabular-nums">
                       {item.progress}%
                     </span>
                     <Progress
@@ -96,8 +96,8 @@ export function MediaGrid({
                   </div>
                 )}
                 {item.status === "error" && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-destructive/40">
-                    <Badge variant="destructive">Failed</Badge>
+                  <div className="absolute inset-0 flex items-center justify-center bg-error/40">
+                    <Badge color="error" variant="soft">Failed</Badge>
                   </div>
                 )}
                 {item.status !== "uploading" && (
@@ -107,7 +107,7 @@ export function MediaGrid({
                     size="icon-sm"
                     onClick={() => onRemove(item.key)}
                     aria-label={`Remove ${item.name}`}
-                    className="absolute top-1.5 right-1.5 size-6 rounded-full"
+                    className="absolute top-1.5 right-1.5 size-6"
                   >
                     <XIcon />
                   </Button>
@@ -120,7 +120,7 @@ export function MediaGrid({
                 <p className="w-24 text-xs text-muted-foreground">Uploaded</p>
               )}
               {item.status === "error" && item.error && (
-                <p className="w-24 text-xs text-destructive">{item.error}</p>
+                <p className="w-24 text-xs text-error-text">{item.error}</p>
               )}
               {item.status === "error" && (
                 <Button

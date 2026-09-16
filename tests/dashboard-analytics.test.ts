@@ -5,6 +5,7 @@ import {
   bucketWeeks,
   buildInsights,
   formatRelativeTime,
+  formatTimeUntil,
   summarizePlatforms,
 } from "../src/lib/dashboard-analytics";
 
@@ -98,41 +99,56 @@ describe("formatRelativeTime", () => {
   });
 });
 
+describe("formatTimeUntil", () => {
+  // Local time on purpose: the dashboard renders these server-side with
+  // the same locale helpers, so the boundaries must hold in local days.
+  const now = new Date(2026, 8, 16, 10, 0); // Wed 16 Sept 2026, 10:00
+
+  test("speaks in minutes, then days of the week", () => {
+    assert.equal(formatTimeUntil(new Date(2026, 8, 16, 10, 20), now), "in 20 minutes");
+    assert.equal(formatTimeUntil(new Date(2026, 8, 16, 10, 1), now), "in 1 minute");
+    assert.match(formatTimeUntil(new Date(2026, 8, 16, 23, 0), now), /^today at /);
+    assert.match(formatTimeUntil(new Date(2026, 8, 17, 9, 0), now), /^tomorrow at /);
+    assert.match(formatTimeUntil(new Date(2026, 8, 19, 9, 0), now), /^Saturday at /);
+  });
+
+  test("switches to coarse distance once a week out", () => {
+    assert.equal(formatTimeUntil(new Date(2026, 8, 25, 9, 0), now), "in 9 days");
+    assert.equal(formatTimeUntil(new Date(2026, 9, 14, 9, 0), now), "in 4 weeks");
+    assert.match(formatTimeUntil(new Date(2027, 0, 5, 9, 0), now), /^on 5 Jan$/);
+  });
+
+  test("a moment that has arrived never reads as negative time", () => {
+    assert.equal(formatTimeUntil(new Date(2026, 8, 16, 10, 0), now), "any moment now");
+    assert.equal(formatTimeUntil(new Date(2026, 8, 16, 9, 0), now), "any moment now");
+  });
+});
+
 describe("buildInsights", () => {
-  test("emits operational insights with real links, nothing otherwise", () => {
-    const insights = buildInsights({
-      failedCount: 2,
-      expiredCount: 1,
-      postsLeft: 2,
-      scheduledCount: 3,
-    });
-    assert.equal(insights.length, 4);
+  test("emits only what has no block of its own, with real links", () => {
+    const insights = buildInsights({ expiredCount: 1, postsLeft: 2 });
+    assert.equal(insights.length, 2);
     assert.ok(insights.every((i) => typeof i.href === "string"));
-    assert.ok(
-      insights.some((i) => i.text.includes("need attention"))
-    );
-    assert.ok(insights.some((i) => i.text.includes("expired")));
+    assert.ok(insights.every((i) => typeof i.action === "string"));
+    assert.ok(insights.some((i) => i.text.includes("stopped working")));
     assert.ok(insights.some((i) => i.text.includes("Only 2 posts left")));
   });
 
+  test("a dead connection is a problem, a thinning allowance is not", () => {
+    const [expired] = buildInsights({ expiredCount: 1, postsLeft: null });
+    assert.equal(expired?.variant, "problem");
+    const [quota] = buildInsights({ expiredCount: 0, postsLeft: 1 });
+    assert.equal(quota?.variant, "heads-up");
+  });
+
   test("quiet account gets no insights and no engagement claims", () => {
-    const insights = buildInsights({
-      failedCount: 0,
-      expiredCount: 0,
-      postsLeft: null,
-      scheduledCount: 0,
-    });
+    const insights = buildInsights({ expiredCount: 0, postsLeft: null });
     assert.equal(insights.length, 0);
   });
 
-  test("zero allowance is a hard attention signal", () => {
-    const insights = buildInsights({
-      failedCount: 0,
-      expiredCount: 0,
-      postsLeft: 0,
-      scheduledCount: 0,
-    });
+  test("zero allowance still speaks up", () => {
+    const insights = buildInsights({ expiredCount: 0, postsLeft: 0 });
     assert.equal(insights.length, 1);
-    assert.ok(insights[0]?.text.includes("used up"));
+    assert.ok(insights[0]?.text.includes("out of posts"));
   });
 });

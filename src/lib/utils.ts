@@ -1,4 +1,11 @@
-export { cn } from "cn";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+// Local class-name merger (replaces the `cn` package): conditional join
+// via clsx, Tailwind conflict resolution via tailwind-merge.
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export const X_POST_CHAR_LIMIT = 280;
 export const THREADS_POST_CHAR_LIMIT = 500;
@@ -9,7 +16,7 @@ const THREADS_SHORTCODE_ALPHABET =
 const SIXTY_FOUR = BigInt(64);
 const ZERO = BigInt(0);
 
-export function toThreadsShortcode(postId: string): string {
+function toThreadsShortcode(postId: string): string {
   let id = BigInt(postId);
   let shortcode = "";
   while (id > ZERO) {

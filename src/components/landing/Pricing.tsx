@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CheckIcon } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PLANS } from "@/lib/plans";
@@ -48,17 +48,17 @@ export function Pricing() {
             >
               <div
                 className={cn(
-                  "flex h-full flex-col rounded-2xl border bg-card p-6",
+                  "flex h-full flex-col rounded-2xl border bg-panel p-6",
                   plan.highlighted
                     ? "border-primary/60 ring-1 ring-primary/30"
-                    : "border-border"
+                    : "border-transparent"
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="font-heading text-base font-medium">
                     {plan.name}
                   </h3>
-                  {plan.highlighted && <Badge>Most popular</Badge>}
+                  {plan.highlighted && <Badge variant="strong" color="primary">Most popular</Badge>}
                 </div>
                 <p className="mt-4">
                   <span className="font-heading text-4xl font-semibold tracking-tight tabular-nums">

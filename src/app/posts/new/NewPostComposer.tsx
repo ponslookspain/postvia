@@ -12,7 +12,7 @@ import {
   OctagonXIcon,
   PencilIcon,
   RotateCcwIcon,
-  UsersIcon,
+  XIcon,
 } from "lucide-react";
 import { threadsPostUrl, isFutureIso } from "@/lib/utils";
 import type { PlanId } from "@/lib/plans";
@@ -55,12 +55,13 @@ import { EmptyBlock } from "@/components/StateBlock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { toast } from "@/components/ui/toast";
 import { ChannelStrip } from "./_components/ChannelStrip";
 import { ChannelCustomizer } from "./_components/ChannelCustomizer";
@@ -1236,37 +1237,32 @@ export default function NewPostComposer({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[88rem] px-4 py-6 md:px-8 md:py-10">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Create post
-          </h1>
-          <p className="mt-1 max-w-[68ch] text-sm leading-5 text-muted-foreground">
-            Write once, publish to every selected channel.
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {selectedAccountIds.length > 0 && (
-            <Badge variant="secondary" className="tabular-nums">
-              <UsersIcon data-icon="inline-start" />
-              {selectedAccountIds.length} selected
-            </Badge>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPreviewSheetOpen(true)}
-            className="lg:hidden"
-          >
-            <EyeIcon data-icon="inline-start" />
-            Preview
-          </Button>
-        </div>
-      </div>
+    <PageContainer size="wide">
+      <PageHeader
+        title="Create post"
+        description="Write once, publish to every selected channel."
+        actions={
+          <div className="flex shrink-0 items-center gap-2">
+            {selectedAccountIds.length > 0 && (
+              <Badge variant="soft" className="tabular-nums">
+                {selectedAccountIds.length} selected
+              </Badge>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewSheetOpen(true)}
+              className="lg:hidden"
+            >
+              <EyeIcon data-icon="inline-start" />
+              Preview
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="flex min-w-0 flex-col gap-5">
           <ChannelStrip
             accounts={accounts}
@@ -1406,14 +1402,14 @@ export default function NewPostComposer({
         onOpenDraft={(postId) => router.push(`/posts/${postId}`)}
         />
       ) : null}
-      <Sheet open={previewSheetOpen} onOpenChange={setPreviewSheetOpen}>
-        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-          <SheetHeader className="px-1 pb-3 text-left">
-            <SheetTitle>Preview</SheetTitle>
-            <SheetDescription>
+      <Drawer open={previewSheetOpen} onOpenChange={setPreviewSheetOpen} direction="bottom">
+        <DrawerContent className="max-h-[85vh] overflow-y-auto">
+          <DrawerHeader className="px-1 pb-3 text-left">
+            <DrawerTitle>Preview</DrawerTitle>
+            <DrawerDescription>
               How your post will look on the selected channel.
-            </SheetDescription>
-          </SheetHeader>
+            </DrawerDescription>
+          </DrawerHeader>
           <PreviewRail
             items={railItems}
             userName={userName}
@@ -1426,8 +1422,18 @@ export default function NewPostComposer({
               handleCustomize(accountId);
             }}
           />
-        </SheetContent>
-      </Sheet>
+          <DrawerClose>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-4 right-4"
+              aria-label="Close preview"
+            >
+              <XIcon aria-hidden="true" />
+            </Button>
+          </DrawerClose>
+        </DrawerContent>
+      </Drawer>
       {/* Spacer so the fixed mobile bar never covers content. */}
       <div aria-hidden="true" className="h-20 lg:hidden" />
       <MobileComposerBar
@@ -1441,6 +1447,6 @@ export default function NewPostComposer({
         onScheduleClick={handleScheduleClick}
         onPublish={handlePublish}
       />
-    </div>
+    </PageContainer>
   );
 }

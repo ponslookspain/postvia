@@ -23,7 +23,7 @@ export default function LegalPageShell({
           >
             &larr; Postvia
           </Link>
-          <h1 className="mt-4 text-3xl font-semibold">{title}</h1>
+          <h1 className="mt-4 font-heading text-3xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Effective date: {effectiveDate}
           </p>
@@ -83,7 +83,7 @@ export function LegalSection({
 }) {
   return (
     <section>
-      <h2 className="mb-3 text-lg font-semibold">{heading}</h2>
+      <h2 className="mb-3 font-heading text-lg font-semibold tracking-tight">{heading}</h2>
       <div className="flex flex-col gap-3 text-sm leading-6">{children}</div>
     </section>
   );

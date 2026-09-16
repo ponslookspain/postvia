@@ -74,7 +74,7 @@ export function PreviewCard({
     <div key={model.accountId} className="flex min-w-0 flex-col gap-3">
       {(model.customized || model.hasSettingsOverride || model.inheritsGlobal) && (
         <div className="flex items-center justify-end gap-2">
-          {model.customized && <Badge variant="secondary">Custom</Badge>}
+          {model.customized && <Badge variant="soft">Custom</Badge>}
           {model.hasSettingsOverride && (
             <Badge variant="outline">Settings</Badge>
           )}
@@ -111,7 +111,7 @@ export function PreviewCard({
               {countCharacters(model.text)} / {model.maxLength}
             </FieldDescription>
             {model.customized && (
-              <Badge variant="secondary">
+              <Badge variant="soft">
                 {model.platform === "TIKTOK" ? "custom" : "custom text"}
               </Badge>
             )}

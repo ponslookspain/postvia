@@ -16,9 +16,11 @@ export function OutcomeDonut({ segments }: { segments: OutcomeSegment[] }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (total === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Nothing to show yet — publish your first post.
-      </p>
+      <div className="flex h-full flex-1 items-center justify-center">
+        <p className="text-sm text-muted-foreground">
+          Nothing to show yet — publish your first post.
+        </p>
+      </div>
     );
   }
   const radius = 52;
@@ -31,7 +33,7 @@ export function OutcomeDonut({ segments }: { segments: OutcomeSegment[] }) {
     arcs.slice(0, index).reduce((sum, arc) => sum + arc.length, 0)
   );
   return (
-    <div className="flex items-center gap-5">
+    <div className="flex h-full flex-col items-center justify-center gap-6">
       <svg
         viewBox="0 0 128 128"
         className="size-32 shrink-0"
@@ -79,12 +81,9 @@ export function OutcomeDonut({ segments }: { segments: OutcomeSegment[] }) {
           posts
         </text>
       </svg>
-      <ul className="flex min-w-0 flex-1 flex-col gap-2">
+      <ul className="grid w-full grid-cols-2 gap-x-4 gap-y-2.5">
         {segments.map((segment) => (
-          <li
-            key={segment.label}
-            className="flex items-center gap-2 text-sm"
-          >
+          <li key={segment.label} className="flex items-center gap-2 text-sm">
             <span
               aria-hidden="true"
               className={`size-2 shrink-0 rounded-full ${segment.dotClassName}`}

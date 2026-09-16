@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /**
  * Section system. Postvia pages read as a dispatch timetable: sections
@@ -36,12 +36,11 @@ export function Section({
 }
 
 /**
- * Single h2 contract for every section title (E4): SectionHeader and
- * FormSection render this instead of duplicating the class string, so
- * the title scale can never drift between the two systems. Zero visual
- * change — same element, same classes.
+ * Single h2 contract for every section title: SectionHeader renders this
+ * instead of duplicating the class string, so the title scale can never
+ * drift. Zero visual change — same element, same classes.
  */
-export function SectionTitle({
+function SectionTitle({
   id,
   children,
   className,
@@ -95,52 +94,5 @@ export function SectionHeader({
         </p>
       )}
     </div>
-  );
-}
-
-/**
- * Ruled divider between timetable sections. Prefer this over spacing
- * alone when two lists follow each other.
- */
-export function SectionRule({ className }: { className?: string }) {
-  return (
-    <hr
-      aria-hidden="true"
-      className={cn("border-t border-border", className)}
-    />
-  );
-}
-
-/**
- * Form section for Settings, Billing and other single-column forms:
- * title, one-line purpose, then fields. Keeps every form on the
- * same title/description/field rhythm.
- */
-export function FormSection({
-  labelledBy,
-  title,
-  description,
-  className,
-  children,
-}: {
-  labelledBy: string;
-  title: string;
-  description?: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      aria-labelledby={labelledBy}
-      className={cn("min-w-0", className)}
-    >
-      <SectionTitle id={labelledBy}>{title}</SectionTitle>
-      {description && (
-        <p className="mt-1 mb-4 max-w-[68ch] text-sm leading-5 text-muted-foreground">
-          {description}
-        </p>
-      )}
-      <div className="min-w-0">{children}</div>
-    </section>
   );
 }

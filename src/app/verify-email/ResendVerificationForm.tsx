@@ -43,7 +43,7 @@ export function ResendVerificationForm() {
   }
 
   return (
-    <div className="rounded-lg border border-border p-4">
+    <div className="rounded-lg bg-panel p-4">
       <FieldGroup>
         <Field data-invalid={Boolean(error) || undefined}>
           <FieldLabel htmlFor="resend-email">

@@ -14,9 +14,12 @@ runs in `npm test`) plus `npx prisma validate`.
 
 ## Topology: one database per environment, never per user
 
-- `main` → **Production** (Vercel Production, `postvia.online`).
-- `development` → **local development** (`localhost` + ngrok). Forked
-  from `main` **with data**, then wiped of copied users/OAuth tokens and
+(Names below are Neon **database** branches — distinct from the Git
+branches `main` / `dev`, which govern code releases.)
+
+- Neon branch `main` → **Production** (Vercel Production, `postvia.online`).
+- Neon branch `development` → **local development** (`localhost` + ngrok). Forked
+  from Neon `main` **with data**, then wiped of copied users/OAuth tokens and
   given one clean local admin. Test writes go here only.
 - Preview workflow is not used; historical `preview/*` branches are not
   part of any flow.

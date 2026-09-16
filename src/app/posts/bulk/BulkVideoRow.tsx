@@ -57,7 +57,7 @@ export function BulkVideoRow({
   onRemove: () => void;
 }) {
   return (
-    <li className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
+    <li className="flex items-center gap-3 rounded-lg bg-background px-3 py-2">
       <span
         aria-hidden="true"
         className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground"
@@ -74,8 +74,8 @@ export function BulkVideoRow({
           </span>
         )}
         {status === "failed" && (
-          <span className="absolute inset-0 flex items-center justify-center bg-destructive/60">
-            <OctagonXIcon className="size-5 text-white" />
+          <span className="absolute inset-0 flex items-center justify-center bg-error/60">
+            <OctagonXIcon className="size-5 text-error-fg" />
           </span>
         )}
       </span>
@@ -97,7 +97,7 @@ export function BulkVideoRow({
           />
         )}
         {error && (
-          <span className="mt-0.5 block text-xs text-destructive">
+          <span className="mt-0.5 block text-xs text-error-text">
             {error}
           </span>
         )}
@@ -128,11 +128,11 @@ export function BulkVideoRow({
         )}
       </span>
       {status === "scheduled" ? (
-        <Badge variant="secondary" className="shrink-0">
+        <Badge variant="soft" className="shrink-0">
           Scheduled
         </Badge>
       ) : status === "failed" ? (
-        <Badge variant="destructive" className="shrink-0">
+        <Badge color="error" variant="soft" className="shrink-0">
           Failed
         </Badge>
       ) : running || status !== "queued" ? (

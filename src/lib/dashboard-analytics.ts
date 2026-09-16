@@ -125,6 +125,38 @@ export function summarizePlatforms(groups: readonly TargetStatGroup[]): {
   };
 }
 
+/**
+ * Human countdown for an upcoming post. Spoken the way someone would say
+ * it out loud ("tomorrow at 09:00"), not as a raw timestamp.
+ */
+export function formatTimeUntil(target: Date, now: Date = new Date()): string {
+  const when = new Date(target);
+  const time = when.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const minutes = Math.round((when.getTime() - now.getTime()) / 60_000);
+  if (minutes <= 0) return "any moment now";
+  if (minutes < 60) return `in ${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+
+  const dayStart = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((dayStart(when) - dayStart(now)) / 86_400_000);
+  if (days === 0) return `today at ${time}`;
+  if (days === 1) return `tomorrow at ${time}`;
+  if (days < 7)
+    return `${when.toLocaleDateString("en-GB", { weekday: "long" })} at ${time}`;
+  if (days < 14) return `in ${days} days`;
+  if (days < 60) {
+    const weeks = Math.round(days / 7);
+    return `in ${weeks} weeks`;
+  }
+  return `on ${when.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  })}`;
+}
+
 /** Tiny relative-time label for "last published" rows. No new dependency. */
 export function formatRelativeTime(from: Date, now: Date = new Date()): string {
   const minutes = Math.max(
@@ -144,49 +176,39 @@ export function formatRelativeTime(from: Date, now: Date = new Date()): string {
 export type Insight = {
   text: string;
   href?: string;
-  variant: "attention" | "info";
+  /** Label for the link, e.g. "Fix it" — phrased for this specific insight. */
+  action?: string;
+  /** "problem" = something broke; "heads-up" = worth knowing, nothing broken. */
+  variant: "problem" | "heads-up";
 };
 
 /**
- * Operational insights only — failures, expiries, quota, schedule.
- * Everything references data the dashboard already holds.
+ * Only things that have no block of their own on the page. Failed posts
+ * are deliberately absent: they get a dedicated list up top, and saying
+ * it twice two rows apart is how a page starts nagging.
  */
 export function buildInsights(input: {
-  failedCount: number;
   expiredCount: number;
   postsLeft: number | null;
-  scheduledCount: number;
 }): Insight[] {
   const insights: Insight[] = [];
-  if (input.failedCount > 0) {
-    insights.push({
-      text: `${input.failedCount} ${input.failedCount === 1 ? "post needs" : "posts need"} attention — review and retry.`,
-      href: "/posts?status=FAILED",
-      variant: "attention",
-    });
-  }
   if (input.expiredCount > 0) {
     insights.push({
-      text: `${input.expiredCount} ${input.expiredCount === 1 ? "connection has" : "connections have"} expired — reconnect to keep publishing.`,
+      text: `${input.expiredCount} ${input.expiredCount === 1 ? "connection" : "connections"} stopped working — reconnect to keep posting.`,
       href: "/accounts",
-      variant: "attention",
+      action: "Reconnect",
+      variant: "problem",
     });
   }
   if (input.postsLeft !== null && input.postsLeft <= 3) {
     insights.push({
       text:
         input.postsLeft <= 0
-          ? "Monthly allowance used up — upgrade for more posts."
+          ? "You're out of posts for this month — upgrade for more."
           : `Only ${input.postsLeft} ${input.postsLeft === 1 ? "post" : "posts"} left this month.`,
       href: "/billing",
-      variant: "attention",
-    });
-  }
-  if (input.scheduledCount > 0) {
-    insights.push({
-      text: `${input.scheduledCount} ${input.scheduledCount === 1 ? "post" : "posts"} scheduled and will publish automatically.`,
-      href: "/posts?status=SCHEDULED",
-      variant: "info",
+      action: "See plans",
+      variant: "heads-up",
     });
   }
   return insights;

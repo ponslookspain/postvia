@@ -12,7 +12,7 @@ export function Hero() {
     >
       <div className="mx-auto max-w-3xl text-center">
         <div className="animate-[post-in_.5s_ease_both] motion-reduce:animate-none">
-          <Badge variant="secondary" className="gap-1.5 py-1 pr-3 pl-2.5">
+          <Badge variant="soft" className="gap-1.5 py-1 pr-3 pl-2.5">
             <span
               aria-hidden="true"
               className="size-1.5 rounded-full bg-signal"

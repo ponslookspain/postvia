@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /**
  * Scroll reveal wrapper. Opacity + translateY entrance only, staggered

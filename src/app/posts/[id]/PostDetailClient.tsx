@@ -45,7 +45,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/spinner";import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";import { TextArea } from "@/components/ui/text-area";
 import { toast } from "@/components/ui/toast";
 import { reportError } from "@/lib/diagnostics";
 
@@ -219,7 +219,7 @@ function MediaHero({
                   onClick={() => onRemove(item.id)}
                   disabled={deletingMediaId === item.id}
                   aria-label={`Remove ${item.filename}`}
-                  className="absolute -top-1.5 -right-1.5 size-6 rounded-full shadow-sm"
+                  className="absolute -top-1.5 -right-1.5 size-6 shadow-sm"
                 >
                   {deletingMediaId === item.id ? (
                     <Spinner data-icon="inline-start" />
@@ -497,7 +497,7 @@ export default function PostDetailPage({
       />
 
       {post.status === "FAILED" && post.errorMessage && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert color="error" variant="outline" className="mb-6">
           <TriangleAlertIcon />
           <AlertTitle>Publication failed</AlertTitle>
           <AlertDescription>{post.errorMessage}</AlertDescription>
@@ -514,7 +514,7 @@ export default function PostDetailPage({
                     <FieldLabel htmlFor="post-text" className="sr-only">
                       Post text
                     </FieldLabel>
-                    <Textarea
+                    <TextArea
                       id="post-text"
                       value={text}
                       onChange={(e) => setText(e.target.value)}
@@ -526,7 +526,8 @@ export default function PostDetailPage({
                         Platform: {formatPlatformName(platform)}
                       </FieldDescription>
                       <Badge
-                        variant={isOverLimit ? "destructive" : "secondary"}
+                        color={isOverLimit ? "error" : undefined}
+                        variant="soft"
                       >
                         {charCount} / {charLimit}
                       </Badge>
@@ -620,7 +621,7 @@ export default function PostDetailPage({
                             : ""}
                         </p>
                         {targetItem.errorMessage && (
-                          <p className="truncate text-xs text-destructive">
+                          <p className="truncate text-xs text-error-text">
                             Couldn&apos;t publish to{" "}
                             {formatPlatformName(targetItem.platform)}.
                           </p>
@@ -829,7 +830,7 @@ export default function PostDetailPage({
               <FieldError>Please choose a valid date and time.</FieldError>
             )}
             {rescheduleError && (
-              <Alert variant="destructive">
+              <Alert color="error" variant="outline">
                 <TriangleAlertIcon />
                 <AlertTitle>Cannot save time</AlertTitle>
                 <AlertDescription>{rescheduleError}</AlertDescription>

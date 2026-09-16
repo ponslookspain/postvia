@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
   AccountsVisual,
@@ -218,7 +218,7 @@ export function HowItWorks() {
         </div>
 
         {/* Active panel */}
-        <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="mt-4 overflow-hidden rounded-2xl bg-panel">
           {steps.map((step, index) => (
             <div
               key={step.id}

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDownIcon } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +37,7 @@ export function PreviewAccordionItem({
   const errorCount = model.validation.errors.length;
   const remaining = remainingCharacters(model.text, model.maxLength);
   return (
-    <div className="min-w-0 rounded-xl border border-border bg-card">
+    <div className="min-w-0 rounded-xl bg-panel">
       <button
         type="button"
         aria-expanded={expanded}
@@ -46,7 +46,7 @@ export function PreviewAccordionItem({
         onClick={onToggle}
         className="flex w-full min-w-0 items-center gap-2 rounded-xl px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        <Avatar size="sm" className="size-6 shrink-0">
+        <Avatar size="24" className="size-6 shrink-0">
           <AvatarFallback className="bg-muted">
             <PlatformIcon platform={model.platform} className="size-3.5" />
           </AvatarFallback>
@@ -59,7 +59,7 @@ export function PreviewAccordionItem({
         </span>
         <span className="flex shrink-0 items-center gap-2">
           {errorCount > 0 && (
-            <Badge variant="destructive" className="tabular-nums">
+            <Badge color="error" variant="soft" className="tabular-nums">
               {errorCount} {errorCount === 1 ? "issue" : "issues"}
             </Badge>
           )}

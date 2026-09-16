@@ -8,8 +8,8 @@ import {
   FieldError,
   FieldLabel,
 } from "@/components/ui/field";
-import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
+import { Divider } from "@/components/ui/divider";
+import { TextArea } from "@/components/ui/text-area";
 import { MediaGrid } from "./MediaGrid";
 import type { DraftMedia } from "./types";
 
@@ -66,7 +66,8 @@ export function ComposerCard({
               </p>
             </div>
             <Badge
-              variant={hasOverLimit ? "destructive" : "secondary"}
+              color={hasOverLimit ? "error" : undefined}
+              variant="soft"
               className="shrink-0 tabular-nums"
             >
               {charCount} chars
@@ -76,7 +77,7 @@ export function ComposerCard({
             <FieldLabel htmlFor="composer-text" className="sr-only">
               Post content
             </FieldLabel>
-            <Textarea
+            <TextArea
               id="composer-text"
               value={text}
               onChange={(e) => onTextChange(e.target.value)}
@@ -97,7 +98,7 @@ export function ComposerCard({
             )}
           </Field>
         </section>
-        <Separator />
+        <Divider />
         <MediaGrid
           media={media}
           maxMedia={maxMedia}

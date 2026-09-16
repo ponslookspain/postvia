@@ -78,7 +78,7 @@ export default async function PostsPage({
           title="Posts"
           description="Manage your content, scheduled posts and publishing activity"
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 nativeButton={false}

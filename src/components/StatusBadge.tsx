@@ -1,6 +1,5 @@
-import { cn } from "cn";
+import { cn, formatStatusLabel } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { formatStatusLabel } from "@/lib/utils";
 
 /**
  * Post status language. One dot + one label everywhere: post lists,
@@ -8,16 +7,17 @@ import { formatStatusLabel } from "@/lib/utils";
  * reads the same at every size.
  *
  * Dots carry the hue; badge shells stay quiet (neutral outline) except
- * Failed, which uses the destructive tint. Signal indigo is reserved
- * for Scheduled, the only state that promises future action.
+ * Failed, which uses the error tint. Scheduled uses info blue — distinct
+ * from both the red brand/primary accent and the red error state, so a
+ * routine future-dated post never reads as a warning.
  */
 const DOT_CLASS: Record<string, string> = {
   DRAFT: "bg-muted-foreground",
-  SCHEDULED: "bg-signal",
+  SCHEDULED: "bg-info",
   PUBLISHING: "animate-pulse bg-warning",
   PUBLISHED: "bg-success",
   PARTIALLY_PUBLISHED: "bg-warning",
-  FAILED: "bg-destructive",
+  FAILED: "bg-error",
 };
 
 export function StatusDot({
@@ -39,14 +39,16 @@ export function StatusDot({
   );
 }
 
-const BADGE_VARIANT = {
-  DRAFT: "outline",
-  SCHEDULED: "outline",
-  PUBLISHING: "secondary",
-  PUBLISHED: "secondary",
-  PARTIALLY_PUBLISHED: "secondary",
-  FAILED: "destructive",
-} as const;
+// PostVIA → Radian mapping: quiet outline shells, soft neutral fills,
+// Failed keeps the error tint.
+const BADGE_STYLE: Record<string, { variant: "outline" | "soft"; color?: "error" }> = {
+  DRAFT: { variant: "outline" },
+  SCHEDULED: { variant: "outline" },
+  PUBLISHING: { variant: "soft" },
+  PUBLISHED: { variant: "soft" },
+  PARTIALLY_PUBLISHED: { variant: "soft" },
+  FAILED: { variant: "soft", color: "error" },
+};
 
 export function StatusBadge({
   status,
@@ -55,14 +57,14 @@ export function StatusBadge({
   status: string;
   className?: string;
 }) {
+  const style = BADGE_STYLE[status] ?? { variant: "outline" as const };
   return (
     <Badge
-      variant={
-        BADGE_VARIANT[status as keyof typeof BADGE_VARIANT] ?? "outline"
-      }
+      variant={style.variant}
+      color={style.color}
       className={cn(
         status === "SCHEDULED" &&
-          "border-signal/30 bg-signal/10 text-signal dark:text-signal",
+          "border-info/30 bg-info/10 text-info dark:text-info",
         status === "PUBLISHED" &&
           "border-success/30 bg-success/10 text-success dark:text-success",
         status === "PUBLISHING" &&

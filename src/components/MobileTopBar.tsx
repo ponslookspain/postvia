@@ -3,20 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MenuIcon } from "lucide-react";
-import { cn } from "cn";
+import { MenuIcon, XIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
-import { isActivePath, navItems } from "@/components/nav-items";
+import { accountMenuItems, isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import {
   Popover,
   PopoverContent,
@@ -58,8 +59,8 @@ export function MobileTopBar({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background md:hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md md:hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -70,27 +71,39 @@ export function MobileTopBar({
           >
             <MenuIcon />
           </Button>
-          <p className="text-base font-semibold tracking-tight">postvia</p>
+          <p className="font-heading text-base font-semibold tracking-tight">postvia</p>
         </div>
         <Popover>
-          <PopoverTrigger
-            aria-label="Account menu"
-            render={
-              <button
-                type="button"
-                className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              />
-            }
-          >
-            <Avatar>
-              <AvatarFallback>{initial}</AvatarFallback>
-            </Avatar>
+          <PopoverTrigger asChild aria-label="Account menu">
+            <button
+              type="button"
+              className="rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <Avatar>
+                <AvatarFallback>{initial}</AvatarFallback>
+              </Avatar>
+            </button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-60">
             <p className="truncate text-sm font-medium">{userName}</p>
             <p className="truncate text-xs text-muted-foreground">
               {userEmail}
             </p>
+            <div className="mt-3 flex flex-col gap-1 border-t border-border pt-3">
+              {accountMenuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Icon className="size-4 shrink-0" aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -103,14 +116,14 @@ export function MobileTopBar({
         </Popover>
       </div>
 
-      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-        <SheetContent side="left">
-          <SheetHeader>
-            <SheetTitle>Menu</SheetTitle>
-            <SheetDescription>
+      <Drawer open={menuOpen} onOpenChange={setMenuOpen} direction="left">
+        <DrawerContent className="w-3/4 sm:max-w-sm">
+          <DrawerHeader>
+            <DrawerTitle>Menu</DrawerTitle>
+            <DrawerDescription>
               Go to a section of Postvia.
-            </SheetDescription>
-          </SheetHeader>
+            </DrawerDescription>
+          </DrawerHeader>
           <nav aria-label="Primary" className="flex flex-col gap-1 px-6">
             {navItems.map((item) => {
               const active = isActivePath(pathname, item.href);
@@ -151,8 +164,18 @@ export function MobileTopBar({
               Privacy
             </Link>
           </div>
-        </SheetContent>
-      </Sheet>
+          <DrawerClose>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-4 right-4"
+              aria-label="Close menu"
+            >
+              <XIcon aria-hidden="true" />
+            </Button>
+          </DrawerClose>
+        </DrawerContent>
+      </Drawer>
     </header>
   );
 }

@@ -259,10 +259,12 @@ export default function AccountsContent({
       <PageHeader
         title="Connected accounts"
         description="Choose where your posts go. Connect a profile on each channel to publish to it."
+        actions={
+          <Badge variant="outline" className="tabular-nums">
+            {totalLabel()}
+          </Badge>
+        }
       />
-      <p className="mb-4 text-xs text-muted-foreground tabular-nums">
-        {totalLabel()}
-      </p>
 
       {message?.error ? (
         <ErrorBlock
@@ -280,7 +282,7 @@ export default function AccountsContent({
           className="mb-6"
         />
       ) : message ? (
-        <Alert className="mb-6">
+        <Alert color="neutral" variant="outline" className="mb-6">
           <AlertTitle>Accounts</AlertTitle>
           <AlertDescription>{message.text}</AlertDescription>
         </Alert>
@@ -293,16 +295,16 @@ export default function AccountsContent({
           const hasExpired = accounts.some((account) => isExpired(account));
           return (
             <li key={config.platform} className="min-w-0">
-              <Card className="flex h-full flex-col">
+              <Card size="sm" className="flex h-full flex-col">
                 <CardHeader>
                   <div className="flex items-center gap-3">
                     <span
                       aria-hidden="true"
-                      className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
+                      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-accent text-primary-text"
                     >
                       <PlatformIcon
                         platform={config.platform}
-                        className="size-6"
+                        className="size-5"
                       />
                     </span>
                     <div className="min-w-0 flex-1">
@@ -311,12 +313,12 @@ export default function AccountsContent({
                     </div>
                     {connected ? (
                       hasExpired ? (
-                        <Badge variant="destructive" className="shrink-0">
+                        <Badge color="error" variant="soft" className="shrink-0">
                           <StatusDot status="FAILED" />
                           Expired
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="shrink-0">
+                        <Badge variant="soft" className="shrink-0">
                           <StatusDot status="PUBLISHED" />
                           Connected
                         </Badge>
@@ -337,7 +339,7 @@ export default function AccountsContent({
                         return (
                           <li
                             key={account.id}
-                            className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2"
+                            className="flex items-center gap-3 rounded-lg border border-soft bg-fill1 px-3 py-2"
                           >
                             <Avatar className="size-8 shrink-0">
                               <AvatarFallback>

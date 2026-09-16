@@ -8,7 +8,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
-import { Textarea } from "@/components/ui/textarea";
+import { TextArea } from "@/components/ui/text-area";
 import {
   countCharacters,
   remainingCharacters,
@@ -63,7 +63,7 @@ export function TargetCustomizer({
     " for " +
     model.label;
   return (
-    <div id={anchorId} className="scroll-mt-24 rounded-lg border border-border bg-muted/40 p-3">
+    <div id={anchorId} className="scroll-mt-24 rounded-lg bg-bg p-3">
       <FieldGroup className="gap-3">
         {model.platform === "TIKTOK" ? (
           <>
@@ -79,7 +79,7 @@ export function TargetCustomizer({
                 <FieldLabel htmlFor={`custom-${model.accountId}`}>
                   Custom title
                 </FieldLabel>
-                <Textarea
+                <TextArea
                   id={`custom-${model.accountId}`}
                   value={customText ?? model.text}
                   rows={model.tiktokMode === "photo" ? 2 : 4}
@@ -111,7 +111,7 @@ export function TargetCustomizer({
                 <FieldLabel htmlFor={`custom-desc-${model.accountId}`}>
                   Description
                 </FieldLabel>
-                <Textarea
+                <TextArea
                   id={`custom-desc-${model.accountId}`}
                   value={customDescription ?? model.description}
                   rows={4}
@@ -145,7 +145,7 @@ export function TargetCustomizer({
             <FieldLabel htmlFor={`custom-${model.accountId}`}>
               {`Text for ${model.label}`}
             </FieldLabel>
-            <Textarea
+            <TextArea
               id={`custom-${model.accountId}`}
               value={customText ?? model.text}
               rows={4}

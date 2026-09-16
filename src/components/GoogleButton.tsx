@@ -87,7 +87,7 @@ export function GoogleButton({
         {loading ? "Redirecting..." : "Continue with Google"}
       </Button>
       {error && (
-        <p className="mt-2 text-center text-sm text-destructive">{error}</p>
+        <p className="mt-2 text-center text-sm text-error-text">{error}</p>
       )}
     </div>
   );

@@ -5,14 +5,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function PostsLoading() {
   return (
     <PageContainer aria-busy="true">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1 basis-48">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1 basis-56">
           <Skeleton className="h-8 w-32" />
           <Skeleton className="mt-2 h-4 w-64" />
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Skeleton className="h-9 w-28 rounded-full" />
-          <Skeleton className="h-9 w-32 rounded-full" />
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Skeleton className="h-9 w-28 rounded-lg" />
+          <Skeleton className="h-9 w-32 rounded-lg" />
         </div>
       </div>
       <div className="mb-6 flex gap-5 overflow-x-auto border-b border-border">

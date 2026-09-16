@@ -2,10 +2,10 @@
 
 import { useMemo } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import { Divider as Separator } from "@/components/ui/divider"
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -52,7 +52,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 const fieldVariants = cva(
-  "group/field flex w-full gap-3 data-[invalid=true]:text-destructive",
+  "group/field flex w-full gap-3 data-[invalid=true]:text-error-text",
   {
     variants: {
       orientation: {
@@ -160,7 +160,7 @@ function FieldSeparator({
       )}
       {...props}
     >
-      <Separator className="absolute inset-0 top-1/2" />
+      <Separator decorative={false} className="absolute inset-0 top-1/2" />
       {children && (
         <span
           className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"
@@ -216,7 +216,9 @@ function FieldError({
     <div
       role="alert"
       data-slot="field-error"
-      className={cn("text-sm font-normal text-destructive", className)}
+      // Radian form error pattern (docs/components/input.md "Error Input"):
+      // text-xs, normal weight, error-text token.
+      className={cn("text-xs font-normal text-error-text", className)}
       {...props}
     >
       {content}

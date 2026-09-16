@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { MobileTopBar } from "@/components/MobileTopBar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import type { AuthUser } from "@/lib/auth";
 import { getEffectivePlan } from "@/lib/entitlements";
 
@@ -15,17 +16,16 @@ export async function AppShell({
     userEmail: user.email,
   });
   return (
-    <div className="min-h-screen md:flex">
+    <SidebarProvider className="min-h-screen bg-background text-foreground antialiased md:flex">
       <Sidebar
         userName={user.name}
         userEmail={user.email}
         plan={effective.bypass ? "scale" : effective.plan}
-        className="hidden md:flex"
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <SidebarInset>
         <MobileTopBar userName={user.name} userEmail={user.email} />
         <main className="min-w-0 flex-1">{children}</main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

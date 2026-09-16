@@ -114,6 +114,13 @@ export function isAscii(text: string): boolean {
   return /^[\x00-\x7F]*$/.test(text);
 }
 
+/** Human file-size label for upload rows (B/KB/MB). Pure, client-safe. */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function slugifyPathSegment(filename: string): string {
   const ascii = filename
     .replace(UNSAFE_FILENAME_CHARS, "_")

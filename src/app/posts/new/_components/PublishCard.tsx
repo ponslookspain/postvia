@@ -89,7 +89,7 @@ export function PublishCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {(quotaBlocked || quotaError) && (
-          <Alert>
+          <Alert color="neutral" variant="outline">
             <AlertTitle>Monthly post limit reached</AlertTitle>
             <AlertDescription>
               <UpgradeCta
@@ -103,7 +103,7 @@ export function PublishCard({
           </Alert>
         )}
         {schedulingForX && scheduleMode && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>Scheduling unavailable</AlertTitle>
             <AlertDescription>
@@ -113,7 +113,7 @@ export function PublishCard({
           </Alert>
         )}
         {schedulingForX && xScheduleHint && !scheduleMode && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>Scheduling unavailable</AlertTitle>
             <AlertDescription>
@@ -138,7 +138,7 @@ export function PublishCard({
           </FieldDescription>
         )}
         {publishBlockedReason && !publishing && (
-          <Alert variant="destructive">
+          <Alert color="error" variant="outline">
             <TriangleAlertIcon />
             <AlertTitle>Complete required fields</AlertTitle>
             <AlertDescription>{publishBlockedReason}</AlertDescription>

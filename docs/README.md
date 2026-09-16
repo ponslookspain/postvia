@@ -18,5 +18,6 @@ as of the current tree; if anything disagrees with the code, the code wins.
 - [Local development](local-development.md) — canonical env, ngrok, DB, Blob, OAuth, smoke tests
 - [Local social development](local-social-dev.md) — real-account social/OAuth testing flow
 - [Workflow](workflow.md) — development/release process contract
-- [Design system](design-system.md) — implemented visual language, tokens, components
+- [Design system](design-system.md) — implemented visual language: themes, tokens, surfaces, rows, voice
+- [Radian design contract (historical)](postvia-radian-design-contract.md) — reasoning behind the shadcn → Radian migration; superseded by the design system, do not quote as current rules
 - [Audit report (archived 2026-09-15)](audit-report.md) — historical hardening findings (A–Q); resolved items marked `RESOLVED` inline, the rest not re-verified — do not quote as current issues

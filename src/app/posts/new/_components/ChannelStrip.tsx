@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { InfoIcon, UsersIcon } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { EmptyBlock } from "@/components/StateBlock";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -58,7 +58,7 @@ export function ChannelStrip({
         </h2>
         <div className="flex shrink-0 items-center gap-2">
           {selectedAccountIds.length > 0 && (
-            <Badge variant="secondary" className="tabular-nums">
+            <Badge variant="soft" className="tabular-nums">
               {selectedAccountIds.length} selected
             </Badge>
           )}
@@ -111,46 +111,44 @@ export function ChannelStrip({
             const label = `${platformName(account.platform)} @${account.username}`;
             return (
               <Tooltip key={account.id}>
-                <TooltipTrigger
-                  render={
-                    <button
-                      type="button"
-                      aria-pressed={selected}
-                      aria-label={`${label}${selected ? ", selected" : ""}${customized ? ", customized" : ""}${accountDisabled ? ", coming soon" : ""}`}
-                      disabled={accountDisabled || disabled}
-                      onClick={() => onToggle(account.id, !selected)}
-                      className={cn(
-                        "relative shrink-0 rounded-full outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
-                        !selected && !accountDisabled && "opacity-55 hover:opacity-100"
-                      )}
-                    />
-                  }
-                >
-                  <Avatar
-                    size="lg"
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-pressed={selected}
+                    aria-label={`${label}${selected ? ", selected" : ""}${customized ? ", customized" : ""}${accountDisabled ? ", coming soon" : ""}`}
+                    disabled={accountDisabled || disabled}
+                    onClick={() => onToggle(account.id, !selected)}
                     className={cn(
-                      "size-11",
-                      selected &&
-                        !accountDisabled &&
-                        "ring-2 ring-signal ring-offset-2 ring-offset-background"
+                      "relative shrink-0 rounded-full outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed",
+                      !selected && !accountDisabled && "opacity-55 hover:opacity-100"
                     )}
                   >
-                    <AvatarFallback
+                    <Avatar
+                      size="40"
                       className={cn(
-                        selected && !accountDisabled
-                          ? "bg-signal/10 text-signal"
-                          : "bg-muted text-muted-foreground"
+                        "size-11",
+                        selected &&
+                          !accountDisabled &&
+                          "ring-2 ring-signal ring-offset-2 ring-offset-background"
                       )}
                     >
-                      <PlatformIcon platform={account.platform} className="size-5" />
-                    </AvatarFallback>
-                    {selected && customized && (
-                      <AvatarBadge
-                        aria-hidden="true"
-                        className="bg-signal text-signal-foreground"
-                      />
-                    )}
-                  </Avatar>
+                      <AvatarFallback
+                        className={cn(
+                          selected && !accountDisabled
+                            ? "bg-signal/10 text-signal"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        <PlatformIcon platform={account.platform} className="size-5" />
+                      </AvatarFallback>
+                      {selected && customized && (
+                        <AvatarBadge
+                          aria-hidden="true"
+                          className="bg-signal text-signal-foreground"
+                        />
+                      )}
+                    </Avatar>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>
                   {label}
@@ -168,7 +166,7 @@ export function ChannelStrip({
         </FieldError>
       )}
       {mediaErrors.length > 0 && (
-        <Alert className="mt-3">
+        <Alert color="neutral" variant="outline" className="mt-3">
           <InfoIcon />
           <AlertTitle>Media requirements</AlertTitle>
           <AlertDescription>

@@ -84,7 +84,7 @@ export function ChannelCustomizer({
           return (
             <div key={account.id}>
               {!expanded ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-panel px-3 py-2">
                   <p className="flex min-w-0 items-center gap-2 text-sm">
                     <span
                       aria-hidden="true"
@@ -133,7 +133,7 @@ export function ChannelCustomizer({
                       </span>
                     </p>
                     {hasOverride && (
-                      <Badge variant="secondary" className="shrink-0">
+                      <Badge variant="soft" className="shrink-0">
                         Customized
                       </Badge>
                     )}

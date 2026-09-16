@@ -12,7 +12,7 @@ import { StatusBadge, StatusDot } from "@/components/StatusBadge";
  */
 
 const shellClass =
-  "overflow-hidden rounded-2xl border border-border bg-card text-left";
+  "overflow-hidden rounded-2xl bg-panel text-left";
 
 /* ---------------------------------- accounts --------------------------------- */
 
@@ -33,7 +33,7 @@ export function AccountsVisual() {
       <div aria-hidden="true">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 md:px-5">
           <p className="text-[15px] font-medium">Social accounts</p>
-          <Badge variant="secondary">Official OAuth</Badge>
+          <Badge variant="soft">Official OAuth</Badge>
         </div>
         <ul className="divide-y divide-border">
           {accountRows.map((row) => (
@@ -105,7 +105,7 @@ export function ComposerVisual() {
           <p className="mt-2 text-xs text-muted-foreground tabular-nums">
             184 characters
           </p>
-          <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-bg px-3 py-2.5">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06]">
               <ImageIcon className="size-4 text-muted-foreground" />
             </span>
@@ -127,7 +127,7 @@ export function ComposerVisual() {
             {railRows.map((row) => (
               <li
                 key={row.platform}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2"
+                className="flex items-center gap-2 rounded-lg bg-bg px-2.5 py-2"
               >
                 <PlatformIcon platform={row.platform} className="size-3.5" />
                 <span className="min-w-0 flex-1">
@@ -138,18 +138,18 @@ export function ComposerVisual() {
                     {row.detail}
                   </span>
                 </span>
-                <Badge variant="secondary" className="shrink-0">
+                <Badge variant="soft" className="shrink-0">
                   {row.tag}
                 </Badge>
               </li>
             ))}
           </ul>
-          <div className="mt-2.5 rounded-lg border border-border bg-card px-2.5 py-2">
+          <div className="mt-2.5 rounded-lg bg-bg px-2.5 py-2">
             <p className="flex items-center gap-1.5 text-xs font-medium">
               <CalendarClockIcon className="size-3.5 text-muted-foreground" />
               Wed 09:00 · Europe/Madrid
             </p>
-            <span className="mt-2 flex h-8 items-center justify-center rounded-4xl bg-primary px-3 text-[13px] font-medium text-primary-foreground">
+            <span className="mt-2 flex h-8 items-center justify-center rounded-full bg-primary px-3 text-[13px] font-medium text-primary-foreground">
               Schedule
             </span>
           </div>
@@ -265,7 +265,7 @@ export function CalendarVisual() {
               <ChevronRightIcon className="size-4" />
             </span>
           </span>
-          <span className="rounded-4xl border border-border px-3 py-1 text-xs font-medium">
+          <span className="rounded-full border border-border px-3 py-1 text-xs font-medium">
             Today
           </span>
         </div>
@@ -288,7 +288,7 @@ export function CalendarVisual() {
                   key={di}
                   className={
                     "min-h-9 border-r border-border/70 p-0.5 last:border-r-0 sm:min-h-[4.5rem] sm:p-1" +
-                    (date.today ? " bg-signal/[0.06]" : "") +
+                    (date.today ? " bg-signal/10" : "") +
                     (date.dimmed ? " bg-muted/30" : "")
                   }
                 >

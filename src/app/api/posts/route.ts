@@ -160,10 +160,9 @@ export async function POST(request: NextRequest) {
       scheduledAt,
       accountIds,
       targets: requestedTargets,
-      // Legacy client flag, superseded by mediaCount below; still accepted
-      // so older composers keep working (unknown fields are ignored).
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      hasMedia = false,
+      // Legacy `hasMedia` client flag, superseded by mediaCount below, is
+      // still accepted so older composers keep working (unknown fields
+      // are ignored).
       mediaCount: rawMediaCount,
       bulkBatchSize: rawBulkBatchSize,
       clientOperationId: rawOperationId,
