@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "../dist/types",
+    "incremental": false,
+    "plugins": [],
+    "paths": { "@/*": ["../src/*"] }
+  },
+  "include": ["ds-entry.ts"],
+  "exclude": []
+}

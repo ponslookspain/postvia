@@ -1,0 +1,11 @@
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import postcss from 'postcss';
+import tw from '@tailwindcss/postcss';
+const inPath = '.design-sync/tailwind-entry.css';
+const outPath = '.design-sync/.cache/postvia.css';
+const css = readFileSync(inPath, 'utf8');
+const res = await postcss([tw()]).process(css, { from: inPath, to: outPath });
+mkdirSync(dirname(outPath), { recursive: true });
+writeFileSync(outPath, res.css);
+console.log(`wrote ${outPath} (${res.css.length} bytes)`);

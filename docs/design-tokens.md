@@ -30,6 +30,23 @@ foundations.css  →  semantic.css  →  compat-radian.css  →  components
                     canonical
 ```
 
+## Exported to Claude Design
+
+The design system is also synced to a Claude Design project, so the design
+agent builds with these real components. The export surface is the hand-written
+barrel `.design-sync/ds-entry.ts` — nothing in the app imports it, and it is
+**not** derived from the directory listing.
+
+**Adding a component to `src/components/ui/` does not add it to the sync.** Add
+its module to `ds-entry.ts` and re-run `.design-sync/gen-component-docs.mjs`,
+which throws if the new module has no group mapped. Operational detail,
+gotchas and the re-sync command live in `.design-sync/NOTES.md`;
+`.design-sync/conventions.md` is the usage guidance handed to the design agent.
+
+Product-coupled modules (`AppShell`, the product `Sidebar`, `MobileTopBar`,
+`landing/*`, `billing/*`) are deliberately excluded — they depend on
+`next/navigation` or prisma-backed auth and are page content, not design system.
+
 ## Theming
 
 `dark` is the product default; light is opt-in. The `dark` class is written

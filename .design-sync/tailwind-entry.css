@@ -1,0 +1,23 @@
+/* Design-sync stylesheet entry.
+   Compiles the app's real globals.css (and therefore the whole canonical
+   design-system layer) with the source globs widened to cover the authored
+   preview files, so a class used only in a preview still gets emitted.
+   Output: .design-sync/.cache/postvia.css -> cfg.cssEntry. */
+@import "../src/app/globals.css";
+
+@source "../src/**/*.{ts,tsx}";
+@source "../.design-sync/previews/**/*.tsx";
+
+/* next/font assigns these on <html> via a generated class; it is not running
+   in the preview environment, so without them every card renders in Arial.
+   The families match the app exactly; the tails differ on purpose. next/font
+   names metric-override faces ("Inter Fallback", src: local(Arial)) that exist
+   only to stop layout shift while a webfont downloads — they ship no file, so
+   harvest-fonts.mjs cannot carry them and a reference to one would dangle.
+   The real woff2 are served from this bundle and paint immediately, so the
+   generic chains below are both honest and equivalent. */
+:root {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-heading: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-geist-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
