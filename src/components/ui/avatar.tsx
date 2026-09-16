@@ -144,7 +144,12 @@ function Avatar({
 				// PostVIA extension hook: data-size drives AvatarBadge sizing
 				// below (values "24" | "32" | "40", matching old sm|default|lg).
 				data-size={size}
-				className={cn(avatarVariants({ size, rounded }), className)}
+				className={cn(
+					// PostVIA extension hook: named group ancestor for AvatarBadge.
+					"group/avatar",
+					avatarVariants({ size, rounded }),
+					className
+				)}
 				{...props}
 			/>
 		</AvatarContext.Provider>
@@ -277,7 +282,9 @@ function AvatarGroupCount({
 		<div
 			data-slot="avatar-group-count"
 			className={cn(
-				"relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background group-has-data-[size=lg]/avatar-group:size-10 group-has-data-[size=sm]/avatar-group:size-6 [&>svg]:size-4 group-has-data-[size=lg]/avatar-group:[&>svg]:size-5 group-has-data-[size=sm]/avatar-group:[&>svg]:size-3",
+				"relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background [&>svg]:size-4",
+				'group-has-data-[size="24"]/avatar-group:size-6 group-has-data-[size="24"]/avatar-group:[&>svg]:size-3',
+				'group-has-data-[size="40"]/avatar-group:size-10 group-has-data-[size="40"]/avatar-group:[&>svg]:size-5',
 				className
 			)}
 			{...props}
