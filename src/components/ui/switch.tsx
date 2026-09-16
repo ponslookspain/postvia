@@ -82,7 +82,7 @@ const switchThumbVariants = cva(
 
 // Indicator Variants (used for styling only)
 const switchIndicatorVariants = cva(
-	"flex items-center justify-center w-full h-full text-[10px] font-medium transition-all duration-200 select-none",
+	"flex items-center justify-center w-full h-full text-micro font-medium transition-all duration-200 select-none",
 	{
 		variants: {
 			state: {

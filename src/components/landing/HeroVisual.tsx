@@ -35,9 +35,9 @@ const channelRows = [
 const weekStrip = [
   { day: "M", active: false, dot: "bg-success" },
   { day: "T", active: false, dot: "bg-success" },
-  { day: "W", active: true, dot: "bg-signal" },
+  { day: "W", active: true, dot: "bg-primary" },
   { day: "T", active: false, dot: null },
-  { day: "F", active: false, dot: "bg-signal" },
+  { day: "F", active: false, dot: "bg-primary" },
   { day: "S", active: false, dot: null },
   { day: "S", active: false, dot: null },
 ] as const;
@@ -114,8 +114,8 @@ export function HeroVisual() {
                   key={i}
                   className={
                     slot.active
-                      ? "flex h-8 flex-1 flex-col items-center justify-center gap-1 rounded-lg bg-signal/10 text-[11px] font-medium text-signal ring-1 ring-signal/30 ring-inset"
-                      : "flex h-8 flex-1 flex-col items-center justify-center gap-1 rounded-lg text-[11px] text-muted-foreground"
+                      ? "flex h-8 flex-1 flex-col items-center justify-center gap-1 rounded-lg bg-primary/10 text-meta font-medium text-primary ring-1 ring-primary/30 ring-inset"
+                      : "flex h-8 flex-1 flex-col items-center justify-center gap-1 rounded-lg text-meta text-muted-foreground"
                   }
                 >
                   {slot.day}
@@ -146,7 +146,7 @@ export function HeroVisual() {
             <span className="block text-xs font-medium">
               One post, four outcomes
             </span>
-            <span className="block text-[11px] text-muted-foreground">
+            <span className="block text-meta text-muted-foreground">
               Queued for Wed 09:00
             </span>
           </span>

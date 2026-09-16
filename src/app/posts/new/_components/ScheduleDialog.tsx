@@ -159,7 +159,7 @@ export function ScheduleDialog({
               </div>
             )}
           {quotaBlocked ? (
-            <p className="text-[13px] leading-5 text-muted-foreground">
+            <p className="text-label leading-5 text-muted-foreground">
               {quotaReason ?? "This plan includes a fixed number of posts per month."}{" "}
               <Link
                 href="/billing"
@@ -172,7 +172,7 @@ export function ScheduleDialog({
             blockReason && (
               <p
                 role="status"
-                className="text-[13px] leading-5 text-muted-foreground"
+                className="text-label leading-5 text-muted-foreground"
               >
                 {blockReason}
               </p>

@@ -95,7 +95,7 @@ export function NextUp({ post, now }: { post: FeedPost; now: Date }) {
           </span>
         )}
         <span className="min-w-0 flex-1">
-          <span className="line-clamp-2 block text-[15px] leading-snug break-words text-foreground">
+          <span className="line-clamp-2 block text-prose leading-snug break-words text-foreground">
             {post.text.trim() || "No caption yet"}
           </span>
           <span className="mt-1.5 block text-xs leading-4 text-muted-foreground">

@@ -284,7 +284,7 @@ export default async function DashboardPage({
               <h1 className="font-heading text-2xl leading-8 font-semibold tracking-tight text-balance">
                 {greetingFor(user.name)}
               </h1>
-              <p className="mt-2 max-w-[58ch] text-[15px] leading-6 text-muted-foreground">
+              <p className="mt-2 max-w-[58ch] text-prose leading-6 text-muted-foreground">
                 {openingLine}
               </p>
             </div>

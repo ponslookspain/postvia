@@ -189,7 +189,7 @@ export function PublishCard({
           </Button>
           {hasSchedule && (
             <div className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2">
-              <p className="min-w-0 truncate text-[13px] text-muted-foreground tabular-nums">
+              <p className="min-w-0 truncate text-label text-muted-foreground tabular-nums">
                 Scheduled for{" "}
                 {selectedDate
                   ? selectedDate.toLocaleDateString("en-GB", {
@@ -206,7 +206,7 @@ export function PublishCard({
                 variant="link"
                 onClick={onScheduleClick}
                 disabled={scheduling}
-                className="h-auto shrink-0 p-0 text-[13px]"
+                className="h-auto shrink-0 p-0 text-label"
               >
                 Edit
               </Button>

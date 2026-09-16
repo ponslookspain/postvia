@@ -76,7 +76,7 @@ export function OutcomeDonut({ segments }: { segments: OutcomeSegment[] }) {
           x={64}
           y={78}
           textAnchor="middle"
-          className="fill-muted-foreground text-[11px]"
+          className="fill-muted-foreground text-meta"
         >
           posts
         </text>

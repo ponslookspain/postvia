@@ -408,8 +408,8 @@ const sidebarThemeVars: Record<
 > = {
 	default: { "--color-sidebar": "var(--color-bg)" } as React.CSSProperties,
 	gray: {
-		"--color-sidebar": "var(--color-fill1)",
-		"--color-sidebar-accent": "var(--color-fill2)",
+		"--color-sidebar": "var(--sidebar)",
+		"--color-sidebar-accent": "var(--sidebar-accent)",
 	} as React.CSSProperties,
 	"gray-body": { "--color-sidebar": "var(--color-bg)" } as React.CSSProperties,
 	inverse: { "--color-sidebar": "var(--color-black)" } as React.CSSProperties,

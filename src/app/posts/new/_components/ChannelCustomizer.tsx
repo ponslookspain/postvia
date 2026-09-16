@@ -118,7 +118,7 @@ export function ChannelCustomizer({
                     <p className="flex min-w-0 items-center gap-2 text-sm">
                       <span
                         aria-hidden="true"
-                        className="flex size-6 shrink-0 items-center justify-center rounded-md bg-signal/10 text-signal"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
                       >
                         <PlatformIcon
                           platform={account.platform}

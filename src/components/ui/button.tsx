@@ -20,7 +20,7 @@ const buttonVariants = cva(
 				"smooth-inverted": "",
 			},
 			size: {
-				"28": "[&>svg]:size-4 text-[13px] leading-4.5 px-1 rounded-full",
+				"28": "[&>svg]:size-4 text-label leading-4.5 px-1 rounded-full",
 				"32": "[&>svg]:size-4.5 text-sm px-1 rounded-full",
 				"36": "[&>svg]:size-5 text-sm px-1 rounded-full",
 				"40": "[&>svg]:size-5 text-sm px-1 rounded-full",

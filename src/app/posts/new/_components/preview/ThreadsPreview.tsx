@@ -28,7 +28,7 @@ export function ThreadsPreview({
           </span>
         </p>
       </div>
-      <p className="text-[15px] leading-normal break-words whitespace-pre-wrap">
+      <p className="text-prose leading-normal break-words whitespace-pre-wrap">
         {model.text || (
           <span className="text-muted-foreground">
             Your post will appear here...

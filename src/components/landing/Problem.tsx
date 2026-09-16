@@ -44,7 +44,7 @@ export function Problem() {
               key={pain.title}
               className="grid gap-1 border-b border-border py-4 sm:grid-cols-[220px_minmax(0,1fr)] sm:gap-6"
             >
-              <h3 className="text-[15px] font-medium">{pain.title}</h3>
+              <h3 className="text-prose font-medium">{pain.title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {pain.text}
               </p>

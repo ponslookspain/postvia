@@ -15,7 +15,7 @@ export function Hero() {
           <Badge variant="soft" className="gap-1.5 py-1 pr-3 pl-2.5">
             <span
               aria-hidden="true"
-              className="size-1.5 rounded-full bg-signal"
+              className="size-1.5 rounded-full bg-primary"
             />
             Instagram · Threads · TikTok · X
           </Badge>

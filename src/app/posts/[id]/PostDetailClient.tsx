@@ -575,7 +575,7 @@ export default function PostDetailPage({
                       onRemove={(mediaId) => void handleDeleteMedia(mediaId)}
                     />
                   )}
-                  <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                  <p className="text-prose leading-relaxed break-words whitespace-pre-wrap">
                     {post.text}
                   </p>
                   {post.status === "DRAFT" && (

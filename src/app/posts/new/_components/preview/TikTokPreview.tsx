@@ -81,7 +81,7 @@ export function TikTokPreview({
             </p>
           )}
           {privacy && (
-            <p className="text-[11px] text-white/70">Privacy: {privacy}</p>
+            <p className="text-meta text-white/70">Privacy: {privacy}</p>
           )}
         </div>
       </div>

@@ -420,14 +420,14 @@ export function BillingSection({
                 key={plan.id}
                 className={cn(
                   "h-full",
-                  recommended && "border-signal/30 bg-signal/10"
+                  recommended && "border-primary/30 bg-primary/10"
                 )}
               >
                 <CardHeader>
                   <div className="flex flex-wrap items-center gap-2">
                     <CardTitle>{plan.name}</CardTitle>
                     {recommended && (
-                      <Badge variant="strong" color="primary" className="border-signal/30 bg-signal/10 text-signal">
+                      <Badge variant="strong" color="primary" className="border-primary/30 bg-primary/10 text-primary">
                         Recommended
                       </Badge>
                     )}
@@ -450,7 +450,7 @@ export function BillingSection({
                           aria-hidden="true"
                           className={cn(
                             "mt-0.5 size-4 shrink-0",
-                            recommended ? "text-signal" : "text-muted-foreground"
+                            recommended ? "text-primary" : "text-muted-foreground"
                           )}
                         />
                         <span>{feature}</span>

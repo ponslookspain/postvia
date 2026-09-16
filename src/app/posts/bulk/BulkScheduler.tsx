@@ -899,7 +899,7 @@ export function BulkScheduler({
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Write something worth publishing..."
                   rows={3}
-                  className="min-h-24 text-[15px] leading-relaxed"
+                  className="min-h-24 text-prose leading-relaxed"
                 />
               </Field>
             </CardContent>
@@ -938,7 +938,7 @@ export function BulkScheduler({
               <FieldGroup>
               <div
                 aria-live="polite"
-                className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-[13px] leading-5 text-muted-foreground tabular-nums"
+                className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-label leading-5 text-muted-foreground tabular-nums"
               >
                 <CalendarClockIcon
                   aria-hidden="true"
@@ -1040,7 +1040,7 @@ export function BulkScheduler({
                             className={cn(
                               "h-6 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40",
                               active
-                                ? "border-signal/30 bg-signal/10 text-signal"
+                                ? "border-primary/30 bg-primary/10 text-primary"
                                 : "border-border bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground"
                             )}
                           >

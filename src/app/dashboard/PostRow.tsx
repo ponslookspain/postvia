@@ -63,7 +63,7 @@ export function PostRow({
           </span>
         )}
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] leading-snug break-words text-foreground line-clamp-2">
+          <span className="block text-prose leading-snug break-words text-foreground line-clamp-2">
             {post.text.trim() || "No caption yet"}
           </span>
           <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">

@@ -21,7 +21,7 @@ const badgeVariants = cva(
 			},
 			size: {
 				"20": "h-5 px-1 text-xs rounded-md [&_svg]:size-3",
-				"24": "h-6 px-1.5 text-[13px] rounded-md [&_svg]:size-3.5",
+				"24": "h-6 px-1.5 text-label rounded-md [&_svg]:size-3.5",
 				"28": "h-7 px-1.5 text-sm rounded-md [&_svg]:size-4",
 			},
 			color: {

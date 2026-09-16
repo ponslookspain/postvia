@@ -70,7 +70,7 @@ const selectTriggerVariants = cva(
 	{
 		variants: {
 			size: {
-				"28": "gap-0.5 h-7 px-2 py-1.5 text-[13px] rounded-md",
+				"28": "gap-0.5 h-7 px-2 py-1.5 text-label rounded-md",
 				"32": "gap-0.5 h-8 px-2 py-1.5 text-sm rounded-md",
 			// Radian default: h-9 follows the standard radius progression
 			// (36 → rounded-lg).

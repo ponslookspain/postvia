@@ -32,7 +32,7 @@ export function AccountsVisual() {
     >
       <div aria-hidden="true">
         <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3 md:px-5">
-          <p className="text-[15px] font-medium">Social accounts</p>
+          <p className="text-prose font-medium">Social accounts</p>
           <Badge variant="soft">Official OAuth</Badge>
         </div>
         <ul className="divide-y divide-border">
@@ -42,7 +42,7 @@ export function AccountsVisual() {
               className="flex items-center gap-3 px-4 py-3 md:px-5"
             >
               <Avatar className="size-8">
-                <AvatarFallback className="text-[11px]">
+                <AvatarFallback className="text-meta">
                   {row.user.replace("@", "").slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -98,7 +98,7 @@ export function ComposerVisual() {
         {/* Editor */}
         <div className="min-w-0 border-b border-border p-4 sm:p-5">
           <p className="text-xs font-medium text-muted-foreground">Channels · 4 selected</p>
-          <p className="mt-3 text-[15px] leading-relaxed">
+          <p className="mt-3 text-prose leading-relaxed">
             Morning launch is live — our biggest update yet. Here is
             everything that changed and why it matters for your week.
           </p>
@@ -113,7 +113,7 @@ export function ComposerVisual() {
               <span className="block truncate text-xs font-medium">
                 launch-day.mp4
               </span>
-              <span className="block text-[11px] text-muted-foreground">
+              <span className="block text-meta text-muted-foreground">
                 1 video · per-network rules apply
               </span>
             </span>
@@ -134,7 +134,7 @@ export function ComposerVisual() {
                   <span className="block truncate text-xs font-medium">
                     {row.user}
                   </span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
+                  <span className="block truncate text-meta text-muted-foreground">
                     {row.detail}
                   </span>
                 </span>
@@ -149,7 +149,7 @@ export function ComposerVisual() {
               <CalendarClockIcon className="size-3.5 text-muted-foreground" />
               Wed 09:00 · Europe/Madrid
             </p>
-            <span className="mt-2 flex h-8 items-center justify-center rounded-full bg-primary px-3 text-[13px] font-medium text-primary-foreground">
+            <span className="mt-2 flex h-8 items-center justify-center rounded-full bg-primary px-3 text-label font-medium text-primary-foreground">
               Schedule
             </span>
           </div>
@@ -234,7 +234,7 @@ function DayChip({ chip }: { chip: Chip }) {
   return (
     <span className="hidden h-6 min-w-0 items-center gap-1.5 rounded-md bg-muted/70 px-1.5 sm:flex">
       <StatusDot status={chip.status} />
-      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+      <span className="shrink-0 text-meta text-muted-foreground tabular-nums">
         {chip.time}
       </span>
       <span className="min-w-0 flex-1 truncate text-xs">{chip.title}</span>
@@ -273,7 +273,7 @@ export function CalendarVisual() {
           {WEEKDAYS.map((day) => (
             <span
               key={day}
-              className="px-1 py-1.5 text-center text-[11px] font-medium text-muted-foreground"
+              className="px-1 py-1.5 text-center text-meta font-medium text-muted-foreground"
             >
               <span className="sm:hidden">{day.slice(0, 1)}</span>
               <span className="hidden sm:inline">{day}</span>
@@ -288,13 +288,13 @@ export function CalendarVisual() {
                   key={di}
                   className={
                     "min-h-9 border-r border-border/70 p-0.5 last:border-r-0 sm:min-h-[4.5rem] sm:p-1" +
-                    (date.today ? " bg-signal/10" : "") +
+                    (date.today ? " bg-primary/10" : "") +
                     (date.dimmed ? " bg-muted/30" : "")
                   }
                 >
                   <span
                     className={
-                      "mx-auto flex size-5 items-center justify-center rounded-full text-[11px] tabular-nums sm:mx-0 sm:mb-0.5 " +
+                      "mx-auto flex size-5 items-center justify-center rounded-full text-meta tabular-nums sm:mx-0 sm:mb-0.5 " +
                       (date.today
                         ? "bg-primary font-medium text-primary-foreground"
                         : date.dimmed
@@ -315,7 +315,7 @@ export function CalendarVisual() {
                       <DayChip key={ci} chip={chip} />
                     ))}
                     {date.more != null && (
-                      <span className="px-1 text-[11px] text-muted-foreground">
+                      <span className="px-1 text-meta text-muted-foreground">
                         +{date.more} more
                       </span>
                     )}
@@ -338,7 +338,7 @@ export function PublishStatusCard() {
       className={shellClass}
     >
       <div aria-hidden="true" className="px-4 py-3.5 md:px-5">
-        <p className="text-[15px] font-medium">Launch day video</p>
+        <p className="text-prose font-medium">Launch day video</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Per-account status · retry only what failed
         </p>

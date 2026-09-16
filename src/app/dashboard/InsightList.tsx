@@ -39,7 +39,7 @@ export function InsightList({ insights }: { insights: Insight[] }) {
               <Link
                 href={insight.href}
                 className={cn(
-                  "shrink-0 rounded-sm text-[13px] font-medium transition-colors outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50",
+                  "shrink-0 rounded-sm text-label font-medium transition-colors outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50",
                   problem ? "text-error" : "text-warning"
                 )}
               >

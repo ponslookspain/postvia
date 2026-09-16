@@ -74,7 +74,7 @@ function FaqItem({
           id={`faq-button-${index}`}
           className="flex w-full items-center justify-between gap-4 rounded-sm py-4 text-left outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          <span className="text-[15px] font-medium">{question}</span>
+          <span className="text-prose font-medium">{question}</span>
           <ChevronDownIcon
             aria-hidden="true"
             className={cn(

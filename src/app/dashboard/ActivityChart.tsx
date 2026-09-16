@@ -84,7 +84,7 @@ export function ActivityChart({ weeks }: { weeks: WeekBucket[] }) {
                     x={x + barWidth / 2}
                     y={height - 4}
                     textAnchor="middle"
-                    className="fill-muted-foreground text-[10px]"
+                    className="fill-muted-foreground text-micro"
                   >
                     {week.label}
                   </text>

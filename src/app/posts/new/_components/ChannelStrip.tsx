@@ -73,7 +73,7 @@ export function ChannelStrip({
             size="sm"
             nativeButton={false}
             render={<Link href="/accounts" />}
-            className="h-auto p-0 text-[13px]"
+            className="h-auto p-0 text-label"
           >
             Manage
           </Button>
@@ -134,13 +134,13 @@ export function ChannelStrip({
                         "size-11",
                         selected &&
                           !accountDisabled &&
-                          "ring-2 ring-signal ring-offset-2 ring-offset-background"
+                          "ring-2 ring-primary ring-offset-2 ring-offset-background"
                       )}
                     >
                       <AvatarFallback
                         className={cn(
                           selected && !accountDisabled
-                            ? "bg-signal/10 text-signal"
+                            ? "bg-primary/10 text-primary"
                             : "bg-muted text-muted-foreground"
                         )}
                       >
@@ -149,7 +149,7 @@ export function ChannelStrip({
                       {selected && customized && (
                         <AvatarBadge
                           aria-hidden="true"
-                          className="bg-signal text-signal-foreground"
+                          className="bg-primary text-primary-foreground"
                         />
                       )}
                     </Avatar>

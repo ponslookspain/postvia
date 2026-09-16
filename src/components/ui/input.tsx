@@ -27,7 +27,7 @@ const inputVariants = cva(
 	{
 		variants: {
 			size: {
-				"28": "h-7 text-[13px] px-2 rounded-md file:pe-1.5 file:me-1.5",
+				"28": "h-7 text-label px-2 rounded-md file:pe-1.5 file:me-1.5",
 				"32": "h-8 text-sm px-2 rounded-md file:pe-3 file:me-3",
 			// Radian default: h-9 follows the standard radius progression
 			// (36 → rounded-lg, like 40/44/48).
@@ -48,7 +48,7 @@ const inputAddonVariants = cva(
 	{
 		variants: {
 			size: {
-				"28": "h-7 min-w-7 text-[13px]  px-2 rounded-md [&_svg:not([class*=size-])]:size-4",
+				"28": "h-7 min-w-7 text-label  px-2 rounded-md [&_svg:not([class*=size-])]:size-4",
 				"32": "h-8 min-w-8 text-sm px-2  rounded-md [&_svg:not([class*=size-])]:size-4.5",
 				"36": "h-9 min-w-9 text-sm px-2.5 rounded-lg [&_svg:not([class*=size-])]:size-5",
 				"40": "h-10 min-w-10 text-sm px-3 rounded-lg [&_svg:not([class*=size-])]:size-5",
