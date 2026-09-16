@@ -307,7 +307,7 @@ export default function AccountsContent({
                   <div className="flex items-center gap-3">
                     <span
                       aria-hidden="true"
-                      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-accent text-primary-text"
+                      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary"
                     >
                       <PlatformIcon
                         platform={config.platform}
@@ -346,7 +346,7 @@ export default function AccountsContent({
                         return (
                           <li
                             key={account.id}
-                            className="flex items-center gap-3 rounded-lg border border-soft bg-fill1 px-3 py-2"
+                            className="flex items-center gap-3 rounded-lg border border-accent bg-muted px-3 py-2"
                           >
                             <Avatar className="size-8 shrink-0">
                               <AvatarFallback>

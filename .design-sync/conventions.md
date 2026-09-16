@@ -47,9 +47,9 @@ are defined for every one.
 | Status | `bg-success`, `bg-warning`, `bg-error`, `bg-info` | dots and badges only |
 
 Never write a hex, a Tailwind palette colour (`bg-red-500`), or `bg-white` /
-`text-black`. Radian aliases (`bg-bg`, `bg-fill1`, `text-fg`, `text-fg-secondary`,
-`bg-elevation-level1`) also resolve — the primitives use them internally — but
-they are a compatibility layer, not canonical. Prefer the table above.
+`text-black`. There is no Radian alias layer any more (`bg-bg`, `bg-fill1`,
+`text-fg` and friends were removed) — every primitive uses the table above
+directly, and so should anything you build.
 
 Type: `font-sans` (Inter) is the default; `font-heading` (DM Sans) for headings;
 `font-mono` (Geist Mono). Page title `text-2xl leading-8 font-semibold

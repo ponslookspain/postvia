@@ -2,10 +2,12 @@
    PostVIA Design System — 2. SEMANTIC TOKENS
    ----------------------------------------------------------------------------
    THIS FILE IS THE CANONICAL SOURCE OF TRUTH for PostVIA colour, surface and
-   border meaning. Components and pages consume these names — via the Tailwind
-   utilities exposed in the `@theme inline` block at the bottom — and nothing
-   else. `compat-radian.css` is an alias layer on top of this file; it is
-   deliberately NOT canonical and must never hold a value of its own.
+   border meaning. Components and pages consume these names directly — via
+   the Tailwind utilities exposed in the `@theme inline` block at the bottom
+   — and nothing else. There used to be a `compat-radian.css` alias layer on
+   top of this file, translating Radian's own token vocabulary
+   (`bg-fill1`, `text-fg-secondary`, …) onto these names; it has been
+   removed now that every call site speaks PostVIA's vocabulary directly.
 
    Two rules keep the layer honest:
      1. A value is written down exactly once. Everything that shares it is a
@@ -94,6 +96,43 @@
 	--error-foreground: oklch(1 0 0);
 	--info: oklch(0.61 0.203 255.637);
 	--info-foreground: oklch(1 0 0);
+
+	/* —— Status sub-steps —————————————————————————————————————————————————
+	   Fill/focus/border/hover chrome for status-coloured controls (e.g. a
+	   status `Button` variant). These formalise values already shipped
+	   through the Radian compatibility layer — each aliases the matching
+	   foundation primitive (`foundations.css`), so light/dark and every
+	   computed pixel stay exactly as they were; only the name moves from
+	   Radian's vocabulary (`--color-emerald-accent`) to PostVIA's
+	   (`--success-accent`). `info` also gets its own `-text`: one step
+	   darker than `--info` itself, for ink on a light info fill. */
+	--success-accent: var(--color-emerald-accent);
+	--success-focus: var(--color-emerald-focus);
+	--success-border: var(--color-emerald-border);
+	--success-hover: var(--color-emerald-hover);
+	--warning-accent: var(--color-amber-accent);
+	--warning-focus: var(--color-amber-focus);
+	--warning-border: var(--color-amber-border);
+	--warning-hover: var(--color-amber-hover);
+	--error-accent: var(--color-red-accent);
+	--error-focus: var(--color-red-focus);
+	--error-border: var(--color-red-border);
+	--error-hover: var(--color-red-hover);
+	--info-text: var(--color-light-blue-text);
+	--info-accent: var(--color-light-blue-accent);
+	--info-focus: var(--color-light-blue-focus);
+	--info-border: var(--color-light-blue-border);
+	--info-hover: var(--color-light-blue-hover);
+
+	/* —— Overlay ——————————————————————————————————————————————————————————
+	   Translucent ink washes for hover/press states and hairlines drawn as a
+	   tint instead of a flat fill. Named by opacity since there is no
+	   qualitative difference between the steps, only strength. Promoted
+	   from the Radian compatibility layer's `alpha` / `fill*-alpha` family
+	   — same `color-mix` recipe, same computed colour. */
+	--overlay-4: color-mix(in oklch, var(--foreground) 4%, transparent);
+	--overlay-8: color-mix(in oklch, var(--foreground) 8%, transparent);
+	--overlay-12: color-mix(in oklch, var(--foreground) 12%, transparent);
 
 	/* —— Navigation ———————————————————————————————————————————————————————
 	   The sidebar rail is a shade off the page so rail and content are told
@@ -219,6 +258,30 @@
 	--color-error-foreground: var(--error-foreground);
 	--color-info: var(--info);
 	--color-info-foreground: var(--info-foreground);
+
+	/* Status sub-steps */
+	--color-success-accent: var(--success-accent);
+	--color-success-focus: var(--success-focus);
+	--color-success-border: var(--success-border);
+	--color-success-hover: var(--success-hover);
+	--color-warning-accent: var(--warning-accent);
+	--color-warning-focus: var(--warning-focus);
+	--color-warning-border: var(--warning-border);
+	--color-warning-hover: var(--warning-hover);
+	--color-error-accent: var(--error-accent);
+	--color-error-focus: var(--error-focus);
+	--color-error-border: var(--error-border);
+	--color-error-hover: var(--error-hover);
+	--color-info-text: var(--info-text);
+	--color-info-accent: var(--info-accent);
+	--color-info-focus: var(--info-focus);
+	--color-info-border: var(--info-border);
+	--color-info-hover: var(--info-hover);
+
+	/* Overlay */
+	--color-overlay-4: var(--overlay-4);
+	--color-overlay-8: var(--overlay-8);
+	--color-overlay-12: var(--overlay-12);
 
 	/* Navigation */
 	--color-sidebar: var(--sidebar);

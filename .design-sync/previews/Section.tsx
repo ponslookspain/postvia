@@ -24,7 +24,7 @@ const caption: React.CSSProperties = {
   margin: "0 0 12px",
   fontSize: 12,
   lineHeight: "16px",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
 };
 
 const rowStyle: React.CSSProperties = {
@@ -52,21 +52,21 @@ export function RuleSeparatedRows() {
       />
       <div style={rowStyle}>
         <span style={{ flex: 1, minWidth: 0 }}>Spring launch teaser</span>
-        <span style={{ fontSize: 13, color: "var(--color-fg-tertiary)" }}>
+        <span style={{ fontSize: 13, color: "var(--color-muted-foreground)" }}>
           tomorrow at 09:00
         </span>
         <StatusBadge status="SCHEDULED" />
       </div>
       <div style={rowStyle}>
         <span style={{ flex: 1, minWidth: 0 }}>Behind the scenes clip</span>
-        <span style={{ fontSize: 13, color: "var(--color-fg-tertiary)" }}>
+        <span style={{ fontSize: 13, color: "var(--color-muted-foreground)" }}>
           Saturday at 14:00
         </span>
         <StatusBadge status="SCHEDULED" />
       </div>
       <div style={rowStyle}>
         <span style={{ flex: 1, minWidth: 0 }}>Hiring post — designer</span>
-        <span style={{ fontSize: 13, color: "var(--color-fg-tertiary)" }}>
+        <span style={{ fontSize: 13, color: "var(--color-muted-foreground)" }}>
           in 2 weeks
         </span>
         <StatusBadge status="DRAFT" />
@@ -130,7 +130,7 @@ export function LabelledSection() {
             padding: "12px 0",
             borderTop: "1px solid var(--border)",
             fontSize: 13,
-            color: "var(--color-fg-tertiary)",
+            color: "var(--color-muted-foreground)",
           }}
         >
           {[

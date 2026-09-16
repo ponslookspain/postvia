@@ -27,18 +27,18 @@ const bannerVariants = cva(
 			},
 			variant: {
 				strong: "[&_[data-slot=banner-close]]:text-[current]",
-				soft: "[&_[data-slot=banner-close]]:text-[current] [&_[data-slot=banner-title]]:text-fg [&_[data-slot=banner-description]]:text-fg",
+				soft: "[&_[data-slot=banner-close]]:text-[current] [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-foreground",
 				outline:
-					"border border-soft border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-fg-secondary [&_[data-slot=banner-title]]:text-fg [&_[data-slot=banner-description]]:text-fg-secondary",
+					"border border-accent border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-muted-foreground [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-muted-foreground",
 			},
 		},
 		compoundVariants: [
 			// Soft
-			{ color: "neutral", variant: "soft", className: "bg-fill2" },
+			{ color: "neutral", variant: "soft", className: "bg-accent" },
 			{
 				color: "primary",
 				variant: "soft",
-				className: "bg-primary-accent text-primary-text",
+				className: "bg-accent text-primary",
 			},
 			{
 				color: "info",
@@ -48,54 +48,54 @@ const bannerVariants = cva(
 			{
 				color: "success",
 				variant: "soft",
-				className: "bg-success-accent text-success-text",
+				className: "bg-success-accent text-success",
 			},
 			{
 				color: "error",
 				variant: "soft",
-				className: "bg-error-accent text-error-text",
+				className: "bg-error-accent text-error",
 			},
 			{
 				color: "warning",
 				variant: "soft",
 				className:
-					"bg-warning-accent text-warning-text [&_[data-slot=banner-icon]]:text-warning-border",
+					"bg-warning-accent text-warning [&_[data-slot=banner-icon]]:text-warning-border",
 			},
 
 			// Strong
 			{
 				color: "neutral",
 				variant: "strong",
-				className: "bg-black-inverse text-white-inverse",
+				className: "bg-foreground text-background",
 			},
 		{
 			color: "primary",
 			variant: "strong",
-			className: "bg-primary text-primary-fg",
+			className: "bg-primary text-primary-foreground",
 		},
-		{ color: "info", variant: "strong", className: "bg-info text-info-fg" },
+		{ color: "info", variant: "strong", className: "bg-info text-info-foreground" },
 		{
 			color: "warning",
 			variant: "strong",
-			className: "bg-warning text-warning-fg",
+			className: "bg-warning text-warning-foreground",
 		},
-		{ color: "error", variant: "strong", className: "bg-error text-error-fg" },
+		{ color: "error", variant: "strong", className: "bg-error text-error-foreground" },
 		{
 			color: "success",
 			variant: "strong",
-			className: "bg-success text-success-fg",
+			className: "bg-success text-success-foreground",
 		},
 
 			// Outline
 			{
 				color: "neutral",
 				variant: "outline",
-				className: "bg-transparent text-fg ",
+				className: "bg-transparent text-foreground ",
 			},
 			{
 				color: "primary",
 				variant: "outline",
-				className: "bg-transparent text-primary-text",
+				className: "bg-transparent text-primary",
 			},
 			{
 				color: "info",
@@ -105,17 +105,17 @@ const bannerVariants = cva(
 			{
 				color: "success",
 				variant: "outline",
-				className: "bg-transparent text-success-text",
+				className: "bg-transparent text-success",
 			},
 			{
 				color: "error",
 				variant: "outline",
-				className: "bg-transparent text-error-text",
+				className: "bg-transparent text-error",
 			},
 			{
 				color: "warning",
 				variant: "outline",
-				className: "bg-transparent text-warning-text",
+				className: "bg-transparent text-warning",
 			},
 		],
 		defaultVariants: {

@@ -1,7 +1,7 @@
 import { Progress } from "postvia";
 
 /**
- * Progress previews. Progress is a 6px track (`bg-fill3`) with a
+ * Progress previews. Progress is a 6px track (`bg-accent`) with a
  * `bg-primary` indicator — the only place the brand hue appears outside a
  * primary action. The plan-usage cell is the dashboard's own composition
  * (`src/app/dashboard/page.tsx`): a sentence on the left, a short bar on

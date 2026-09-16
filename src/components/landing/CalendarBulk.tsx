@@ -74,7 +74,7 @@ export function CalendarBulk() {
                   {week.map((entry) => (
                     <li
                       key={entry.title}
-                      className="flex items-center justify-between gap-3 rounded-xl bg-bg px-3 py-2.5"
+                      className="flex items-center justify-between gap-3 rounded-xl bg-background px-3 py-2.5"
                     >
                       <span className="min-w-0">
                         <span className="block text-xs text-muted-foreground">

@@ -23,7 +23,7 @@ const caption: React.CSSProperties = {
   margin: "0 0 10px",
   fontSize: 12,
   lineHeight: "16px",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
 };
 
 const rowStyle: React.CSSProperties = {
@@ -48,7 +48,7 @@ function PostRow({
   return (
     <div style={rowStyle}>
       <span style={{ minWidth: 0, flex: 1 }}>{title}</span>
-      <span style={{ color: "var(--color-fg-tertiary)", fontSize: 13 }}>
+      <span style={{ color: "var(--color-muted-foreground)", fontSize: 13 }}>
         {when}
       </span>
       <StatusBadge status={status} />
@@ -137,13 +137,13 @@ export function NarrowForm() {
             />
             <div style={rowStyle}>
               <span>Connected accounts</span>
-              <span style={{ color: "var(--color-fg-tertiary)" }}>
+              <span style={{ color: "var(--color-muted-foreground)" }}>
                 6 of 10
               </span>
             </div>
             <div style={rowStyle}>
               <span>Posts this month</span>
-              <span style={{ color: "var(--color-fg-tertiary)" }}>
+              <span style={{ color: "var(--color-muted-foreground)" }}>
                 48 of 500
               </span>
             </div>
@@ -182,7 +182,7 @@ export function WidthScale() {
               <span style={{ fontSize: 14, fontWeight: 500 }}>
                 size=&quot;{name}&quot;
               </span>
-              <span style={{ fontSize: 12, color: "var(--color-fg-tertiary)" }}>
+              <span style={{ fontSize: 12, color: "var(--color-muted-foreground)" }}>
                 {measure}
               </span>
             </div>
@@ -199,7 +199,7 @@ export function WidthScale() {
               style={{
                 margin: "6px 0 0",
                 fontSize: 12,
-                color: "var(--color-fg-tertiary)",
+                color: "var(--color-muted-foreground)",
               }}
             >
               {pages}

@@ -77,12 +77,12 @@ const avatarVariants = cva(
 )
 
 const avatarStatusVariants = cva(
-	"absolute z-10 border-bg rounded-full box-content",
+	"absolute z-10 border-background rounded-full box-content",
 	{
 		variants: {
 			variant: {
 				online: "bg-success",
-				offline: "bg-fg-disabled",
+				offline: "bg-muted-foreground",
 				busy: "bg-warning",
 				away: "bg-info",
 			},

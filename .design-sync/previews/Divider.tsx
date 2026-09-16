@@ -1,7 +1,7 @@
 import { Divider } from "postvia";
 
 /**
- * Divider previews. Divider is a Radix Separator with one job: a `bg-soft-alpha`
+ * Divider previews. Divider is a Radix Separator with one job: a `bg-overlay-8`
  * hairline, full-width when horizontal and full-height when vertical. PostVIA
  * separates blocks by tone rather than by drawn boxes, so the divider only shows
  * up where two things genuinely share a surface — inside a composer card,
@@ -21,7 +21,7 @@ const stage: React.CSSProperties = {
 const caption: React.CSSProperties = {
   fontSize: 12,
   lineHeight: "16px",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
 };
 
 export function SectionSplit() {

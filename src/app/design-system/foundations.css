@@ -5,7 +5,7 @@
    meaning is assigned one layer up, in `semantic.css`.
 
    Layer order (see `globals.css`):
-     foundations.css  → semantic.css → compat-radian.css → @layer base
+     foundations.css  → semantic.css → @layer base
 
    Canonical for:  Colors (primitives) · Typography · Spacing · Radius ·
                    Motion.  (Surfaces, Borders and Elevation are tone

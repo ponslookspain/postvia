@@ -9,30 +9,36 @@ the *rules*; that one is the *parts*.
 
 ## Canonical layer
 
-The design system is three files, imported in dependency order from
+The design system is two files, imported in dependency order from
 `src/app/globals.css`:
 
 ```
 src/app/design-system/foundations.css      1. raw scales
 src/app/design-system/semantic.css         2. CANONICAL PostVIA tokens
-src/app/design-system/compat-radian.css    3. Radian aliases — NOT canonical
 ```
 
 `semantic.css` is the source of truth: background, surface, panel,
 foreground, muted, border, primary, success, warning, error, info,
-navigation, in both themes. `compat-radian.css` translates those tokens into
-Radian's vocabulary (`bg`, `fill1`-`fill4`, the `fg` ramp, `<family>-fg`…)
-so the primitives in `src/components/ui` keep working. It holds no values
-and is scheduled for removal; never read it as the design system, and never
-put a value in it.
+navigation, in both themes. Every component and page consumes these names
+directly (`bg-panel`, `text-muted-foreground`, `border-error`, …) — there is
+no alias layer between them. There used to be a third file,
+`compat-radian.css`, translating those names into Radian's own vocabulary
+(`bg`, `fill1`-`fill4`, the `fg` ramp, `<family>-fg`…) so the RadianUI-
+generated primitives in `src/components/ui` could keep their original
+classnames; it has been removed now that every call site was migrated onto
+the canonical names (see `docs/design-tokens.md`, "Radian removal", for the
+full before/after mapping).
 
 ## Base
 
-- **Radian UI** (`default` style, `components.json`), Tailwind v4,
-  Radix UI primitives, Lucide icons, `cn()` for conditional classes.
-- `components.json` pins the Radian configuration (paths, aliases,
-  icon library); primitives live in `src/components/ui`, PostVIA
-  custom components (`Field`, `Toast`, avatar extensions) beside them.
+- **Radian UI** (`default` style) originally generated the primitives'
+  structure, Tailwind v4 supplies styling, Radix UI (`@radix-ui/react-*`)
+  supplies accessibility behaviour, Lucide supplies icons, `cn()` handles
+  conditional classes.
+- Primitives live in `src/components/ui`, PostVIA custom components
+  (`Field`, `Toast`, avatar extensions) beside them. There is no
+  `components.json` any more — it was the RadianUI generator's config,
+  dead weight once nothing in the repo runs that generator.
 
 ## Color philosophy
 

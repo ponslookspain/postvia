@@ -30,7 +30,7 @@ export function InsightList({ insights }: { insights: Insight[] }) {
                 aria-hidden="true"
                 className={cn(
                   "size-4 shrink-0",
-                  problem ? "text-error-text" : "text-warning"
+                  problem ? "text-error" : "text-warning"
                 )}
               />
               <span className="min-w-0">{insight.text}</span>
@@ -40,7 +40,7 @@ export function InsightList({ insights }: { insights: Insight[] }) {
                 href={insight.href}
                 className={cn(
                   "shrink-0 rounded-sm text-[13px] font-medium transition-colors outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50",
-                  problem ? "text-error-text" : "text-warning"
+                  problem ? "text-error" : "text-warning"
                 )}
               >
                 {insight.action ?? "Review"}

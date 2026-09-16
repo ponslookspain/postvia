@@ -51,7 +51,7 @@ export function SignIn() {
             margin: 0,
             textAlign: "center",
             fontSize: 13,
-            color: "var(--color-fg-tertiary)",
+            color: "var(--color-muted-foreground)",
           }}
         >
           New here? Create an account.

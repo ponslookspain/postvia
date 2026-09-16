@@ -8,7 +8,7 @@ function Skeleton({ className, ...props }: SkeletonProps) {
 		data-slot="skeleton"
 		// PostVIA compat: preserve the previous default rounding. Explicit
 		// rounded-* in className still wins via tailwind-merge.
-		className={cn("bg-fill2 animate-pulse rounded-xl", className)}
+		className={cn("bg-accent animate-pulse rounded-xl", className)}
 			{...props}></div>
 	)
 }

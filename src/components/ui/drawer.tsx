@@ -45,7 +45,7 @@ export type DrawerCloseProps = {
 }
 
 const drawerVariants = cva(
-	"fixed z-50 bg-bg flex flex-col gap-5 overflow-hidden",
+	"fixed z-50 bg-background flex flex-col gap-5 overflow-hidden",
 	{
 		variants: {
 			variant: {
@@ -255,7 +255,7 @@ function DrawerTitle({ children, className }: DrawerTitleProps) {
 function DrawerDescription({ children, className }: DrawerDescriptionProps) {
 	return (
 		<DrawerPrimitives.Description
-			className={cn("text-fg-secondary gap-1 text-sm", className)}>
+			className={cn("text-muted-foreground gap-1 text-sm", className)}>
 			{children}
 		</DrawerPrimitives.Description>
 	)

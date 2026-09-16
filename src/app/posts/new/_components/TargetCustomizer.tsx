@@ -63,7 +63,7 @@ export function TargetCustomizer({
     " for " +
     model.label;
   return (
-    <div id={anchorId} className="scroll-mt-24 rounded-lg bg-bg p-3">
+    <div id={anchorId} className="scroll-mt-24 rounded-lg bg-background p-3">
       <FieldGroup className="gap-3">
         {model.platform === "TIKTOK" ? (
           <>

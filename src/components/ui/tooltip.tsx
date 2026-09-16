@@ -17,8 +17,8 @@ const tooltipContentVariants = cva(
 	{
 		variants: {
 			theme: {
-				light: "bg-elevation-level1 text-fg-secondary border border-border",
-				default: "bg-black-inverse text-white-inverse",
+				light: "bg-elevation-raised text-muted-foreground border border-border",
+				default: "bg-foreground text-background",
 			},
 		},
 		defaultVariants: {
@@ -69,7 +69,7 @@ function TooltipContent({
 					data-theme={theme}
 					width={12}
 					height={7}
-					className="data-[theme=light]:fill-elevation-level1 data-[theme=default]:fill-black-inverse -mt-0.5 rounded-md data-[theme=light]:drop-shadow-[0_1px_0_var(--color-border)]"
+					className="data-[theme=light]:fill-elevation-raised data-[theme=default]:fill-foreground -mt-0.5 rounded-md data-[theme=light]:drop-shadow-[0_1px_0_var(--color-border)]"
 				/>
 			)}
 		</TooltipPrimitive.Content>

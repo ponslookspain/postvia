@@ -15,7 +15,7 @@ const SELECTED = new Date(2026, 8, 18);
 const caption: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.2,
-  color: "var(--color-fg-tertiary, #6b7280)",
+  color: "var(--color-muted-foreground, #6b7280)",
 };
 
 const stack: React.CSSProperties = {

@@ -4,7 +4,7 @@
 /* ============================================================================
    PostVIA Design System — entry point
    ----------------------------------------------------------------------------
-   The design system is three files, imported in dependency order. Read them
+   The design system is two files, imported in dependency order. Read them
    in this order too; `docs/design-tokens.md` is the written companion.
 
      1. foundations.css     raw scales — colour primitives, typography,
@@ -12,16 +12,17 @@
      2. semantic.css        CANONICAL PostVIA tokens: background, surface,
                             panel, foreground, muted, border, primary,
                             success, warning, error, info, navigation
-     3. compat-radian.css   alias layer that lets the Radian primitives in
-                            `src/components/ui` speak their own token names.
-                            NOT canonical — holds no values
+
+   `src/components/ui` (and every call site) speaks this vocabulary directly.
+   There is no Radian alias layer any more — `compat-radian.css` was removed
+   once every consumer was migrated onto the names above (see
+   `docs/design-tokens.md`, "Radian removal").
 
    What stays in this file: the `dark` variant, base-layer resets and the
    keyframes/reduced-motion rules. No token may be defined here.
    ========================================================================= */
 @import "./design-system/foundations.css";
 @import "./design-system/semantic.css";
-@import "./design-system/compat-radian.css";
 
 @custom-variant dark (&:is(.dark *));
 

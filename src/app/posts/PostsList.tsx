@@ -375,7 +375,7 @@ export function PostsList({
             {visible.map((post) => (
               <li
                 key={post.id}
-                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-fill1-alpha md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4 md:px-4 md:py-3.5"
+                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-overlay-4 md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4 md:px-4 md:py-3.5"
               >
                 <Link
                   href={`/posts/${post.id}`}
@@ -478,7 +478,7 @@ export function PostsList({
                     {loadingMore ? "Loading…" : "Load more"}
                   </Button>
                   {loadError && (
-                    <p role="alert" className="text-sm text-error-text">
+                    <p role="alert" className="text-sm text-error">
                       {loadError}
                     </p>
                   )}

@@ -136,7 +136,7 @@ export function Sidebar({
           <div className="px-3 pt-1 pb-2">
             <Link
               href="/billing"
-              className="block rounded-xl bg-bg p-3 outline-none transition-colors hover:bg-fill1 focus-visible:ring-2 focus-visible:ring-primary-focus"
+              className="block rounded-xl bg-background p-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
             >
               <p className="flex items-center gap-1.5 text-sm leading-5 font-medium">
                 <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
@@ -145,7 +145,7 @@ export function Sidebar({
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 More posts, more accounts and Bulk scheduling.
               </p>
-              <p className="mt-2 text-xs leading-4 font-medium text-primary-text underline underline-offset-4">
+              <p className="mt-2 text-xs leading-4 font-medium text-primary underline underline-offset-4">
                 View plans
               </p>
             </Link>
@@ -159,7 +159,7 @@ export function Sidebar({
           <DropdownMenuTrigger
             aria-label="Account menu"
             className={cn(
-              "flex w-full items-center rounded-lg outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-primary-focus",
+              "flex w-full items-center rounded-lg outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
               collapsed ? "justify-center p-1" : "gap-2.5 px-1.5 py-1.5"
             )}
           >
@@ -241,7 +241,7 @@ export function Sidebar({
             <DropdownMenuDivider />
             <DropdownMenuItem
               onSelect={() => void handleSignOut()}
-              className="text-error-text [&_svg]:text-error-text"
+              className="text-error [&_svg]:text-error"
             >
               <LogOutIcon aria-hidden="true" />
               Sign out

@@ -40,13 +40,13 @@ const stage: React.CSSProperties = {
 
 const caption: React.CSSProperties = {
   font: "500 12px/1.4 var(--font-body)",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
   letterSpacing: "0.02em",
 };
 
 const panel: React.CSSProperties = {
   font: "400 14px/1.6 var(--font-body)",
-  color: "var(--color-fg-secondary)",
+  color: "var(--color-muted-foreground)",
   paddingTop: 4,
 };
 

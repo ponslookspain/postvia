@@ -11,7 +11,7 @@ const caption: React.CSSProperties = {
   margin: "0 0 12px",
   fontSize: 12,
   lineHeight: "16px",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
 };
 
 export function LoadFailed() {

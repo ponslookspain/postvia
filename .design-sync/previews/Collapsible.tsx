@@ -37,10 +37,10 @@ const rail: React.CSSProperties = {
   width: 256,
   padding: 8,
   borderRadius: 12,
-  background: "var(--color-fill1)",
+  background: "var(--color-muted)",
   border: "1px solid var(--color-border)",
   font: "400 14px/1.4 var(--font-body)",
-  color: "var(--color-fg)",
+  color: "var(--color-foreground)",
 };
 
 const triggerRow: React.CSSProperties = {
@@ -54,7 +54,7 @@ const triggerRow: React.CSSProperties = {
   borderRadius: 9999,
   background: "transparent",
   font: "500 14px/1 var(--font-body)",
-  color: "var(--color-fg)",
+  color: "var(--color-foreground)",
   cursor: "pointer",
   textAlign: "left",
 };
@@ -68,19 +68,19 @@ const subRow: React.CSSProperties = {
   marginLeft: 22,
   borderRadius: 9999,
   font: "400 13px/1 var(--font-body)",
-  color: "var(--color-fg-secondary)",
+  color: "var(--color-muted-foreground)",
 };
 
 const icon: React.CSSProperties = {
   width: 16,
   height: 16,
   flexShrink: 0,
-  color: "var(--color-fg-secondary)",
+  color: "var(--color-muted-foreground)",
 };
 
 const caption: React.CSSProperties = {
   font: "500 12px/1.4 var(--font-body)",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
   letterSpacing: "0.02em",
   marginBottom: 8,
 };
@@ -171,7 +171,7 @@ export function FilterDisclosure() {
         style={{
           borderRadius: 12,
           border: "1px solid var(--color-border)",
-          background: "var(--color-bg)",
+          background: "var(--color-background)",
           padding: 12,
         }}
       >
@@ -199,16 +199,16 @@ export function FilterDisclosure() {
                 font: "400 13px/1.4 var(--font-body)",
               }}
             >
-              <dt style={{ color: "var(--color-fg-tertiary)" }}>Channel</dt>
-              <dd style={{ margin: 0, color: "var(--color-fg)" }}>
+              <dt style={{ color: "var(--color-muted-foreground)" }}>Channel</dt>
+              <dd style={{ margin: 0, color: "var(--color-foreground)" }}>
                 Instagram, TikTok
               </dd>
-              <dt style={{ color: "var(--color-fg-tertiary)" }}>Window</dt>
-              <dd style={{ margin: 0, color: "var(--color-fg)" }}>
+              <dt style={{ color: "var(--color-muted-foreground)" }}>Window</dt>
+              <dd style={{ margin: 0, color: "var(--color-foreground)" }}>
                 Next 14 days
               </dd>
-              <dt style={{ color: "var(--color-fg-tertiary)" }}>Author</dt>
-              <dd style={{ margin: 0, color: "var(--color-fg)" }}>Anyone</dd>
+              <dt style={{ color: "var(--color-muted-foreground)" }}>Author</dt>
+              <dd style={{ margin: 0, color: "var(--color-foreground)" }}>Anyone</dd>
             </dl>
           </CollapsibleContent>
         </Collapsible>

@@ -20,7 +20,7 @@ const stage: React.CSSProperties = {
 const caption: React.CSSProperties = {
   fontSize: 12,
   lineHeight: "16px",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
 };
 
 const STATUSES: Array<[string, string]> = [
@@ -66,7 +66,7 @@ export function CalendarChips() {
             gap: 8,
             padding: "6px 8px",
             borderRadius: 8,
-            background: "var(--color-fill2, rgba(0,0,0,0.04))",
+            background: "var(--color-accent, rgba(0,0,0,0.04))",
             minWidth: 0,
           }}
         >
@@ -78,7 +78,7 @@ export function CalendarChips() {
             style={{
               fontSize: 12,
               lineHeight: "16px",
-              color: "var(--color-fg-tertiary)",
+              color: "var(--color-muted-foreground)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",

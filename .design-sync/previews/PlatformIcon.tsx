@@ -25,7 +25,7 @@ const stage: React.CSSProperties = {
 const caption: React.CSSProperties = {
   fontSize: 12,
   lineHeight: "16px",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
 };
 
 const PLATFORMS: Array<[string, string]> = [

@@ -103,7 +103,7 @@ const wordmark: React.CSSProperties = {
   margin: 0,
   font: "600 18px/1.2 var(--font-heading)",
   letterSpacing: "-0.01em",
-  color: "var(--color-fg)",
+  color: "var(--color-foreground)",
 };
 
 const headerStyle: React.CSSProperties = {
@@ -177,7 +177,7 @@ function AccountFooter({ collapsed = false }: { collapsed?: boolean }) {
                 minWidth: 0,
                 flex: 1,
                 font: "500 14px/1.35 var(--font-body)",
-                color: "var(--color-fg)",
+                color: "var(--color-foreground)",
               }}
             >
               <p style={{ margin: 0 }}>Mara Oyelaran</p>
@@ -185,7 +185,7 @@ function AccountFooter({ collapsed = false }: { collapsed?: boolean }) {
                 style={{
                   margin: 0,
                   font: "400 12px/1.35 var(--font-body)",
-                  color: "var(--color-fg-tertiary)",
+                  color: "var(--color-muted-foreground)",
                 }}
               >
                 mara@postvia.app
@@ -197,7 +197,7 @@ function AccountFooter({ collapsed = false }: { collapsed?: boolean }) {
                 width: 16,
                 height: 16,
                 flexShrink: 0,
-                color: "var(--color-fg-tertiary)",
+                color: "var(--color-muted-foreground)",
               }}
             />
           </>
@@ -216,7 +216,7 @@ function InsetPage() {
             margin: 0,
             font: "600 22px/1.2 var(--font-heading)",
             letterSpacing: "-0.01em",
-            color: "var(--color-fg)",
+            color: "var(--color-foreground)",
           }}
         >
           Posts
@@ -225,7 +225,7 @@ function InsetPage() {
           style={{
             margin: "6px 0 20px",
             font: "400 14px/1.5 var(--font-body)",
-            color: "var(--color-fg-secondary)",
+            color: "var(--color-muted-foreground)",
           }}
         >
           Everything you have drafted, scheduled or published.
@@ -243,8 +243,8 @@ function InsetPage() {
                 borderRadius: 12,
                 padding: "12px 14px",
                 font: "400 14px/1.4 var(--font-body)",
-                color: "var(--color-fg)",
-                background: "var(--color-bg)",
+                color: "var(--color-foreground)",
+                background: "var(--color-background)",
               }}
             >
               {t}
@@ -277,7 +277,7 @@ export function AppShellExpanded() {
               <div
                 style={{
                   borderRadius: 12,
-                  background: "var(--color-bg)",
+                  background: "var(--color-background)",
                   padding: 12,
                 }}
               >
@@ -288,7 +288,7 @@ export function AppShellExpanded() {
                     alignItems: "center",
                     gap: 6,
                     font: "500 14px/1.35 var(--font-body)",
-                    color: "var(--color-fg)",
+                    color: "var(--color-foreground)",
                   }}
                 >
                   <SparklesIcon
@@ -301,7 +301,7 @@ export function AppShellExpanded() {
                   style={{
                     margin: "4px 0 0",
                     font: "400 12px/1.4 var(--font-body)",
-                    color: "var(--color-fg-tertiary)",
+                    color: "var(--color-muted-foreground)",
                   }}
                 >
                   More posts, more accounts and Bulk scheduling.

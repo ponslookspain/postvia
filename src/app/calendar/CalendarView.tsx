@@ -109,7 +109,7 @@ function DayPostChip({
       onDragStart={onDragStart}
       aria-label={`${post.text || "Untitled post"} (${post.status.toLowerCase()})`}
       className={cn(
-        "flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-transparent bg-fill2 px-1.5 outline-none transition-colors hover:border-border hover:bg-fill3 focus-visible:ring-2 focus-visible:ring-primary-focus",
+        "flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-transparent bg-accent px-1.5 outline-none transition-colors hover:border-border hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
         dimmed && "opacity-50"
       )}
     >
@@ -368,8 +368,8 @@ export function CalendarView({
                   className={cn(
                     "flex h-20 flex-col gap-1 overflow-hidden bg-card p-1 sm:h-36 sm:p-1.5",
                     !inMonth && "bg-muted/40 text-muted-foreground",
-                    isToday && "bg-primary-accent",
-                    isOver && "bg-muted ring-2 ring-inset ring-primary-focus"
+                    isToday && "bg-accent",
+                    isOver && "bg-muted ring-2 ring-inset ring-ring"
                   )}
                 >
                   <span

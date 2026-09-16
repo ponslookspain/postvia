@@ -62,7 +62,7 @@ export function NextUp({ post, now }: { post: FeedPost; now: Date }) {
 
       <Link
         href={`/posts/${post.id}`}
-        className="group mt-4 flex items-center gap-3.5 rounded-xl bg-bg p-3 outline-none transition-colors hover:bg-fill1-alpha focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="group mt-4 flex items-center gap-3.5 rounded-xl bg-background p-3 outline-none transition-colors hover:bg-overlay-4 focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         {preview ? (
           <span className="relative block size-14 shrink-0 overflow-hidden rounded-lg bg-muted">

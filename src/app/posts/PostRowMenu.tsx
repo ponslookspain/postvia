@@ -139,7 +139,7 @@ export function PostRowMenu({
                 setMenuOpen(false);
                 setDeleteOpen(true);
               }}
-              className="text-error-text [&_svg]:text-error-text"
+              className="text-error [&_svg]:text-error"
             >
               <Trash2Icon aria-hidden="true" />
               Delete

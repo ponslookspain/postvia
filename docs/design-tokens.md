@@ -10,25 +10,53 @@ product *uses* the system (rules, screen notes, voice); this file records
 src/app/globals.css                        entry: imports, dark variant, @layer base
 src/app/design-system/foundations.css      1. Foundations   — raw scales
 src/app/design-system/semantic.css         2. Semantic      — CANONICAL
-src/app/design-system/compat-radian.css    3. Compatibility — NOT canonical
 src/app/layout.tsx                         font families (next/font)
-src/components/ui/*                        components (Radian implementations)
+src/components/ui/*                        components
 src/components/*                           patterns and shells
 ```
 
 **The canonical design system is `src/app/design-system/semantic.css`.**
-Everything else is either an input to it (foundations, fonts) or a
-translation of it (the Radian compatibility layer). A tool reading this
-repository should treat `semantic.css` as the token source of truth and
-`compat-radian.css` as a legacy adapter scheduled for removal.
+`foundations.css` is its only input (raw colour/type/spacing primitives).
+Every component and page consumes `semantic.css`'s names directly —
+`bg-panel`, `text-muted-foreground`, `border-error`, and so on. A tool
+reading this repository should treat `semantic.css` as the single token
+source of truth; there is nothing downstream of it to also check.
 
 Direction of truth:
 
 ```
-foundations.css  →  semantic.css  →  compat-radian.css  →  components
+foundations.css  →  semantic.css  →  components
                     ^^^^^^^^^^^^
                     canonical
 ```
+
+### Radian removal
+
+The primitives under `src/components/ui/` were originally scaffolded by the
+RadianUI generator (`radianui.com`) and, until this cleanup, styled with
+Radian's own token vocabulary (`bg-fill1`, `text-fg-secondary`,
+`border-primary-focus`, …) via a `compat-radian.css` alias layer. That
+layer has been **removed**: every call site — all `src/components/ui/*`
+primitives and every product page that used the Radian names directly —
+now writes PostVIA's canonical classes (`bg-muted`, `text-muted-foreground`,
+`ring-ring`, …). The rename was purely mechanical: each Radian alias
+resolved to one canonical value already, so every replacement is that same
+value under its PostVIA name — no colour, spacing, or behaviour changed.
+Four status sub-steps that only ever lived in the compat layer
+(`success/warning/error/info` `-accent/-focus/-border/-hover`, plus
+`info-text`) were promoted into `semantic.css` itself as first-class
+canonical tokens, still pointing at the same Radian-palette foundation
+values in `foundations.css` they always used. Three `-alpha` translucency
+steps became `--overlay-4/-8/-12`.
+
+What's still "Radian" in this codebase, and is **not** part of this
+removal: `@radix-ui/react-*` (Radix UI) is the headless accessibility
+engine under `Dialog`, `Select`, `Tooltip`, `Popover`, `DropdownMenu`, etc.
+— it has nothing to do with styling or naming and stays. The 17-hue OKLCH
+palette in `foundations.css` (`emerald`, `red`, `amber`, `light-blue`, …)
+is also unchanged: it's raw colour data, legitimately reused as an input
+by `semantic.css`, not a naming convention components should reach past
+`semantic.css` to touch.
 
 ## Exported to Claude Design
 
@@ -136,52 +164,51 @@ place to change.
 | `--accent-foreground` | own value | — | Radian `fill` ink |
 | `--secondary` / `--secondary-foreground` | own values | — | No utility consumes them today; retained so the Radian `secondary` surface keeps a value |
 
-## 3. Radian compatibility layer — **not canonical**
+## 3. Historical: the Radian name mapping (removed)
 
-`src/app/design-system/compat-radian.css` maps Radian's vocabulary onto the
-canonical tokens so the primitives in `src/components/ui` keep working. It
-holds no values.
+`src/app/design-system/compat-radian.css` used to translate Radian's own
+token vocabulary onto the canonical tokens, so `src/components/ui`'s
+Radian-generated primitives could keep their original classnames. It has
+been deleted — every call site now writes the canonical name directly.
+This table is kept only so old branches, PRs, or screenshots that still
+reference a Radian name can be read against today's system.
 
-| Radian name | → PostVIA |
+| Old Radian name | → today's PostVIA class |
 | --- | --- |
-| `bg` | `--background` |
-| `fill1` / `fill4` | `--muted` |
-| `fill2` / `fill3` / `soft` | `--accent` (→ `--muted`) |
-| `fg` | `--foreground` |
-| `fg-secondary` / `fg-tertiary` / `fg-disabled` | `--muted-foreground` |
-| `fg-inverse` | `--background` |
-| `alpha`, `soft-alpha`, `fill1-alpha` … `fill4-alpha` | `color-mix()` of `--foreground` at 12 / 8 / 4 / 8 / 12 / 16% |
-| `elevation-negative` / `-level1` / `-level2` | `--elevation-sunken` / `-raised` / `-raised` |
-| `white-inverse` / `black-inverse` | `--background` / `--foreground` |
-| `primary-fg/-text/-border/-hover/-accent/-focus` | `--primary-foreground`, `--primary`, `--primary`, `--primary`, `--accent`, `--ring` |
-| `success-fg` / `-text` | `--success-foreground` / `--success` |
-| `warning-fg` / `-text` | `--warning-foreground` / `--warning` |
-| `error-fg` / `-text` | `--error-foreground` / `--error` |
-| `info-fg` | `--info-foreground` |
-| `<status>-accent/-focus/-border/-hover` | Radian emerald / amber / red / light-blue primitives |
-| `sidebar-fg` / `sidebar-accent-fg` | `--sidebar-foreground` / `--sidebar-accent-foreground` |
-| `font-body` | `--font-sans` |
+| `bg` | `background` |
+| `fill1` / `fill4` | `muted` |
+| `fill2` / `fill3` / `soft` | `accent` |
+| `fg` | `foreground` |
+| `fg-secondary` / `fg-tertiary` / `fg-disabled` | `muted-foreground` |
+| `fg-inverse` | `background` |
+| `alpha` / `soft-alpha` / `fill1-alpha` / `fill2-alpha` | `overlay-12` / `overlay-8` / `overlay-4` / `overlay-8` |
+| `elevation-negative` / `-level1` / `-level2` | `elevation-sunken` / `elevation-raised` / `elevation-raised` |
+| `white-inverse` / `black-inverse` | `background` / `foreground` |
+| `primary-fg` / `-text` / `-border` / `-hover` / `-accent` / `-focus` | `primary-foreground` / `primary` / `primary` / `primary` / `accent` / `ring` |
+| `success` / `warning` / `error` `-fg` / `-text` | `<status>-foreground` / `<status>` |
+| `info-fg` | `info-foreground` |
+| `<status>-accent/-focus/-border/-hover`, `info-text` | unchanged name — now a first-class token in `semantic.css` (§1's "Status sub-steps"), not a compat alias |
+| `sidebar-fg` / `sidebar-accent-fg` | `sidebar-foreground` / `sidebar-accent-foreground` |
+| `font-body` | `font-sans` |
 
-### Known gaps
-
-Recorded, not hidden. Closing one is a design decision with a visual
-consequence, not a cleanup.
-
-- `primary-hover` / `primary-border` / `primary-accent` reuse the base, the
-  base and `--accent` instead of hue-matched steps.
-- `fill1`–`fill4` all resolve to the same neutral; Radian defines four
-  distinct steps.
-- `fg-secondary` / `fg-tertiary` / `fg-disabled` share `--muted-foreground`.
-- `elevation-level2` has no distinct PostVIA value (`card` and `popover` are
-  the same colour in both themes today).
-- `--color-stroke` is absent — stock Radian does not define it either.
+Two genuine gaps outlive the compat file, now recorded directly against
+`semantic.css` — closing either is a design decision with a visual
+consequence, not a rename: `--muted`/`--accent` still stand in for
+Radian's four-step `fill1`–`fill4` ramp (PostVIA uses two steps, not
+four), and `--elevation-raised` still covers both of Radian's `level1`
+and `level2` (`card` and `popover` are the same colour in both themes
+today).
 
 ## 4. Components
 
-All primitives live in `src/components/ui` and are Radian implementations.
-Several carry a **legacy PostVIA API on top** so existing call sites did not
-have to change during the migration. The legacy surface is documented here
-so it can be removed deliberately rather than discovered.
+All primitives live in `src/components/ui`, originally scaffolded by the
+RadianUI generator (`radianui.com`) and built on Radix UI
+(`@radix-ui/react-*`) for accessibility behaviour — focus trap, portals,
+ARIA. Styling now speaks PostVIA's canonical vocabulary only (§3); Radix
+stays, since it's behaviour, not a design-system concern. Several
+components carry a **legacy PostVIA API on top** so existing call sites did
+not have to change during the migration. The legacy surface is documented
+here so it can be removed deliberately rather than discovered.
 
 | Target component | File | Legacy PostVIA API on top of Radian |
 | --- | --- | --- |

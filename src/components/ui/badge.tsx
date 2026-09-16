@@ -30,7 +30,7 @@ const badgeVariants = cva(
 				success: "",
 				error: "",
 				warning: "",
-				neutral: "bg-elevation-level1 border-alpha",
+				neutral: "bg-elevation-raised border-overlay-12",
 				red: "",
 				orange: "",
 				amber: "",
@@ -60,40 +60,40 @@ const badgeVariants = cva(
 			{
 				variant: "strong",
 				color: "primary",
-				className: "bg-primary text-primary-fg  border border-alpha",
+				className: "bg-primary text-primary-foreground  border border-overlay-12",
 			},
 			{
 				variant: "strong",
 				color: "info",
-				className: "bg-info text-info-fg border border-alpha",
+				className: "bg-info text-info-foreground border border-overlay-12",
 			},
 			{
 				variant: "strong",
 				color: "success",
-				className: "bg-success text-success-fg border border-alpha",
+				className: "bg-success text-success-foreground border border-overlay-12",
 			},
 			{
 				variant: "strong",
 				color: "error",
-				className: "bg-error text-error-fg border border-alpha",
+				className: "bg-error text-error-foreground border border-overlay-12",
 			},
 			{
 				variant: "strong",
 				color: "warning",
-				className: "bg-warning text-warning-fg border border-alpha",
+				className: "bg-warning text-warning-foreground border border-overlay-12",
 			},
 			{
 				variant: "strong",
 				color: "neutral",
 				className:
-					"bg-black-inverse border border-alpha text-white-inverse font-medium",
+					"bg-foreground border border-overlay-12 text-background font-medium",
 			},
 			// outline
 			{
 				variant: "outline",
 				color: "primary",
 				className:
-					"text-primary-text border border-primary-border bg-transparent",
+					"text-primary border border-primary bg-transparent",
 			},
 			{
 				variant: "outline",
@@ -104,143 +104,143 @@ const badgeVariants = cva(
 				variant: "outline",
 				color: "success",
 				className:
-					"text-success-text border border-success-border bg-transparent",
+					"text-success border border-success-border bg-transparent",
 			},
 			{
 				variant: "outline",
 				color: "error",
-				className: "text-error-text border border-error-border bg-transparent",
+				className: "text-error border border-error-border bg-transparent",
 			},
 			{
 				variant: "outline",
 				color: "warning",
 				className:
-					"text-warning-text border border-warning-border bg-transparent",
+					"text-warning border border-warning-border bg-transparent",
 			},
 			{
 				variant: "outline",
 				color: "neutral",
-				className: "text-fg border bg-transparent",
+				className: "text-foreground border bg-transparent",
 			},
 			// soft
 			{
 				variant: "soft",
 				color: "primary",
-				className: "bg-primary-accent text-primary-text border-soft-alpha",
+				className: "bg-accent text-primary border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "info",
-				className: "bg-info-accent text-info-text border-soft-alpha",
+				className: "bg-info-accent text-info-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "success",
-				className: "bg-success-accent text-success-text border-soft-alpha",
+				className: "bg-success-accent text-success border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "error",
-				className: "bg-error-accent text-error-text border-soft-alpha",
+				className: "bg-error-accent text-error border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "warning",
-				className: "bg-warning-accent text-warning-text border-soft-alpha",
+				className: "bg-warning-accent text-warning border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "neutral",
-				className: "bg-fill2 text-fg border-soft-alpha",
+				className: "bg-accent text-foreground border-overlay-8",
 			},
 			// utility colors (soft)
 			{
 				variant: "soft",
 				color: "red",
-				className: "bg-red-accent text-red-text border-soft-alpha",
+				className: "bg-red-accent text-red-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "orange",
-				className: "bg-orange-accent text-orange-text border-soft-alpha",
+				className: "bg-orange-accent text-orange-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "amber",
-				className: "bg-amber-accent text-amber-text border-soft-alpha",
+				className: "bg-amber-accent text-amber-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "yellow",
-				className: "bg-yellow-accent text-yellow-text border-soft-alpha",
+				className: "bg-yellow-accent text-yellow-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "neon",
-				className: "bg-neon-accent text-neon-text border-soft-alpha",
+				className: "bg-neon-accent text-neon-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "green",
-				className: "bg-green-accent text-green-text border-soft-alpha",
+				className: "bg-green-accent text-green-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "emerald",
-				className: "bg-emerald-accent text-emerald-text border-soft-alpha",
+				className: "bg-emerald-accent text-emerald-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "teal",
-				className: "bg-teal-accent text-teal-text border-soft-alpha",
+				className: "bg-teal-accent text-teal-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "cyan",
-				className: "bg-cyan-accent text-cyan-text border-soft-alpha",
+				className: "bg-cyan-accent text-cyan-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "light-blue",
 				className:
-					"bg-light-blue-accent text-light-blue-text border-soft-alpha",
+					"bg-light-blue-accent text-light-blue-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "blue",
-				className: "bg-blue-accent text-blue-text border-soft-alpha",
+				className: "bg-blue-accent text-blue-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "violet-blue",
 				className:
-					"bg-violet-blue-accent text-violet-blue-text border-soft-alpha",
+					"bg-violet-blue-accent text-violet-blue-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "purple",
-				className: "bg-purple-accent text-purple-text border-soft-alpha",
+				className: "bg-purple-accent text-purple-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "dark-orchid",
 				className:
-					"bg-dark-orchid-accent text-dark-orchid-text border-soft-alpha",
+					"bg-dark-orchid-accent text-dark-orchid-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "fuchsia",
-				className: "bg-fuchsia-accent text-fuchsia-text border-soft-alpha",
+				className: "bg-fuchsia-accent text-fuchsia-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "magenta",
-				className: "bg-magenta-accent text-magenta-text border-soft-alpha",
+				className: "bg-magenta-accent text-magenta-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "rose",
-				className: "bg-rose-accent text-rose-text border-soft-alpha",
+				className: "bg-rose-accent text-rose-text border-overlay-8",
 			},
 
 			// utility colors (strong)
@@ -445,7 +445,7 @@ function BadgeDot({ className, ...props }: BadgeDotProps) {
 			<span
 				data-slot="badge-dot"
 				className={cn(
-					"bg-fg-disabled size-1.5 shrink-0 rounded-full",
+					"bg-muted-foreground size-1.5 shrink-0 rounded-full",
 					className
 				)}
 				{...props}

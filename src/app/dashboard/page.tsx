@@ -272,7 +272,7 @@ export default async function DashboardPage({
     { label: "Published", value: published, className: "text-primary", dotClassName: "bg-primary" },
     { label: "Scheduled", value: scheduled + publishing, className: "text-muted-foreground", dotClassName: "bg-muted-foreground/60" },
     { label: "Drafts", value: drafts, className: "text-muted-foreground/60", dotClassName: "bg-muted-foreground/40" },
-    { label: "Failed", value: failed, className: "text-error-text", dotClassName: "bg-error" },
+    { label: "Failed", value: failed, className: "text-error", dotClassName: "bg-error" },
   ];
 
   return (

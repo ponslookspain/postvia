@@ -16,7 +16,7 @@ const emptyMediaVariants = cva(
 		variants: {
 			variant: {
 				default: "bg-transparent",
-				icon: "bg-primary-focus text-primary-text border p-3 border-soft flex shrink-0 items-center justify-center rounded-lg [&_svg:not([class*='size-'])]:size-6",
+				icon: "bg-ring text-primary border p-3 border-accent flex shrink-0 items-center justify-center rounded-lg [&_svg:not([class*='size-'])]:size-6",
 			},
 		},
 		defaultVariants: {
@@ -81,7 +81,7 @@ function EmptyDescription({ className, ...props }: EmptyDescriptionProps) {
 		<div
 			data-slot="empty-description"
 			className={cn(
-				"text-fg-secondary [&>a:hover]:text-primary-text text-sm [&>a]:underline [&>a]:underline-offset-4",
+				"text-muted-foreground [&>a:hover]:text-primary text-sm [&>a]:underline [&>a]:underline-offset-4",
 				className
 			)}
 			{...props}

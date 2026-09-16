@@ -105,7 +105,7 @@ export function ComposerVisual() {
           <p className="mt-2 text-xs text-muted-foreground tabular-nums">
             184 characters
           </p>
-          <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-bg px-3 py-2.5">
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-background px-3 py-2.5">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06]">
               <ImageIcon className="size-4 text-muted-foreground" />
             </span>
@@ -127,7 +127,7 @@ export function ComposerVisual() {
             {railRows.map((row) => (
               <li
                 key={row.platform}
-                className="flex items-center gap-2 rounded-lg bg-bg px-2.5 py-2"
+                className="flex items-center gap-2 rounded-lg bg-background px-2.5 py-2"
               >
                 <PlatformIcon platform={row.platform} className="size-3.5" />
                 <span className="min-w-0 flex-1">
@@ -144,7 +144,7 @@ export function ComposerVisual() {
               </li>
             ))}
           </ul>
-          <div className="mt-2.5 rounded-lg bg-bg px-2.5 py-2">
+          <div className="mt-2.5 rounded-lg bg-background px-2.5 py-2">
             <p className="flex items-center gap-1.5 text-xs font-medium">
               <CalendarClockIcon className="size-3.5 text-muted-foreground" />
               Wed 09:00 · Europe/Madrid

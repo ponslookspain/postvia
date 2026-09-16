@@ -31,7 +31,7 @@ const row: React.CSSProperties = {
 const caption: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.2,
-  color: "var(--color-fg-tertiary, #6b7280)",
+  color: "var(--color-muted-foreground, #6b7280)",
 };
 
 export function Sizes() {

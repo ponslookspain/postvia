@@ -34,20 +34,20 @@ const alertVariants = cva(
 			},
 			variant: {
 				strong: "",
-				soft: "[&_[data-slot=alert-title]]:text-fg [&_[data-slot=alert-description]]:text-fg",
+				soft: "[&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
 				"soft-outline":
-					"ring-1 ring-inset [&_[data-slot=alert-title]]:text-fg [&_[data-slot=alert-description]]:text-fg",
+					"ring-1 ring-inset [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
 				outline:
-					"border border-soft [&_[data-slot=alert-close]]:text-fg-tertiary [&_[data-slot=alert-title]]:text-fg [&_[data-slot=alert-description]]:text-fg",
+					"border border-accent [&_[data-slot=alert-close]]:text-muted-foreground [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
 			},
 		},
 		compoundVariants: [
 			// Soft variants
-			{ color: "neutral", variant: "soft", className: "bg-fill2" },
+			{ color: "neutral", variant: "soft", className: "bg-accent" },
 			{
 				color: "primary",
 				variant: "soft",
-				className: "bg-primary-accent text-primary-text",
+				className: "bg-accent text-primary",
 			},
 			{
 				color: "info",
@@ -57,53 +57,53 @@ const alertVariants = cva(
 			{
 				color: "success",
 				variant: "soft",
-				className: "bg-success-accent text-success-text",
+				className: "bg-success-accent text-success",
 			},
 			{
 				color: "error",
 				variant: "soft",
-				className: "bg-error-accent text-error-text",
+				className: "bg-error-accent text-error",
 			},
 			{
 				color: "warning",
 				variant: "soft",
-				className: "bg-warning-accent text-warning-text",
+				className: "bg-warning-accent text-warning",
 			},
 
 			// Strong variants
 			{
 				color: "neutral",
 				variant: "strong",
-				className: "bg-black-inverse text-white-inverse",
+				className: "bg-foreground text-background",
 			},
 			{
 				color: "primary",
 				variant: "strong",
-				className: "bg-primary text-primary-fg",
+				className: "bg-primary text-primary-foreground",
 			},
-			{ color: "info", variant: "strong", className: "bg-info text-info-fg" },
+			{ color: "info", variant: "strong", className: "bg-info text-info-foreground" },
 		{
 			color: "warning",
 			variant: "strong",
-			className: "bg-warning text-warning-fg",
+			className: "bg-warning text-warning-foreground",
 		},
-		{ color: "error", variant: "strong", className: "bg-error text-error-fg" },
+		{ color: "error", variant: "strong", className: "bg-error text-error-foreground" },
 		{
 			color: "success",
 			variant: "strong",
-			className: "bg-success text-success-fg",
+			className: "bg-success text-success-foreground",
 		},
 
 			// Soft-outline variants
 			{
 				color: "neutral",
 				variant: "soft-outline",
-				className: "border-border bg-fill2",
+				className: "border-border bg-accent",
 			},
 			{
 				color: "primary",
 				variant: "soft-outline",
-				className: "bg-primary-accent text-primary-text border-primary-border",
+				className: "bg-accent text-primary border-primary",
 			},
 			{
 				color: "info",
@@ -113,29 +113,29 @@ const alertVariants = cva(
 			{
 				color: "success",
 				variant: "soft-outline",
-				className: "bg-success-accent text-success-text border-success-border",
+				className: "bg-success-accent text-success border-success-border",
 			},
 			{
 				color: "error",
 				variant: "soft-outline",
-				className: "bg-error-accent text-error-text border-error-border",
+				className: "bg-error-accent text-error border-error-border",
 			},
 			{
 				color: "warning",
 				variant: "soft-outline",
-				className: "bg-warning-accent text-warning-text border-warning-border",
+				className: "bg-warning-accent text-warning border-warning-border",
 			},
 
 			// Outline variants
 			{
 				color: "neutral",
 				variant: "outline",
-				className: "bg-transparent text-fg ",
+				className: "bg-transparent text-foreground ",
 			},
 			{
 				color: "primary",
 				variant: "outline",
-				className: "bg-transparent text-primary-text",
+				className: "bg-transparent text-primary",
 			},
 			{
 				color: "info",
@@ -145,17 +145,17 @@ const alertVariants = cva(
 			{
 				color: "success",
 				variant: "outline",
-				className: "bg-transparent text-success-text",
+				className: "bg-transparent text-success",
 			},
 			{
 				color: "error",
 				variant: "outline",
-				className: "bg-transparent text-error-text",
+				className: "bg-transparent text-error",
 			},
 			{
 				color: "warning",
 				variant: "outline",
-				className: "bg-transparent text-warning-text",
+				className: "bg-transparent text-warning",
 			},
 		],
 		defaultVariants: {

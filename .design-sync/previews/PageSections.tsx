@@ -17,7 +17,7 @@ const caption: React.CSSProperties = {
   margin: "0 0 12px",
   fontSize: 12,
   lineHeight: "16px",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
 };
 
 const rowStyle: React.CSSProperties = {
@@ -34,7 +34,7 @@ function Row({ title, when, status }: { title: string; when: string; status: str
   return (
     <div style={rowStyle}>
       <span style={{ minWidth: 0, flex: 1 }}>{title}</span>
-      <span style={{ fontSize: 13, color: "var(--color-fg-tertiary)" }}>
+      <span style={{ fontSize: 13, color: "var(--color-muted-foreground)" }}>
         {when}
       </span>
       <StatusBadge status={status} />
@@ -50,7 +50,7 @@ export function DashboardStack() {
           id="ps-attention"
           title="Needs a look"
           description="These didn't go out, or are still publishing."
-          meta={<span style={{ color: "var(--color-fg-tertiary)" }}>2</span>}
+          meta={<span style={{ color: "var(--color-muted-foreground)" }}>2</span>}
         />
         <Row title="Weekly roundup" when="last Friday" status="FAILED" />
         <Row
@@ -113,13 +113,13 @@ export function TwoSections() {
           />
           <div style={rowStyle}>
             <span style={{ flex: 1 }}>Instagram — @velastudio</span>
-            <span style={{ fontSize: 13, color: "var(--color-fg-tertiary)" }}>
+            <span style={{ fontSize: 13, color: "var(--color-muted-foreground)" }}>
               connected
             </span>
           </div>
           <div style={rowStyle}>
             <span style={{ flex: 1 }}>Threads — Vela Studio</span>
-            <span style={{ fontSize: 13, color: "var(--color-fg-tertiary)" }}>
+            <span style={{ fontSize: 13, color: "var(--color-muted-foreground)" }}>
               reconnect needed
             </span>
           </div>
@@ -137,7 +137,7 @@ export function TwoSections() {
           />
           <div style={rowStyle}>
             <span style={{ flex: 1 }}>Weekdays</span>
-            <span style={{ fontSize: 13, color: "var(--color-fg-tertiary)" }}>
+            <span style={{ fontSize: 13, color: "var(--color-muted-foreground)" }}>
               09:00, 13:00, 17:30
             </span>
           </div>

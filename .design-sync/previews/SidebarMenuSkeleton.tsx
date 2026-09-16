@@ -23,11 +23,11 @@ import {
  * `true` prepends a 16px square for the nav icon. The product's nav
  * rows all carry icons, so the loading rail uses `showIcon`.
  *
- * Surface matters here. `Skeleton` is `bg-fill2`, and in the LIGHT theme
+ * Surface matters here. `Skeleton` is `bg-accent`, and in the LIGHT theme
  * these previews render in, `--accent` is aliased to `--muted`, so
- * `--color-fill2` and `--color-fill1` are the same colour — a skeleton
+ * `--color-accent` and `--color-muted` are the same colour — a skeleton
  * laid on a `fill1` panel is invisible. The standalone cells therefore
- * sit on `--color-bg`; `LoadingRail` sits on the real rail, which is
+ * sit on `--color-background`; `LoadingRail` sits on the real rail, which is
  * `--color-sidebar` (a shade lighter than `fill1`) and still reads.
  *
  * Widths genuinely differ per row — that is the component's own
@@ -37,7 +37,7 @@ import {
 
 const caption: React.CSSProperties = {
   font: "500 12px/1.4 var(--font-body)",
-  color: "var(--color-fg-tertiary)",
+  color: "var(--color-muted-foreground)",
   letterSpacing: "0.02em",
   marginBottom: 8,
 };
@@ -47,13 +47,13 @@ const panel: React.CSSProperties = {
   boxSizing: "border-box",
   borderRadius: 12,
   border: "1px solid var(--color-border)",
-  background: "var(--color-bg)",
+  background: "var(--color-background)",
   padding: 8,
 };
 
 const groupLabel: React.CSSProperties = {
   font: "500 12px/1.4 var(--font-body)",
-  color: "var(--color-fg-secondary)",
+  color: "var(--color-muted-foreground)",
   padding: "6px 8px 2px",
 };
 
@@ -85,7 +85,7 @@ export function LoadingRail() {
                   margin: 0,
                   font: "600 18px/1.2 var(--font-heading)",
                   letterSpacing: "-0.01em",
-                  color: "var(--color-fg)",
+                  color: "var(--color-foreground)",
                 }}
               >
                 postvia

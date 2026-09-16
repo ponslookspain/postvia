@@ -24,16 +24,16 @@ function Calendar({
 				month_grid: "flex flex-col gap-1 items-center",
 				weekdays: "w-full flex gap-1",
 				weekday:
-					"text-fg-tertiary text-sm font-medium size-9 shrink-0 flex items-center justify-center",
+					"text-muted-foreground text-sm font-medium size-9 shrink-0 flex items-center justify-center",
 				weeks: "w-full flex flex-col gap-1",
 				week: "w-full flex gap-1",
-				day: "size-9 p-0 shrink-0 group text-sm aria-selected:opacity-100 *:data-disabled:text-error-text",
+				day: "size-9 p-0 shrink-0 group text-sm aria-selected:opacity-100 *:data-disabled:text-error",
 				day_button:
-					"text-center rounded-lg text-fg text-sm font-medium hover:bg-fill1-alpha cursor-pointer size-9 p-0 hover:group-data-selected:bg-primary group-data-disabled:pointer-events-none group-data-disabled:line-through group-data-selected:bg-primary group-data-selected:text-primary-fg hover:group-[.rdp-outside]:group-data-selected:bg-primary group-[.rdp-outside]:group-data-selected:text-primary-fg group-[.range-middle]:group-[.rdp-outside]:group-data-selected:text-primary-text hover:group-[.range-middle]:group-[.rdp-outside]:group-data-selected:bg-primary-accent group-data-selected:text-primary-fg group-data-disabled:text-fg-tertiary group-data-outside:text-fg-tertiary group-data-today:border group-data-today:border-primary group-data-today:text-primary-text group-data-today:group-data-selected:text-primary-fg hover:group-[.range-middle]:group-data-selected:bg-primary-accent group-[.range-middle]:group-data-selected:text-primary group-[.range-middle]:group-data-selected:bg-primary-accent group-[.range-middle]:group-data-selected:text-primary-text group-data-selected:group-data-outside:text-primary-text",
+					"text-center rounded-lg text-foreground text-sm font-medium hover:bg-overlay-4 cursor-pointer size-9 p-0 hover:group-data-selected:bg-primary group-data-disabled:pointer-events-none group-data-disabled:line-through group-data-selected:bg-primary group-data-selected:text-primary-foreground hover:group-[.rdp-outside]:group-data-selected:bg-primary group-[.rdp-outside]:group-data-selected:text-primary-foreground group-[.range-middle]:group-[.rdp-outside]:group-data-selected:text-primary hover:group-[.range-middle]:group-[.rdp-outside]:group-data-selected:bg-accent group-data-selected:text-primary-foreground group-data-disabled:text-muted-foreground group-data-outside:text-muted-foreground group-data-today:border group-data-today:border-primary group-data-today:text-primary group-data-today:group-data-selected:text-primary-foreground hover:group-[.range-middle]:group-data-selected:bg-accent group-[.range-middle]:group-data-selected:text-primary group-[.range-middle]:group-data-selected:bg-accent group-[.range-middle]:group-data-selected:text-primary group-data-selected:group-data-outside:text-primary",
 				button_previous:
-					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-bg bg-elevation-level1 font-medium text-fg-secondary border border-border hover:bg-fill1-alpha focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
+					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-bg bg-elevation-raised font-medium text-muted-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
 				button_next:
-					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-bg bg-elevation-level1 font-medium text-fg-secondary border border-border hover:bg-fill1-alpha focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
+					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-bg bg-elevation-raised font-medium text-muted-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
 				range_start: "range-start",
 				range_middle: "range-middle",
 				range_end: "range-end",
@@ -42,12 +42,12 @@ function Calendar({
 			components={{
 				Chevron: (props: ChevronProps) => {
 					if (props.orientation === "left")
-						return <ChevronLeft size={16} className="text-fg-tertiary" />
-					return <ChevronRight size={16} className="text-fg-tertiary" />
+						return <ChevronLeft size={16} className="text-muted-foreground" />
+					return <ChevronRight size={16} className="text-muted-foreground" />
 				},
 			}}
 			className={cn(
-				"bg-elevation-level1 border-border rounded-xl border p-3",
+				"bg-elevation-raised border-border rounded-xl border p-3",
 				className
 			)}
 			showOutsideDays={showOutsideDays}

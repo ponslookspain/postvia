@@ -40,7 +40,7 @@ export function PostRow({
     >
       <Link
         href={`/posts/${post.id}`}
-        className="group flex items-center gap-4 rounded-xl px-2.5 py-3.5 outline-none transition-colors hover:bg-fill1-alpha focus-visible:bg-fill1-alpha focus-visible:ring-2 focus-visible:ring-ring/50 sm:gap-5"
+        className="group flex items-center gap-4 rounded-xl px-2.5 py-3.5 outline-none transition-colors hover:bg-overlay-4 focus-visible:bg-overlay-4 focus-visible:ring-2 focus-visible:ring-ring/50 sm:gap-5"
       >
         {preview && (
           <span className="relative block size-16 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-20">
@@ -83,7 +83,7 @@ export function PostRow({
             <span>{formatPostDate(post)}</span>
           </span>
           {error && (
-            <span className="mt-1 block truncate text-xs text-error-text">
+            <span className="mt-1 block truncate text-xs text-error">
               Couldn&apos;t publish — open the post to review.
             </span>
           )}
@@ -92,7 +92,7 @@ export function PostRow({
           className={cn(
             "flex shrink-0 items-center gap-1 text-sm transition-colors",
             post.status === "FAILED"
-              ? "font-medium text-error-text"
+              ? "font-medium text-error"
               : "text-muted-foreground group-hover:text-foreground"
           )}
         >
