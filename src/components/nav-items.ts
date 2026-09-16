@@ -23,8 +23,12 @@ export const navItems: NavItem[] = [
   { href: "/posts/new", label: "Create post", icon: PlusIcon },
   { href: "/posts/bulk", label: "Bulk video", icon: ClapperboardIcon },
   { href: "/accounts", label: "Accounts", icon: UsersIcon },
-  { href: "/billing", label: "Billing", icon: CreditCardIcon },
+];
+
+/** Account-scoped destinations, surfaced from the account menu, not the primary nav. */
+export const accountMenuItems: NavItem[] = [
   { href: "/settings", label: "Settings", icon: SettingsIcon },
+  { href: "/billing", label: "Billing", icon: CreditCardIcon },
 ];
 
 export function isActivePath(pathname: string, href: string): boolean {

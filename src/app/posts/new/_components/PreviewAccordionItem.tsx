@@ -37,7 +37,7 @@ export function PreviewAccordionItem({
   const errorCount = model.validation.errors.length;
   const remaining = remainingCharacters(model.text, model.maxLength);
   return (
-    <div className="min-w-0 rounded-xl border border-border bg-card">
+    <div className="min-w-0 rounded-xl bg-panel">
       <button
         type="button"
         aria-expanded={expanded}

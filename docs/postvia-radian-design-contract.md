@@ -4,11 +4,18 @@ Normative visual contract for the future PostVIA redesign under Radian UI.
 This document is the **single internal source of truth** for visual/system decisions.
 It proposes no code changes itself; it fixes what the redesign must conform to.
 
-Status: preparatory contract + foundation alignment (implemented on `dev`, uncommitted).
-Sections marked [ALIGNED] were implemented in the foundation step; everything
-else still describes the pre-alignment state or future page redesign.
+> **Status: historical record of the shadcn → Radian migration.
+> Superseded by [`design-system.md`](design-system.md).**
+>
+> This document captured the migration's target state in September 2026.
+> The product has since moved on: it is dark by default with a red brand
+> hue, blocks carry no outline (`--panel` surfaces), and buttons are
+> pills again — a decision this document's radius table once recorded as
+> reversed. Read it for the reasoning behind the migration, not for the
+> current rules. Where the two disagree, `design-system.md` and the code
+> win.
 
-Related: `docs/design-system.md` describes what is **implemented today**; this contract describes what the **redesign must converge to** and what is still unconfirmed.
+Related: `docs/design-system.md` describes what is **implemented today**; this contract records what the migration was converging to and what was still unconfirmed at the time.
 
 ## 0. Sources and confidence rule
 
@@ -96,8 +103,7 @@ Confirmed from installed component source (not registry — registry values `NOT
 
 | Component | Radian shape in repo | PostVIA override | Status |
 |---|---|---|---|
-| Button 28/32 | `rounded-md` (`button.tsx:23-24`) | ~~Wrapper forces `rounded-4xl` pill (`button.tsx:346`)~~ **[ALIGNED] pill removed** — per-size Radian radius now applies; pill is opt-in via `className="rounded-full"` (docs “Rounded Button” example) | DONE |
-| Button 36/40/44/48 | `rounded-lg` (`button.tsx:25-28`) | Same pill override | DONE (same change) |
+| Button 28/32/36/40/44/48 | `rounded-md`/`rounded-lg` per size (Radian default) | **[SUPERSEDED, commit `c81ada5`]** Pill removal was reverted — every size is hardcoded `rounded-full` again (`button.tsx:23-28`), documented as the permanent PostVIA rule in `docs/design-system.md:36-37` (“buttons always fully rounded pills”). This row's earlier “pill removed / DONE” status no longer reflects the code; `design-system.md` is the current source of truth. | INTENTIONAL (see design-system.md) |
 | Input 28/32 / 40/44/48 | `rounded-md` / `rounded-lg` (`input.tsx`) | ~~Size 36 `rounded-4xl` compat~~ **[ALIGNED] 36 → `rounded-lg`** | DONE |
 | Select trigger 28/32 / 40+ | `rounded-md` / `rounded-lg` | ~~Size 36 `rounded-4xl` compat~~ **[ALIGNED] 36 → `rounded-lg`** | DONE |
 | Card / Dialog | `rounded-2xl` (`card.tsx:19`, `dialog.tsx:94`) | None | KEEP |

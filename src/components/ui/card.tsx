@@ -14,9 +14,11 @@ function Card({
 			data-slot="card"
 			data-size={size}
 			className={cn(
-				// PostVIA compat: previous surface was rounded-2xl bg-card
-				// with ring-1 ring-foreground/10 and no shadow.
-				"bg-elevation-level1 text-fg text-sm flex flex-col gap-6 overflow-hidden rounded-2xl border border-border py-6",
+				// PostVIA surface rule: blocks are separated by tone, not by a
+				// drawn box — a panel one shade off the page, no outline. The
+				// transparent border keeps the geometry (and lets a caller opt
+				// into a colored one, e.g. border-error on a destructive card).
+				"bg-panel text-fg text-sm flex flex-col gap-6 overflow-hidden rounded-2xl border border-transparent py-6",
 				"data-[size=sm]:gap-4 data-[size=sm]:py-4",
 				"data-[size=sm]:[&_[data-slot=card-header]]:px-4",
 				"data-[size=sm]:[&_[data-slot=card-header]]:[.border-b]:pb-4",

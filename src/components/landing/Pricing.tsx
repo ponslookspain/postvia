@@ -48,10 +48,10 @@ export function Pricing() {
             >
               <div
                 className={cn(
-                  "flex h-full flex-col rounded-2xl border bg-card p-6",
+                  "flex h-full flex-col rounded-2xl border bg-panel p-6",
                   plan.highlighted
                     ? "border-primary/60 ring-1 ring-primary/30"
-                    : "border-border"
+                    : "border-transparent"
                 )}
               >
                 <div className="flex items-center justify-between gap-2">

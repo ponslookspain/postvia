@@ -160,7 +160,7 @@ export function AdminBillingPanel() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
         {state && (
-          <details className="overflow-auto rounded-md border border-border bg-muted/50 px-3 py-2 text-xs">
+          <details className="overflow-auto rounded-md bg-muted/50 px-3 py-2 text-xs">
             <summary className="cursor-pointer rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
               Technical details
             </summary>

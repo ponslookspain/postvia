@@ -80,7 +80,7 @@ export function TailorPreview() {
             {versions.map((version) => (
               <li
                 key={version.platform}
-                className="rounded-xl border border-border bg-card p-3.5 transition-colors duration-200 hover:border-foreground/20 motion-reduce:transition-none"
+                className="rounded-xl bg-panel p-3.5 transition-colors duration-200 hover:bg-fill1 motion-reduce:transition-none"
               >
                 <span className="flex items-center gap-2">
                   <PlatformIcon platform={version.platform} />

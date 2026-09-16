@@ -7,7 +7,7 @@ import { MenuIcon, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
-import { isActivePath, navItems } from "@/components/nav-items";
+import { accountMenuItems, isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,6 +89,21 @@ export function MobileTopBar({
             <p className="truncate text-xs text-muted-foreground">
               {userEmail}
             </p>
+            <div className="mt-3 flex flex-col gap-1 border-t border-border pt-3">
+              {accountMenuItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Icon className="size-4 shrink-0" aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
             <Button
               variant="outline"
               size="sm"

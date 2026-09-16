@@ -218,7 +218,7 @@ export function HowItWorks() {
         </div>
 
         {/* Active panel */}
-        <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="mt-4 overflow-hidden rounded-2xl bg-panel">
           {steps.map((step, index) => (
             <div
               key={step.id}

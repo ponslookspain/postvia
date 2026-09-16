@@ -246,7 +246,7 @@ export function PostsList({
       <div
         role="search"
         aria-label="Filter posts"
-        className="flex flex-col gap-2 rounded-xl border border-border bg-card p-2 md:flex-row md:items-center"
+        className="flex flex-col gap-2 rounded-xl bg-panel p-2 md:flex-row md:items-center"
       >
         <div className="relative min-w-0 flex-1">
           <SearchIcon
@@ -359,7 +359,7 @@ export function PostsList({
           />
         )
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="overflow-hidden rounded-xl bg-panel">
           <div
             aria-hidden="true"
             className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border bg-muted/40 px-4 py-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase md:grid"
@@ -371,11 +371,11 @@ export function PostsList({
             <span>Date</span>
             <span className="sr-only">Actions</span>
           </div>
-          <ul className="divide-y divide-border">
+          <ul className="flex flex-col p-1.5">
             {visible.map((post) => (
               <li
                 key={post.id}
-                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/40 md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4 md:px-4 md:py-3.5"
+                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-fill1-alpha md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4 md:px-4 md:py-3.5"
               >
                 <Link
                   href={`/posts/${post.id}`}

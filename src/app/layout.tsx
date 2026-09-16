@@ -3,6 +3,7 @@ import { Geist_Mono, Inter, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
+import { THEME_INIT_SCRIPT } from "@/hooks/use-theme";
 
 const dmSansHeading = DM_Sans({subsets:['latin'],variable:'--font-heading'});
 
@@ -43,8 +44,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn("h-full", "antialiased", geistMono.variable, "font-sans", inter.variable, dmSansHeading.variable)}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full bg-background text-foreground">
         {children}
         <Toaster />

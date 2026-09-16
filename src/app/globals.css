@@ -15,16 +15,23 @@
   --muted-foreground: oklch(0.556 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
+  /* Panel surface: a shade off the page, carrying no outline. Blocks are
+     separated by tone, not by a drawn box — see docs/design-system.md.
+     Currently applied on the dashboard; becomes the Card default once the
+     rule is rolled out to the rest of the pages. */
+  --panel: oklch(0.974 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
 
-  /* ——— PostVIA brand. Contract decision: keep the brand indigo instead
-     of the Radian default violet-blue (#623DF5). ——— */
-  --primary: oklch(0.488 0.243 264.376);
-  --primary-foreground: oklch(0.97 0.014 254.604);
+  /* ——— PostVIA brand. Contract decision: brand red (crimson, hue ~19)
+     instead of the Radian default violet-blue (#623DF5). Kept distinct
+     in hue/chroma from --error (hue ~27) so primary actions and error
+     states stay visually separable even though both read as "red". ——— */
+  --primary: oklch(0.58 0.22 19);
+  --primary-foreground: oklch(0.985 0 0);
 
   /* ——— Canonical status hues.
      --error holds the value; --destructive is a compat alias for the
@@ -58,8 +65,8 @@
   --radius: 0.875rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.546 0.245 262.881);
-  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-primary: oklch(0.58 0.22 19);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
@@ -101,6 +108,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-panel: var(--panel);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -219,9 +227,10 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-* {
-  border-color: var(--border);
-}
+/* The default border color lives in @layer base below, on purpose: an
+   unlayered `* { border-color }` rule outranks every Tailwind utility
+   (unlayered styles beat layered ones), which silently disabled every
+   border-* color class in the app. */
 
 .dark {
   --background: oklch(0.145 0 0);
@@ -232,10 +241,11 @@ body {
   --warning: oklch(0.78 0.13 75);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
+  --panel: oklch(0.185 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.424 0.199 265.638);
-  --primary-foreground: oklch(0.97 0.014 254.604);
+  --primary: oklch(0.62 0.22 19);
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -249,8 +259,8 @@ body {
   --ring: oklch(0.556 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.623 0.214 259.815);
-  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-primary: oklch(0.62 0.22 19);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);

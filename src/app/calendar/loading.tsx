@@ -32,7 +32,7 @@ export default function CalendarLoading() {
       </div>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <div>
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-2xl border border-border bg-border">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-2xl bg-border">
             {Array.from({ length: 7 }).map((_, index) => (
               <Skeleton key={index} className="h-8 rounded-none" />
             ))}

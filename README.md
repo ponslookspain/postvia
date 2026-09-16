@@ -61,7 +61,8 @@ Vercel Preview is not part of daily development. Checks before commit:
 - **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
 - **Styling:** Tailwind CSS v4, Radian UI on Radix UI primitives,
   Lucide icons, Inter body + DM Sans headings
-  (`--font-sans` / `--font-heading`; Geist variables retained, not primary)
+  (`--font-sans` / `--font-heading`; Geist variables retained, not primary),
+  dark theme by default with a light opt-in
 - **Database:** PostgreSQL via Prisma 6
 - **Auth:** Better Auth — email/password, Google OAuth, email verification
   (Resend)
@@ -85,11 +86,14 @@ full matrix, retry/idempotency semantics, and portal requirements.
 
 ## App structure
 
-- `/dashboard` — publishing overview: Needs attention (failed / partially
-  published / publishing), Up next (upcoming scheduled), stats with
-  publishing/failed counters and per-platform breakdown, accounts strip,
-  recent posts with search (`?q=`) and status filter (`?status=`), onboarding
-  empty state for new users
+- `/dashboard` — opens with one sentence about where things stand, then
+  in order of what can be acted on: Needs a look (failed / still
+  publishing), alerts without a block of their own (dead connection, plan
+  running out), Next up (the focal block — countdown, time, channel and
+  the post itself), recent posts with search (`?q=`) and status filter
+  (`?status=`), channels, a quiet plan row, and activity charts that
+  appear only once there is history worth charting; onboarding empty
+  state for new users
 - `/posts` — post list with `?status=` filter (All / Draft / Scheduled /
   Publishing / Published / Partially published / Failed)
 - `/calendar` — visual content calendar (month grid, per-day posts with
@@ -204,11 +208,20 @@ invariants and the fail-open/fail-closed matrix:
 
 ## Design system
 
-- Neutral CSS-variable tokens (`src/app/globals.css`), semantic colors
-  only, light mode primary with `.dark` overrides, no hardcoded palette values.
+- CSS-variable tokens (`src/app/globals.css`), semantic colors only, no
+  hardcoded palette values.
+- **Dark by default, light opt-in.** The theme class is set on `<html>`
+  before first paint (`src/hooks/use-theme.ts`), persists in
+  `localStorage` and is switched from Appearance in the account menu.
+- **Red brand hue** for primary actions, kept a step off the error red;
+  the scheduled state uses info blue so routine work never looks like an
+  alert.
+- **Blocks carry no outline:** a tile is `--panel`, one shade off the
+  page; a block nested inside a tile goes inset (`bg-bg`). List rows are
+  rounded surfaces separated by spacing, not hairline bands.
 - Shared components (`src/components`): `PageHeader`, `StatusBadge`,
-  `AuthShell`, `MobileTopBar`, `PageContainer` (`max-w-3xl/5xl/6xl`,
-  `px-4 py-6 md:px-8 md:py-10`), plus Radian UI primitives in
+  `AuthShell`, `MobileTopBar`, `PageContainer` (page-width tokens
+  `--page-narrow/default/wide`), plus Radian UI primitives in
   `src/components/ui` (Radix UI) and PostVIA custom components
   (`Field` forms, `Toast` notifications).
 - Conventions: `FieldGroup` + `Field` forms with `data-invalid` /

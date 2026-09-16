@@ -2,15 +2,32 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOutIcon, SparklesIcon } from "lucide-react";
+import {
+  ChevronsUpDownIcon,
+  LogOutIcon,
+  MoonIcon,
+  SparklesIcon,
+  SunIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
+import { useTheme } from "@/hooks/use-theme";
 import type { PlanId } from "@/lib/plans";
-import { isActivePath, navItems } from "@/components/nav-items";
+import { accountMenuItems, isActivePath, navItems } from "@/components/nav-items";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Divider } from "@/components/ui/divider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuDivider,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -46,6 +63,7 @@ export function Sidebar({
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const initial = userName.trim().charAt(0).toUpperCase() || "U";
+  const { theme, setTheme } = useTheme();
 
   async function handleSignOut() {
     try {
@@ -70,13 +88,14 @@ export function Sidebar({
   }
 
   return (
-    <SidebarPrimitive variant="inset" collapsible="icon">
-      <SidebarHeader className="flex-row items-center justify-between gap-2 border-b border-border px-4 py-3.5">
-        {collapsed ? (
-          <p aria-hidden="true" className="font-heading text-lg font-semibold tracking-tight">
-            p
-          </p>
-        ) : (
+    <SidebarPrimitive variant="inset" collapsible="icon" theme="gray">
+      <SidebarHeader
+        className={cn(
+          "flex-row items-center border-b border-border py-3.5",
+          collapsed ? "justify-center px-1.5" : "justify-between gap-2 px-4"
+        )}
+      >
+        {!collapsed && (
           <p className="font-heading text-lg font-semibold tracking-tight">postvia</p>
         )}
         <SidebarTrigger
@@ -87,7 +106,7 @@ export function Sidebar({
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {navItems.map((item) => {
                 const isActive = isActivePath(pathname, item.href);
                 const Icon = item.icon;
@@ -96,6 +115,7 @@ export function Sidebar({
                     <SidebarMenuButton
                       isActive={isActive}
                       tooltip={item.label}
+                      className="rounded-full"
                       asChild
                     >
                       <Link
@@ -116,7 +136,7 @@ export function Sidebar({
           <div className="px-3 pt-1 pb-2">
             <Link
               href="/billing"
-              className="block rounded-xl border border-border bg-fill1 p-3 outline-none transition-colors hover:bg-fill2 focus-visible:ring-2 focus-visible:ring-primary-focus"
+              className="block rounded-xl bg-bg p-3 outline-none transition-colors hover:bg-fill1 focus-visible:ring-2 focus-visible:ring-primary-focus"
             >
               <p className="flex items-center gap-1.5 text-sm leading-5 font-medium">
                 <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
@@ -135,60 +155,99 @@ export function Sidebar({
       <SidebarFooter
         className={cn("border-t border-border", collapsed ? "p-2" : "p-3")}
       >
-        <div className={cn("flex items-center gap-3 px-1", collapsed && "justify-center px-0")}>
-          <Avatar>
-            <AvatarFallback>{initial}</AvatarFallback>
-          </Avatar>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 text-sm">
-              <p className="truncate leading-5 font-medium">{userName}</p>
-              <p className="truncate text-xs leading-4 text-muted-foreground">
-                {userEmail}
-              </p>
-            </div>
-          )}
-        </div>
-        {collapsed ? (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => void handleSignOut()}
-            aria-label="Sign out"
-            title="Sign out"
-            className="mt-2 w-full"
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Account menu"
+            className={cn(
+              "flex w-full items-center rounded-lg outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-primary-focus",
+              collapsed ? "justify-center p-1" : "gap-2.5 px-1.5 py-1.5"
+            )}
           >
-            <LogOutIcon />
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            onClick={() => void handleSignOut()}
-            className="mt-2 w-full justify-start font-normal"
-          >
-            <LogOutIcon data-icon="inline-start" />
-            Sign out
-          </Button>
-        )}
-        {!collapsed && (
-          <>
-            <Divider className="my-2.5" />
-            <div className="flex items-center gap-2 px-2 text-xs leading-4 text-muted-foreground">
-              <Link
-                href="/terms"
-                className="rounded-sm transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                Terms
-              </Link>
-              <span aria-hidden="true">&middot;</span>
-              <Link
-                href="/privacy"
-                className="rounded-sm transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                Privacy
-              </Link>
+            <Avatar>
+              <AvatarFallback>{initial}</AvatarFallback>
+            </Avatar>
+            {!collapsed && (
+              <>
+                <div className="min-w-0 flex-1 text-left text-sm">
+                  <p className="truncate leading-5 font-medium">{userName}</p>
+                  <p className="truncate text-xs leading-4 text-muted-foreground">
+                    {userEmail}
+                  </p>
+                </div>
+                <ChevronsUpDownIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground"
+                />
+              </>
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" side="top" className="w-56">
+            <div className="flex items-center gap-2.5 px-2 py-1.5">
+              <Avatar>
+                <AvatarFallback>{initial}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1 text-sm">
+                <p className="truncate leading-5 font-medium">{userName}</p>
+                <p className="truncate text-xs leading-4 text-muted-foreground">
+                  {userEmail}
+                </p>
+              </div>
             </div>
-          </>
-        )}
+            <DropdownMenuDivider />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                {theme === "dark" ? (
+                  <MoonIcon aria-hidden="true" />
+                ) : (
+                  <SunIcon aria-hidden="true" />
+                )}
+                Appearance
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuRadioGroup
+                  value={theme}
+                  onValueChange={(value) => setTheme(value as "light" | "dark")}
+                >
+                  <DropdownMenuRadioItem value="light">
+                    <SunIcon aria-hidden="true" />
+                    Light
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="dark">
+                    <MoonIcon aria-hidden="true" />
+                    Dark
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuDivider />
+            {accountMenuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <DropdownMenuItem key={item.href} asChild>
+                  <Link href={item.href}>
+                    <Icon aria-hidden="true" />
+                    {item.label}
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuDivider />
+            <DropdownMenuItem asChild>
+              <Link href="/terms">Terms of Service</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/privacy">Privacy Policy</Link>
+            </DropdownMenuItem>
+            <DropdownMenuDivider />
+            <DropdownMenuItem
+              onSelect={() => void handleSignOut()}
+              className="text-error-text [&_svg]:text-error-text"
+            >
+              <LogOutIcon aria-hidden="true" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
       <SidebarRail />
     </SidebarPrimitive>

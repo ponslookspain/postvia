@@ -299,7 +299,7 @@ export function CalendarView({
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl border border-border bg-card px-3 py-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-1">
           <Button
             variant="ghost"
@@ -336,7 +336,7 @@ export function CalendarView({
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section aria-label={`Posts in ${title}`}>
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-2xl border border-border bg-border">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-2xl bg-border">
             {WEEKDAYS.map((day) => (
               <div
                 key={day}
@@ -443,7 +443,7 @@ export function CalendarView({
           )}
         </section>
 
-        <aside aria-labelledby="drafts-heading" className="min-w-0 rounded-2xl border border-border bg-card p-4">
+        <aside aria-labelledby="drafts-heading" className="min-w-0 rounded-2xl bg-panel p-4">
           <div className="flex items-baseline justify-between gap-3">
             <h2
               id="drafts-heading"
@@ -474,7 +474,7 @@ export function CalendarView({
                       onDragStart={startDrag(post.id)}
                       title="Drag onto a day to schedule"
                       className={cn(
-                        "flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background p-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
+                        "flex min-w-0 items-center gap-2 rounded-lg bg-background p-2 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50",
                         droppingId === post.id && "opacity-50"
                       )}
                     >

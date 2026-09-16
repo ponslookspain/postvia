@@ -1,40 +1,54 @@
 import Link from "next/link";
-import { TriangleAlertIcon } from "lucide-react";
+import { InfoIcon, TriangleAlertIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { Insight } from "@/lib/dashboard-analytics";
 
 /**
- * Operational insights: failures, expiries, quota, schedule.
- * Plain rows with an action link where one exists — no invented
- * engagement data, everything links to a real surface.
+ * Two weights only: something broke (error tint) and something worth
+ * knowing (warning tint). A heads-up must never look like a failure —
+ * that is what makes a dashboard feel like it is nagging.
  */
 export function InsightList({ insights }: { insights: Insight[] }) {
   if (insights.length === 0) return null;
   return (
     <ul className="flex flex-col gap-2">
-      {insights.map((insight) => (
-        <li
-          key={insight.text}
-          className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2"
-        >
-          <p className="flex min-w-0 items-center gap-2 text-sm">
-            {insight.variant === "attention" && (
-              <TriangleAlertIcon
-                aria-hidden="true"
-                className="size-4 shrink-0 text-error-text"
-              />
+      {insights.map((insight) => {
+        const problem = insight.variant === "problem";
+        const Icon = problem ? TriangleAlertIcon : InfoIcon;
+        return (
+          <li
+            key={insight.text}
+            className={cn(
+              "flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3",
+              problem
+                ? "border-error-border/40 bg-error-accent"
+                : "border-warning/30 bg-warning/10"
             )}
-            <span className="min-w-0">{insight.text}</span>
-          </p>
-          {insight.href && (
-            <Link
-              href={insight.href}
-              className="shrink-0 rounded-sm text-[13px] font-medium text-primary transition-colors outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
-            >
-              Review
-            </Link>
-          )}
-        </li>
-      ))}
+          >
+            <p className="flex min-w-0 items-center gap-2.5 text-sm">
+              <Icon
+                aria-hidden="true"
+                className={cn(
+                  "size-4 shrink-0",
+                  problem ? "text-error-text" : "text-warning"
+                )}
+              />
+              <span className="min-w-0">{insight.text}</span>
+            </p>
+            {insight.href && (
+              <Link
+                href={insight.href}
+                className={cn(
+                  "shrink-0 rounded-sm text-[13px] font-medium transition-colors outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50",
+                  problem ? "text-error-text" : "text-warning"
+                )}
+              >
+                {insight.action ?? "Review"}
+              </Link>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

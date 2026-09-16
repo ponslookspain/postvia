@@ -17,19 +17,19 @@ export type FeedPost = {
 };
 
 /**
- * Visual feed row shared by the dashboard sections. Content first
- * (thumbnail, text), action second (whole row links to the post),
- * metadata third (platforms, status, date) — no boxes, hairlines only.
+ * Feed row shared by the dashboard lists. The interactive surface is a
+ * rounded panel inset from the content, so the hover reads as "this row"
+ * rather than a band pinned to the block's edges and the rule above it.
+ * Rows are separated by spacing, not hairlines — a hairline and a hover
+ * highlight fight for the same gap.
  */
 export function PostRow({
   post,
   index = 0,
-  large = false,
   error,
 }: {
   post: FeedPost;
   index?: number;
-  large?: boolean;
   error?: string | null;
 }) {
   const preview = post.media[0];
@@ -40,15 +40,10 @@ export function PostRow({
     >
       <Link
         href={`/posts/${post.id}`}
-        className="group flex items-start gap-4 py-5 outline-none transition-colors hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 sm:gap-5"
+        className="group flex items-center gap-4 rounded-xl px-2.5 py-3.5 outline-none transition-colors hover:bg-fill1-alpha focus-visible:bg-fill1-alpha focus-visible:ring-2 focus-visible:ring-ring/50 sm:gap-5"
       >
-        {preview ? (
-          <span
-            className={cn(
-              "relative block shrink-0 overflow-hidden rounded-lg bg-muted",
-              large ? "size-24 sm:size-28" : "size-20 sm:size-24"
-            )}
-          >
+        {preview && (
+          <span className="relative block size-16 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-20">
             {preview.type === "IMAGE" ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -66,20 +61,10 @@ export function PostRow({
               </span>
             )}
           </span>
-        ) : (
-          <span
-            aria-hidden="true"
-            className="mt-2 hidden size-2 shrink-0 rounded-full bg-border sm:block"
-          />
         )}
         <span className="min-w-0 flex-1">
-          <span
-            className={cn(
-              "block break-words text-foreground line-clamp-2",
-              large ? "text-base leading-snug" : "text-[15px] leading-snug"
-            )}
-          >
-            {post.text}
+          <span className="block text-[15px] leading-snug break-words text-foreground line-clamp-2">
+            {post.text.trim() || "No caption yet"}
           </span>
           <span className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -105,7 +90,7 @@ export function PostRow({
         </span>
         <span
           className={cn(
-            "flex shrink-0 items-center gap-1 pt-0.5 text-sm transition-colors",
+            "flex shrink-0 items-center gap-1 text-sm transition-colors",
             post.status === "FAILED"
               ? "font-medium text-error-text"
               : "text-muted-foreground group-hover:text-foreground"

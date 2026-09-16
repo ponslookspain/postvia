@@ -37,9 +37,9 @@ export function PageContainer({
       data-size={size}
       className={cn(
         "mx-auto w-full min-w-0 px-4 py-6 md:px-8 md:py-8",
-        size === "narrow" && "max-w-3xl",
-        size === "default" && "max-w-5xl",
-        size === "wide" && "max-w-6xl",
+        size === "narrow" && "max-w-(--page-narrow)",
+        size === "default" && "max-w-(--page-default)",
+        size === "wide" && "max-w-(--page-wide)",
         className
       )}
     >

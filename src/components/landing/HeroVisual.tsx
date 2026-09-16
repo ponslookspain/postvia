@@ -138,7 +138,7 @@ export function HeroVisual() {
         style={{ animationDelay: "900ms" }}
         className="absolute -right-3 -bottom-6 hidden animate-[post-in_.5s_ease_both] motion-reduce:animate-none sm:block md:-right-8"
       >
-        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-3.5 py-2.5 shadow-lg shadow-foreground/5">
+        <div className="flex items-center gap-2.5 rounded-xl bg-panel px-3.5 py-2.5 shadow-lg shadow-foreground/5">
           <span className="flex size-7 items-center justify-center rounded-full bg-success/10">
             <CheckIcon className="size-4 text-success" />
           </span>

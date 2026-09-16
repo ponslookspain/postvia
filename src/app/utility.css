@@ -180,6 +180,7 @@
 	--color-orange-border: oklch(0.5 0.127 44.136);
 	--color-orange-hover: oklch(0.685 0.186 43.133);
 	--color-orange-text: oklch(0.736 0.151 45.93);
+	--color-orange-fg: oklch(1 0 0);
 
 	/* amber */
 	--color-amber: oklch(0.802 0.171 73.267);

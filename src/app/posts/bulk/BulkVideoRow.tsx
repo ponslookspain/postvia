@@ -57,7 +57,7 @@ export function BulkVideoRow({
   onRemove: () => void;
 }) {
   return (
-    <li className="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2">
+    <li className="flex items-center gap-3 rounded-lg bg-background px-3 py-2">
       <span
         aria-hidden="true"
         className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground"

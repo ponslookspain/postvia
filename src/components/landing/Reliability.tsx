@@ -56,7 +56,7 @@ export function Reliability() {
             {(["INSTAGRAM", "THREADS", "TIKTOK", "X"] as const).map((platform) => (
               <span
                 key={platform}
-                className="flex size-9 items-center justify-center rounded-full border border-border bg-card"
+                className="flex size-9 items-center justify-center rounded-full bg-panel"
               >
                 <PlatformIcon platform={platform} />
               </span>

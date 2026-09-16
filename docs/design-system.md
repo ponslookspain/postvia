@@ -13,14 +13,59 @@ no proposals — only what the code does today.
 
 ## Color philosophy
 
-- White canvas (`--background`), near-black text, neutral gray muted
+- **Dark is the default theme**, light is opt-in. Both are first-class:
+  the `dark` class is set on `<html>` by a blocking script before first
+  paint (`src/hooks/use-theme.ts`), the choice persists in
+  `localStorage`, and it is switched from Appearance in the account menu.
+- Near-black canvas (`--background`), near-white text, neutral gray
   surfaces. No cream, no warm tints, no gradients, no glow.
-- **One brand hue:** indigo primary (`--primary`,
-  light `oklch(0.488 0.243 264.376)`), reserved for primary actions
-  and the scheduled state. Everything else stays monochrome.
+- **One brand hue:** red primary (`--primary`, light
+  `oklch(0.58 0.22 19)`), reserved for primary actions. It is kept a
+  step off `--error` (hue ~27) in hue and lightness so a call to action
+  never reads as a failure.
+- The scheduled state uses **info blue**, not the brand hue: a routine
+  future-dated post must not look like an alert.
 - Semantic colors only where they mean something: destructive,
   success/warning status dots, per-platform glyph accents (Instagram).
-- Dark mode exists and compiles; light mode is the primary reference.
+
+## Surfaces
+
+- **Blocks are separated by tone, not by a drawn box.** A tile sits on
+  `--panel`, one shade off the page, and carries no outline. `Card` does
+  this by default; hand-rolled tiles use `bg-panel` and no border class.
+- **A block nested inside a tile goes the other way** — `bg-bg`, so it
+  reads as inset instead of vanishing into an identically toned panel.
+- An outline is an accent, not a default: it is legitimate only when it
+  marks something out (the highlighted plan, an aria-invalid field). The
+  `Card` border is `border-transparent`, so a caller can still opt into
+  one without the geometry shifting.
+- The default border color belongs to `@layer base`. Never restate it as
+  an unlayered `* { border-color }` rule — unlayered styles outrank every
+  Tailwind layer and silently disable all `border-*` color utilities.
+
+## List rows
+
+- A clickable row is a **rounded surface**, never a full-bleed band. It
+  spans exactly the block's content width, so the gap from the highlight
+  to the block edge is the same on the left, the right and the bottom,
+  and the highlight lines up with the rule above it.
+- The row carries its own padding, which indents its text slightly from
+  the block title. That is the same relationship the `Next up` block
+  uses; aligning the text instead would push the highlight past the
+  block's padding and break the even gap.
+- Hover is `bg-fill1-alpha` — a 4% lift. It must stay clearly below the
+  tone of any thumbnail or icon tile inside the row, otherwise hovering
+  reads as the row lighting up rather than being pointed at.
+- **Rows are separated by spacing, not hairlines.** A hairline and a
+  hover highlight compete for the same gap; pick the highlight. Keep
+  hairlines only for structural splits (header from list, filter from
+  results), inset to the block's content padding so every rule on the
+  page lines up.
+- Row content is vertically centered (`items-center`) — thumbnail, text
+  and the trailing affordance share one axis.
+- No decorative placeholders. An empty slot where a thumbnail would go
+  stays empty; a dot that stands in for missing media says nothing and
+  reads as a status the row does not have.
 
 ## Typography
 
@@ -59,24 +104,36 @@ no proposals — only what the code does today.
    hand-rolled strips; plain underline treatments remain for inline
    text links only.
 
-## Cards / surfaces
+## Cards
 
-- `Card` is a white bordered `rounded-2xl` discrete object
-  (header/title/description/content/footer composition). It is **not**
-  the default layout primitive: major areas are canvas sections
-  separated by whitespace; lists use hairline `divide-y` rows.
+- `Card` is the block primitive: `rounded-2xl`, `bg-panel`, no outline,
+  with header/title/description/action/content/footer composition.
+- Its `size="sm"` padding rule (`data-[size=sm]:…px-4`) outranks a
+  `px-0` passed by a caller, so content inside a card is always inset by
+  the card padding. Align rules and rows to that inset rather than
+  fighting it — that is what keeps every divider on a page in one line.
 - No shadows except true floating UI (popover/dialog/drawer/toast).
-- Shadows, gradients and decorative borders are out.
+  Gradients and decorative borders are out.
 
 ## Navigation / sidebar
 
-- Radian sidebar primitive (`ui/sidebar.tsx`,
-  `ui/tooltip.tsx`, `ui/drawer.tsx`, `hooks/use-mobile.ts`):
-  `SidebarProvider`, icon-collapsible rail (`16rem` / `3rem`), tooltips
-  in collapsed mode, keyboard toggle, mobile Drawer.
-- App content (`Sidebar`, `MobileTopBar`, `nav-items.ts`) is Postvia's
-  own: flat routes, `aria-current`, avatar + sign-out + plan upsell.
-  No `inset` variant, no demo nav data.
+- Radian sidebar primitive (`ui/sidebar.tsx`, `ui/tooltip.tsx`,
+  `ui/drawer.tsx`, `hooks/use-mobile.ts`): `SidebarProvider`,
+  icon-collapsible rail (`16rem` / `3rem`), tooltips in collapsed mode,
+  keyboard toggle, mobile Drawer.
+- `variant="inset"` + `theme="gray"`: the rail is a shade off the page
+  and the content sits on it as a rounded panel, so the two are told
+  apart by tone rather than by a divider.
+- Nav items are **pills** (`rounded-full`); the active one is a quiet
+  neutral fill, never the brand hue — the red is for actions.
+- Collapsed geometry is arithmetic, not eyeballing: the rail is `3rem`
+  and a nav button is `size-8`, so the group padding must be `px-2` for
+  the icons to sit centered. Same for the header, where the wordmark is
+  dropped entirely and only the toggle remains.
+- The footer is one account trigger opening a `DropdownMenu`: profile,
+  Appearance (light/dark), Settings, Billing, legal links, sign out.
+  Settings and Billing live there, not in the primary nav
+  (`accountMenuItems` in `nav-items.ts`, shared with `MobileTopBar`).
 
 ## Dialogs / popovers / sheets
 
@@ -109,9 +166,14 @@ no proposals — only what the code does today.
 
 ## Screen notes (actual)
 
-- **Dashboard:** greeting header + single primary CTA, editorial stat
-  strip, usage card, hairline post lists, quiet underline filter,
-  plain accounts section, minimal first-run block.
+- **Dashboard:** greeting + **one sentence** about the month's rhythm
+  and a single primary CTA — no KPI tile wall. Then, in order of what
+  can be acted on: anything that failed, alerts that have no block of
+  their own, `Next up` (the focal block: countdown, time, channel and
+  the post itself), recent posts, channels, a quiet plan row. Charts
+  live last and only appear once there are at least three posts —
+  twelve empty bars are ceremony, not insight. First run keeps the
+  minimal two-step block.
 - **Composer:** dominant borderless editor, channels → media →
   schedule utility, sticky rail (borderless preview mock, single
   publish `Card`), one schedule dialog (no duplicate date/time entry),
@@ -126,6 +188,25 @@ no proposals — only what the code does today.
   description), `FieldSeparator` OAuth divider, centered code input;
   all flows/gating/copy preserved (see `docs/auth-ui.md`).
 
+## Voice
+
+- Write sentences, not readouts. "Nothing has gone out this month yet —
+  1 post is lined up" beats a row of counters that includes four zeros.
+- Say a thing once per page. If a block already states the next post's
+  time, the page header must not repeat it, and an alert must not
+  duplicate a list that is visible right above it.
+- Time is spoken the way a person says it: "tomorrow at 09:00",
+  "Saturday at 14:00", "in 2 weeks" — not a bare timestamp
+  (`formatTimeUntil` in `lib/dashboard-analytics.ts`).
+- Labels name the thing, not the system: "Your channels / Where your
+  posts go", not "Platforms and accounts / Publish totals, success rate
+  and connection state per platform".
+- Two weights for notices: a **problem** (something broke, error tint)
+  and a **heads-up** (worth knowing, warning tint). A heads-up must
+  never wear the failure colors.
+- Don't show a chart, a percentage or a metric that has no data behind
+  it yet; hide the block instead.
+
 ## Hard rules
 
 1. No new global design tokens without necessity — extend the Radian
@@ -136,3 +217,6 @@ no proposals — only what the code does today.
    documented platform accents only.
 5. Compose from installed primitives; verify with `lint` +
    `typecheck` before every commit.
+6. Never restate a base style as an unlayered CSS rule — it outranks
+   every Tailwind utility and disables the class silently.
+7. Blocks get no outline; separation is tone and spacing.

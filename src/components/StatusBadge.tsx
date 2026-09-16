@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
  * reads the same at every size.
  *
  * Dots carry the hue; badge shells stay quiet (neutral outline) except
- * Failed, which uses the error tint. Signal indigo is reserved
- * for Scheduled, the only state that promises future action.
+ * Failed, which uses the error tint. Scheduled uses info blue — distinct
+ * from both the red brand/primary accent and the red error state, so a
+ * routine future-dated post never reads as a warning.
  */
 const DOT_CLASS: Record<string, string> = {
   DRAFT: "bg-muted-foreground",
-  SCHEDULED: "bg-signal",
+  SCHEDULED: "bg-info",
   PUBLISHING: "animate-pulse bg-warning",
   PUBLISHED: "bg-success",
   PARTIALLY_PUBLISHED: "bg-warning",
@@ -63,7 +64,7 @@ export function StatusBadge({
       color={style.color}
       className={cn(
         status === "SCHEDULED" &&
-          "border-signal/30 bg-signal/10 text-signal dark:text-signal",
+          "border-info/30 bg-info/10 text-info dark:text-info",
         status === "PUBLISHED" &&
           "border-success/30 bg-success/10 text-success dark:text-success",
         status === "PUBLISHING" &&

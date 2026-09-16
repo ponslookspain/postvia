@@ -742,7 +742,7 @@ function SidebarGroup({ className, ...props }: SidebarGroupProps) {
 			data-slot="sidebar-group"
 			data-sidebar="group"
 			className={cn(
-				"relative flex w-full min-w-0 flex-col px-3 py-1.5 group-data-[state=collapsed]:px-3.5",
+				"relative flex w-full min-w-0 flex-col px-3 py-1.5 group-data-[state=collapsed]:px-2",
 				className
 			)}
 			{...props}
