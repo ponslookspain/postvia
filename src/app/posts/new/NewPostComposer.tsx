@@ -115,6 +115,15 @@ type PrepareResponse = {
   pathname: string;
 };
 
+/**
+ * Production-safe bound for the direct browser→Blob PUT phase only
+ * (`await uploadPresigned(...)`). A stalled transport resolves to a
+ * named, user-visible timeout instead of hanging `Saving...` forever.
+ * Does not touch token generation, webhook verification, or
+ * registration polling.
+ */
+const UPLOAD_PUT_TIMEOUT_MS = 30_000;
+
 function uploadFileToPost(
   postId: string,
   file: File,
@@ -122,6 +131,7 @@ function uploadFileToPost(
 ): Promise<string | null> {
   return new Promise((resolve) => {
     (async () => {
+      const uploadStart = Date.now();
       try {
         onProgress(0);
 
@@ -155,11 +165,22 @@ function uploadFileToPost(
         // webhook registration key): the SDK echo is ignored so a
         // re-encoded/non-ASCII echo can never desync registration polling
         // from the stored object.
+        //
+        // The PUT phase is time-bounded: a transport that never settles
+        // is aborted at UPLOAD_PUT_TIMEOUT_MS and reported as a named
+        // timeout instead of hanging the composer indefinitely.
+        const putController = new AbortController();
+        let putTimedOut = false;
+        const putTimer = setTimeout(() => {
+          putTimedOut = true;
+          putController.abort();
+        }, UPLOAD_PUT_TIMEOUT_MS);
         try {
           const { uploadPresigned } = await import("@vercel/blob/client");
           await uploadPresigned(pathname, file, {
             access: "private",
             handleUploadUrl: "/api/media/upload",
+            abortSignal: putController.signal,
             clientPayload: JSON.stringify({
               postId,
               filename: file.name,
@@ -171,10 +192,29 @@ function uploadFileToPost(
               onProgress(Math.min(100, Math.round(percentage))),
           });
         } catch (error) {
+          if (putTimedOut) {
+            reportError(
+              "composer-client",
+              "media upload timed out",
+              error,
+              {
+                stage: "blob-upload-timeout",
+                elapsedMs: Date.now() - uploadStart,
+                fileSize: file.size,
+                mimeType: file.type,
+              }
+            );
+            // Do NOT proceed to registration polling: without a
+            // completed PUT there is nothing to register.
+            resolve("Media upload timed out. Please try again.");
+            return;
+          }
           const message =
             error instanceof Error ? error.message : "Unknown upload error";
           resolve(`Upload failed: ${message}`);
           return;
+        } finally {
+          clearTimeout(putTimer);
         }
         onProgress(100);
 

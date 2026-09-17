@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://api.stripe.com https://*.sentry.io https://*.ingest.sentry.io https://*.blob.vercel-storage.com https://*.vercel-storage.com",
+      "connect-src 'self' https://api.stripe.com https://*.sentry.io https://*.ingest.sentry.io https://*.blob.vercel-storage.com https://*.vercel-storage.com https://vercel.com/api/blob/",
       "frame-src https://js.stripe.com",
       "frame-ancestors 'none'",
       "object-src 'none'",
