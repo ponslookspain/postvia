@@ -84,7 +84,7 @@ export function ComposerCard({
               placeholder="Write something worth publishing..."
               rows={6}
               aria-invalid={hasOverLimit || undefined}
-              className="min-h-40 border-0 bg-muted/40 px-4 text-prose leading-relaxed shadow-none focus-visible:ring-2"
+              className="min-h-40 text-prose leading-relaxed"
             />
             {hasOverLimit ? (
               <FieldError>
