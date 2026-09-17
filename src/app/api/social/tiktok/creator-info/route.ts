@@ -41,8 +41,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "accountId is required" }, { status: 400 });
     }
 
+    // The refresh path genuinely needs the token columns, so they are named
+    // explicitly rather than arriving by accident with the rest of the row.
+    // The response below returns only `username` — never a token field.
     const account = await prisma.socialAccount.findFirst({
       where: { id: accountId, userId: user.id, platform: "TIKTOK" },
+      select: {
+        id: true,
+        username: true,
+        accessToken: true,
+        refreshToken: true,
+        expiresAt: true,
+      },
     });
     if (!account) {
       return NextResponse.json({ error: "TikTok account not found" }, { status: 404 });

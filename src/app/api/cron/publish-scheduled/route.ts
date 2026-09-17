@@ -10,9 +10,11 @@ import {
 } from "@/lib/abuse";
 import {
   ABUSE_EVENT_RETENTION_MS,
+  RATE_BUCKET_GRACE_MS,
   retentionCutoff,
   STRIPE_EVENT_RETENTION_MS,
   sweepAbuseEvents,
+  sweepRateBuckets,
   sweepStripeEvents,
 } from "@/lib/retention";
 import {
@@ -81,6 +83,17 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     reportError("cron", "abuse event sweep failed", error);
   }
+  // Persistent rate-limit buckets: dead once resetAt passes, kept a further
+  // grace window so the sweep never races an in-flight reset. Same
+  // best-effort contract as the sweeps above — a failure never fails the tick.
+  let rateBuckets = 0;
+  try {
+    rateBuckets = await sweepRateBuckets(
+      retentionCutoff(nowMs, RATE_BUCKET_GRACE_MS)
+    );
+  } catch (error) {
+    reportError("cron", "rate bucket sweep failed", error);
+  }
   return NextResponse.json({
     ok: true,
     ...stats,
@@ -88,6 +101,7 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
     tombstones,
     stripeEvents,
     abuseEvents,
+    rateBuckets,
   });
 }
 

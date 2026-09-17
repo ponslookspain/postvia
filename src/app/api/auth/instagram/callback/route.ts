@@ -102,8 +102,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Only the id is used (reconnect updates by id); matching the X and
+    // Threads callbacks, which already select narrowly. Loading the whole row
+    // here would pull the existing access token into the request for nothing.
     const existing = await prisma.socialAccount.findFirst({
       where: { userId: user.id, platform: "INSTAGRAM", externalId: profile.id },
+      select: { id: true },
     });
     const accountData = {
       username: profile.username,

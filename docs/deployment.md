@@ -49,8 +49,18 @@ schedule). Required dashboard policy, to be set manually (one time):
 Do not claim the repo or docs switch these triggers off by themselves.
 
 Cron: `vercel.json` → `0 3 * * *` → `/api/cron/publish-scheduled`
-(once daily — Hobby-plan maximum; scheduled posts can go out up to ~24h
-late; sub-daily needs a paid Vercel plan). Authenticated by `CRON_SECRET`.
+(once daily; scheduled posts can go out up to ~24h late; sub-daily needs a
+paid Vercel plan). Authenticated by `CRON_SECRET`.
+
+> **The "Hobby-plan maximum" claim above is unverified and may be stale.**
+> Three routes declare `maxDuration = 300`, which exceeds the Hobby 60s
+> ceiling, and `.vercel/repo.json` records a team org. Either this project is
+> on Pro (and the cron should be `*/5 * * * *`), or `maxDuration` is being
+> silently clamped to 60s — in which case Threads video publishing, which
+> polls for up to 240s, is being killed mid-poll. Confirm the plan in the
+> Vercel dashboard; see `docs/backend-audit-followup.md` (P0.1).
+> `tests/cron-schedule.test.ts` already pins the safety invariants, so
+> tightening the schedule is a one-line change once the plan is known.
 
 ## Database (Neon, `neondb`, `public` schema)
 

@@ -1,5 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { authorizeMediaUpload } from "../src/lib/media-upload";
 import {
   applyPeriodRules,
@@ -209,5 +211,117 @@ describe("security hardening: rate-limit budgets", () => {
   test("OTP per-IP buckets are roomier than per-email (NAT-safe)", () => {
     assert.ok(OTP_SEND_IP_MAX_PER_HOUR > OTP_SEND_MAX_PER_HOUR);
     assert.ok(OTP_VERIFY_IP_MAX_PER_WINDOW > OTP_VERIFY_MAX_PER_WINDOW);
+  });
+});
+
+/**
+ * Credential-surface guard (P1.5a).
+ *
+ * `SocialAccount` rows carry live publishing credentials
+ * (`accessToken` / `refreshToken`). A route that loads the whole row is one
+ * careless `NextResponse.json(row)` away from handing them to the browser, so
+ * every route-handler query against that table must name its columns.
+ *
+ * This is a static check on purpose: a runtime test can only cover the paths
+ * it happens to exercise, while the risk is a route nobody thought about.
+ */
+describe("security hardening: social tokens never leave via a wide select", () => {
+  const ROUTE_DIR = new URL("../src/app/api/", import.meta.url);
+
+  function routeFiles(dir: URL): URL[] {
+    const out: URL[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const child = new URL(
+        `${entry.name}${entry.isDirectory() ? "/" : ""}`,
+        dir
+      );
+      if (entry.isDirectory()) out.push(...routeFiles(child));
+      else if (entry.name.endsWith(".ts")) out.push(child);
+    }
+    return out;
+  }
+
+  /** Query call sites against socialAccount, with the args object that follows. */
+  function socialAccountReads(source: string): string[] {
+    const reads: string[] = [];
+    const pattern = /socialAccount\s*\.\s*(findMany|findFirst|findUnique)\s*\(/g;
+    for (const match of source.matchAll(pattern)) {
+      // Walk from the opening paren to its match so nested braces are handled.
+      let depth = 0;
+      let i = match.index + match[0].length - 1;
+      const start = i;
+      for (; i < source.length; i++) {
+        if (source[i] === "(") depth++;
+        else if (source[i] === ")") {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+      reads.push(source.slice(start, i + 1));
+    }
+    return reads;
+  }
+
+  test("every route-handler read of SocialAccount names its columns", () => {
+    const offenders: string[] = [];
+    for (const file of routeFiles(ROUTE_DIR)) {
+      const source = readFileSync(file, "utf8");
+      for (const read of socialAccountReads(source)) {
+        if (!/\bselect\s*:/.test(read)) {
+          offenders.push(fileURLToPath(file));
+        }
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      `these route handlers load full SocialAccount rows (tokens included):\n` +
+        offenders.join("\n")
+    );
+  });
+
+  /**
+   * Handlers that legitimately read a token column, with the reason. Reading
+   * a credential is allowed — doing it WITHOUT having decided to is not, so
+   * the allowlist forces the decision to be explicit and reviewable.
+   */
+  const TOKEN_READERS: Record<string, string> = {
+    "api/social/tiktok/creator-info/route.ts":
+      "refreshes the TikTok token before querying creator info",
+    "api/settings/account/route.ts":
+      "revokes each provider token before the account is wiped",
+  };
+
+  test("only documented handlers read a token column", () => {
+    const found: string[] = [];
+    for (const file of routeFiles(ROUTE_DIR)) {
+      const source = readFileSync(file, "utf8");
+      const reads = socialAccountReads(source);
+      const touchesToken = reads.some((read) =>
+        /\b(accessToken|refreshToken)\s*:\s*true/.test(read)
+      );
+      if (!touchesToken) continue;
+      const rel = fileURLToPath(file)
+        .replace(/\\/g, "/")
+        .replace(/^.*?\/src\/app\//, "api/".replace("api/", ""))
+        .replace(/^/, "");
+      found.push(rel.slice(rel.indexOf("api/")));
+    }
+    for (const handler of found) {
+      assert.ok(
+        TOKEN_READERS[handler],
+        `${handler} reads a social token but is not in TOKEN_READERS — ` +
+          `add it with a reason, or narrow the select`
+      );
+    }
+  });
+
+  test("the guard actually detects a wide read", () => {
+    // Proves the matcher is not vacuously passing.
+    const bad = `const a = await prisma.socialAccount.findMany({ where: { userId } });`;
+    const good = `const a = await prisma.socialAccount.findMany({ where: { userId }, select: { id: true } });`;
+    assert.equal(socialAccountReads(bad).length, 1);
+    assert.ok(!/\bselect\s*:/.test(socialAccountReads(bad)[0]));
+    assert.ok(/\bselect\s*:/.test(socialAccountReads(good)[0]));
   });
 });

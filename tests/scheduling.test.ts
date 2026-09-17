@@ -68,8 +68,27 @@ function createFakeDb(seed: { posts: PostRow[] }) {
 
   const db: SchedulingDb = {
     post: {
-      findMany: async (args) =>
-        posts.filter((p) => matchesWhere(p as unknown as Record<string, unknown>, args.where)).map(clonePost),
+      // Honors orderBy + take so the batching contract is actually exercised
+      // (Array.prototype.sort is stable, so ties keep insertion order —
+      // matching how the real index scan behaves for equal sort keys).
+      findMany: async (args) => {
+        const matched = posts.filter((p) =>
+          matchesWhere(p as unknown as Record<string, unknown>, args.where)
+        );
+        const orderKey = args.orderBy
+          ? (Object.keys(args.orderBy)[0] as keyof PostRow)
+          : null;
+        const sorted = orderKey
+          ? [...matched].sort((a, b) => {
+              const av = dateValue(a[orderKey])?.getTime() ?? 0;
+              const bv = dateValue(b[orderKey])?.getTime() ?? 0;
+              return av - bv;
+            })
+          : matched;
+        const limited =
+          typeof args.take === "number" ? sorted.slice(0, args.take) : sorted;
+        return limited.map(clonePost);
+      },
       updateMany: async ({ where, data }) => {
         let count = 0;
         for (const p of posts) {
@@ -347,6 +366,130 @@ describe("runScheduledPublishTick (due-post processing)", () => {
 
     assert.equal(stats.published, 1);
     assert.deepEqual(published, ["p1"]);
+  });
+});
+
+describe("bounded tick batching (P0.2)", () => {
+  /** n due posts, each scheduled one minute further in the past than the last. */
+  function dueBacklog(n: number): PostRow[] {
+    return Array.from({ length: n }, (_, i) =>
+      scheduledPost({
+        id: `p${i}`,
+        // p0 is the most recently due, p{n-1} the oldest-due.
+        scheduledAt: new Date(NOW.getTime() - (i + 1) * MIN),
+        targets: [
+          {
+            id: `t${i}`,
+            postId: `p${i}`,
+            status: "PENDING",
+            platform: "THREADS",
+            externalPostId: null,
+            publishedAt: null,
+          },
+        ],
+      })
+    );
+  }
+
+  test("a due-set larger than the batch claims only batchSize posts", async () => {
+    const { db, posts } = createFakeDb({ posts: dueBacklog(10) });
+    const { fn, published } = okPublish();
+
+    const stats = await runScheduledPublishTick({
+      db,
+      publish: fn,
+      now: NOW,
+      batchSize: 4,
+    });
+
+    assert.equal(stats.checked, 4, "only one batch is read");
+    assert.equal(published.length, 4);
+    assert.equal(
+      posts.filter((p) => p.status === "SCHEDULED").length,
+      6,
+      "the rest stay SCHEDULED for the next tick — bounded, not dropped"
+    );
+  });
+
+  test("the batch is oldest-DUE-first, not oldest-created-first", async () => {
+    // Every post is created at the same instant, so only scheduledAt can
+    // produce this ordering: p9 is the longest overdue.
+    const { db } = createFakeDb({ posts: dueBacklog(10) });
+    const { fn, published } = okPublish();
+
+    await runScheduledPublishTick({
+      db,
+      publish: fn,
+      now: NOW,
+      batchSize: 3,
+    });
+
+    assert.deepEqual(published, ["p9", "p8", "p7"]);
+  });
+
+  test("successive ticks drain the backlog without re-publishing a claimed post", async () => {
+    const { db, posts } = createFakeDb({ posts: dueBacklog(10) });
+    const published: string[] = [];
+    const { fn } = okPublish(published);
+
+    for (let tick = 0; tick < 3; tick++) {
+      await runScheduledPublishTick({ db, publish: fn, now: NOW, batchSize: 4 });
+    }
+
+    assert.equal(published.length, 10, "backlog drains across ticks");
+    assert.equal(
+      new Set(published).size,
+      10,
+      "the conditional claim still guarantees one publish per post"
+    );
+    assert.equal(posts.filter((p) => p.status === "SCHEDULED").length, 0);
+  });
+
+  test("overlapping ticks over one batch still publish each post once", async () => {
+    const { db } = createFakeDb({ posts: dueBacklog(6) });
+    const published: string[] = [];
+    const { fn } = okPublish(published);
+
+    // Two invocations racing over the same bounded batch (a */5 cadence can
+    // overlap a tick that runs close to maxDuration).
+    await Promise.all([
+      runScheduledPublishTick({ db, publish: fn, now: NOW, batchSize: 6 }),
+      runScheduledPublishTick({ db, publish: fn, now: NOW, batchSize: 6 }),
+    ]);
+
+    assert.equal(published.length, 6);
+    assert.equal(new Set(published).size, 6, "no duplicate publish");
+  });
+
+  test("the recovery pass is bounded and oldest-stuck-first", async () => {
+    const stuck = Array.from({ length: 8 }, (_, i) =>
+      scheduledPost({
+        id: `s${i}`,
+        status: "PUBLISHING",
+        // s7 has been stuck the longest.
+        updatedAt: new Date(NOW.getTime() - STALE_PUBLISHING_MS - (i + 1) * MIN),
+        scheduledAt: new Date(NOW.getTime() - MIN),
+        targets: [
+          {
+            id: `st${i}`,
+            postId: `s${i}`,
+            status: "PUBLISHING",
+            platform: "THREADS",
+            externalPostId: null,
+            publishedAt: null,
+          },
+        ],
+      })
+    );
+    const { db, posts } = createFakeDb({ posts: stuck });
+
+    const stats = await recoverStalePublishing(db, NOW, { batchSize: 3 });
+
+    assert.equal(stats.recovered, 3, "only one batch is recovered per pass");
+    const recovered = posts
+      .filter((p) => p.status === "SCHEDULED")
+      .map((p) => p.id);
+    assert.deepEqual(recovered, ["s5", "s6", "s7"].sort());
   });
 });
 

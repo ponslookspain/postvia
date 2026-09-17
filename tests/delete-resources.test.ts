@@ -1,6 +1,9 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  BLOB_DELETE_CHUNK,
+  chunkPathnames,
+  runAccountDeleteFlow,
   runMediaDeleteFlow,
   runPostDeleteFlow,
 } from "../src/lib/delete-resources";
@@ -183,5 +186,171 @@ describe("runMediaDeleteFlow", () => {
     assert.deepEqual(recorder.events, [
       { scope: "media", event: "media blob delete failed after row delete" },
     ]);
+  });
+});
+
+/**
+ * Account deletion (P1.6).
+ *
+ * Contract: DB-first, exactly like the flows above. A failed transaction must
+ * remove NOTHING (the previous implementation deleted the bytes first, so a
+ * failed transaction left the user alive with rows pointing at missing
+ * bytes), and a failed blob delete must still report success — the account is
+ * gone, and the leftovers are orphans the 24h sweep reclaims.
+ */
+describe("runAccountDeleteFlow", () => {
+  test("happy path: rows first, then the blobs", async () => {
+    const calls: string[] = [];
+    const outcome = await runAccountDeleteFlow({
+      userId: "u1",
+      mediaPathnames: ["media/u1/p1/a.png", "media/u1/p2/b.mp4"],
+      deleteAccountRows: async () => {
+        calls.push("rows");
+      },
+      deleteBlobs: async (pathnames) => {
+        calls.push(`blobs:${pathnames.join(",")}`);
+      },
+      report: makeReport().report,
+    });
+
+    assert.deepEqual(outcome, { outcome: "deleted" });
+    assert.deepEqual(calls, [
+      "rows",
+      "blobs:media/u1/p1/a.png,media/u1/p2/b.mp4",
+    ]);
+  });
+
+  test("a failed transaction touches NO storage", async () => {
+    const calls: string[] = [];
+    const recorder = makeReport();
+    const outcome = await runAccountDeleteFlow({
+      userId: "u1",
+      mediaPathnames: ["media/u1/p1/a.png"],
+      deleteAccountRows: async () => {
+        throw new Error("P2028 transaction timeout");
+      },
+      deleteBlobs: async (pathnames) => {
+        calls.push(`blobs:${pathnames.join(",")}`);
+      },
+      report: recorder.report,
+    });
+
+    assert.deepEqual(outcome, { outcome: "failed" });
+    assert.deepEqual(
+      calls,
+      [],
+      "the bytes must survive so the user can retry the delete"
+    );
+    assert.deepEqual(recorder.events, [
+      { scope: "account", event: "account delete transaction failed" },
+    ]);
+  });
+
+  test("a failed blob delete still deletes the account", async () => {
+    const recorder = makeReport();
+    const outcome = await runAccountDeleteFlow({
+      userId: "u1",
+      mediaPathnames: ["media/u1/p1/a.png"],
+      deleteAccountRows: async () => {},
+      deleteBlobs: async () => {
+        throw new Error("blob store down");
+      },
+      report: recorder.report,
+    });
+
+    assert.deepEqual(outcome, {
+      outcome: "deleted-with-orphans",
+      orphanPathnames: ["media/u1/p1/a.png"],
+    });
+    assert.deepEqual(recorder.events, [
+      { scope: "account", event: "account blob delete failed after row delete" },
+    ]);
+  });
+
+  test("an unbounded media set is deleted in bounded chunks", async () => {
+    const pathnames = Array.from({ length: 250 }, (_, i) => `media/u1/p/${i}`);
+    const chunks: number[] = [];
+
+    const outcome = await runAccountDeleteFlow({
+      userId: "u1",
+      mediaPathnames: pathnames,
+      deleteAccountRows: async () => {},
+      deleteBlobs: async (batch) => {
+        chunks.push(batch.length);
+      },
+      chunkSize: 100,
+      report: makeReport().report,
+    });
+
+    assert.deepEqual(outcome, { outcome: "deleted" });
+    assert.deepEqual(
+      chunks,
+      [100, 100, 50],
+      "never one call with every key a user ever stored"
+    );
+  });
+
+  test("one failing chunk does not strand the others", async () => {
+    const pathnames = Array.from({ length: 30 }, (_, i) => `media/u1/p/${i}`);
+    const deleted: string[] = [];
+    const recorder = makeReport();
+
+    const outcome = await runAccountDeleteFlow({
+      userId: "u1",
+      mediaPathnames: pathnames,
+      deleteAccountRows: async () => {},
+      deleteBlobs: async (batch) => {
+        if (batch[0] === "media/u1/p/10") throw new Error("chunk failed");
+        deleted.push(...batch);
+      },
+      chunkSize: 10,
+      report: recorder.report,
+    });
+
+    assert.equal(outcome.outcome, "deleted-with-orphans");
+    if (outcome.outcome !== "deleted-with-orphans") return;
+    assert.equal(outcome.orphanPathnames.length, 10, "only the failed chunk");
+    assert.equal(deleted.length, 20, "the other chunks still went through");
+    assert.equal(recorder.events.length, 1);
+  });
+
+  test("an account with no media skips blob work entirely", async () => {
+    const calls: string[] = [];
+    const outcome = await runAccountDeleteFlow({
+      userId: "u1",
+      mediaPathnames: [],
+      deleteAccountRows: async () => {
+        calls.push("rows");
+      },
+      deleteBlobs: async () => {
+        calls.push("blobs");
+      },
+      report: makeReport().report,
+    });
+
+    assert.deepEqual(outcome, { outcome: "deleted" });
+    assert.deepEqual(calls, ["rows"]);
+  });
+});
+
+describe("chunkPathnames", () => {
+  test("splits evenly and keeps the remainder", () => {
+    assert.deepEqual(chunkPathnames(["a", "b", "c", "d", "e"], 2), [
+      ["a", "b"],
+      ["c", "d"],
+      ["e"],
+    ]);
+  });
+
+  test("an empty list yields no chunks (no empty delete call)", () => {
+    assert.deepEqual(chunkPathnames([], 10), []);
+  });
+
+  test("a list shorter than the chunk stays one chunk", () => {
+    assert.deepEqual(chunkPathnames(["a"], 100), [["a"]]);
+  });
+
+  test("the default chunk size is bounded", () => {
+    assert.ok(BLOB_DELETE_CHUNK > 0 && BLOB_DELETE_CHUNK <= 1000);
   });
 });

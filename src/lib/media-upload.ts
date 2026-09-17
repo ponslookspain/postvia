@@ -16,8 +16,14 @@ import {
 } from "@/lib/blob";
 import { selectImageOptimization } from "@/lib/media-optimize";
 import {
+  SIGNATURE_PROBE_BYTES,
+  verifyMediaSignature,
+  type SignatureCheck,
+} from "@/lib/media-signature";
+import {
   logDiagnostic,
   logErrorDiagnostic,
+  mediaTrace,
   safePathname,
 } from "@/lib/diagnostics";
 
@@ -195,10 +201,14 @@ export async function reserveUploadPathname(input: {
     input.filename
   );
   logDiagnostic("media", "upload path reserved", {
-    stage: "prepare",
+    ...mediaTrace({
+      stage: "prepare",
+      userId: authorized.userId,
+      postId: authorized.postId,
+      pathname,
+    }),
     size: input.size,
     mimeType: input.mimeType,
-    pathname: safePathname(pathname),
   });
   return { ok: true, pathname };
 }
@@ -319,21 +329,215 @@ export function validateCompletedUpload(input: {
 }
 
 /**
+ * The three DB operations a completed upload needs, as a seam so the
+ * registration contract (cap enforcement, idempotency) is testable without a
+ * database. `withPostLock` must serialize concurrent registrations for one
+ * post — see `liveMediaRegistrationStore`.
+ */
+export type MediaRegistrationTx = {
+  countForPost: (postId: string, userId: string) => Promise<number>;
+  findByPathname: (pathname: string) => Promise<{ id: string } | null>;
+  create: (data: {
+    userId: string;
+    postId: string;
+    url: string;
+    pathname: string;
+    filename: string;
+    mimeType: string;
+    size: number;
+    type: MediaKind;
+  }) => Promise<void>;
+};
+
+export type MediaRegistrationStore = MediaRegistrationTx & {
+  withPostLock: <T>(
+    postId: string,
+    fn: (tx: MediaRegistrationTx) => Promise<T>
+  ) => Promise<T>;
+};
+
+function txFromClient(
+  client: Pick<Prisma.TransactionClient, "media">
+): MediaRegistrationTx {
+  return {
+    countForPost: (postId, userId) =>
+      client.media.count({ where: { postId, userId } }),
+    findByPathname: (pathname) =>
+      client.media.findUnique({ where: { pathname }, select: { id: true } }),
+    create: async (data) => {
+      await client.media.create({ data });
+    },
+  };
+}
+
+export const liveMediaRegistrationStore: MediaRegistrationStore = {
+  ...txFromClient(prisma),
+  withPostLock: async (postId, fn) => {
+    // Per-post serialization across instances, using the SAME primitive the
+    // billing checkout already relies on (`pg_advisory_xact_lock` inside one
+    // short transaction). A plain count-then-insert is NOT safe even inside a
+    // transaction: under READ COMMITTED two concurrent registrations both
+    // observe the same count and both insert (phantom write). The lock makes
+    // the check and the insert one critical section per post.
+    //
+    // Nothing inside fn() touches the network — canonicalization and blob
+    // deletion happen outside — so a pool connection is never parked on
+    // third-party latency while holding the lock.
+    return await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        "SELECT pg_advisory_xact_lock(hashtext($1))",
+        postId
+      );
+      return await fn(txFromClient(tx));
+    });
+  },
+};
+
+/**
+ * Thrown when a completed upload cannot become a row for a permanent reason
+ * (over the per-post cap, failed signature check). Distinguished from
+ * transient failures so callers and logs can tell "will never succeed" from
+ * "retry me" — the blob is always removed before this is raised.
+ */
+export class MediaRegistrationRejected extends Error {
+  readonly reason: "media-cap" | "signature-mismatch";
+
+  constructor(reason: "media-cap" | "signature-mismatch", message: string) {
+    super(message);
+    this.name = "MediaRegistrationRejected";
+    this.reason = reason;
+  }
+}
+
+/**
+ * Reads just the head of a stored object and confirms it really is the type
+ * it claims to be.
+ *
+ * Only `SIGNATURE_PROBE_BYTES` are fetched (HTTP Range — the same mechanism
+ * the TikTok publish path already uses against the private store), so this
+ * costs a few bytes rather than a full download even for a 100 MB video.
+ *
+ * Fails CLOSED: a read error means the bytes could not be verified, and an
+ * unverified object must not become a Media row.
+ */
+export async function verifyStoredSignature(
+  pathname: string,
+  declaredMimeType: string,
+  fetchHead: (
+    pathname: string,
+    range: string
+  ) => Promise<ArrayBuffer | null> = defaultFetchHead
+): Promise<SignatureCheck> {
+  let head: ArrayBuffer | null;
+  try {
+    head = await fetchHead(pathname, `bytes=0-${SIGNATURE_PROBE_BYTES - 1}`);
+  } catch (error) {
+    logErrorDiagnostic("media", "signature probe read failed", error, {
+      stage: "media-signature",
+      pathname: safePathname(pathname),
+    });
+    return { ok: false, error: "File contents could not be verified" };
+  }
+  if (!head) {
+    return { ok: false, error: "File contents could not be verified" };
+  }
+  return verifyMediaSignature(declaredMimeType, new Uint8Array(head));
+}
+
+async function defaultFetchHead(
+  pathname: string,
+  range: string
+): Promise<ArrayBuffer | null> {
+  const blob = await fetchPrivateBlob(pathname, range);
+  if (!blob?.stream) return null;
+  return new Response(blob.stream).arrayBuffer();
+}
+
+export type MediaSlotClaim = "created" | "duplicate" | "over-cap";
+
+/**
+ * The race fix, isolated so it can be reasoned about (and tested) on its own.
+ *
+ * The per-post media cap used to be a `count()` in `/api/media/prepare`
+ * followed — in a LATER, separate request — by an unconditional insert in the
+ * upload-completed webhook. Nothing connected the two, so N concurrent
+ * prepares all saw the same count, all got a reserved pathname, and all
+ * registered: a post capped at 4 could end up with 20.
+ *
+ * Here the count and the insert are one critical section, serialized per post
+ * by `withPostLock`. Concurrent completions on the last free slot therefore
+ * grant exactly one winner — the same "exactly one winner" property the quota
+ * ledgers get from their conditional increments, obtained with a lock instead
+ * because there is no counter row to increment (and adding one would mean a
+ * schema migration on a database with no migration history).
+ *
+ * Duplicate delivery is re-checked INSIDE the lock as well: a retried webhook
+ * must collapse to a no-op rather than consume a second slot.
+ */
+export async function claimMediaSlot(
+  store: MediaRegistrationStore,
+  data: {
+    userId: string;
+    postId: string;
+    url: string;
+    pathname: string;
+    filename: string;
+    mimeType: string;
+    size: number;
+    type: MediaKind;
+  }
+): Promise<MediaSlotClaim> {
+  return store.withPostLock(data.postId, async (tx) => {
+    const duplicate = await tx.findByPathname(data.pathname);
+    if (duplicate) return "duplicate";
+
+    const count = await tx.countForPost(data.postId, data.userId);
+    if (count >= MAX_MEDIA_PER_POST) return "over-cap";
+
+    await tx.create(data);
+    return "created";
+  });
+}
+
+/** Removes rejected bytes. Never masks the rejection it is cleaning up after. */
+async function discardRejectedBlob(
+  pathname: string,
+  reason: string
+): Promise<void> {
+  try {
+    await deleteBlobs([pathname]);
+  } catch (error) {
+    // The bytes stay as a sweepable orphan (the 24h sweep reclaims them).
+    // Logged rather than swallowed so a persistent storage failure is
+    // visible instead of silently accumulating cost.
+    logErrorDiagnostic("media", "rejected upload cleanup failed", error, {
+      stage: "media-reject",
+      reason,
+      pathname: safePathname(pathname),
+    });
+  }
+}
+
+/**
  * Step 4 of the official flow: called by `handleUploadPresigned` when
  * Vercel Blob reports the browser upload finished (webhook, Ed25519
- * signature-verified). Verifies the object in the PRIVATE store, replaces
- * still images with their optimized canonical version (same pathname, so
- * validation, polling and Media rows keep working unchanged), then creates
- * the Media row. Throws on any problem so the webhook retries.
+ * signature-verified). Verifies the object in the PRIVATE store, confirms the
+ * bytes really are the declared type, replaces still images with their
+ * optimized canonical version (same pathname, so validation, polling and Media
+ * rows keep working unchanged), then creates the Media row under a per-post
+ * lock. Throws on any problem so the webhook retries.
  * Idempotent: a retried webhook for the same pathname is a no-op.
  *
  * Availability first: if canonicalization fails, the original bytes are
  * registered instead of failing the upload.
  */
-export async function registerCompletedUpload(payload: {
-  blob: CompletedBlobInfo;
-  tokenPayload?: string | null;
-}): Promise<void> {
+export async function registerCompletedUpload(
+  payload: {
+    blob: CompletedBlobInfo;
+    tokenPayload?: string | null;
+  },
+  store: MediaRegistrationStore = liveMediaRegistrationStore
+): Promise<void> {
   const meta = await headPrivateBlob(payload.blob.pathname);
   if (!meta) {
     logErrorDiagnostic(
@@ -355,25 +559,59 @@ export async function registerCompletedUpload(payload: {
     size: meta.size,
   });
   if (!outcome.ok) {
-    try {
-      await deleteBlobs([meta.pathname]);
-    } catch {
-      // Best-effort orphan cleanup; ignore secondary failures.
-    }
+    await discardRejectedBlob(meta.pathname, "scope-or-policy");
     throw new Error(outcome.error);
   }
 
   // `@@unique([pathname])`: the true unique lookup (Batch 2 pattern).
-  const existing = await prisma.media.findUnique({
-    where: { pathname: meta.pathname },
-    select: { id: true },
-  });
+  const existing = await store.findByPathname(meta.pathname);
   if (existing) {
     logDiagnostic("media", "upload already registered", {
-      stage: "media-create",
-      pathname: safePathname(meta.pathname),
+      ...mediaTrace({
+        stage: "media-create",
+        userId: outcome.userId,
+        postId: outcome.postId,
+        mediaId: existing.id,
+        pathname: meta.pathname,
+      }),
     });
     return;
+  }
+
+  // The declared content type is client-supplied all the way through (it pins
+  // `allowedContentTypes` on the signed token and is echoed back by the
+  // store), so it proves intent, never content. Confirm the actual bytes
+  // before anything durable is written.
+  const signature = await verifyStoredSignature(meta.pathname, meta.contentType);
+  if (!signature.ok) {
+    await discardRejectedBlob(meta.pathname, "signature-mismatch");
+    logErrorDiagnostic(
+      "media",
+      "upload rejected: bytes do not match declared type",
+      new Error(signature.error),
+      {
+        ...mediaTrace({
+          stage: "media-signature",
+          userId: outcome.userId,
+          postId: outcome.postId,
+          pathname: meta.pathname,
+        }),
+        declaredMimeType: meta.contentType,
+      }
+    );
+    throw new MediaRegistrationRejected("signature-mismatch", signature.error);
+  }
+
+  // Cheap advisory pre-check BEFORE the (billed) canonical transformation, so
+  // an over-cap flood cannot amplify into image transformations. The
+  // authoritative check is the locked one below.
+  const preCount = await store.countForPost(outcome.postId, outcome.userId);
+  if (preCount >= MAX_MEDIA_PER_POST) {
+    await discardRejectedBlob(meta.pathname, "media-cap");
+    throw new MediaRegistrationRejected(
+      "media-cap",
+      `A post can have at most ${MAX_MEDIA_PER_POST} media files`
+    );
   }
 
   const canonical = await canonicalizeStoredImage({
@@ -383,32 +621,73 @@ export async function registerCompletedUpload(payload: {
     size: meta.size,
   });
 
+  // Authoritative cap + insert as ONE critical section per post. Without the
+  // lock, N concurrent completions all read the same count and all insert.
+  let result: MediaSlotClaim;
   try {
-    await prisma.media.create({
-      data: {
-        ...outcome.createInput,
-        url: canonical.url,
-        mimeType: canonical.contentType,
-        size: canonical.size,
-      },
+    result = await claimMediaSlot(store, {
+      ...outcome.createInput,
+      url: canonical.url,
+      mimeType: canonical.contentType,
+      size: canonical.size,
     });
   } catch (error) {
     if (isDuplicatePathnameError(error)) {
       // A concurrent webhook delivery already registered this pathname
       // (unique index): the upload is complete, this delivery is a no-op.
       logDiagnostic("media", "duplicate webhook collapsed to no-op", {
-        stage: "media-create",
-        pathname: safePathname(meta.pathname),
+        ...mediaTrace({
+          stage: "media-create",
+          userId: outcome.userId,
+          postId: outcome.postId,
+          pathname: meta.pathname,
+        }),
       });
       return;
     }
     throw error;
   }
+
+  if (result === "duplicate") {
+    logDiagnostic("media", "duplicate webhook collapsed to no-op", {
+      ...mediaTrace({
+        stage: "media-create",
+        userId: outcome.userId,
+        postId: outcome.postId,
+        pathname: meta.pathname,
+      }),
+    });
+    return;
+  }
+
+  if (result === "over-cap") {
+    await discardRejectedBlob(meta.pathname, "media-cap");
+    logErrorDiagnostic(
+      "media",
+      "upload rejected: post is at the media cap",
+      new Error(`Post already holds ${MAX_MEDIA_PER_POST} media files`),
+      mediaTrace({
+        stage: "media-cap",
+        userId: outcome.userId,
+        postId: outcome.postId,
+        pathname: meta.pathname,
+      })
+    );
+    throw new MediaRegistrationRejected(
+      "media-cap",
+      `A post can have at most ${MAX_MEDIA_PER_POST} media files`
+    );
+  }
+
   logDiagnostic("media", "media record created from client upload", {
-    stage: "media-create",
+    ...mediaTrace({
+      stage: "media-create",
+      userId: outcome.userId,
+      postId: outcome.postId,
+      pathname: meta.pathname,
+    }),
     size: canonical.size,
     mimeType: canonical.contentType,
-    pathname: safePathname(meta.pathname),
   });
 }
 

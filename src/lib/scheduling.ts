@@ -20,6 +20,29 @@ export const SCHEDULE_VALIDITY_MS = 24 * 60 * 60_000;
 export const CRON_TICK_BUDGET_MS = 240_000;
 
 /**
+ * Hard ceiling on posts claimed per tick.
+ *
+ * Without it the due-post query loads EVERY due post in the system (with all
+ * its targets) into one function's memory, so a global backlog turns a single
+ * invocation into an unbounded read. The bound is a batch, not a drop:
+ * whatever does not fit stays SCHEDULED and is picked up by the next
+ * invocation, in due order.
+ *
+ * 200 is deliberately far above what one tick can actually publish
+ * (CRON_TICK_BUDGET_MS is the real throughput gate — a single video target can
+ * hold the tick for minutes), so the batch never becomes the binding limit
+ * for normal traffic; it exists to cap the *read*, not the work.
+ */
+export const SCHEDULE_TICK_BATCH = 200;
+
+/**
+ * Same bound for the recovery pass. Stale rows are rare (they only appear
+ * after a crashed/killed function), so this ceiling is lower — but it must
+ * exist for the same reason: a bad deploy can strand many posts at once.
+ */
+export const STALE_RECOVERY_BATCH = 100;
+
+/**
  * Timing-safe comparison of the `Authorization: Bearer <CRON_SECRET>`
  * header. Missing/empty secret always rejects, so there is no
  * unauthenticated execution path.
@@ -104,7 +127,11 @@ export type SchedulingDb = {
     findMany(args: {
       where: Record<string, unknown>;
       include: { targets: true };
-      orderBy?: { createdAt: "asc" };
+      orderBy?:
+        | { createdAt: "asc" }
+        | { scheduledAt: "asc" }
+        | { updatedAt: "asc" };
+      take?: number;
     }): Promise<StoredPost[]>;
     updateMany(args: {
       where: Record<string, unknown>;
@@ -151,14 +178,20 @@ export async function recoverStalePublishing(
   now: Date,
   options: {
     resumeJob?: (target: StoredPostTarget) => Promise<StaleJobResumeResult>;
+    batchSize?: number;
   } = {}
 ): Promise<Pick<TickStats, "recovered" | "finalized" | "expired">> {
   const stats = { recovered: 0, finalized: 0, expired: 0 };
   const cutoff = new Date(now.getTime() - STALE_PUBLISHING_MS);
 
+  // Bounded + oldest-stuck-first, matching `@@index([status, updatedAt])`:
+  // a bad deploy can strand many posts at once, and the recovery pass must
+  // stay a batch instead of loading every stranded row into memory.
   const stale = await db.post.findMany({
     where: { status: "PUBLISHING", updatedAt: { lt: cutoff } },
     include: { targets: true },
+    orderBy: { updatedAt: "asc" },
+    take: options.batchSize ?? STALE_RECOVERY_BATCH,
   });
 
   for (const post of stale) {
@@ -284,6 +317,8 @@ export async function runScheduledPublishTick(deps: {
   now?: Date;
   clock?: () => number;
   tickBudgetMs?: number;
+  /** Test seam: overrides SCHEDULE_TICK_BATCH / STALE_RECOVERY_BATCH. */
+  batchSize?: number;
 }): Promise<TickStats> {
   const db = deps.db;
   const now = deps.now ?? new Date();
@@ -303,18 +338,32 @@ export async function runScheduledPublishTick(deps: {
 
   const recovery = await recoverStalePublishing(db, now, {
     resumeJob: deps.resumeJob,
+    ...(deps.batchSize !== undefined ? { batchSize: deps.batchSize } : {}),
   });
   stats.recovered = recovery.recovered;
   stats.finalized = recovery.finalized;
   stats.expired = recovery.expired;
 
+  // Bounded batch, oldest-DUE-first.
+  //
+  // `orderBy: scheduledAt` (not createdAt) is what makes the bound safe: with
+  // a cap, ordering decides who waits, and the only fair rule is "whatever was
+  // due first goes first". Ordering by creation time would let a backlog
+  // starve a post that was scheduled long ago but created recently.
+  //
+  // Single sort key on purpose: it matches `@@index([status, scheduledAt])`
+  // exactly, so Postgres walks the index and stops at `take` instead of
+  // sorting the whole due-set. Ties (same instant) resolve arbitrarily —
+  // that is fine, because the claim below is conditional and anything not
+  // claimed this tick is simply claimed by the next one.
   const duePosts = await db.post.findMany({
     where: {
       status: "SCHEDULED",
       scheduledAt: { lte: now },
     },
     include: { targets: true },
-    orderBy: { createdAt: "asc" },
+    orderBy: { scheduledAt: "asc" },
+    take: deps.batchSize ?? SCHEDULE_TICK_BATCH,
   });
 
   for (const post of duePosts) {
