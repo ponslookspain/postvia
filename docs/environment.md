@@ -3,40 +3,40 @@
 Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 `src/lib/*.client config`, `.env.example`. `(src)` = read in app code.
 
-| Variable | Required | Env | Purpose | Sensitive |
-|---|---|---|---|---|
-| `DATABASE_URL_POSTGRES_PRISMA_URL` | yes | all | Prisma datasource (Neon pooled URL) | **yes** |
-| `BETTER_AUTH_SECRET` | yes | all | Better Auth signing secret (src) | **yes** |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | yes (auth) | all | Google OAuth (src) | **yes** |
-| `ADMIN_EMAILS` | no | prod | Admin allowlist CSV, `isAdminEmail` (src) | no |
-| `ABUSE_HASH_PEPPER` | prod yes | prod | Identity/rate hash pepper; missing ⇒ fail-closed (src) | **yes** |
-| `ABUSE_ENFORCEMENT` | no | all | `enforce` = deny, else observe; `off` = fully disabled (src). Default: observe | no |
-| `RESEND_API_KEY` | prod yes | prod | Verification mail; missing ⇒ throw prod / skip dev (src) | **yes** |
-| `EMAIL_FROM` / `EMAIL_REPLY_TO` | no | all | Sender overrides, default `hello@postvia.online` (src) | no |
-| `X_CLIENT_ID` / `X_CLIENT_SECRET` / `X_REDIRECT_URI` | yes (X) | all | X OAuth + PKCE (src) | **yes** |
-| `THREADS_APP_ID` / `THREADS_APP_SECRET` / `THREADS_REDIRECT_URI` | yes (Threads) | all | Threads OAuth (src) | **yes** |
-| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` / `TIKTOK_REDIRECT_URI` | yes (TikTok) | all | TikTok OAuth (src) | **yes** |
-| `TIKTOK_BRIDGE_SECRET` | no | all | Dedicated HMAC secret for TikTok bridge URLs; falls back to `BETTER_AUTH_SECRET` when unset — set it everywhere for key separation (src) | **yes** |
-| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` / `INSTAGRAM_REDIRECT_URI` | yes (Instagram) | all | Instagram OAuth (src) | **yes** |
-| `STRIPE_SECRET_KEY` | yes (billing) | per-env | Live keys prod, `sk_test_*` preview (src) | **yes** |
-| `STRIPE_WEBHOOK_SECRET` | yes (billing) | per-env | Webhook signature (src) | **yes** |
-| `STRIPE_PRICE_GROWTH` / `STRIPE_PRICE_SCALE` | yes (billing) | per-env | Test prices required for test mode (src) | no |
-| `CRON_SECRET` | prod yes | prod | Cron Bearer auth; missing ⇒ always 401 (src) | **yes** |
-| `BLOB_WEBHOOK_PUBLIC_KEY` | yes (media) | all | Blob webhook verification (src). The SDK refuses presigned URLs without it | **yes** |
-| `VERCEL_BLOB_CALLBACK_URL` | yes (media) | local only | Overrides the Blob upload-completed webhook target (src reads it via SDK). Set to the ngrok origin locally, otherwise no `Media` rows are created; on Vercel the platform origin applies automatically | no |
-| `BLOB_READ_WRITE_TOKEN` | yes (media) | local only | Blob credential for local uploads (src). Production gets its store binding from the platform; locally a missing token fails every upload ("No blob credentials found"). Create a Read-Write token in Vercel Dashboard → Storage (prefer a separate dev store) | **yes** |
-| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | no | all | Error reporting; missing ⇒ console-only (src) | no |
-| `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | no | all | Traces (src); default 0.1 prod / 0 dev | no |
-| `SENTRY_AUTH_TOKEN` | no | Vercel (Secret) | Sourcemap upload + release creation (org `postvia` / project `javascript-nextjs` are pinned in `next.config.ts`); missing ⇒ upload skipped, build stays green | **yes** |
-| `BETTER_AUTH_URL` | no | all | Pinned auth base URL (src). Local social-dev: set to the tunnel origin (src fallback + email links + TikTok bridge host) | no |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | no | local only | CSV of extra Better Auth origins appended to `allowedHosts`/`trustedOrigins` (src). Never set in Vercel Preview/Production | no |
-| `OTP_E2E_DEBUG` / `OTP_DEBUG_TOKEN` | no | local test only | Plaintext-OTP + gated code reader for local automated E2E (`src/lib/auth.ts`, `/api/auth/otp/debug`). Never set outside local testing; production/preview always hash | **yes** |
-| `THREADS_POLL_DELAY_MS` / `THREADS_MAX_ATTEMPTS` / `THREADS_TIMEOUT_MS` | no | all | Threads publish polling tuning (src) | no |
-| `THREADS_VIDEO_POLL_DELAY_MS` / `THREADS_VIDEO_MAX_ATTEMPTS` / `THREADS_VIDEO_TIMEOUT_MS` | no | all | Threads video publish polling tuning (src) | no |
-| `ALLOW_TEST_CLEANUP` | no | local test only | Gate for `scripts/cleanup-test-users.ts` | no |
-| `PG_INTEGRATION` | no | local test only | `1` enables `npm run test:pg` against an isolated DB (never production) | no |
-| `E2E_BASE` | no | local test only | Base URL for `scripts/e2e-otp-check.ts` | no |
-| `BLOB_STORE_ID` | no | local scripts | Vercel Blob store used by `scripts/reset-data.ts` | **yes** |
+| Variable | Scope | Required | Env | Purpose | Security notes |
+|---|---|---|---|---|---|
+| `DATABASE_URL_POSTGRES_PRISMA_URL` | server-only | yes | all | Prisma datasource (Neon pooled URL) | Never leaves the server; never `NEXT_PUBLIC_` |
+| `BETTER_AUTH_SECRET` | server-only | yes | all | Better Auth signing secret (src) | Session/cookie signing; never exposed |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | server-only | yes (auth) | all | Google OAuth (src) | Secret stays server-side |
+| `ADMIN_EMAILS` | server-only | no | prod | Admin allowlist CSV, `isAdminEmail` (src) | Decides admin; checked server-side only |
+| `ABUSE_HASH_PEPPER` | server-only | prod yes | prod | Identity/rate hash pepper; missing ⇒ fail-closed (src) | Never logged; hashes only |
+| `ABUSE_ENFORCEMENT` | server-only | no | all | `enforce` = deny, else observe; `off` = fully disabled (src). Default: observe | Production must be `enforce` |
+| `RESEND_API_KEY` | server-only | prod yes | prod | Verification mail; missing ⇒ throw prod / skip dev (src) | Never `NEXT_PUBLIC_` (see `src/lib/email.ts`) |
+| `EMAIL_FROM` / `EMAIL_REPLY_TO` | server-only | no | all | Sender overrides, default `hello@postvia.online` (src) | Non-secret config |
+| `X_CLIENT_ID` / `X_CLIENT_SECRET` / `X_REDIRECT_URI` | server-only | yes (X) | all | X OAuth + PKCE (src) | Secret stays server-side |
+| `THREADS_APP_ID` / `THREADS_APP_SECRET` / `THREADS_REDIRECT_URI` | server-only | yes (Threads) | all | Threads OAuth (src) | Secret stays server-side |
+| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` / `TIKTOK_REDIRECT_URI` | server-only | yes (TikTok) | all | TikTok OAuth (src) | Secret stays server-side |
+| `TIKTOK_BRIDGE_SECRET` | server-only | yes (TikTok bridge) | all | Dedicated HMAC secret for TikTok bridge URLs; required — fail-closed when unset, never falls back to any other secret (src) | Key separation enforced in code |
+| `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET` / `INSTAGRAM_REDIRECT_URI` | server-only | yes (Instagram) | all | Instagram OAuth (src) | Secret stays server-side |
+| `STRIPE_SECRET_KEY` | server-only | yes (billing) | per-env | Live keys prod, `sk_test_*` preview (src) | Never reaches browser/API responses |
+| `STRIPE_WEBHOOK_SECRET` | server-only | yes (billing) | per-env | Webhook signature (src) | Missing ⇒ webhook fail-closed |
+| `STRIPE_PRICE_GROWTH` / `STRIPE_PRICE_SCALE` | server-only | yes (billing) | per-env | Test prices required for test mode (src) | Price IDs are config, resolved server-side |
+| `CRON_SECRET` | server-only | prod yes | prod | Cron Bearer auth; missing ⇒ always 401 (src) | Never logged |
+| `BLOB_WEBHOOK_PUBLIC_KEY` | server-only | yes (media) | all | Blob webhook verification (src). The SDK refuses presigned URLs without it | Verification key, server-side |
+| `VERCEL_BLOB_CALLBACK_URL` | server-only | yes (media) | local only | Overrides the Blob upload-completed webhook target (src reads it via SDK). Set to the ngrok origin locally, otherwise no `Media` rows are created; on Vercel the platform origin applies automatically | Local-only config |
+| `BLOB_READ_WRITE_TOKEN` | server-only | yes (media) | local only | Blob credential for local uploads (src). Production gets its store binding from the platform; locally a missing token fails every upload ("No blob credentials found"). Create a Read-Write token in Vercel Dashboard → Storage (prefer a separate dev store) | Local-only secret, never commit |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | server + public variant | no | all | Error reporting; missing ⇒ console-only (src) | Public by design (DSN only) |
+| `SENTRY_TRACES_SAMPLE_RATE` (+ `NEXT_PUBLIC_` variant) | server + public variant | no | all | Traces (src); default 0.1 prod / 0 dev | Non-secret tuning |
+| `SENTRY_AUTH_TOKEN` | server-only (CI/Vercel Secret) | no | Vercel (Secret) | Sourcemap upload + release creation (org `postvia` / project `javascript-nextjs` are pinned in `next.config.ts`); missing ⇒ upload skipped, build stays green | CI-only secret |
+| `BETTER_AUTH_URL` | server-only | no | all | Pinned auth base URL (src). Local social-dev: set to the tunnel origin (src fallback + email links + TikTok bridge host) | Config, no secret |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | server-only | no | local only | CSV of extra Better Auth origins appended to `allowedHosts`/`trustedOrigins` (src). Never set in Vercel Preview/Production | Local-only |
+| `OTP_E2E_DEBUG` / `OTP_DEBUG_TOKEN` | server-only | no | local test only | Plaintext-OTP + gated code reader for local automated E2E (`src/lib/auth.ts`, `/api/auth/otp/debug`). Never set outside local testing; production/preview always hash | Test-only; token is secret |
+| `THREADS_POLL_DELAY_MS` / `THREADS_MAX_ATTEMPTS` / `THREADS_TIMEOUT_MS` | server-only | no | all | Threads publish polling tuning (src) | Non-secret tuning |
+| `THREADS_VIDEO_POLL_DELAY_MS` / `THREADS_VIDEO_MAX_ATTEMPTS` / `THREADS_VIDEO_TIMEOUT_MS` | server-only | no | all | Threads video publish polling tuning (src) | Non-secret tuning |
+| `ALLOW_TEST_CLEANUP` | server-only | no | local test only | Gate for `scripts/cleanup-test-users.ts` | Local-only |
+| `PG_INTEGRATION` | server-only | no | local test only | `1` enables `npm run test:pg` against an isolated DB (never production) | Local-only |
+| `E2E_BASE` | server-only | no | local test only | Base URL for `scripts/e2e-otp-check.ts` | Local-only |
+| `BLOB_STORE_ID` | server-only | no | local scripts | Vercel Blob store used by `scripts/reset-data.ts` | Local scripts only |
 
 Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
 `VERCEL_PROJECT_PRODUCTION_URL`. `NODE_ENV` switches dev/prod defaults.

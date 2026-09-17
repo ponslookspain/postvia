@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_CREATOR_INFO } from "@/lib/abuse";
 import {
   TiktokApiError,
   ensureFreshTiktokToken,
@@ -20,6 +21,21 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
+    // Each call fans out to the TikTok API server-side: roomy persistent
+    // gate so composer polling cannot be scripted into provider abuse.
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "creator-info",
+        userMax: WRITE_LIMIT_CREATOR_INFO,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
+    }
     const accountId = request.nextUrl.searchParams.get("accountId");
     if (!accountId) {
       return NextResponse.json({ error: "accountId is required" }, { status: 400 });
@@ -36,8 +52,8 @@ export async function GET(request: NextRequest) {
     const info = await queryTiktokCreatorInfo(accessToken);
 
     if (info.creatorUsername && info.creatorUsername !== account.username) {
-      await prisma.socialAccount.update({
-        where: { id: account.id },
+      await prisma.socialAccount.updateMany({
+        where: { id: account.id, userId: user.id },
         data: { username: info.creatorUsername },
       });
     }

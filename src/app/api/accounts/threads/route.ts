@@ -45,9 +45,17 @@ export async function DELETE(request: NextRequest) {
       externalId: account.externalId,
     });
 
-    await prisma.socialAccount.delete({
-      where: { id: account.id },
+    // Atomic ownership: the delete itself is scoped to this user's row
+    // instead of trusting the earlier lookup alone.
+    const deleted = await prisma.socialAccount.deleteMany({
+      where: { id: account.id, userId: user.id },
     });
+    if (deleted.count === 0) {
+      return NextResponse.json(
+        { error: "Threads account not connected" },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ ok: true });
   } catch {

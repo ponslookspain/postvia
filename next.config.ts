@@ -19,6 +19,47 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async headers() {
+    // Security headers (defence-in-depth; server-side auth/z is unchanged).
+    // CSP keeps 'unsafe-inline' for scripts+styles: required by the static
+    // theme init script (layout.tsx) and Next.js runtime/Tailwind. No
+    // 'unsafe-eval', no wildcard script sources, no 'allow-all' CORS.
+    // Browser connect targets are same-origin API + Stripe.js/Sentry/Blob;
+    // provider token exchanges run server-side and need no browser egress.
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https://api.stripe.com https://*.sentry.io https://*.ingest.sentry.io https://*.blob.vercel-storage.com https://*.vercel-storage.com",
+      "frame-src https://js.stripe.com",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; ");
+    const securityHeaders = [
+      { key: "Content-Security-Policy", value: csp },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=()",
+      },
+      { key: "X-Frame-Options", value: "DENY" },
+      {
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
+      },
+    ];
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {

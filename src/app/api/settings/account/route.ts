@@ -9,9 +9,11 @@ import { deleteBlobs } from "@/lib/blob";
 import { cancelStripeSubscriptionNow, getStripeClient } from "@/lib/stripe";
 import {
   emailSignal,
+  gateWriteRequest,
   getAbusePepper,
   googleSignal,
   socialSignal,
+  WRITE_LIMIT_ACCOUNT_DELETE,
   type SignalInput,
 } from "@/lib/abuse";
 import { reportError } from "@/lib/diagnostics";
@@ -23,6 +25,23 @@ export async function DELETE(request: NextRequest) {
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Destructive + irreversible: persistent gate on top of session +
+    // exact confirmation phrase, so a stolen-session burst cannot be
+    // scripted into rapid re-creation/deletion loops.
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "account-delete",
+        userMax: WRITE_LIMIT_ACCOUNT_DELETE,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     const body = await request.json().catch(() => null);

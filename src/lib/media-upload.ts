@@ -32,7 +32,11 @@ export type MediaAuthorizeResult =
 
 /**
  * Authorize a user to upload media to a post.
- * Checks authentication, post existence, and ownership.
+ *
+ * Self-contained security boundary: checks authentication, post existence,
+ * AND ownership (post.userId === user.id) internally, so safety never
+ * depends on the caller having pre-scoped the post lookup. Caller-side
+ * scoped queries remain as defence-in-depth.
  */
 export function authorizeMediaUpload(input: {
   user: { id: string } | null;
@@ -46,6 +50,10 @@ export function authorizeMediaUpload(input: {
     return { ok: false, status: 400, error: "postId is required" };
   }
   if (!input.post) {
+    return { ok: false, status: 404, error: "Post not found" };
+  }
+  if (input.post.userId !== input.user.id) {
+    // Same 404 as missing: no oracle for other users' post ids.
     return { ok: false, status: 404, error: "Post not found" };
   }
   return { ok: true, userId: input.user.id, postId: input.statedPostId };
