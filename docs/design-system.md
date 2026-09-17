@@ -137,8 +137,11 @@ full before/after mapping).
 
 ## Cards
 
-- `Card` is the block primitive: `rounded-2xl`, `bg-panel`, no outline,
-  with header/title/description/action/content/footer composition.
+- `Card` is the primary surface primitive: `rounded-2xl`, `bg-card`
+  (one step lighter than the canvas), no outline, with
+  header/title/description/action/content/footer composition. Nested
+  content inside a card goes darker (`bg-muted`); grouped secondary
+  areas use `bg-panel`.
 - Its `size="sm"` padding rule (`data-[size=sm]:…px-4`) outranks a
   `px-0` passed by a caller, so content inside a card is always inset by
   the card padding. Align rules and rows to that inset rather than

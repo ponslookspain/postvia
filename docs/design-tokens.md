@@ -225,7 +225,7 @@ here so it can be removed deliberately rather than discovered.
 | Tooltip | `ui/tooltip.tsx` | — |
 | Dropdown | `ui/dropdown-menu.tsx` | — |
 | Dialog | `ui/dialog.tsx`, `ui/drawer.tsx`, `ui/popover.tsx` | — |
-| Card | `ui/card.tsx` | `size` prop (`default`/`sm`, spacing 6/4) — Radian has none; `bg-panel`, `border-transparent` |
+| Card | `ui/card.tsx` | `size` prop (`default`/`sm`, spacing 6/4) — Radian has none; `bg-card`, `border-transparent` |
 | Table | — | **Missing as a primitive.** Post and calendar tables are hand-rolled grids (`PostsList`, `CalendarView`). |
 | Pagination | — | **Missing as a primitive.** `PostsList` renders its own controls. |
 | Toast | `ui/toast.tsx` | PostVIA `Toaster` + `toast()` helper |

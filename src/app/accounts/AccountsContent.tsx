@@ -346,7 +346,7 @@ export default function AccountsContent({
                         return (
                           <li
                             key={account.id}
-                            className="flex items-center gap-3 rounded-lg border border-muted bg-muted px-3 py-2"
+                            className="flex items-center gap-3 rounded-lg bg-muted px-3 py-2"
                           >
                             <Avatar className="size-8 shrink-0">
                               <AvatarFallback>

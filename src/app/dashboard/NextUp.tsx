@@ -30,7 +30,7 @@ export function NextUp({ post, now }: { post: FeedPost; now: Date }) {
   return (
     <section
       aria-labelledby="next-up-heading"
-      className="rounded-2xl bg-panel p-5 md:p-6"
+      className="rounded-2xl bg-card p-5 md:p-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h2

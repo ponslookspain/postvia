@@ -359,7 +359,7 @@ export function PostsList({
           />
         )
       ) : (
-        <div className="overflow-hidden rounded-xl bg-panel">
+        <div className="overflow-hidden rounded-xl bg-card">
           <div
             aria-hidden="true"
             className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border bg-muted/40 px-4 py-2.5 text-meta font-medium tracking-wide text-muted-foreground uppercase md:grid"

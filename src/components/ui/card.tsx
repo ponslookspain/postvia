@@ -14,11 +14,14 @@ function Card({
 			data-slot="card"
 			data-size={size}
 			className={cn(
-				// PostVIA surface rule: blocks are separated by tone, not by a
-				// drawn box — a panel one shade off the page, no outline. The
-				// transparent border keeps the geometry (and lets a caller opt
-				// into a colored one, e.g. border-error on a destructive card).
-				"bg-panel text-foreground text-sm flex flex-col gap-6 overflow-hidden rounded-2xl border border-transparent py-6",
+				// PostVIA surface rule: canvas → card → inset. The card is
+				// the primary surface, one step lighter than the page
+				// (`bg-card`), separated by tone with no outline. Nested
+				// content goes darker (`bg-muted`); blocks nested directly
+				// inside read as inset. The transparent border keeps the
+				// geometry (and lets a caller opt into a colored one, e.g.
+				// border-error on a destructive card).
+				"bg-card text-foreground text-sm flex flex-col gap-6 overflow-hidden rounded-2xl border border-transparent py-6",
 				"data-[size=sm]:gap-4 data-[size=sm]:py-4",
 				"data-[size=sm]:[&_[data-slot=card-header]]:px-4",
 				"data-[size=sm]:[&_[data-slot=card-header]]:[.border-b]:pb-4",
