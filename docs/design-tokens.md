@@ -114,7 +114,7 @@ Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).
 | --- | --- | --- | --- |
 | Background | `--background` | `#F5F4EE` | `#262624` |
 | Foreground | `--foreground` | `#20201E` | `#F5F4EE` |
-| Muted | `--muted` | `#EEEDE8` | `#30302C` |
+| Muted | `--muted` | `#E7E5DE` | `#38362F` |
 | Muted | `--muted-foreground` | `#77766F` | `#A4A39D` |
 | Panel | `--panel` | `#F0EFEB` | `#222120` |
 | Panel | `--panel-foreground` | → `--foreground` | → `--foreground` |

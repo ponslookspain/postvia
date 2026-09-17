@@ -35,7 +35,7 @@
 
 	/* —— Muted ————————————————————————————————————————————————————————————
 	   The neutral fill: hovers, inset wells, disabled chrome. */
-	--muted: #eeede8;
+	--muted: #e7e5de;
 
 	/* —— Panel ————————————————————————————————————————————————————————————
 	   A block on the page. One shade off the canvas and carrying NO outline:
@@ -174,7 +174,7 @@
 	--foreground: #f5f4ee;
 	--muted-foreground: #a4a39d;
 
-	--muted: #30302c;
+	--muted: #38362f;
 
 	--panel: #222120;
 
