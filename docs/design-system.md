@@ -152,11 +152,13 @@ full before/after mapping).
   `ui/drawer.tsx`, `hooks/use-mobile.ts`): `SidebarProvider`,
   icon-collapsible rail (`16rem` / `3rem`), tooltips in collapsed mode,
   keyboard toggle, mobile Drawer.
-- `variant="inset"` + `theme="gray"`: the rail is a shade off the page
-  and the content sits on it as a rounded panel, so the two are told
-  apart by tone rather than by a divider.
+- `variant="floating"` + `theme="gray"`: the rail is a separate rounded
+  surface (`bg-sidebar`, 8px canvas inset) floating on the continuous
+  `bg-background` canvas; the main content sits directly on that canvas
+  with no outer card, so rail and content are told apart by tone rather
+  than by a divider.
 - Nav items are **pills** (`rounded-full`); the active one is a quiet
-  neutral fill, never the brand hue — the red is for actions.
+  neutral fill, never the brand hue — the blue is for actions.
 - Collapsed geometry is arithmetic, not eyeballing: the rail is `3rem`
   and a nav button is `size-8`, so the group padding must be `px-2` for
   the icons to sit centered. Same for the header, where the wordmark is

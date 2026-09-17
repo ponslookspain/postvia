@@ -54,8 +54,10 @@ export function Sidebar({
 }) {
   // Canonical Radian structure (radianui.com/docs/components/sidebar):
   // SidebarProvider lives in AppShell and wraps both this Sidebar and
-  // SidebarInset as direct children, so the peer-data-[variant=inset]
-  // styles on SidebarInset resolve. No visibility classes here — the
+  // SidebarInset as direct children. The rail is `variant="floating"`:
+  // a separate surface on the bg-background canvas with an 8px inset,
+  // so SidebarInset stays plain canvas (its inset card styles only
+  // resolve for `variant="inset"`). No visibility classes here — the
   // primitive hides itself on mobile (hidden md:block / hidden md:flex
   // + Drawer branch) and sizes via its own --sidebar-width gap.
   const pathname = usePathname();
@@ -88,7 +90,7 @@ export function Sidebar({
   }
 
   return (
-    <SidebarPrimitive variant="inset" collapsible="icon" theme="gray">
+    <SidebarPrimitive variant="floating" collapsible="icon" theme="gray">
       <SidebarHeader
         className={cn(
           "flex-row items-center border-b border-border py-3.5",

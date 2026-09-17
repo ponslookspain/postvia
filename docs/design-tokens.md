@@ -229,7 +229,7 @@ here so it can be removed deliberately rather than discovered.
 | Table | — | **Missing as a primitive.** Post and calendar tables are hand-rolled grids (`PostsList`, `CalendarView`). |
 | Pagination | — | **Missing as a primitive.** `PostsList` renders its own controls. |
 | Toast | `ui/toast.tsx` | PostVIA `Toaster` + `toast()` helper |
-| Navigation | `ui/sidebar.tsx`, `components/Sidebar.tsx`, `components/nav-items.ts` | rail 16rem / icon 3rem / mobile 18rem (upstream 16.25 / 3.75); `variant="inset"`, `theme="gray"`; nav items are pills |
+| Navigation | `ui/sidebar.tsx`, `components/Sidebar.tsx`, `components/nav-items.ts` | rail 16rem / icon 3rem / mobile 18rem (upstream 16.25 / 3.75); `variant="floating"`, `theme="gray"`; floating container `p-2` (8px canvas inset, collapsed width accounts padding + 1px border); nav items are pills |
 
 Supporting primitives with no slot in the target list, all in use:
 `alert`, `banner`, `calendar`, `collapsible`, `divider`, `empty`, `field`,

@@ -559,7 +559,7 @@ function Sidebar({
 					"group-data-[collapsible=offcanvas]:w-0",
 					"group-data-[side=right]:rotate-180",
 					variant === "floating"
-						? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(6))+2px)]"
+						? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
 						: "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
 				)}
 			/>
@@ -576,7 +576,7 @@ function Sidebar({
 					variant === "inset"
 						? "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
 						: variant === "floating"
-							? "p-3 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(6))+2px)]"
+							? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
 							: "border-sidebar-border group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
 					"group-data-[theme=gray-body]:group-data-[variant=floating]:bg-muted",
 					className
