@@ -24,11 +24,16 @@ const nextConfig: NextConfig = {
     // CSP keeps 'unsafe-inline' for scripts+styles: required by the static
     // theme init script (layout.tsx) and Next.js runtime/Tailwind. No
     // 'unsafe-eval', no wildcard script sources, no 'allow-all' CORS.
+    // Development only (`next dev`, Turbopack HMR + React dev builds
+    // evaluate modules via eval()): 'unsafe-eval' is appended to
+    // script-src there. Production keeps the strict value below —
+    // shipped bundles never eval, so the dev exception cannot leak.
     // Browser connect targets are same-origin API + Stripe.js/Sentry/Blob;
     // provider token exchanges run server-side and need no browser egress.
+    const allowDevEval = process.env.NODE_ENV !== "production";
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      `script-src 'self' 'unsafe-inline'${allowDevEval ? " 'unsafe-eval'" : ""} https://js.stripe.com`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",

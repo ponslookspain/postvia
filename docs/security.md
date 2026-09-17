@@ -164,7 +164,9 @@ Stripe webhook signatures verified; redirect URLs allow-listed
 (`isStripeRedirectUrl`); cron Bearer-checked.
 
 Production-grade headers via `headers()` in `next.config.ts` (all
-routes, incl. API): `Content-Security-Policy` (no `unsafe-eval`, no
+routes, incl. API): `Content-Security-Policy` (no `unsafe-eval` in
+production — `next dev` appends it to `script-src` only, for Turbopack
+HMR/React dev eval; shipped bundles never eval — no
 wildcard script sources, `frame-ancestors 'none'`; `unsafe-inline`
 kept for scripts/styles as required by the static theme init script,
 Next.js runtime and Tailwind), `Strict-Transport-Security`
