@@ -80,7 +80,7 @@ export function PreviewAccordionItem({
           id={`preview-panel-${model.accountId}`}
           role="region"
           aria-labelledby={`preview-header-${model.accountId}`}
-          className="border-t border-border p-3"
+          className="rounded-b-xl border-t border-border bg-background p-3"
         >
           <PreviewCard
             model={model}
