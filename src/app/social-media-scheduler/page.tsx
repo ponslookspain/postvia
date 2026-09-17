@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { FullVisual, PageHero, QuietRows } from "@/components/marketing/MarketingSections";
+import { ComposerVisual, PublishStatusCard } from "@/components/landing/ProductVisuals";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -67,7 +67,7 @@ export default function SchedulerPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Plan and publish"
           title="A scheduler that treats every network honestly."
           description="Pick a date and time once. Postvia queues the post for Instagram, Threads and TikTok — and tells you plainly that X publishes immediately instead of pretending otherwise."
@@ -76,76 +76,43 @@ export default function SchedulerPage() {
             { label: "Features", href: "/features" },
             { label: "Social Media Scheduler" },
           ]}
+          visual={<ComposerVisual />}
+          secondaryHref="/social-media-calendar"
+          secondaryLabel="See the calendar"
+          meta={[
+            { label: "Scheduling", value: "Instagram · Threads · TikTok" },
+            { label: "X", value: "immediate only" },
+            { label: "Retry", value: "per account" },
+          ]}
         />
-        <section aria-label="How scheduling works" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Schedule from the composer
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Write your post, attach media once, and choose a future date
-                  and time in the schedule dialog. The post moves through a
-                  visible lifecycle — draft, scheduled, publishing, published —
-                  instead of disappearing into a black box.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  If anything fails, only the affected account needs attention:
-                  failed targets keep their error message and can be retried
-                  individually while successful ones stay untouched.
-                </p>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  What scheduling respects
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "Per-account statuses: each connected profile reports pending, publishing, published or failed on its own row.",
-                    "Connected-account limits: Free includes 1 account, Growth up to 5, Scale unlimited — the composer only offers what your plan allows.",
-                    "Monthly quota: every created post counts once, even if you delete it later, so the schedule you see is the schedule you keep.",
-                    "X honesty: selecting an X account switches the composer to immediate publishing with an explicit hint, never a silent schedule.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section aria-label="Scheduling workflow" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              From idea to published, in four moves
-            </h2>
-            <ol className="mt-6 grid gap-4 md:grid-cols-4">
-              {[
-                { title: "Write once", text: "One shared caption for every selected account." },
-                { title: "Tailor", text: "Adjust text or media where a network needs its own version." },
-                { title: "Schedule", text: "Pick the date and time; the post waits in your queue." },
-                { title: "Check", text: "Watch each account report its own result after publish." },
-              ].map((step, index) => (
-                <li key={step.title} className="rounded-2xl bg-panel p-5">
-                  <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums">
-                    {index + 1}
-                  </span>
-                  <p className="mt-3 font-heading text-base font-semibold">{step.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Planning a batch of videos instead?{" "}
-              <Link href="/bulk-social-media-scheduling" className="font-medium text-primary hover:underline">
-                Bulk scheduling turns up to 10 videos into dated posts at once.
-              </Link>
-            </p>
-          </div>
-        </section>
+        <FullVisual
+          title="Every account reports back"
+          intro="After publish, the post becomes a status board: each connected profile on its own row, failures retryable without touching what succeeded."
+          visual={<PublishStatusCard />}
+          caption="Real product language: per-account statuses with individual retry, as shown in the app."
+        />
+        <QuietRows
+          title="What scheduling respects"
+          intro="Constraints the queue enforces before anything waits on a date."
+          items={[
+            {
+              title: "Per-account lifecycle",
+              text: "Draft, scheduled, publishing, published — plus partial and failed states that stay visible instead of disappearing.",
+            },
+            {
+              title: "Plan-shaped queue",
+              text: "Free includes 1 account and 15 posts a month; Growth adds accounts, volume and bulk. The composer only offers what your plan allows.",
+            },
+            {
+              title: "Quota honesty",
+              text: "Every created post counts once, even if deleted later. Rescheduling never creates a second post, so usage stays predictable.",
+            },
+            {
+              title: "The X exception",
+              text: "Selecting X switches the composer to immediate publishing with an explicit hint — never a silent schedule that cannot happen.",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[

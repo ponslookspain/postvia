@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { PageHero, PlatformMock, QuietRows } from "@/components/marketing/MarketingSections";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -67,7 +66,7 @@ export default function InstagramPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Platforms"
           title="Instagram, scheduled without the juggling."
           description="Photos and Reels with real captions, validated before they ship and scheduled from the same queue as your other networks."
@@ -76,72 +75,46 @@ export default function InstagramPage() {
             { label: "Features", href: "/features" },
             { label: "Instagram" },
           ]}
+          visual={
+            <PlatformMock
+              platform="INSTAGRAM"
+              handle="@studio"
+              text="Morning launch is live — our biggest update yet. Everything that changed, and why it matters for your week."
+              counter="184 / 2,200"
+              mediaLabel="launch-day.mp4 · 1 Reel"
+              foot="Caption fits · Reel attached · ready to schedule"
+            />
+          }
+          secondaryHref="/platform-previews"
+          secondaryLabel="See the preview"
+          meta={[
+            { label: "Formats", value: "1 photo · 1 Reel" },
+            { label: "Caption", value: "up to 2,200" },
+            { label: "Scheduling", value: "yes" },
+          ]}
         />
-        <section aria-label="Instagram capabilities" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  What ships to Instagram
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "Single JPEG photo with a caption of up to 2,200 characters.",
-                    "Single MP4 Reel with the same caption treatment.",
-                    "Preview shows the caption version Instagram will receive.",
-                    "Scheduling with per-account status: published, publishing or failed.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  What Postvia does not claim
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  The Instagram Content Publishing API supports more than
-                  Postvia ships — carousels, Stories, alt text. Those are
-                  conscious scope decisions, not gaps you will discover at
-                  publish time.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Anything outside photo-or-Reel fails closed in the composer
-                  with a named validation issue, before scheduling. You learn
-                  the boundary while writing, not after a failed publish.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section aria-label="Instagram workflow" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              Instagram inside the shared workflow
-            </h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {[
-                { title: "Attach once", text: "Add the photo or Reel in the composer; Instagram's media rules apply automatically." },
-                { title: "Caption with a counter", text: "2,200 characters with remaining count visible while you write." },
-                { title: "Schedule and check", text: "Future-dated queueing, calendar placement, and per-account result." },
-              ].map((card) => (
-                <div key={card.title} className="rounded-2xl bg-panel p-5">
-                  <p className="font-heading text-base font-semibold">{card.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{card.text}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Pair Instagram with short video:{" "}
-              <Link href="/platforms/tiktok" className="font-medium text-primary hover:underline">
-                how TikTok publishing works.
-              </Link>
-            </p>
-          </div>
-        </section>
+        <QuietRows
+          title="What ships — and what does not"
+          intro="The boundary is stated here so the composer never has to surprise you."
+          items={[
+            {
+              title: "Single photo",
+              text: "One JPEG per post with a caption of up to 2,200 characters and a live remaining counter.",
+            },
+            {
+              title: "Single Reel",
+              text: "One MP4 Reel per post with the same caption treatment and scheduling.",
+            },
+            {
+              title: "No carousels, Stories, alt text",
+              text: "Conscious scope, not a gap. Anything outside photo-or-Reel fails closed in the composer with a named issue.",
+            },
+            {
+              title: "No text-only posts",
+              text: "Instagram requires media. The composer blocks text-only Instagram targets before scheduling.",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[

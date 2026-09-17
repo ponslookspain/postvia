@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { PageHero, QuietRows, SplitSection } from "@/components/marketing/MarketingSections";
+import { ComposerVisual, PublishStatusCard } from "@/components/landing/ProductVisuals";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -67,7 +67,7 @@ export default function PreviewsPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Create"
           title="Approve the post you will actually publish."
           description="Every selected network renders its own mock — with its limits, media rules and counters — before anything is scheduled or sent. No surprises after the fact."
@@ -76,72 +76,52 @@ export default function PreviewsPage() {
             { label: "Features", href: "/features" },
             { label: "Platform Previews" },
           ]}
+          visual={<ComposerVisual />}
+          secondaryHref="/cross-platform-publishing"
+          secondaryLabel="How publishing works"
+          meta={[
+            { label: "Limits", value: "280 · 500 · 2,200 · TikTok titles" },
+            { label: "Validation", value: "named issues, pre-publish" },
+          ]}
         />
-        <section aria-label="Preview capabilities" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  One switcher, four truths
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  The platform switcher renders a single mock at a time — an
-                  X post that looks like X, a Threads post that looks like
-                  Threads, an Instagram caption paired with its required
-                  photo or Reel, a TikTok post with its title and settings.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Switching never loses your text: the shared caption
-                  persists while each mock shows how much of it survives that
-                  network&apos;s rules.
-                </p>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Validation with names, not shrugs
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "Remaining counters per platform, visible while you type — not after you press publish.",
-                    "Media presence checks: Instagram refuses text-only posts before they leave the composer.",
-                    "Mixed-media conflicts named per platform, with the exact combination that cannot ship together.",
-                    "TikTok publishing options validated per account: privacy level, comments, duet, stitch and cover.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section aria-label="Customization" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              Customize the version, keep the idea
-            </h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {[
-                { title: "Per-account text", text: "Override the caption for one account when its limit or audience demands it." },
-                { title: "TikTok titles", text: "Global post text becomes the default caption; per-target titles and descriptions refine it." },
-                { title: "Posting options", text: "Privacy, comments, duet, stitch and cover timestamp — set where TikTok actually supports them." },
-              ].map((card) => (
-                <div key={card.title} className="rounded-2xl bg-panel p-5">
-                  <p className="font-heading text-base font-semibold">{card.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{card.text}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              See how tailored posts ship together:{" "}
-              <Link href="/cross-platform-publishing" className="font-medium text-primary hover:underline">
-                cross-platform publishing, end to end.
-              </Link>
-            </p>
-          </div>
-        </section>
+        <SplitSection
+          title="From preview to outcome"
+          visual={<PublishStatusCard />}
+          flip
+          caption="Approved versions become per-account statuses: published, publishing, or failed with retry."
+        >
+          <p>
+            The version you approve is the version that ships. After publish,
+            the same per-account thinking continues: each network reports
+            its own result on its own row.
+          </p>
+          <p>
+            A failure on one account never rewrites the story for the rest —
+            retry the failed target and leave the published ones untouched.
+          </p>
+        </SplitSection>
+        <QuietRows
+          title="Validation with names, not shrugs"
+          intro="What the preview checks while you write."
+          items={[
+            {
+              title: "Remaining counters",
+              text: "Per-platform counts visible while typing — Threads 500, X 280, Instagram caption 2,200, TikTok title rules.",
+            },
+            {
+              title: "Media presence",
+              text: "Instagram refuses text-only posts; TikTok demands video or photos. Stopped in the composer, not at publish.",
+            },
+            {
+              title: "Mixed-media conflicts",
+              text: "Combinations that cannot ship together are named per platform with the exact offending mix.",
+            },
+            {
+              title: "Per-account overrides",
+              text: "Edit one network's text or TikTok options in place. The shared caption never forks into disconnected drafts.",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[

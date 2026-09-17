@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CheckIcon } from "lucide-react";
 import { NavbarState } from "@/components/landing/NavbarState";
-import { Pricing } from "@/components/landing/Pricing";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { PageHero } from "@/components/marketing/MarketingSections";
+import { PLANS } from "@/lib/plans";
+import { cn } from "@/lib/utils";
 import {
   absoluteUrl,
   breadcrumbSchema,
@@ -58,6 +62,57 @@ const FAQS = [
   },
 ];
 
+function formatCount(value: number | null, singular: string, plural: string): string {
+  if (value === null) return "Unlimited";
+  if (value === 0) return "—";
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+function PlanCta({ planId, highlighted }: { planId: string; highlighted?: boolean }) {
+  return (
+    <Button
+      nativeButton={false}
+      render={
+        <Link href={planId === "free" ? "/signup" : `/signup?plan=${planId}`} />
+      }
+      variant={highlighted ? "default" : "outline"}
+      className="mt-5 w-full"
+    >
+      {planId === "free" ? "Get started free" : `Choose ${PLANS.find((p) => p.id === planId)?.name}`}
+    </Button>
+  );
+}
+
+const ROWS: { label: string; value: (planId: string) => string }[] = [
+  {
+    label: "Monthly posts",
+    value: (id) =>
+      formatCount(
+        PLANS.find((p) => p.id === id)!.entitlements.monthlyPosts,
+        "post",
+        "posts"
+      ),
+  },
+  {
+    label: "Connected accounts",
+    value: (id) => {
+      const v = PLANS.find((p) => p.id === id)!.entitlements.maxTotalAccounts;
+      if (v === null) return "Unlimited";
+      return `${v} ${v === 1 ? "account" : "accounts"}`;
+    },
+  },
+  {
+    label: "Bulk video scheduling",
+    value: (id) => {
+      const v = PLANS.find((p) => p.id === id)!.entitlements.maxBulkVideos;
+      return v === 0 ? "—" : `Up to ${v} videos per batch`;
+    },
+  },
+  { label: "Content calendar", value: () => "Included" },
+  { label: "Per-platform previews", value: () => "Included" },
+  { label: "Retry and reschedule", value: () => "Included" },
+];
+
 export default function PricingPage() {
   return (
     <div className="min-h-screen overflow-x-clip bg-background font-sans text-foreground antialiased">
@@ -82,37 +137,123 @@ export default function PricingPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Pricing"
           title="Start free. Pay when volume says so."
           description="Three plans from the same source of truth as the app itself. Every limit below is enforced server-side — what you read is what the API allows."
           breadcrumbs={[{ label: "Home", href: "/" }, { label: "Pricing" }]}
+          meta={[
+            { label: "Free", value: "€0 · 15 posts" },
+            { label: "Growth", value: "€20 · 300 posts" },
+            { label: "Scale", value: "€50 · unlimited" },
+          ]}
         />
-        <Pricing />
-        <section aria-label="Plan details" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              The limits, plainly
+        {/* Desktop comparison table — one structure, three plans. */}
+        <section aria-label="Plan comparison" className="border-t border-border">
+          <div className="mx-auto hidden w-full max-w-6xl px-8 py-16 md:block md:py-20">
+            <div
+              role="table"
+              aria-label="Postvia plan comparison"
+              className="overflow-hidden rounded-2xl bg-panel"
+            >
+              <div role="row" className="grid grid-cols-4 border-b border-border">
+                <div role="columnheader" className="p-6">
+                  <p className="font-heading text-base font-semibold">Compare plans</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Limits, plainly. No credit card to start.
+                  </p>
+                </div>
+                {PLANS.map((plan) => (
+                  <div
+                    key={plan.id}
+                    role="columnheader"
+                    className={cn("p-6", plan.highlighted && "bg-muted/50")}
+                  >
+                    <p className="flex items-center gap-2 font-heading text-base font-semibold">
+                      {plan.name}
+                      {plan.highlighted && (
+                        <Badge variant="strong" color="primary">Popular</Badge>
+                      )}
+                    </p>
+                    <p className="mt-2">
+                      <span className="font-heading text-4xl font-semibold tracking-tight tabular-nums">
+                        ${plan.price}
+                      </span>{" "}
+                      <span className="text-sm text-muted-foreground">/ month</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {ROWS.map((row) => (
+                <div key={row.label} role="row" className="grid grid-cols-4 border-b border-border last:border-b-0">
+                  <div role="rowheader" className="p-6 text-sm text-muted-foreground">
+                    {row.label}
+                  </div>
+                  {PLANS.map((plan) => (
+                    <div
+                      key={plan.id}
+                      role="cell"
+                      className={cn(
+                        "flex items-center gap-2 p-6 text-sm font-medium",
+                        plan.highlighted && "bg-muted/50"
+                      )}
+                    >
+                      {row.value(plan.id) !== "—" && (
+                        <CheckIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                      )}
+                      {row.value(plan.id)}
+                    </div>
+                  ))}
+                </div>
+              ))}
+              <div role="row" className="grid grid-cols-4 border-t border-border">
+                <div className="p-6" />
+                {PLANS.map((plan) => (
+                  <div key={plan.id} className={cn("p-6 pt-2", plan.highlighted && "bg-muted/50")}>
+                    <PlanCta planId={plan.id} highlighted={plan.highlighted} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* Mobile: one stacked block per plan — same data, no table. */}
+          <div className="mx-auto w-full max-w-6xl px-4 py-14 md:hidden">
+            <h2 className="font-heading text-2xl font-semibold tracking-tight">
+              Compare plans
             </h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {[
-                { title: "Free · €0", text: "15 posts a month, 1 connected account. Scheduling, previews, calendar and retries included. Start in onboarding without a card." },
-                { title: "Growth · €20", text: "300 posts a month, up to 5 accounts, bulk batches to 10 videos. For creators publishing every week." },
-                { title: "Scale · €50", text: "Unlimited posts and accounts, same bulk and calendar. For teams and heavy schedules." },
-              ].map((card) => (
-                <div key={card.title} className="rounded-2xl bg-panel p-5">
-                  <p className="font-heading text-base font-semibold">{card.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{card.text}</p>
+            <div className="mt-6 flex flex-col gap-4">
+              {PLANS.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={cn(
+                    "rounded-2xl bg-panel p-6",
+                    plan.highlighted && "ring-1 ring-primary/40 ring-inset"
+                  )}
+                >
+                  <p className="flex items-center justify-between gap-2 font-heading text-base font-semibold">
+                    {plan.name}
+                    {plan.highlighted && (
+                      <Badge variant="strong" color="primary">Popular</Badge>
+                    )}
+                  </p>
+                  <p className="mt-2">
+                    <span className="font-heading text-4xl font-semibold tracking-tight tabular-nums">
+                      ${plan.price}
+                    </span>{" "}
+                    <span className="text-sm text-muted-foreground">/ month</span>
+                  </p>
+                  <dl className="mt-4 border-t border-border">
+                    {ROWS.map((row) => (
+                      <div key={row.label} className="flex items-baseline justify-between gap-4 border-b border-border py-2.5 last:border-b-0">
+                        <dt className="text-xs text-muted-foreground">{row.label}</dt>
+                        <dd className="text-right text-sm font-medium">{row.value(plan.id)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <PlanCta planId={plan.id} highlighted={plan.highlighted} />
                 </div>
               ))}
             </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              New users pick a plan during{" "}
-              <Link href="/signup" className="font-medium text-primary hover:underline">
-                onboarding
-              </Link>
-              ; paid plans check out through Stripe on the billing page.
-            </p>
           </div>
         </section>
         <RelatedLinks

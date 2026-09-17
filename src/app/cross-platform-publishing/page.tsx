@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { PageHero, QuietRows, SplitSection } from "@/components/marketing/MarketingSections";
+import { ComposerVisual } from "@/components/landing/ProductVisuals";
+import { HeroVisual } from "@/components/landing/HeroVisual";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -67,7 +68,7 @@ export default function PublishingPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Plan and publish"
           title="Create once. Fit every network."
           description="The multi-target composer starts from one caption and one set of media, then lets each account diverge — with previews and validation that match the real rules of every network."
@@ -76,76 +77,54 @@ export default function PublishingPage() {
             { label: "Features", href: "/features" },
             { label: "Cross-Platform Publishing" },
           ]}
+          visual={<ComposerVisual />}
+          secondaryHref="/platform-previews"
+          secondaryLabel="See previews"
+          meta={[
+            { label: "Flow", value: "create → tailor → preview → publish" },
+            { label: "Targets", value: "4 networks, 1 post" },
+          ]}
         />
-        <section aria-label="The publishing flow" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              Create, tailor, preview, publish
-            </h2>
-            <ol className="mt-6 grid gap-4 md:grid-cols-4">
-              {[
-                { title: "Create", text: "Global text plus images or video attached once in the composer." },
-                { title: "Tailor", text: "Per-account overrides and TikTok titles, privacy and cover options." },
-                { title: "Preview", text: "A platform-aware mock per network with limits and counters visible." },
-                { title: "Publish", text: "Schedule ahead or publish now, with live progress and cancel." },
-              ].map((step, index) => (
-                <li key={step.title} className="rounded-2xl bg-panel p-5">
-                  <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums">
-                    {index + 1}
-                  </span>
-                  <p className="mt-3 font-heading text-base font-semibold">{step.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-        <section aria-label="What the composer enforces" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Overrides, not copies
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  The shared caption stays the source of truth. When Threads
-                  allows 500 characters and X allows 280, you edit the X
-                  version in place — the shared text never forks into four
-                  disconnected drafts.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  TikTok goes further with its own title and publishing
-                  settings (privacy level, comments, duet, stitch, cover),
-                  served per account from creator info rather than guessed.
-                </p>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Validation before regret
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "Character limits with remaining counters per platform while you type.",
-                    "Media rules per network: Instagram needs a photo or Reel; TikTok needs video or photos; Threads takes a single item.",
-                    "Mixed-media guards: formats that cannot share one post are rejected with a named issue, not a silent failure.",
-                    "Dirty-form guard and mobile action bar so an accidental tap never loses a multi-target draft.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Want the per-network format details?{" "}
-              <Link href="/platform-previews" className="font-medium text-primary hover:underline">
-                Platform previews show exactly what each version looks like.
-              </Link>
-            </p>
-          </div>
-        </section>
+        {/* The four-version moment, full width and mirrored from the hero. */}
+        <SplitSection
+          title="One post, four honest versions"
+          visual={<HeroVisual />}
+          flip
+          caption="The same launch post adapted per network: full story on Threads, trimmed on X, captioned media elsewhere."
+        >
+          <p>
+            The channel rail is the workflow made visible: each account shows
+            its adapted detail and limit counter — caption length on
+            Instagram, full story on Threads, video plus title on TikTok,
+            trimmed text on X.
+          </p>
+          <p>
+            Nothing here is a mock of a mock. These are the same adaptations
+            the composer produces before scheduling.
+          </p>
+        </SplitSection>
+        <QuietRows
+          title="What the composer enforces"
+          intro="Guardrails with names, applied while you write."
+          items={[
+            {
+              title: "Remaining counters",
+              text: "Character limits per platform, visible while typing — not discovered after pressing publish.",
+            },
+            {
+              title: "Media presence",
+              text: "Instagram refuses text-only posts; TikTok demands video or photos. Rejected in the composer, not at publish time.",
+            },
+            {
+              title: "No silent mixing",
+              text: "Formats that cannot share one post are rejected with a named issue instead of failing halfway.",
+            },
+            {
+              title: "TikTok depth",
+              text: "Privacy level, comments, duet, stitch and cover — served per account from creator info, not guessed.",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[

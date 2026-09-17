@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { FullVisual, PageHero, QuietRows } from "@/components/marketing/MarketingSections";
+import { CalendarVisual } from "@/components/landing/ProductVisuals";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -67,7 +67,8 @@ export default function CalendarPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        {/* Calendar hero stays text-first: the grid below is the visual. */}
+        <PageHero
           eyebrow="Plan and publish"
           title="The month, visible in one grid."
           description="Scheduled posts, unscheduled drafts and per-day statuses live on a single calendar. Drag a post to a new day and the schedule follows."
@@ -76,75 +77,38 @@ export default function CalendarPage() {
             { label: "Features", href: "/features" },
             { label: "Content Calendar" },
           ]}
+          secondaryHref="/bulk-social-media-scheduling"
+          secondaryLabel="Fill it with bulk"
+          meta={[
+            { label: "View", value: "month grid" },
+            { label: "Reschedule", value: "drag and drop" },
+            { label: "Timezone", value: "viewer local" },
+          ]}
         />
-        <section aria-label="What the calendar shows" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Every post has a place
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  The grid shows scheduled posts with their status, platform
-                  and media preview per day. Drafts without a date wait in
-                  their own panel — nothing unpublished gets lost, and nothing
-                  scheduled hides.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Failed and partially published posts surface with their
-                  state intact, so the calendar doubles as a triage view: see
-                  what needs a retry without opening every post.
-                </p>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Rescheduling without retyping
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "Drag and drop: move a draft or scheduled post to another day; the grid never reflows around you.",
-                    "Viewer-timezone bucketing: days reflect your local time, not the server clock.",
-                    "Status-aware: publishing and published posts stay readable while you plan around them.",
-                    "Quota-safe: rescheduling never creates a second post, so your monthly usage stays predictable.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section aria-label="Planning workflow" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              A weekly planning rhythm
-            </h2>
-            <ol className="mt-6 grid gap-4 md:grid-cols-3">
-              {[
-                { title: "Draft the week", text: "Write posts without dates; they collect in the drafts panel." },
-                { title: "Place them", text: "Drag each draft onto its day and set times in the composer." },
-                { title: "Adjust live", text: "Move, retry or reschedule as results come back — all from the grid." },
-              ].map((step, index) => (
-                <li key={step.title} className="rounded-2xl bg-panel p-5">
-                  <span aria-hidden="true" className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium tabular-nums">
-                    {index + 1}
-                  </span>
-                  <p className="mt-3 font-heading text-base font-semibold">{step.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
-                </li>
-              ))}
-            </ol>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Filling the calendar with videos?{" "}
-              <Link href="/bulk-social-media-scheduling" className="font-medium text-primary hover:underline">
-                Bulk scheduling creates dated posts straight onto the grid.
-              </Link>
-            </p>
-          </div>
-        </section>
+        <FullVisual
+          title="March, as Postvia sees it"
+          intro="Status dots and chips per day, today highlighted, failures impossible to miss. On mobile the same grid collapses to dots — the product's own responsive language."
+          visual={<CalendarVisual />}
+          caption="Recreation of the real calendar: statuses, platforms and media per day, drafts waiting in the side panel."
+        />
+        <QuietRows
+          title="A weekly rhythm, not a feature list"
+          intro="How the grid gets used once the novelty wears off."
+          items={[
+            {
+              title: "Draft the week",
+              text: "Write posts without dates; they collect in the drafts panel instead of clogging the grid.",
+            },
+            {
+              title: "Place them",
+              text: "Drag each draft onto its day and set times in the composer. Validation still applies per network.",
+            },
+            {
+              title: "Adjust live",
+              text: "Move, retry or reschedule as results come back. Failed posts surface with state intact for triage.",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[

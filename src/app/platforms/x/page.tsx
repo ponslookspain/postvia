@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { PageHero, PlatformMock, QuietRows } from "@/components/marketing/MarketingSections";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -67,7 +66,7 @@ export default function XPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Platforms"
           title="X, published now — honestly."
           description="Short posts with media that go out immediately. Postvia never promises X scheduling; the composer tells you upfront and the workflow respects it."
@@ -76,71 +75,67 @@ export default function XPage() {
             { label: "Features", href: "/features" },
             { label: "X" },
           ]}
+          visual={
+            <PlatformMock
+              platform="X"
+              handle="@studio"
+              text="Launch day is live. Biggest update yet — details in the thread below."
+              counter="184 / 280"
+              mediaLabel="2 photos attached"
+              foot="Trimmed version · publishes immediately"
+            />
+          }
+          secondaryHref="/social-media-scheduler"
+          secondaryLabel="How scheduling works"
+          meta={[
+            { label: "Text", value: "up to 280" },
+            { label: "Media", value: "4 photos · 1 GIF · 1 video" },
+            { label: "Scheduling", value: "not available" },
+          ]}
         />
-        <section aria-label="X capabilities" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  What ships to X
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "Text posts up to 280 characters with a live remaining counter.",
-                    "Up to 4 photos, 1 GIF, or 1 video attached via chunked upload.",
-                    "Preview renders the trimmed X version before you confirm.",
-                    "Immediate publish with per-account status and individual retry.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  No scheduling — by rule, not by accident
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Scheduling for X is not available yet. The composer detects
-                  X in your selection and shows the immediate-publishing hint
-                  instead of the schedule dialog; the posts API enforces the
-                  same rule server-side.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  This page is titled publishing, not scheduling, on purpose:
-                  search intent and product truth stay aligned.
-                </p>
-              </div>
+        {/* Deliberately no scheduling visual: the constraint is the message. */}
+        <section aria-label="No scheduling for X" className="border-t border-border bg-muted/30">
+          <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 md:px-8 md:py-20 lg:grid-cols-2 lg:gap-14">
+            <div className="min-w-0">
+              <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+                No scheduling — by rule, not by accident
+              </h2>
+              <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
+                Scheduling for X is not available yet. The composer detects X
+                in your selection and shows the immediate-publishing hint
+                instead of the schedule dialog; the posts API enforces the
+                same rule server-side.
+              </p>
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+                How X shares a post
+              </h2>
+              <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
+                Trim the X version to 280 characters, attach photos, GIF or
+                video within limits, and publish: X goes out now with its own
+                status while the other networks follow their schedule.
+              </p>
             </div>
           </div>
         </section>
-        <section aria-label="X workflow" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              X inside the shared workflow
-            </h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {[
-                { title: "Trim the version", text: "Override the X text to 280 characters; the shared caption stays long elsewhere." },
-                { title: "Attach the media", text: "Photos, GIF or video validated against X limits before publish." },
-                { title: "Publish and check", text: "X goes out now with its own status while other networks queue." },
-              ].map((card) => (
-                <div key={card.title} className="rounded-2xl bg-panel p-5">
-                  <p className="font-heading text-base font-semibold">{card.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{card.text}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Need the scheduled counterpart?{" "}
-              <Link href="/social-media-scheduler" className="font-medium text-primary hover:underline">
-                How scheduling works for Instagram, Threads and TikTok.
-              </Link>
-            </p>
-          </div>
-        </section>
+        <QuietRows
+          title="Media rules for X"
+          items={[
+            {
+              title: "Up to 4 photos",
+              text: "Stills up to 5 MB each via chunked upload. Over-limit stills are rejected before publish.",
+            },
+            {
+              title: "1 GIF or 1 video",
+              text: "One moving attachment per post — never mixed with photos on the same post.",
+            },
+            {
+              title: "Individual retry",
+              text: "A failed X target keeps its error and retries alone; published siblings stay untouched.",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[

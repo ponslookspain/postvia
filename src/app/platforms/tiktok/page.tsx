@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { PageHero, PlatformMock, QuietRows } from "@/components/marketing/MarketingSections";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -72,7 +71,7 @@ export default function TiktokPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Platforms"
           title="TikTok, with the settings TikTok actually offers."
           description="Video or photo posts with titles, privacy levels and interaction toggles served per account — scheduled singly or in bulk batches."
@@ -81,78 +80,71 @@ export default function TiktokPage() {
             { label: "Features", href: "/features" },
             { label: "TikTok" },
           ]}
+          visual={
+            <PlatformMock
+              platform="TIKTOK"
+              handle="@studio.clips"
+              text="Launch day, cut to 30 seconds. Full story in the caption — duet open."
+              counter="title 42 / 2,200"
+              mediaLabel="launch-day.mp4 · 1 video · cover 00:01"
+              foot="Privacy: public · comments on · duet on"
+            />
+          }
+          secondaryHref="/bulk-social-media-scheduling"
+          secondaryLabel="Schedule in bulk"
+          meta={[
+            { label: "Formats", value: "1 video · 1–4 photos" },
+            { label: "Title", value: "per-target override" },
+            { label: "Scheduling", value: "single + bulk" },
+          ]}
         />
-        <section aria-label="TikTok capabilities" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  What ships to TikTok
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "One video (MP4/WebM/MOV) per post via Direct Post.",
-                    "1–4 photos (JPEG/WebP) per post as the photo flow.",
-                    "Title per target: global text by default, overridable per account.",
-                    "Photo-only description up to 4,000 characters.",
-                    "Privacy level, allow-comments, allow-duet, allow-stitch and cover options per post.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Options from the source, not guesses
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Privacy choices and interaction toggles are served
-                  per account from creator info — the composer shows what
-                  your TikTok account actually allows instead of a static
-                  list that drifts from reality.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  Validation keeps the two media flows apart: video-only
-                  settings never leak into photo posts, and mixed photo-plus-
-                  video posts are rejected with a named issue before publish.
-                </p>
-              </div>
+        {/* Two flows, side by side on quiet background — no cards. */}
+        <section aria-label="Video and photo flows" className="border-t border-border bg-muted/30">
+          <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 md:px-8 md:py-20 lg:grid-cols-2 lg:gap-14">
+            <div className="min-w-0">
+              <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+                Video flow
+              </h2>
+              <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
+                One video per post with a title of up to 2,200 characters,
+                privacy level, comment/duet/stitch toggles and a cover
+                timestamp — options served per account from creator info, so
+                the composer shows what your account actually allows.
+              </p>
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+                Photo flow
+              </h2>
+              <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
+                One to four photos with a title narrowed to 90 characters and
+                a separate description of up to 4,000. Video-only settings
+                never leak across, and mixed photo-plus-video posts are
+                rejected before publish.
+              </p>
             </div>
           </div>
         </section>
-        <section aria-label="TikTok scheduling" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              Scheduled singly or in batches
-            </h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl bg-panel p-5">
-                <p className="font-heading text-base font-semibold">Single scheduling</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Date and time in the composer, per-account status after
-                  publish, retries and calendar rescheduling like any other
-                  network.
-                </p>
-              </div>
-              <div className="rounded-2xl bg-panel p-5">
-                <p className="font-heading text-base font-semibold">Bulk batches</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Up to 10 videos with a start time and interval become
-                  individual scheduled posts on Growth and Scale.
-                </p>
-              </div>
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Batch workflow in detail:{" "}
-              <Link href="/bulk-social-media-scheduling" className="font-medium text-primary hover:underline">
-                bulk video scheduling.
-              </Link>
-            </p>
-          </div>
-        </section>
+        <QuietRows
+          title="Scheduled singly or in batches"
+          items={[
+            {
+              title: "Single scheduling",
+              text: "Date and time in the composer, per-account status after publish, retries and calendar rescheduling.",
+              href: "/social-media-scheduler",
+            },
+            {
+              title: "Bulk batches",
+              text: "Up to 10 videos with a start time and interval become individual scheduled posts on Growth and Scale.",
+              href: "/bulk-social-media-scheduling",
+            },
+            {
+              title: "Preview first",
+              text: "The TikTok version with titles and settings renders before anything is queued.",
+              href: "/platform-previews",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[

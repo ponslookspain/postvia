@@ -153,6 +153,7 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [mobileFeaturesOpen, setMobileFeaturesOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const featuresWrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -161,15 +162,27 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close the mega menu on Escape while it is open. Route changes
-  // close it via onNavigate on every mega-menu link.
+  // Close the mega menu on Escape or pointer-down outside while open.
+  // Route changes close it via onNavigate on every mega-menu link.
   useEffect(() => {
     if (!featuresOpen) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setFeaturesOpen(false);
     };
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        featuresWrapRef.current &&
+        !featuresWrapRef.current.contains(event.target as Node)
+      ) {
+        setFeaturesOpen(false);
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
   }, [featuresOpen]);
 
   function scheduleClose() {
@@ -210,6 +223,7 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
             Product
           </Link>
           <div
+            ref={featuresWrapRef}
             className="relative"
             onMouseEnter={() => {
               cancelClose();

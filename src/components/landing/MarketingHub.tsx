@@ -70,8 +70,8 @@ export function HomeFeatures() {
       aria-labelledby="home-features-heading"
       className="border-t border-border bg-muted/30"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-8 md:py-24">
-        <Reveal className="max-w-2xl">
+      <div className="mx-auto grid w-full max-w-6xl items-start gap-10 px-4 py-16 md:px-8 md:py-24 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
+        <Reveal className="lg:sticky lg:top-24">
           <p className="text-sm font-medium text-muted-foreground">
             Explore features
           </p>
@@ -85,41 +85,38 @@ export function HomeFeatures() {
             Scheduling, planning, publishing and previews — each with its own
             page explaining the real workflow.
           </p>
-        </Reveal>
-        <ul className="mt-10 grid gap-4 sm:grid-cols-2">
-          {FEATURE_HUB_CARDS.slice(0, 4).map((feature, index) => (
-            <Reveal key={feature.href} delay={index === 1 ? 75 : index === 2 ? 150 : index === 3 ? 225 : 0} className="h-full">
-              <Link
-                href={feature.href}
-                className="group flex h-full flex-col rounded-2xl bg-panel p-6 outline-none transition-colors hover:bg-muted motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <feature.icon aria-hidden="true" className="size-5 text-primary" />
-                <span className="mt-4 font-heading text-lg font-semibold tracking-tight">
-                  {feature.title}
-                </span>
-                <span className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  {feature.description}
-                </span>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                  Learn more
-                  <ArrowRightIcon
-                    aria-hidden="true"
-                    className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:transform-none"
-                  />
-                </span>
-              </Link>
-            </Reveal>
-          ))}
-        </ul>
-        <Reveal className="mt-6">
           <Link
             href="/features"
-            className="inline-flex items-center gap-1 rounded-sm text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="mt-6 inline-flex items-center gap-1 rounded-sm text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             View all features
             <ArrowRightIcon aria-hidden="true" className="size-4" />
           </Link>
         </Reveal>
+        <ul className="border-t border-border">
+          {FEATURE_HUB_CARDS.slice(0, 4).map((feature) => (
+            <li key={feature.href} className="border-b border-border">
+              <Link
+                href={feature.href}
+                className="group flex items-center gap-4 rounded-sm py-5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                <feature.icon aria-hidden="true" className="size-5 shrink-0 text-primary" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-heading text-lg font-semibold tracking-tight">
+                    {feature.title}
+                  </span>
+                  <span className="block truncate text-sm text-muted-foreground">
+                    {feature.description}
+                  </span>
+                </span>
+                <ArrowRightIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:transform-none"
+                />
+              </Link>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
@@ -145,7 +142,7 @@ export function HomeResources() {
             blog, no placeholder links.
           </p>
         </Reveal>
-        <ul className="mt-10 grid gap-4 md:grid-cols-3">
+        <ul className="mt-10 border-t border-border">
           {[
             {
               title: "How scheduling works",
@@ -163,24 +160,23 @@ export function HomeResources() {
               href: "/pricing",
             },
           ].map((resource) => (
-            <li key={resource.href + resource.title}>
+            <li key={resource.href + resource.title} className="border-b border-border">
               <Link
                 href={resource.href}
-                className="group flex h-full flex-col rounded-2xl bg-panel p-6 outline-none transition-colors hover:bg-muted motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="group flex items-center gap-4 rounded-sm py-4 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
               >
-                <span className="font-heading text-lg font-semibold tracking-tight">
-                  {resource.title}
+                <span className="min-w-0 flex-1">
+                  <span className="block font-heading text-base font-semibold tracking-tight">
+                    {resource.title}
+                  </span>
+                  <span className="block truncate text-sm text-muted-foreground">
+                    {resource.text}
+                  </span>
                 </span>
-                <span className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                  {resource.text}
-                </span>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                  Read the guide
-                  <ArrowRightIcon
-                    aria-hidden="true"
-                    className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:transform-none"
-                  />
-                </span>
+                <ArrowRightIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none motion-reduce:transform-none"
+                />
               </Link>
             </li>
           ))}

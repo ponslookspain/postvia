@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { NavbarState } from "@/components/landing/NavbarState";
 import { Footer } from "@/components/landing/Faq";
-import { MarketingHero } from "@/components/marketing/MarketingHero";
 import { RelatedLinks } from "@/components/marketing/MarketingCards";
 import { MarketingFaq } from "@/components/marketing/MarketingFaq";
 import { MarketingCta } from "@/components/marketing/MarketingCta";
+import { PageHero, PlatformMock, QuietRows } from "@/components/marketing/MarketingSections";
 import { absoluteUrl, breadcrumbSchema, faqPageSchema, serializeJsonLd } from "@/lib/seo/site";
 
 export const metadata: Metadata = {
@@ -67,7 +66,7 @@ export default function ThreadsPage() {
       />
       <NavbarState />
       <main>
-        <MarketingHero
+        <PageHero
           eyebrow="Platforms"
           title="Threads, where the long version lives."
           description="Text-first posts up to 500 characters with a single image or video — scheduled from the same composer as everything else."
@@ -76,71 +75,43 @@ export default function ThreadsPage() {
             { label: "Features", href: "/features" },
             { label: "Threads" },
           ]}
+          visual={
+            <PlatformMock
+              platform="THREADS"
+              handle="@studio"
+              text="Morning launch is live — our biggest update yet. Here is everything that changed, why it matters, and what ships next for your week."
+              counter="184 / 500"
+              mediaLabel="launch-day.mp4 · 1 video"
+              foot="Full story fits · single media · ready to schedule"
+            />
+          }
+          secondaryHref="/platforms/x"
+          secondaryLabel="Compare with X"
+          meta={[
+            { label: "Text", value: "up to 500" },
+            { label: "Media", value: "1 image · 1 video" },
+            { label: "Scheduling", value: "yes" },
+          ]}
         />
-        <section aria-label="Threads capabilities" className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <div className="grid gap-10 md:grid-cols-2">
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  What ships to Threads
-                </h2>
-                <ul className="mt-4 flex flex-col gap-3">
-                  {[
-                    "Text posts up to 500 characters — the longest short-form limit Postvia serves.",
-                    "One image (JPEG/PNG/WebP/GIF) or one MP4 video per post.",
-                    "Preview renders the Threads version with its counter before scheduling.",
-                    "Scheduling with per-account status and calendar placement.",
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  Single media, stated plainly
-                </h2>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  The Threads API supports carousels, but Postvia publishes
-                  single-media posts only — a product scope decision. The
-                  composer fails closed on multi-file Threads input instead
-                  of letting the publish fail later.
-                </p>
-                <p className="mt-3 leading-relaxed text-muted-foreground">
-                  In practice this keeps Threads fast: one thought, one
-                  attachment, one preview, one schedule slot.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section aria-label="Threads workflow" className="border-t border-border bg-muted/30">
-          <div className="mx-auto w-full max-w-6xl px-4 py-10 md:px-8 md:py-14">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-              Threads inside the shared workflow
-            </h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {[
-                { title: "Keep the story", text: "Threads holds the full 500-character version of your caption." },
-                { title: "Trim elsewhere", text: "X and other limits get their own overrides without touching Threads." },
-                { title: "Schedule together", text: "One date queues Threads alongside Instagram and TikTok." },
-              ].map((card) => (
-                <div key={card.title} className="rounded-2xl bg-panel p-5">
-                  <p className="font-heading text-base font-semibold">{card.title}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{card.text}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Compare the short-form sibling:{" "}
-              <Link href="/platforms/x" className="font-medium text-primary hover:underline">
-                publishing to X, immediately.
-              </Link>
-            </p>
-          </div>
-        </section>
+        <QuietRows
+          title="One thought, one attachment"
+          intro="Single media is a scope decision, stated once and enforced kindly."
+          items={[
+            {
+              title: "Text up to 500",
+              text: "The longest short-form limit Postvia serves — Threads usually keeps the full version of your shared caption.",
+            },
+            {
+              title: "Single image or video",
+              text: "JPEG, PNG, WebP, GIF or one MP4. Multi-file input fails closed with an explicit per-platform error.",
+            },
+            {
+              title: "Scheduled together",
+              text: "One date queues Threads alongside Instagram and TikTok, each reporting its own status afterward.",
+              href: "/social-media-scheduler",
+            },
+          ]}
+        />
         <RelatedLinks
           heading="Keep exploring"
           links={[
