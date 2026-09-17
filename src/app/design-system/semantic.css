@@ -18,9 +18,9 @@
    Theming: `.dark` is applied to <html> by the blocking script in
    `src/hooks/use-theme.ts` (dark is the product default, light is opt-in).
    Because `:root` and `.dark` are therefore the SAME element, an alias such
-   as `--destructive: var(--error)` only has to be declared once — it resolves
-   against whichever `--error` is in effect. Aliases are listed in `:root`
-   only; `.dark` restates real values.
+   as `--panel-foreground: var(--foreground)` only has to be declared once —
+   it resolves against whichever `--foreground` is in effect. Aliases are
+   listed in `:root` only; `.dark` restates real values.
    ========================================================================= */
 
 :root {
@@ -148,25 +148,17 @@
 	   Kept because call sites still use them. They are ALIASES, never
 	   values: each resolves to a canonical token above, so there is exactly
 	   one place to change. Do not add new names here.
+	   History: `--destructive` (legacy name for the failure hue, prefer
+	   `--error`), `--signal` (legacy name for the brand hue, prefer
+	   `--primary`) and `--secondary` (quiet neutral button fill) were
+	   removed once repo-wide usage analysis showed zero consumers of the
+	   utilities. `variant="destructive"` remains live as Button API and
+	   maps directly to `--error`; it never depended on the token.
 
-	   --destructive  legacy name for the failure hue. Prefer `--error`.
-	   --signal       legacy name for the brand hue, from the dispatch-desk
-	                  vocabulary. It is `--primary`; the SCHEDULED state it
-	                  once described now uses `--info` (see StatusBadge).
-	                  Prefer `--primary`.
 	   --accent       the neutral fill step. It carried a value identical to
 	                  `--muted` in both themes, so it is stated as an alias
-	                  rather than a second copy of the same colour.
-	   --secondary    quiet neutral button fill. No utility consumes it
-	                  today; retained so the Radian `secondary` surface and
-	                  the `soft/neutral` button variant keep a value. */
-	--destructive: var(--error);
-	--signal: var(--primary);
-	--signal-foreground: var(--primary-foreground);
+	                  rather than a second copy of the same colour. */
 	--accent: var(--muted);
-	--accent-foreground: #20201e;
-	--secondary: #e9e6dc;
-	--secondary-foreground: #20201e;
 }
 
 .dark {
@@ -210,12 +202,6 @@
 	--sidebar-accent-foreground: #f5f4ee;
 	--sidebar-border: #34332f;
 	--sidebar-ring: #5fa1f3;
-
-	/* Legacy aliases: see `:root`. Only the two that hold a real value need
-	   a dark counterpart. */
-	--accent-foreground: #f5f4ee;
-	--secondary: #30302c;
-	--secondary-foreground: #f5f4ee;
 }
 
 /* ----------------------------------------------------------------------------
@@ -223,8 +209,8 @@
    ----------------------------------------------------------------------------
    `@theme inline` so the utilities point straight at the tokens above and
    pick up the `.dark` override without a second indirection. This block is
-   the complete list of PostVIA colour utilities; anything outside it is
-   either a foundation primitive or a Radian compatibility alias.
+   the complete list of PostVIA colour utilities; anything outside it is a
+   foundation primitive.
 -------------------------------------------------------------------------- */
 @theme inline {
 	/* Background · Foreground · Muted */
@@ -294,12 +280,6 @@
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
 
-	/* Legacy aliases — see the `:root` block for what replaces each. */
-	--color-destructive: var(--destructive);
-	--color-signal: var(--signal);
-	--color-signal-foreground: var(--signal-foreground);
+	/* Legacy alias — see the `:root` block. */
 	--color-accent: var(--accent);
-	--color-accent-foreground: var(--accent-foreground);
-	--color-secondary: var(--secondary);
-	--color-secondary-foreground: var(--secondary-foreground);
 }

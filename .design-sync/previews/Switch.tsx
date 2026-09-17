@@ -10,7 +10,7 @@ import {
 } from "postvia";
 
 /**
- * Switch previews. Radian numeric sizes ("20"/"24"/"32"), the pill and square
+ * Switch previews. Numeric sizes ("20"/"24"/"32"), the pill and square
  * shapes, checked/disabled, and the two extras the primitive carries:
  * `SwitchWrapper permanent` (an always-on toggle that never takes the brand
  * fill) and `SwitchIndicator` (a glyph riding inside the thumb). The settings

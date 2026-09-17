@@ -108,24 +108,17 @@ const avatarStatusVariants = cva(
 
 const avatarFallbackVariants = cva("", {
 	variants: {
+		// Tints for the four product hues only (red → error, emerald →
+		// success, amber → warning, light-blue → info/primary). The axis
+		// used to span the full 17-hue foundation palette; repo-wide usage
+		// analysis showed zero call sites passing color at all (the
+		// fallback defaults to muted monochrome below), so the unused hues
+		// were removed alongside the foundations trim.
 		color: {
 			red: "bg-red-accent text-red-text",
-			orange: "bg-orange-accent text-orange-text",
-			amber: "bg-amber-accent text-amber-text",
-			yellow: "bg-yellow-accent text-yellow-text",
-			neon: "bg-neon-accent text-neon-text",
-			green: "bg-green-accent text-green-text",
 			emerald: "bg-emerald-accent text-emerald-text",
-			teal: "bg-teal-accent text-teal-text",
-			cyan: "bg-cyan-accent text-cyan-text",
+			amber: "bg-amber-accent text-amber-text",
 			"light-blue": "bg-light-blue-accent text-light-blue-text",
-			blue: "bg-blue-accent text-blue-text",
-			"violet-blue": "bg-violet-blue-accent text-violet-blue-text",
-			purple: "bg-purple-accent text-purple-text",
-			"dark-orchid": "bg-dark-orchid-accent text-dark-orchid-text",
-			fuchsia: "bg-fuchsia-accent text-fuchsia-text",
-			magenta: "bg-magenta-accent text-magenta-text",
-			rose: "bg-rose-accent text-rose-text",
 		},
 	},
 })
@@ -239,9 +232,9 @@ export {
 }
 
 // ---------------------------------------------------------------------------
-// PostVIA extension layer (no Radian equivalent). Preserved verbatim from the
-// previous implementation except the group-data size selectors, remapped
-// from the old sm|default|lg scale to the numeric Radian scale:
+// PostVIA extension layer. Preserved from the previous implementation except
+// the group-data size selectors, remapped from the old sm|default|lg scale to
+// the numeric scale:
 //   sm (24px) -> "24", default (32px) -> "32", lg (40px) -> "40".
 // ---------------------------------------------------------------------------
 

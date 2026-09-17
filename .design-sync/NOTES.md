@@ -199,10 +199,11 @@ deleted after folding. These cost real iterations — read before authoring more
 
 ### Two size APIs are live at once, and mixing them fails silently
 
-`Button` takes the **legacy PostVIA** API (`variant: default | secondary |
-outline | ghost | destructive | link`, `size: default | xs | sm | lg | icon |
-icon-xs | icon-sm | icon-lg`). `SelectTrigger`, `Badge`, `Avatar` and `Input`
-take the **Radian numeric** scale (`size="28|32|36|40|44|48"`). Passing one
+`Button` takes the **PostVIA** API (`variant: default | secondary |
+outline | ghost | destructive | link`, `size: default | sm | lg |
+icon-sm`; a direct cva contract since the mapping-indirection cleanup).
+`SelectTrigger`, `Avatar` and `Input` take the **numeric** scale
+(`size="28|32|36|40|44|48"`); `Badge` takes `"20|24"`. Passing one
 API's value to the other component drops every size class with no error: cva
 finds no matching variant, and `defaultVariants` only fill a prop that is
 `undefined`, not one that is set to an unknown value. This is the single most
@@ -258,15 +259,16 @@ product's default card render.
 
 Recorded here because a future sync will re-discover them.
 
-- **`Alert` is composed wrongly at every call site.** The root is `flex
-  items-stretch`; `AlertContent` is the `flex-col` stacker. App code renders
-  `<Alert><Icon/><AlertTitle/><AlertDescription/></Alert>`, which lays title and
-  description **side by side**. Verified by rendering both compositions from the
-  built bundle. Affects `src/app/login/LoginForm.tsx` (5 alerts),
-  `src/app/onboarding/OnboardingForm.tsx`, `src/app/accounts/AccountsContent.tsx`.
-  Filed as a separate task; `src/` was not touched by the sync.
-- **`ToastIcon` is not exported** from `ui/toast.tsx`, so Toast cannot be fully
-  composed from outside the module. Previews substitute a coloured dot.
+- **RESOLVED — `Alert` is composed correctly at every call site.**
+  (The old finding: the root is `flex items-stretch`, `AlertContent` is the
+  `flex-col` stacker, and app code rendered
+  `<Alert><Icon/><AlertTitle/><AlertDescription/></Alert>`, laying title
+  and description side by side. A repo-wide check during the design-system
+  cleanup showed all 16 importing files — `LoginForm`, `OnboardingForm`,
+  `AccountsContent`, `StateBlock`, billing, composer, settings, posts —
+  already render `<AlertContent>`; no change was needed.)
+- **RESOLVED — `ToastIcon` is exported** from `ui/toast.tsx`, so Toast can
+  be fully composed from outside the module.
 - **Not a bug:** in `Calendar`, a trailing outside day that happens to be
   *today* picks up the crimson today marker while its neighbours stay muted.
   That is `group-data-today:border-primary group-data-today:text-primary-text`
@@ -337,9 +339,9 @@ shade lighter and it just reads.
 ### More per-component size scales
 
 Extending the wave-1 list: `SidebarMenuButton` `size="28|32|36|48|52|56"`
-(default `"32"`), `variant="neutral|soft|strong"` (default `"neutral"`);
-`SidebarMenuSubButton` `size="28|32"` only; `SidebarInput` hard-codes
-`size="32"` on its underlying `Input` and **ignores any size passed**.
+(default `"32"`), `variant="neutral"` (only); `SidebarMenuSubButton`
+`size="28|32"` only; `SidebarInput` hard-codes `size="32"` on its
+underlying `Input` and **ignores any size passed**.
 
 ### `class`-passing props are a preview trap
 
@@ -361,34 +363,34 @@ children survive it.
 ### Misc capture facts
 
 - Backticks in caption prose render **literally** in a screenshot. Use quotes.
-- `var(--border)`, `var(--muted)`, `var(--color-fill2)` and
-  `var(--color-fg-tertiary)` all resolve in the preview environment, so
-  hairline rules and captions need no utility classes.
+- `var(--border)` and `var(--muted)` resolve in the preview environment
+  (canonical, `semantic.css`), so hairline rules and captions need no
+  utility classes. (Previews used to reference `var(--color-fill2)` and
+  `var(--color-fg-tertiary)` from the now-removed `compat-radian.css`;
+  all were migrated to canonical `--color-*` names when that file was
+  deleted, and later `var(--font-body)` references to `var(--font-sans)`.)
 - No cell may reference a remote image — the capture is offline. `AvatarImage`
   is deliberately not demonstrated; a dangling `src` falls through to the
   fallback and quietly misrepresents the component.
 
-### A design-system contradiction worth a decision
+### RESOLVED — the Sidebar tone contradiction is gone
 
-`SidebarMenuButton`'s `soft` and `strong` variants put `--primary` on the
-**active** nav row, which contradicts the normative rule in
+`SidebarMenuButton`'s `soft` and `strong` variants used to put `--primary`
+on the **active** nav row, contradicting the normative rule in
 `docs/design-system.md` ("the active one is a quiet neutral fill, never the
-brand hue — the red is for actions"). The product is correct (it uses the
-default `neutral`), but the variants exist in the primitive. Either the rule or
-the variants should give way; the preview shows both so the contradiction is
-visible rather than buried in a cva config.
+brand hue"). The product always used the default `neutral`; during the
+design-system cleanup the two unused variants were removed (zero call
+sites), so the rule now holds in code as well. The preview shows the
+`neutral` tone only.
 
-### `ErrorBlock` carries the `Alert` composition bug into the design system
+### RESOLVED — `ErrorBlock` composes `Alert` correctly
 
-`src/components/StateBlock.tsx` omits `AlertContent`, so every `ErrorBlock`
-renders its title and description side by side. Unlike the app-level call
-sites, this one is a **component the design system exports**, with 16 usages
-across 8 files including every route's `error.tsx` boundary. It cannot be
-fixed from a preview (`ErrorBlock` exposes only `title`/`description`/
-`action`), so those cells are graded `good` — they are the component's real
-behaviour — with the cause recorded in the grade notes. `AuthShell`'s
-`SignInFailed` cell composes the same alert *with* `AlertContent` on an
-adjacent sheet, so the diff is visible in the bundle. Filed as a task.
+(The old finding: `src/components/StateBlock.tsx` omitted `AlertContent`,
+so every `ErrorBlock` rendered its title and description side by side. A
+repo-wide check during the design-system cleanup showed `StateBlock` —
+like every app-level call site — already composes `<AlertContent>`; no
+change was needed. `AuthShell`'s `SignInFailed` cell remains the adjacent
+reference for the same composition.)
 - **A component-source change does not clear its grade** (see the section
   above). This is the failure mode most likely to ship a wrong verdict, and it
   will recur on every component fix.

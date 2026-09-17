@@ -1,11 +1,14 @@
 import { Badge, BadgeDot } from "postvia";
 
 /**
- * Badge previews. Badge takes the Radian numeric scale
- * (`size="20" | "24" | "28"`, default "24") crossed with
- * `variant="strong" | "outline" | "soft"` and a `color`. The product uses a
+ * Badge previews. Badge takes the PostVIA size pair
+ * (`size="20" | "24"`, default "24") crossed with
+ * `variant="strong" | "outline" | "soft"` and a semantic `color`
+ * (`"primary" | "error" | "neutral"`, default "neutral"). The product uses a
  * narrow slice of that matrix: soft neutral for counts and metadata, outline
- * neutral for quiet labels, soft error for "Reconnect" / "Failed".
+ * neutral for quiet labels, soft error for "Reconnect" / "Failed", strong
+ * primary for plan markers. Post statuses ("Scheduled", "Published", …) go
+ * through the StatusBadge domain gateway, never through a Badge color.
  *
  * Scaffolding is inline-styled so nothing depends on a utility class that was
  * never scanned into the stylesheet.
@@ -45,29 +48,13 @@ export function Variants() {
         <Badge variant="outline" color="primary">Outline</Badge>
         <Badge variant="soft" color="primary">Soft</Badge>
       </div>
-      <span style={caption}>Primary — the crimson brand hue.</span>
-    </div>
-  );
-}
-
-export function SemanticColors() {
-  return (
-    <div style={stage}>
+      <span style={caption}>Primary — PostVIA Blue, for plan markers.</span>
       <div style={row}>
-        <Badge variant="soft" color="info">Scheduled</Badge>
-        <Badge variant="soft" color="success">Published</Badge>
-        <Badge variant="soft" color="warning">Retrying</Badge>
+        <Badge variant="strong" color="error">Strong</Badge>
+        <Badge variant="outline" color="error">Outline</Badge>
         <Badge variant="soft" color="error">Reconnect</Badge>
       </div>
-      <div style={row}>
-        <Badge variant="outline" color="info">Scheduled</Badge>
-        <Badge variant="outline" color="success">Published</Badge>
-        <Badge variant="outline" color="warning">Retrying</Badge>
-        <Badge variant="outline" color="error">Reconnect</Badge>
-      </div>
-      <span style={caption}>
-        Soft above, outline below. Status hues live in badges and dots only.
-      </span>
+      <span style={caption}>Error — failure states only.</span>
     </div>
   );
 }
@@ -78,10 +65,9 @@ export function Sizes() {
       <div style={row}>
         <Badge size="20" variant="soft">20</Badge>
         <Badge size="24" variant="soft">24</Badge>
-        <Badge size="28" variant="soft">28</Badge>
       </div>
       <span style={caption}>
-        The Radian numeric scale. Default is 24 — Button&apos;s &quot;sm&quot;
+        The PostVIA size pair. Default is 24 — Button&apos;s &quot;sm&quot;
         and &quot;lg&quot; would drop every size class here.
       </span>
     </div>
@@ -96,7 +82,7 @@ export function WithDot() {
           <BadgeDot />
           Draft
         </Badge>
-        <Badge variant="soft" color="info">
+        <Badge variant="soft" color="primary">
           <BadgeDot />
           Scheduled
         </Badge>

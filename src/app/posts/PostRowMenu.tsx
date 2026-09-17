@@ -30,7 +30,7 @@ import { toast } from "@/components/ui/toast";
 import { reportError } from "@/lib/diagnostics";
 
 /**
- * Row actions as a Radian DropdownMenu. Only existing endpoints are used:
+ * Row actions as the `DropdownMenu` primitive. Only existing endpoints are used:
  * detail page, retry, delete. There is no duplicate endpoint, so
  * Duplicate is intentionally absent.
  */

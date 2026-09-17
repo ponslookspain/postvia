@@ -9,22 +9,23 @@ their own roots.
 
 ## Two size APIs are live at once — this is the trap
 
-`Button` uses the **legacy PostVIA** API. Everything else uses the **Radian
-numeric** scale. Crossing them drops every size class *silently* — `cva` finds
+`Button` uses the **PostVIA** API. Everything else uses a **numeric**
+scale. Crossing them drops every size class *silently* — `cva` finds
 no match, and `defaultVariants` only fills a prop that is `undefined`, not one
 set to an unknown value. Nothing errors; the component just renders at its base
 size.
 
 ```tsx
-<Button variant="secondary" size="sm">Save draft</Button>   // ✅ legacy
+<Button variant="secondary" size="sm">Save draft</Button>   // ✅ PostVIA
 <Input size="32" />                                         // ✅ numeric
 <Button size="32">…</Button>                                // ❌ silently unsized
 <Input size="sm" />                                         // ❌ silently unsized
 ```
 
 - `Button` — `variant: default | secondary | outline | ghost | destructive | link`,
-  `size: default | xs | sm | lg | icon | icon-xs | icon-sm | icon-lg`
-- `Input`, `SelectTrigger`, `Badge`, `Avatar` — `size="28|32|36|40|44|48"` (subsets vary)
+  `size: default | sm | lg | icon-sm`
+- `Input`, `SelectTrigger`, `Avatar` — `size="28|32|36|40|44|48"` (subsets vary)
+- `Badge` — `size="20|24"`
 - `Switch` — `"20|24|32"` · `Checkbox`, `RadioGroup` — `sm|md|lg` · `TextArea` — no size axis
 - `SidebarMenuButton` — `"28|32|36|48|52|56"`
 

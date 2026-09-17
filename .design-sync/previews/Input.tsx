@@ -8,7 +8,7 @@ import {
 import { AtSign, Link2, Search } from "lucide-react";
 
 /**
- * Input previews. The Radian numeric size scale ("28"–"48", default "36"),
+ * Input previews. The numeric size scale ("28"–"48", default "36"),
  * the resting/readonly/disabled/invalid states, and the two composition
  * shells the app uses around a bare input: InputGroup + InputAddon (a prefix
  * such as a channel handle or a URL scheme) and InputWrapper (an icon sharing

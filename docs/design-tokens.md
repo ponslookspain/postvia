@@ -45,18 +45,26 @@ value under its PostVIA name — no colour, spacing, or behaviour changed.
 Four status sub-steps that only ever lived in the compat layer
 (`success/warning/error/info` `-accent/-focus/-border/-hover`, plus
 `info-text`) were promoted into `semantic.css` itself as first-class
-canonical tokens, still pointing at the same Radian-palette foundation
-values in `foundations.css` they always used. Three `-alpha` translucency
-steps became `--overlay-4/-8/-12`.
+canonical tokens, derived from the semantic hues via `color-mix`. Three
+`-alpha` translucency steps became `--overlay-4/-8/-12`.
+
+A second cleanup wave then removed the runtime surface the compat layer had
+existed to serve: the `POSTVIA_VARIANT_MAP / POSTVIA_SIZE_MAP /
+POSTVIA_SIZE_FIXES` Button indirection (now a direct cva contract with the
+same class sets), the Badge 17-hue `color` axis and `28` size, the
+`AvatarFallback` hues outside the four product ones, the
+`SidebarMenuButton` `soft` / `strong` tones, and the `--signal`,
+`--destructive`-token and `--secondary` aliases (all zero consumers). No
+colour, spacing, or behaviour changed at any call site.
 
 What's still "Radian" in this codebase, and is **not** part of this
 removal: `@radix-ui/react-*` (Radix UI) is the headless accessibility
 engine under `Dialog`, `Select`, `Tooltip`, `Popover`, `DropdownMenu`, etc.
-— it has nothing to do with styling or naming and stays. The 17-hue OKLCH
-palette in `foundations.css` (`emerald`, `red`, `amber`, `light-blue`, …)
-is also unchanged: it's raw colour data, legitimately reused as an input
-by `semantic.css`, not a naming convention components should reach past
-`semantic.css` to touch.
+— it has nothing to do with styling or naming and stays. The raw hue
+palette in `foundations.css` (`red`, `emerald`, `amber`, `light-blue`,
+plus `neutral`) is also unchanged in role: it's raw colour data backing
+the `AvatarFallback` tints, not a naming convention components should
+reach past `semantic.css` to touch.
 
 ## Exported to Claude Design
 
@@ -83,8 +91,8 @@ to `<html>` by a blocking script before first paint
 Appearance in the account menu.
 
 Because `.dark` sits on `<html>` — the same element as `:root` — a token
-declared as an alias (`--destructive: var(--error)`) resolves against
-whichever value is in effect. Aliases are therefore declared once, in
+   declared as an alias (`--panel-foreground: var(--foreground)`) resolves against
+   whichever value is in effect. Aliases are therefore declared once, in
 `:root`, and `.dark` restates real values only.
 
 Every canonical token is defined for both themes. Three status hues
@@ -95,13 +103,13 @@ both themes because they stay legible on either canvas.
 
 | Group | Tokens | Notes |
 | --- | --- | --- |
-| Colors | 17-hue OKLCH palette (`--color-red` … `--color-rose`, `--color-neutral`), each with `base / accent / focus / border / hover / text / fg`, plus a full `.dark` re-map | Primitives. Components must not use them directly; `semantic.css` names the four PostVIA uses (red, emerald, amber, light-blue). Kept because the Radian primitives accept a `color` prop across the whole palette. |
+| Colors | 4-hue OKLCH palette (`--color-red`, `--color-emerald`, `--color-amber`, `--color-light-blue`), each with the two consumed steps `-accent` / `-text`, plus a full `.dark` re-map | Primitives. Components must not use them directly, except the `AvatarFallback` tint axis; `semantic.css` gives the four hues product names (`error`, `success`, `warning`, `info`). History: a 17-hue generator palette exposing `base / accent / focus / border / hover / text / fg`; every hue and step without a consumer was removed (see §3). |
 | Typography | `--font-sans` (Inter, body), `--font-heading` (DM Sans), `--font-mono` (Geist Mono) | Families come from `next/font` in `layout.tsx`. Declared with `@theme inline` so the utility points at the next/font variable instead of self-referencing. |
 | Typography | `--text-micro` 10px · `--text-meta` 11px · `--text-label` 13px · `--text-prose` 15px | The four half-steps Tailwind's ramp lacks. Font size only — line height stays at the call site. |
 | Spacing | `--spacing` 0.25rem | Tailwind's base step, stated explicitly. |
 | Spacing | `--page-narrow` 48rem · `--page-default` 64rem · `--page-wide` 76rem · `--section-gap` 2.5rem · `--measure-prose` 68ch | Consumed by `PageContainer`, `PageSections`, `PageHeader`, `SectionHeader`. |
 | Radius | `--radius` 0.875rem, and `--radius-sm … --radius-4xl` derived from it | One base, everything else `calc()`. Buttons are always `rounded-full`. Never add an arbitrary radius at a call site. |
-| Motion | `--duration-fast` 150ms · `--duration-base` 200ms · `--duration-slow` 300ms · `--ease-standard` linear · `--ease-emphasized` `cubic-bezier(.22,1,.36,1)` | Read off what the components already use. `prefers-reduced-motion` is honoured globally in `globals.css`. |
+| Motion | Tailwind utilities at the call site (`duration-200`, `ease-linear`, …) | Decorative animation libraries are out. Custom keyframes (`post-in`, `how-progress`) live in `globals.css`; `prefers-reduced-motion` is honoured globally there. |
 
 Surfaces, Borders and Elevation are tone decisions rather than raw scales,
 so they live in the semantic layer.
@@ -158,11 +166,13 @@ place to change.
 
 | Legacy | Resolves to | Use instead | Why it is still here |
 | --- | --- | --- | --- |
-| `--destructive` | `--error` | `--error` | `variant="destructive"` and `text-destructive` call sites |
-| `--signal` / `--signal-foreground` | `--primary` / `--primary-foreground` | `--primary` | 14 call sites, mostly landing page. The SCHEDULED state it once named now uses `--info`. |
-| `--accent` | `--muted` | `--muted` | Held a value identical to `--muted` in both themes; feeds the Radian `fill2/fill3/soft` aliases |
-| `--accent-foreground` | own value | — | Radian `fill` ink |
-| `--secondary` / `--secondary-foreground` | own values | — | No utility consumes them today; retained so the Radian `secondary` surface keeps a value |
+| `--accent` | `--muted` | `--muted` | Held a value identical to `--muted` in both themes; the neutral fill step |
+
+Removed (zero consumers, verified repo-wide): `--destructive` (the token;
+`variant="destructive"` remains live as Button API and maps directly to
+`--error`), `--signal` / `--signal-foreground` (the SCHEDULED state they
+once named now uses `--info`), `--secondary` / `--secondary-foreground`, and
+`--accent-foreground`.
 
 ## 3. Historical: the Radian name mapping (removed)
 
@@ -205,31 +215,29 @@ All primitives live in `src/components/ui`, originally scaffolded by the
 RadianUI generator (`radianui.com`) and built on Radix UI
 (`@radix-ui/react-*`) for accessibility behaviour — focus trap, portals,
 ARIA. Styling now speaks PostVIA's canonical vocabulary only (§3); Radix
-stays, since it's behaviour, not a design-system concern. Several
-components carry a **legacy PostVIA API on top** so existing call sites did
-not have to change during the migration. The legacy surface is documented
-here so it can be removed deliberately rather than discovered.
+stays, since it's behaviour, not a design-system concern. The table below
+records each component's current public API.
 
-| Target component | File | Legacy PostVIA API on top of Radian |
+| Target component | File | API notes |
 | --- | --- | --- |
-| Button | `ui/button.tsx` | `variant`: `default / secondary / outline / ghost / destructive / link` → Radian `variant`+`color` (`POSTVIA_VARIANT_MAP`). `size`: `default / xs / sm / lg / icon / icon-xs / icon-sm / icon-lg` → Radian `28…48` (`POSTVIA_SIZE_MAP`) plus icon padding fixes (`POSTVIA_SIZE_FIXES`). `render` (BaseUI composition) and `nativeButton` (accepted, never rendered). Geometry: always `rounded-full`. |
-| Input | `ui/input.tsx` | Radian sizes; `InputGroup` chrome |
+| Button | `ui/button.tsx` | Direct PostVIA contract: `variant` `default / secondary / outline / ghost / destructive / link` (`destructive` maps to `--error`), `size` `default / sm / lg / icon-sm`. History: a `POSTVIA_VARIANT_MAP / POSTVIA_SIZE_MAP / POSTVIA_SIZE_FIXES` layer used to translate these onto an internal Radian-style axis, with extra `xs / icon / icon-xs / icon-lg` sizes and `glossy / smooth` variants — all unreachable (zero call sites) and removed; the remaining class sets are unchanged. `render` (BaseUI composition) and `nativeButton` (accepted, never rendered). Geometry: always `rounded-full`. |
+| Input | `ui/input.tsx` | numeric sizes; `InputGroup` chrome |
 | Textarea | `ui/text-area.tsx` | previous defaults preserved (`min-h-16`, `resize-none`) |
 | Select | `ui/select.tsx` | trigger kept `w-fit` pill |
 | Checkbox | `ui/checkbox.tsx` | — |
 | Radio | `ui/radio-group.tsx` | — |
 | Switch | `ui/switch.tsx` | — |
-| Badge | `ui/badge.tsx` | `variant`+`color` across the full 17-hue palette; `BadgeDot` |
-| Avatar | `ui/avatar.tsx` | default 32px (`size-8`); `data-size` drives `AvatarBadge`; PostVIA extension layer preserved verbatim |
+| Badge | `ui/badge.tsx` | `variant` `strong / outline / soft`, `size` `20 / 24`, semantic `color` `primary / error / neutral` (default); `BadgeDot`. Post statuses go through the `StatusBadge` domain gateway, never through a Badge color. History: the color axis spanned the full 17-hue palette plus `info / success / warning`, and a `28` size existed — zero call sites, removed. |
+| Avatar | `ui/avatar.tsx` | default 32px (`size-8`); `data-size` drives `AvatarBadge`; PostVIA extension layer preserved verbatim. `AvatarFallback` tint axis narrowed to the four product hues (`red / emerald / amber / light-blue`); the default is muted monochrome. |
 | Tabs | `ui/tabs.tsx` | URL-driven links for status filters |
 | Tooltip | `ui/tooltip.tsx` | — |
 | Dropdown | `ui/dropdown-menu.tsx` | — |
 | Dialog | `ui/dialog.tsx`, `ui/drawer.tsx`, `ui/popover.tsx` | — |
-| Card | `ui/card.tsx` | `size` prop (`default`/`sm`, spacing 6/4) — Radian has none; `bg-card`, `border-transparent` |
+| Card | `ui/card.tsx` | `size` prop (`default`/`sm`, spacing 6/4) — no upstream size prop; `bg-card`, `border-transparent` |
 | Table | — | **Missing as a primitive.** Post and calendar tables are hand-rolled grids (`PostsList`, `CalendarView`). |
 | Pagination | — | **Missing as a primitive.** `PostsList` renders its own controls. |
-| Toast | `ui/toast.tsx` | PostVIA `Toaster` + `toast()` helper |
-| Navigation | `ui/sidebar.tsx`, `components/Sidebar.tsx`, `components/nav-items.ts` | rail 16rem / icon 3rem / mobile 18rem (upstream 16.25 / 3.75); `variant="floating"`, `theme="gray"`; floating container `p-2` (8px canvas inset, collapsed width accounts padding + 1px border); nav items are pills |
+| Toast | `ui/toast.tsx` | PostVIA `Toaster` + `toast()` helper; `ToastIcon` is exported for outside composition |
+| Navigation | `ui/sidebar.tsx`, `components/Sidebar.tsx`, `components/nav-items.ts` | rail 16rem / icon 3rem / mobile 18rem (upstream 16.25 / 3.75); `variant="floating"`, `theme="gray"`; floating container `p-2` (8px canvas inset, collapsed width accounts padding + 1px border); nav items are pills; `SidebarMenuButton` has only the `neutral` tone (the `soft` / `strong` brand-hue actives had zero call sites and were removed) |
 
 Supporting primitives with no slot in the target list, all in use:
 `alert`, `banner`, `calendar`, `collapsible`, `divider`, `empty`, `field`,
@@ -259,16 +267,20 @@ Left in place on purpose.
 | `components/GoogleButton.tsx`, `app/settings/SettingsClient.tsx` | Google `#4285F4 / #34A853 / #FBBC05 / #EA4335` | Third-party brand mark; a token would be wrong |
 | `lib/email.ts` | full inline hex palette | Transactional email HTML — mail clients do not support CSS custom properties |
 | `app/posts/new/_components/preview/TikTokPreview.tsx` | `text-white`, `text-white/70`, `text-white/90` | Deliberate mimicry of the TikTok surface inside a preview mock |
-| `ui/*` Radian variants (`glossy`, `smooth`, `strong/neutral`) | `bg-black`, `text-white` | Stock Radian variant bodies; the PostVIA variant map never selects most of them |
-| ~50 call sites | `text-[10px] / [11px] / [13px] / [15px]` | Now named in foundations as `--text-micro/-meta/-label/-prose`; the call sites are **not** migrated — see below |
+| `ui/*` unreachable variant bodies | `bg-black`, `text-white` | Removed with the second cleanup wave (`glossy` / `smooth` Button variants had zero call sites) |
+| `ui/tooltip.tsx` arrow | `drop-shadow-[0_1px_0_var(--color-border)]` | Radix-anchored arrow fill; the token reference is intentional |
+| none remaining | `text-[10px] / [11px] / [13px] / [15px]` | Named in foundations as `--text-micro/-meta/-label/-prose`; every exact-equivalent site is migrated (see below) |
 
-### Why the `text-[Npx]` call sites were not migrated
+### Why the remaining `text-[Npx]` call sites were migrated last
 
 `cn()` is `twMerge(clsx(...))`. `tailwind-merge` classifies an unknown
 `text-*` class by its own validators; a custom font-size name such as
 `text-prose` is not in its config, so it would most likely be filed under
 `text-color` and start conflicting with a neighbouring `text-muted-foreground`
 in the same class string — silently dropping one of them. Migrating the call
-sites therefore needs `extendTailwindMerge` in `src/lib/utils.ts` first. The
-tokens exist so the scale is canonical and discoverable; the swap is a
-separate, testable change.
+sites therefore needed `extendTailwindMerge` in `src/lib/utils.ts` first,
+which now registers `text-label / text-meta / text-prose / text-micro` in
+the `font-size` group. The exact-equivalent arbitrary sites
+(`MarketingSections.tsx`, `bulk-social-media-scheduling/page.tsx`) are
+migrated; the tooltip arrow arbitrary stays — it is a Radix-anchored
+exception, not a type size.

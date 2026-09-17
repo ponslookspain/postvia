@@ -39,7 +39,7 @@ const rail: React.CSSProperties = {
   borderRadius: 12,
   background: "var(--color-muted)",
   border: "1px solid var(--color-border)",
-  font: "400 14px/1.4 var(--font-body)",
+  font: "400 14px/1.4 var(--font-sans)",
   color: "var(--color-foreground)",
 };
 
@@ -53,7 +53,7 @@ const triggerRow: React.CSSProperties = {
   border: 0,
   borderRadius: 9999,
   background: "transparent",
-  font: "500 14px/1 var(--font-body)",
+  font: "500 14px/1 var(--font-sans)",
   color: "var(--color-foreground)",
   cursor: "pointer",
   textAlign: "left",
@@ -67,7 +67,7 @@ const subRow: React.CSSProperties = {
   padding: "0 8px",
   marginLeft: 22,
   borderRadius: 9999,
-  font: "400 13px/1 var(--font-body)",
+  font: "400 13px/1 var(--font-sans)",
   color: "var(--color-muted-foreground)",
 };
 
@@ -79,7 +79,7 @@ const icon: React.CSSProperties = {
 };
 
 const caption: React.CSSProperties = {
-  font: "500 12px/1.4 var(--font-body)",
+  font: "500 12px/1.4 var(--font-sans)",
   color: "var(--color-muted-foreground)",
   letterSpacing: "0.02em",
   marginBottom: 8,
@@ -196,7 +196,7 @@ export function FilterDisclosure() {
                 gridTemplateColumns: "auto 1fr",
                 rowGap: 8,
                 columnGap: 16,
-                font: "400 13px/1.4 var(--font-body)",
+                font: "400 13px/1.4 var(--font-sans)",
               }}
             >
               <dt style={{ color: "var(--color-muted-foreground)" }}>Channel</dt>

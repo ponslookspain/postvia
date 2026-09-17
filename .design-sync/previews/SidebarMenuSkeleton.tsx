@@ -36,7 +36,7 @@ import {
  */
 
 const caption: React.CSSProperties = {
-  font: "500 12px/1.4 var(--font-body)",
+  font: "500 12px/1.4 var(--font-sans)",
   color: "var(--color-muted-foreground)",
   letterSpacing: "0.02em",
   marginBottom: 8,
@@ -52,7 +52,7 @@ const panel: React.CSSProperties = {
 };
 
 const groupLabel: React.CSSProperties = {
-  font: "500 12px/1.4 var(--font-body)",
+  font: "500 12px/1.4 var(--font-sans)",
   color: "var(--color-muted-foreground)",
   padding: "6px 8px 2px",
 };

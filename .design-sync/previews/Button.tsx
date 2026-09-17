@@ -3,8 +3,9 @@ import { ArrowRightIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-reac
 
 /**
  * Button previews. Props and composition are taken from the app's own call
- * sites (`src/app/**`) and the rules in docs/design-system.md: the legacy
- * PostVIA variant/size API on top of the Radian implementation, buttons are
+ * sites (`src/app/**`) and the rules in docs/design-system.md: the direct
+ * PostVIA variant/size contract (`default | secondary | outline | ghost |
+ * destructive | link` × `default | sm | lg | icon-sm`), buttons are
  * always fully rounded pills, and icons are placed with
  * `data-icon="inline-start|inline-end"` and carry no sizing classes.
  */
@@ -27,7 +28,6 @@ export function Variants() {
 export function Sizes() {
   return (
     <div className={row}>
-      <Button size="xs">Retry</Button>
       <Button size="sm">Edit</Button>
       <Button size="default">Publish now</Button>
       <Button size="lg">Get started free</Button>
@@ -57,16 +57,13 @@ export function WithIcons() {
 export function IconOnly() {
   return (
     <div className={row}>
-      <Button size="icon-xs" variant="ghost" aria-label="Add">
-        <PlusIcon />
-      </Button>
       <Button size="icon-sm" variant="ghost" aria-label="Retry">
         <RotateCcwIcon />
       </Button>
-      <Button size="icon" variant="outline" aria-label="Delete">
+      <Button size="icon-sm" variant="outline" aria-label="Delete">
         <Trash2Icon />
       </Button>
-      <Button size="icon-lg" aria-label="New post">
+      <Button size="icon-sm" aria-label="New post">
         <PlusIcon />
       </Button>
     </div>

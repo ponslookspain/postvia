@@ -39,7 +39,7 @@ export function StatusDot({
   );
 }
 
-// PostVIA → Radian mapping: quiet outline shells, soft neutral fills,
+// PostVIA status mapping: quiet outline shells, soft neutral fills,
 // Failed keeps the error tint.
 const BADGE_STYLE: Record<string, { variant: "outline" | "soft"; color?: "error" }> = {
   DRAFT: { variant: "outline" },

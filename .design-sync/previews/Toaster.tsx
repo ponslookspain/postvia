@@ -5,6 +5,7 @@ import {
   ToastClose,
   ToastContent,
   ToastDescription,
+  ToastIcon,
   ToastProvider,
   ToastTitle,
   ToastViewport,
@@ -72,7 +73,7 @@ function List() {
       {toasts.map((item) => (
         <Toast key={item.id} toast={item} style={toastStyle} swipeDirection={[]}>
           <ToastContent style={{ opacity: 1 }}>
-            <ToastIconFor type={item.type} />
+            <ToastIcon type={item.type} />
             <div
               style={{
                 display: "flex",
@@ -94,32 +95,8 @@ function List() {
   );
 }
 
-// The DS's ToastIcon is internal to toast.tsx and not exported, so the
-// glyphs are redrawn here at the same 16px with the same semantic colours.
-function ToastIconFor({ type }: { type: string | undefined }) {
-  const color =
-    type === "success"
-      ? "var(--success-text, var(--success))"
-      : type === "warning"
-        ? "var(--warning-text, var(--warning))"
-        : type === "error"
-          ? "var(--error-text, var(--error))"
-          : "var(--muted-foreground)";
-  if (!type) return null;
-  return (
-    <span
-      style={{
-        flexShrink: 0,
-        display: "inline-flex",
-        width: 16,
-        height: 16,
-        borderRadius: 9999,
-        background: color,
-      }}
-      aria-hidden="true"
-    />
-  );
-}
+// `ToastIcon` is exported from the DS, so cells use the real glyphs at the
+// same 16px with the same semantic colours — no substitute.
 
 function Stage({ seeds }: { seeds: Seed[] }) {
   return (

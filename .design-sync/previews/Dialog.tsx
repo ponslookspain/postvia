@@ -104,7 +104,7 @@ export function ChannelDetails() {
                 Instagram · reconnected 3 days ago
               </p>
             </div>
-            <Badge variant="soft" color="success">
+            <Badge variant="soft" color="primary">
               Connected
             </Badge>
           </div>

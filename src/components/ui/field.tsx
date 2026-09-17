@@ -216,7 +216,7 @@ function FieldError({
     <div
       role="alert"
       data-slot="field-error"
-      // Radian form error pattern (docs/components/input.md "Error Input"):
+      // Form error pattern:
       // text-xs, normal weight, error-text token.
       className={cn("text-xs font-normal text-error", className)}
       {...props}

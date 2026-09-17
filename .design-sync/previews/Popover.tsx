@@ -117,7 +117,7 @@ export function AccountSwitcher() {
                   </p>
                 </div>
                 {a.platform === "Instagram" && (
-                  <Badge variant="soft" color="success" size="20">
+                  <Badge variant="soft" color="primary" size="20">
                     Active
                   </Badge>
                 )}

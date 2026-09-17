@@ -15,7 +15,7 @@ import {
  * with the child that gives it content: initials, a platform glyph, a status
  * pip or an overflow count.
  *
- * Sizing uses the Radian numeric scale
+ * Sizing uses the numeric scale
  * (`size="16|20|24|32|36|40|48|64|80|120"`, default "32"); Button's
  * `sm` / `lg` values would silently drop every size class.
  *
@@ -59,12 +59,13 @@ export function Sizes() {
 }
 
 export function FallbackColors() {
-  const people: Array<[string, "blue" | "teal" | "purple" | "amber" | "rose"]> = [
-    ["ST", "blue"],
-    ["MR", "teal"],
-    ["AK", "purple"],
-    ["JD", "amber"],
-    ["LN", "rose"],
+  const people: Array<
+    [string, "light-blue" | "emerald" | "amber" | "red"]
+  > = [
+    ["ST", "light-blue"],
+    ["MR", "emerald"],
+    ["AK", "amber"],
+    ["JD", "red"],
   ];
   return (
     <div style={stage}>
@@ -77,10 +78,10 @@ export function FallbackColors() {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <Avatar size="64">
-          <AvatarFallback color="blue">ST</AvatarFallback>
+          <AvatarFallback color="light-blue">ST</AvatarFallback>
         </Avatar>
         <Avatar size="64" rounded="square">
-          <AvatarFallback color="blue">ST</AvatarFallback>
+          <AvatarFallback color="light-blue">ST</AvatarFallback>
         </Avatar>
         <span style={caption}>
           circle (default) · square. The radius scale is generous, so the two

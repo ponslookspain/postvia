@@ -29,7 +29,7 @@ const inputVariants = cva(
 			size: {
 				"28": "h-7 text-label px-2 rounded-md file:pe-1.5 file:me-1.5",
 				"32": "h-8 text-sm px-2 rounded-md file:pe-3 file:me-3",
-			// Radian default: h-9 follows the standard radius progression
+			// Default control: h-9 follows the standard radius progression
 			// (36 → rounded-lg, like 40/44/48).
 			"36": "h-9 text-sm px-3 rounded-lg file:pe-2.5 file:me-2.5",
 				"40": "h-10 text-sm px-3 rounded-lg file:pe-3 file:me-3",
@@ -44,7 +44,7 @@ const inputVariants = cva(
 )
 
 const inputAddonVariants = cva(
-	"flex items-center shrink-0 justify-center bg-elevation-raised border border-overlay-12 shadow-xs shadow-[rgba(0,0,0,0.05)] text-muted-foreground [&_svg]:text-muted-foreground",
+	"flex items-center shrink-0 justify-center bg-elevation-raised border border-overlay-12 shadow-xs text-muted-foreground [&_svg]:text-muted-foreground",
 	{
 		variants: {
 			size: {

@@ -6,8 +6,8 @@ import { type VariantProps, cva } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-// PostVIA adapt: global Button stays legacy (see SidebarTrigger below);
-// all other siblings are canonical Radian paths.
+// SidebarTrigger renders the shared Button (ghost / icon-sm); every other
+// sibling primitive is imported from src/components/ui directly.
 import { Button } from "@/components/ui/button"
 import {
 	Collapsible,
@@ -132,9 +132,11 @@ export const sidebarMenuButtonVariants = cva(
 	{
 		variants: {
 			variant: {
-			strong:
-				"text-sidebar-foreground focus-visible:ring-ring focus-visible:outline-none data-[active=true]:bg-primary! data-[active=true]:text-primary-foreground  data-[active=true]:[&>svg]:stroke-primary-foreground",
-				soft: "text-sidebar-foreground focus-visible:ring-ring focus-visible:outline-none data-[active=true]:bg-accent! data-[active=true]:text-primary [&>svg]:text-muted-foreground data-[active=true]:[&>svg]:stroke-primary",
+				// The only nav tone. Active is a quiet neutral fill, never
+				// the brand hue (see docs/design-system.md, Navigation).
+				// History: `soft` and `strong` variants put --primary on the
+				// active row; repo-wide usage analysis showed zero call
+				// sites, so they were removed.
 				neutral:
 					"text-sidebar-foreground rounded-md data-[active=true]:bg-sidebar-accent!",
 			},
@@ -406,13 +408,13 @@ const sidebarThemeVars: Record<
 	NonNullable<SidebarProps["theme"]>,
 	React.CSSProperties
 > = {
-	default: { "--color-sidebar": "var(--color-bg)" } as React.CSSProperties,
+	default: { "--color-sidebar": "var(--background)" } as React.CSSProperties,
 	gray: {
 		"--color-sidebar": "var(--sidebar)",
 		"--color-sidebar-accent": "var(--sidebar-accent)",
 	} as React.CSSProperties,
-	"gray-body": { "--color-sidebar": "var(--color-bg)" } as React.CSSProperties,
-	inverse: { "--color-sidebar": "var(--color-black)" } as React.CSSProperties,
+	"gray-body": { "--color-sidebar": "var(--background)" } as React.CSSProperties,
+	inverse: { "--color-sidebar": "black" } as React.CSSProperties,
 }
 
 /**

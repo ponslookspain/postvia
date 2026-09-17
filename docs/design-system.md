@@ -32,9 +32,9 @@ full before/after mapping).
 ## Base
 
 - **Radian UI** (`default` style) originally generated the primitives'
-  structure, Tailwind v4 supplies styling, Radix UI (`@radix-ui/react-*`)
-  supplies accessibility behaviour, Lucide supplies icons, `cn()` handles
-  conditional classes.
+  structure; the components now live in-tree as PostVIA primitives. Tailwind v4
+  supplies styling, Radix UI (`@radix-ui/react-*`) supplies accessibility
+  behaviour, Lucide supplies icons, `cn()` handles conditional classes.
 - Primitives live in `src/components/ui`, PostVIA custom components
   (`Field`, `Toast`, avatar extensions) beside them. There is no
   `components.json` any more — it was the RadianUI generator's config,
@@ -63,7 +63,7 @@ full before/after mapping).
 - **Blocks are separated by tone, not by a drawn box.** A tile sits on
   `--panel`, one shade off the page, and carries no outline. `Card` does
   this by default; hand-rolled tiles use `bg-panel` and no border class.
-- **A block nested inside a tile goes the other way** — `bg-bg`, so it
+- **A block nested inside a tile goes the other way** — `bg-background`, so it
   reads as inset instead of vanishing into an identically toned panel.
 - An outline is an accent, not a default: it is legitimate only when it
   marks something out (the highlighted plan, an aria-invalid field). The
@@ -83,7 +83,7 @@ full before/after mapping).
   the block title. That is the same relationship the `Next up` block
   uses; aligning the text instead would push the highlight past the
   block's padding and break the even gap.
-- Hover is `bg-fill1-alpha` — a 4% lift. It must stay clearly below the
+- Hover is `bg-overlay-4` — a 4% lift. It must stay clearly below the
   tone of any thumbnail or icon tile inside the row, otherwise hovering
   reads as the row lighting up rather than being pointed at.
 - **Rows are separated by spacing, not hairlines.** A hairline and a
@@ -100,8 +100,8 @@ full before/after mapping).
 ## Typography
 
 - Body **Inter** (`--font-sans`), headings **DM Sans**
-  (`--font-heading`), monospace **Geist Mono** (`--font-mono`) — declared
-  and available, not yet used by any call site.
+  (`--font-heading`), monospace **Geist Mono** (`--font-mono`, used for
+  dense numeric/data labels only).
 - Scale: page titles large/semibold, section titles medium, body
   14–15px relaxed, metadata 12–13px muted. Left-aligned, sentence
   case, no decorative serif, no single-word accent coloring.
@@ -115,10 +115,10 @@ full before/after mapping).
 
 ## Buttons (rule)
 
-- Use the `Button` API exactly as installed: `default / outline /
-  secondary / ghost / destructive / link`, sizes `default / xs / sm /
-  lg`, icon sizes `icon / icon-xs / icon-sm / icon-lg` (Radian
-  implementation underneath, PostVIA-compatible props on top).
+- Use the `Button` API exactly as installed: `default / secondary /
+  outline / ghost / destructive / link` (`destructive` maps to the error
+  hue), sizes `default / sm / lg`, icon size `icon-sm` — one direct cva
+  layer, no mapping underneath.
 - **No separate button sizing system.** Do not add `size` props,
   `h-*`/`min-h-*`, paddings or radii to individual buttons to make
   them match each other; do not add global button CSS.
@@ -129,9 +129,9 @@ full before/after mapping).
 ## Inputs / forms
 
 - `FieldGroup + Field + FieldLabel`, validation via `data-invalid` on
-   the `Field` and `aria-invalid` on the control. Native date/time
+    the `Field` and `aria-invalid` on the control. Native date/time
     inputs keep their functional borders. Filter collections use the
-    Radian `Tabs` primitive (`ui/tabs.tsx`, URL-driven links), not
+    `Tabs` primitive (`ui/tabs.tsx`, URL-driven links), not
    hand-rolled strips; plain underline treatments remain for inline
    text links only.
 
@@ -151,7 +151,7 @@ full before/after mapping).
 
 ## Navigation / sidebar
 
-- Radian sidebar primitive (`ui/sidebar.tsx`, `ui/tooltip.tsx`,
+- Sidebar primitive (`ui/sidebar.tsx`, `ui/tooltip.tsx`,
   `ui/drawer.tsx`, `hooks/use-mobile.ts`): `SidebarProvider`,
   icon-collapsible rail (`16rem` / `3rem`), tooltips in collapsed mode,
   keyboard toggle, mobile Drawer.
@@ -181,7 +181,7 @@ full before/after mapping).
 
 - Month timetable grid (fixed geometry, drag-to-reschedule, overflow
   popover, dots on mobile, drafts rail). Scheduling date uses the
-  Radian `Calendar` in a `Popover` (`ui/calendar.tsx`,
+  `Calendar` in a `Popover` (`ui/calendar.tsx`,
   `ScheduleDatePicker.tsx`); time stays a native time input.
   `react-day-picker` + `date-fns` are the only UI-adjacent runtime
   dependencies and belong to that component.

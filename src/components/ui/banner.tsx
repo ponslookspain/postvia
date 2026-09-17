@@ -26,8 +26,8 @@ const bannerVariants = cva(
 				warning: "",
 			},
 			variant: {
-				strong: "[&_[data-slot=banner-close]]:text-[current]",
-				soft: "[&_[data-slot=banner-close]]:text-[current] [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-foreground",
+				strong: "[&_[data-slot=banner-close]]:text-current",
+				soft: "[&_[data-slot=banner-close]]:text-current [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-foreground",
 				outline:
 					"border border-accent border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-muted-foreground [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-muted-foreground",
 			},

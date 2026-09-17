@@ -204,7 +204,7 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
       className={cn(
         "sticky top-0 z-50 bg-background/85 backdrop-blur-md transition-[border-color,box-shadow] duration-300 motion-reduce:transition-none",
         scrolled
-          ? "border-b border-border shadow-[0_1px_12px_-6px_rgb(0_0_0/0.12)]"
+          ? "border-b border-border"
           : "border-b border-transparent"
       )}
     >

@@ -121,7 +121,7 @@ export default function BulkPage() {
                   key={step.title}
                   className="grid gap-1 border-b border-border py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)_minmax(0,8fr)] sm:items-baseline sm:gap-6"
                 >
-                  <span aria-hidden="true" className="font-mono text-[13px] text-muted-foreground tabular-nums">
+                  <span aria-hidden="true" className="font-mono text-label text-muted-foreground tabular-nums">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <span className="font-heading text-base font-semibold tracking-tight">{step.title}</span>

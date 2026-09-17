@@ -176,7 +176,7 @@ function AccountFooter({ collapsed = false }: { collapsed?: boolean }) {
               style={{
                 minWidth: 0,
                 flex: 1,
-                font: "500 14px/1.35 var(--font-body)",
+                font: "500 14px/1.35 var(--font-sans)",
                 color: "var(--color-foreground)",
               }}
             >
@@ -184,7 +184,7 @@ function AccountFooter({ collapsed = false }: { collapsed?: boolean }) {
               <p
                 style={{
                   margin: 0,
-                  font: "400 12px/1.35 var(--font-body)",
+                  font: "400 12px/1.35 var(--font-sans)",
                   color: "var(--color-muted-foreground)",
                 }}
               >
@@ -224,7 +224,7 @@ function InsetPage() {
         <p
           style={{
             margin: "6px 0 20px",
-            font: "400 14px/1.5 var(--font-body)",
+            font: "400 14px/1.5 var(--font-sans)",
             color: "var(--color-muted-foreground)",
           }}
         >
@@ -242,7 +242,7 @@ function InsetPage() {
                 border: "1px solid var(--color-border)",
                 borderRadius: 12,
                 padding: "12px 14px",
-                font: "400 14px/1.4 var(--font-body)",
+                font: "400 14px/1.4 var(--font-sans)",
                 color: "var(--color-foreground)",
                 background: "var(--color-background)",
               }}
@@ -287,7 +287,7 @@ export function AppShellExpanded() {
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
-                    font: "500 14px/1.35 var(--font-body)",
+                    font: "500 14px/1.35 var(--font-sans)",
                     color: "var(--color-foreground)",
                   }}
                 >
@@ -300,7 +300,7 @@ export function AppShellExpanded() {
                 <p
                   style={{
                     margin: "4px 0 0",
-                    font: "400 12px/1.4 var(--font-body)",
+                    font: "400 12px/1.4 var(--font-sans)",
                     color: "var(--color-muted-foreground)",
                   }}
                 >
@@ -428,20 +428,20 @@ export function RailAffordances() {
 }
 
 /**
- * `SidebarMenuButton` variant axis. `neutral` is the product default —
- * a quiet fill. `soft` and `strong` exist in the primitive and put the
- * brand hue on the active row; the PostVIA contract reserves red for
- * actions, so they are shown here as the documented exception rather
- * than used in the nav above.
+ * `SidebarMenuButton` tone. `neutral` is the only variant — a quiet fill
+ * for the active row, never the brand hue (see docs/design-system.md,
+ * Navigation). History: `soft` and `strong` variants put the brand hue on
+ * the active row; they had zero call sites and were removed, resolving the
+ * contradiction rather than documenting it.
  */
 export function MenuButtonVariants() {
   return (
-    <Stage height={340}>
+    <Stage height={240}>
       <SidebarProvider>
         <Sidebar collapsible="none" theme="gray" style={{ height: "100%" }}>
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>neutral (product default)</SidebarGroupLabel>
+              <SidebarGroupLabel>neutral (the only variant)</SidebarGroupLabel>
               <SidebarMenu style={{ gap: 4 }}>
                 <SidebarMenuItem>
                   <SidebarMenuButton className="rounded-full" isActive>
@@ -453,37 +453,6 @@ export function MenuButtonVariants() {
                   <SidebarMenuButton className="rounded-full">
                     <FileTextIcon aria-hidden="true" />
                     <span>Posts</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-            <SidebarGroup>
-              <SidebarGroupLabel>soft</SidebarGroupLabel>
-              <SidebarMenu style={{ gap: 4 }}>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    variant="soft"
-                    className="rounded-full"
-                    isActive
-                  >
-                    <CalendarIcon aria-hidden="true" />
-                    <span>Calendar</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroup>
-            <SidebarGroup>
-              <SidebarGroupLabel>strong · size 36</SidebarGroupLabel>
-              <SidebarMenu style={{ gap: 4 }}>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    variant="strong"
-                    size="36"
-                    className="rounded-full"
-                    isActive
-                  >
-                    <PlusIcon aria-hidden="true" />
-                    <span>Create post</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

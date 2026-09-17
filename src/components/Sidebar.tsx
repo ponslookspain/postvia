@@ -52,7 +52,7 @@ export function Sidebar({
   userEmail: string;
   plan: PlanId;
 }) {
-  // Canonical Radian structure (radianui.com/docs/components/sidebar):
+  // Sidebar structure:
   // SidebarProvider lives in AppShell and wraps both this Sidebar and
   // SidebarInset as direct children. The rail is `variant="floating"`:
   // a separate surface on the bg-background canvas with an 8px inset,

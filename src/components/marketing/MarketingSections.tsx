@@ -120,7 +120,7 @@ function MetaRow({ meta }: { meta?: { label: string; value: string }[] }) {
       {meta.map((item) => (
         <div key={item.label}>
           <dt className="text-xs text-muted-foreground">{item.label}</dt>
-          <dd className="mt-1 font-mono text-[13px] text-foreground">{item.value}</dd>
+          <dd className="mt-1 font-mono text-label text-foreground">{item.value}</dd>
         </div>
       ))}
     </dl>

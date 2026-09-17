@@ -40,7 +40,7 @@ export function PreviewSheet() {
             <Badge variant="soft" color="primary">
               Instagram
             </Badge>
-            <Badge variant="soft" color="info">
+            <Badge variant="soft" color="neutral">
               Threads
             </Badge>
             <Badge variant="soft" color="neutral">
