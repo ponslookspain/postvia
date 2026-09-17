@@ -1,3 +1,7 @@
+import {
+  decryptToken,
+  encryptRotatedTokens,
+} from "@/lib/social-token-crypto";
 import { prisma } from "@/lib/prisma";
 import { TIKTOK_BRIDGE_URL_TTL_MS } from "@/lib/tiktok-media-bridge";
 import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
@@ -288,7 +292,7 @@ export async function ensureFreshTiktokToken(
   const db: TiktokTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
   if (account.expiresAt && account.expiresAt.getTime() > now + 5 * 60_000) {
-    return account.accessToken;
+    return decryptToken(account.accessToken);
   }
   const stored = await db.findUnique({
     where: { id: account.id },
@@ -301,7 +305,7 @@ export async function ensureFreshTiktokToken(
     current.accessToken !== account.accessToken
   ) {
     // Another worker refreshed concurrently; reuse its rotated tokens.
-    return current.accessToken;
+    return decryptToken(current.accessToken);
   }
   const refreshToken = current.refreshToken;
   if (!refreshToken) {
@@ -313,7 +317,7 @@ export async function ensureFreshTiktokToken(
   }
   let tokens: TiktokTokens;
   try {
-    tokens = await refreshTiktokToken(refreshToken);
+    tokens = await refreshTiktokToken(decryptToken(refreshToken));
   } catch (error) {
     // Preserve TikTok's terminal refresh codes so callers can map them
     // to "reconnect" without parsing messages. Never attach tokens.
@@ -327,10 +331,14 @@ export async function ensureFreshTiktokToken(
     refreshToken: tokens.refresh_token,
     expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
   };
+  // Encrypted for storage; `next` stays plaintext because it is also the
+  // return value. The CAS `where` below keeps using the value as READ from
+  // the row, so ciphertext compares byte-for-byte (see social-token-crypto).
+  const persisted = encryptRotatedTokens(next);
   try {
     const claimed = await db.updateMany({
       where: { id: account.id, accessToken: current.accessToken },
-      data: next,
+      data: persisted,
     });
     if (claimed.count === 0) {
       // Lost the rotation race: re-read the winner's tokens.
@@ -339,13 +347,13 @@ export async function ensureFreshTiktokToken(
         select: { accessToken: true, refreshToken: true, expiresAt: true },
       });
       if (winner && winner.accessToken !== current.accessToken) {
-        return winner.accessToken;
+        return decryptToken(winner.accessToken);
       }
     }
   } catch {
     // Conditional update unsupported (or transient DB error): fall back
     // to a plain update so tokens still rotate, then return them.
-    await db.update({ where: { id: account.id }, data: next });
+    await db.update({ where: { id: account.id }, data: persisted });
   }
   return next.accessToken;
 }

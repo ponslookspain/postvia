@@ -1,3 +1,7 @@
+import {
+  decryptToken,
+  encryptRotatedTokens,
+} from "@/lib/social-token-crypto";
 import { prisma } from "@/lib/prisma";
 import type { SocialProvider, PublishResult } from "./provider";
 
@@ -195,8 +199,13 @@ export async function ensureFreshXToken(
 ): Promise<string> {
   const db: XTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
+  // Stored tokens may be encrypted at rest. Ciphertext stays OPAQUE through
+  // the rotation compare-and-swap below (the `where` clause compares stored
+  // value to stored value, never a re-encryption — AES-GCM is randomized, so
+  // a re-encrypted comparand would never match). Decryption happens only
+  // where a token is actually used or returned.
   if (account.expiresAt && account.expiresAt.getTime() > now + 5 * 60_000) {
-    return account.accessToken;
+    return decryptToken(account.accessToken);
   }
   const stored = await db.findUnique({
     where: { id: account.id },
@@ -209,7 +218,7 @@ export async function ensureFreshXToken(
     current.accessToken !== account.accessToken
   ) {
     // Another worker refreshed concurrently; reuse its rotated tokens.
-    return current.accessToken;
+    return decryptToken(current.accessToken);
   }
   const refreshToken = current.refreshToken;
   if (!refreshToken) {
@@ -221,7 +230,7 @@ export async function ensureFreshXToken(
   }
   let tokens: { accessToken: string; refreshToken?: string; expiresAt?: Date };
   try {
-    tokens = await refreshXToken(refreshToken);
+    tokens = await refreshXToken(decryptToken(refreshToken));
   } catch (error) {
     // Preserve terminal refresh codes so callers can map them to
     // "reconnect" without parsing messages. Never attach tokens.
@@ -235,10 +244,15 @@ export async function ensureFreshXToken(
     ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
     ...(tokens.expiresAt ? { expiresAt: tokens.expiresAt } : {}),
   };
+  // What goes to the database is encrypted; `next` stays plaintext because
+  // it is also what this function returns to the caller.
+  const persisted = encryptRotatedTokens(next);
   try {
     const claimed = await db.updateMany({
+      // Unchanged CAS: `current.accessToken` is the value as read from the
+      // row, so it matches byte-for-byte whether or not it is encrypted.
       where: { id: account.id, accessToken: current.accessToken },
-      data: next,
+      data: persisted,
     });
     if (claimed.count === 0) {
       // Lost the rotation race: re-read the winner's tokens.
@@ -247,13 +261,13 @@ export async function ensureFreshXToken(
         select: { accessToken: true, refreshToken: true, expiresAt: true },
       });
       if (winner && winner.accessToken !== current.accessToken) {
-        return winner.accessToken;
+        return decryptToken(winner.accessToken);
       }
     }
   } catch {
     // Conditional update unsupported (or transient DB error): fall back
     // to a plain update so tokens still rotate, then return them.
-    await db.update({ where: { id: account.id }, data: next });
+    await db.update({ where: { id: account.id }, data: persisted });
   }
   return next.accessToken;
 }
@@ -388,6 +402,37 @@ export type XMediaUploadDeps = {
   pollBudgetMs?: number;
   now?: () => number;
 };
+
+/**
+ * Where the bytes for a chunked upload come from.
+ *
+ * Deliberately a reader, not a buffer. X's upload is INIT -> APPEND(n) ->
+ * FINALIZE, and INIT needs only `total_bytes` — which the Media row already
+ * knows — so the whole file never has to exist in memory at once. The publish
+ * path used to do `new Response(stream).arrayBuffer()` first, pinning up to
+ * the full 100 MB video limit in a function that (on Hobby) has 60s and finite
+ * memory, and then `.slice()`-ing another copy per segment.
+ *
+ * `readChunk` is given INCLUSIVE bounds, matching HTTP Range semantics so a
+ * private-blob ranged read maps to it one-to-one.
+ */
+export type XMediaSource = {
+  totalBytes: number;
+  readChunk: (start: number, endInclusive: number) => Promise<ArrayBuffer>;
+};
+
+/**
+ * Adapter for callers that genuinely already hold the whole file (tests, and
+ * any future in-memory producer). Slices lazily, so it behaves exactly like a
+ * ranged reader from `uploadXMedia`'s point of view.
+ */
+export function bufferedXMediaSource(bytes: ArrayBuffer): XMediaSource {
+  return {
+    totalBytes: bytes.byteLength,
+    readChunk: async (start, endInclusive) =>
+      bytes.slice(start, endInclusive + 1),
+  };
+}
 
 const X_DEFAULT_POLL_INTERVAL_MS = 2000;
 const X_DEFAULT_POLL_BUDGET_MS = 120_000;
@@ -532,7 +577,11 @@ export async function fetchXMediaProcessingStatus(
  */
 export async function uploadXMedia(
   accessToken: string,
-  input: { bytes: ArrayBuffer; mediaType: string; mediaCategory: XMediaCategory },
+  input: {
+    source: XMediaSource;
+    mediaType: string;
+    mediaCategory: XMediaCategory;
+  },
   deps: XMediaUploadDeps = {}
 ): Promise<XUploadOutcome> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
@@ -540,25 +589,41 @@ export async function uploadXMedia(
   const pollBudgetMs = deps.pollBudgetMs ?? X_DEFAULT_POLL_BUDGET_MS;
   const now = deps.now ?? (() => Date.now());
 
-  if (!(input.bytes instanceof ArrayBuffer) || input.bytes.byteLength === 0) {
+  const totalBytes = input.source?.totalBytes;
+  if (!Number.isInteger(totalBytes) || !totalBytes || totalBytes <= 0) {
     return { state: "failed", error: "X media upload requires a non-empty file." };
   }
 
+  // INIT needs only the length, which the caller knows without reading a byte.
   let mediaId: string;
   try {
     mediaId = await initializeXMediaUpload(accessToken, {
       mediaType: input.mediaType,
-      totalBytes: input.bytes.byteLength,
+      totalBytes,
       mediaCategory: input.mediaCategory,
     });
   } catch (error) {
     return { state: "failed", error: xErrorMessage(error) };
   }
 
+  // One segment resident at a time: peak memory is the chunk size (4 MB),
+  // not the file size.
   try {
     let segmentIndex = 0;
-    for (let offset = 0; offset < input.bytes.byteLength; offset += X_APPEND_CHUNK_SIZE) {
-      const chunk = input.bytes.slice(offset, offset + X_APPEND_CHUNK_SIZE);
+    for (let offset = 0; offset < totalBytes; offset += X_APPEND_CHUNK_SIZE) {
+      const endInclusive = Math.min(offset + X_APPEND_CHUNK_SIZE, totalBytes) - 1;
+      const chunk = await input.source.readChunk(offset, endInclusive);
+      const expected = endInclusive - offset + 1;
+      if (chunk.byteLength !== expected) {
+        // A short read means the stored object disagrees with the length we
+        // told X at INIT; FINALIZE would fail anyway, so stop with a clear
+        // cause instead of uploading a corrupt segment sequence.
+        throw new XApiError(
+          "invalid_media",
+          "The stored media could not be read completely for X upload. Retry the post.",
+          502
+        );
+      }
       await appendXMediaChunk(accessToken, { mediaId, segmentIndex, chunk });
       segmentIndex += 1;
     }

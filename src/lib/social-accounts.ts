@@ -3,6 +3,31 @@ import {
   canConnectAccount,
   type EffectiveSubscription,
 } from "@/lib/entitlements";
+import {
+  encryptNullableToken,
+  encryptToken,
+  decryptToken,
+} from "@/lib/social-token-crypto";
+
+/**
+ * Encrypts the credential fields of an account payload on the way into
+ * storage. Every SocialAccount write goes through here (a static guard in
+ * `tests/security-hardening.test.ts` enforces that), so a new write site
+ * cannot silently persist a plaintext token.
+ *
+ * No-op when `SOCIAL_TOKEN_KEY` is unset — see social-token-crypto.ts.
+ */
+export function encryptAccountTokens<
+  T extends { accessToken: string; refreshToken?: string | null },
+>(data: T): T {
+  return {
+    ...data,
+    accessToken: encryptToken(data.accessToken),
+    ...(data.refreshToken !== undefined
+      ? { refreshToken: encryptNullableToken(data.refreshToken) }
+      : {}),
+  };
+}
 
 /**
  * Race-safe SocialAccount creation shared by all OAuth callbacks.
@@ -90,7 +115,7 @@ export const liveSocialAccountStore: SocialAccountStore = {
     }),
   create: async ({ userId, platform, data }) =>
     prisma.socialAccount.create({
-      data: { userId, platform: platform as "X", ...data },
+      data: { userId, platform: platform as "X", ...encryptAccountTokens(data) },
       select: { id: true },
     }),
   listIdsOldestFirst: async (userId) => {
@@ -102,7 +127,10 @@ export const liveSocialAccountStore: SocialAccountStore = {
     return rows.map((row) => row.id);
   },
   updateAccount: async (id, data) => {
-    await prisma.socialAccount.update({ where: { id }, data });
+    await prisma.socialAccount.update({
+      where: { id },
+      data: encryptAccountTokens(data),
+    });
   },
   deleteOwnById: async (id, userId) => {
     await prisma.socialAccount.deleteMany({ where: { id, userId } });
@@ -164,7 +192,10 @@ export async function findDisconnectTarget(input: {
   if (!account) {
     return { ok: false, code: "not_found" };
   }
-  return { ok: true, ...account };
+  // The only consumer of this token is best-effort remote revocation in the
+  // four disconnect routes, so it is decrypted here rather than in each of
+  // them. Unlike the refresh path there is no compare-and-swap to preserve.
+  return { ok: true, ...account, accessToken: decryptToken(account.accessToken) };
 }
 
 export type CreateSocialAccountResult =

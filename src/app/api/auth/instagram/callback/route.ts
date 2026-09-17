@@ -3,7 +3,10 @@ import { oauthRedirect, safeProviderError } from "@/lib/oauth-redirect";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlan } from "@/lib/entitlements";
-import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
+import {
+  createSocialAccountRaceSafe,
+  encryptAccountTokens,
+} from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   gateOAuthCallback,
@@ -121,7 +124,7 @@ export async function GET(request: NextRequest) {
       // this user's row atomically; a concurrently deleted row updates nothing.
       await prisma.socialAccount.updateMany({
         where: { id: existing.id, userId: user.id },
-        data: accountData,
+        data: encryptAccountTokens(accountData),
       });
     } else {
       // Abuse gate for fresh links (reconnects above skip it).

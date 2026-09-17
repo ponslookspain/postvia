@@ -101,6 +101,31 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3100/login)" = "200"
           kill "$(cat server.pid)"
 
+  # Production schema-drift gate.
+  #
+  # Production carries no _prisma_migrations history (migrations are applied
+  # by hand, see docs/database.md), so nothing else verifies that the live
+  # schema matches prisma/schema.prisma — a forgotten statement surfaces as a
+  # runtime P2022. This asks the database directly.
+  #
+  # Strictly read-only: `migrate diff` only introspects. The secret must be a
+  # DIRECT (unpooled), read-only connection string; the script refuses a
+  # pooled endpoint. Without the secret the job skips, so forks and
+  # secret-less branches stay green.
+  schema-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run check:schema-drift
+        env:
+          SCHEMA_DRIFT_DATABASE_URL: ${{ secrets.SCHEMA_DRIFT_DATABASE_URL }}
+
   # Dependency audit always runs, but is temporarily non-blocking.
   # Known finding GHSA-ggr8-5vv4-36mx / CVE-2026-40345 lives in the transitive
   # devDependency chain prisma CLI -> @prisma/config -> deepmerge-ts < 8.0.0;

@@ -1,8 +1,24 @@
 # Database connection pooling — verification note
 
-**Status: UNVERIFIED from the repository. This document does not assert a
-conclusion; it records what the code proves, what it cannot prove, and the
-exact checks that settle it.**
+**Status: VERIFIED 2026-09-17 — production uses the Neon POOLED endpoint. No
+action required, and no Prisma connection logic was changed.**
+
+Confirmed by the operator against the live environment:
+
+| Variable | Value | Meaning |
+|---|---|---|
+| `PGHOST` | `ep-gentle-sky-b1kruqyx-pooler.c-5.eu-central-1.aws.neon.tech` | `-pooler` host → PgBouncer-fronted |
+| `PGHOST_UNPOOLED` | direct endpoint | available for introspection/DDL |
+| `DATABASE_URL_UNPOOLED` | present | used by the CI schema-drift gate |
+
+The cliff this document was written to rule out does not exist. The remainder
+is kept as the record of what was checked and how to re-check it after any
+change to the database wiring.
+
+> The CI `schema-drift` job (`scripts/check-schema-drift.ts`) needs the
+> **UNPOOLED** URL — PgBouncer in transaction mode cannot serve introspection
+> reliably, and the script refuses a pooled URL rather than producing a
+> misleading diff.
 
 Raised by the backend audit (P0.3). No connection logic was changed, because
 changing pool behaviour on a guess is how you turn a healthy database into an
@@ -148,7 +164,7 @@ Do **not** start by editing `src/lib/prisma.ts`. The fix is the URL:
 
 | Date | Checked by | Endpoint | Result |
 |---|---|---|---|
-| 2026-09-17 | backend audit | — | **UNVERIFIED** — value not present in the repository; Vercel API returned 403 for this project/org, so it could not be read programmatically either |
+| 2026-09-17 | backend audit | — | UNVERIFIED — value not in the repository; Vercel API returned 403 for this project/org |
+| 2026-09-17 | operator | `ep-gentle-sky-b1kruqyx-pooler.c-5.eu-central-1.aws.neon.tech` | **POOLED — CORRECT.** Unpooled endpoint available separately as `PGHOST_UNPOOLED` / `DATABASE_URL_UNPOOLED`. No change made. |
 
-Append a row when this is confirmed. Until a row here says otherwise, treat
-production pooling as an open question.
+Append a row after any change to the database wiring.

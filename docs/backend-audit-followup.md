@@ -207,9 +207,228 @@ ranges, clamping, inverted ranges, empty entities, and unsafe integers.
 
 ---
 
-## NOT IMPLEMENTED — and why
+---
 
-### P0.1 — Cron frequency: **BLOCKED, needs an infrastructure decision**
+# Round 2 (2026-09-17) — after the infrastructure facts landed
+
+Two things were **VERIFIED by the operator** and they resolve open questions
+from round 1:
+
+1. **Database pooling: CONFIRMED CORRECT.** `DATABASE_URL` uses the Neon
+   pooled endpoint (`ep-gentle-sky-b1kruqyx-pooler...`), with
+   `PGHOST_UNPOOLED` / `DATABASE_URL_UNPOOLED` available separately. The open
+   question in `docs/DATABASE_POOLING.md` is closed; **no Prisma connection
+   logic was changed**, which was the right call.
+
+2. **The Vercel plan is Hobby.** This is not just "the cron stays daily" — it
+   invalidated two constants the code was reasoning from.
+
+## Hobby consequences — fixed
+
+### The tick budget could never fire
+`src/lib/scheduling.ts`
+
+`CRON_TICK_BUDGET_MS` was `240_000` against a **60s** ceiling: four times the
+wall the function actually hits. It could never stop the loop, so the
+invocation was **killed mid-publish** instead of finishing gracefully, and
+every post it had already claimed (`SCHEDULED → PUBLISHING`) was stranded
+until a later tick recovered it — on a daily cron, up to 24 hours.
+
+There is now one source of truth, `functionMaxDurationMs()` (Hobby 60s,
+overridable with `FUNCTION_MAX_DURATION_MS` on a paid plan), and the budget
+derives from it at 70%, leaving headroom for in-flight work and the retention
+sweeps. `tests/cron-schedule.test.ts` pins that the budget is strictly inside
+the ceiling and that raising the ceiling raises the budget.
+
+### `maxDuration = 300` was fiction
+`cron/publish-scheduled`, `posts/[id]/publish`, `posts/[id]/retry`
+
+Hobby clamps to 60s, so three routes declared a ceiling the platform would not
+honour and every timeout comment reasoned from the wrong number. All three now
+declare `60`, and a test asserts the declaration matches
+`functionMaxDurationMs()`.
+
+`STALE_PUBLISHING_MS` (6 min) was already safe and is unchanged — it now has a
+**6x** margin over the real ceiling instead of 1.2x, which is why recovery
+still cannot reset a live publish.
+
+### Still broken on Hobby, and NOT silently changed
+Provider poll budgets all exceed the 60s ceiling: **Threads video 240s**,
+Instagram 150s, TikTok 150s, X 120s. A video publish that needs longer than
+~60s is killed mid-poll.
+
+This is not corruption — `externalJobId` is persisted before the provider call
+and the resume path reuses the same container, so nothing double-posts. But
+the post stays `PUBLISHING` until the next daily cron, i.e. up to 24h.
+
+These budgets were deliberately left alone: clamping them changes publishing
+behaviour for every user and is a product decision, not a cleanup. The options
+are (a) upgrade the plan, or (b) clamp each budget to fit inside the function
+and let the resume path finish the job sooner.
+
+## Round 2 work
+
+### Bounded-concurrency scheduler (priority 1)
+`src/lib/scheduling.ts`
+
+The tick published strictly serially, so one slow target held the whole
+invocation — a single Threads video blocked every other user's post behind it.
+With 60s and one cron per day, effective throughput was roughly "one slow post
+per day".
+
+Posts are now published in chunks of `SCHEDULE_TICK_CONCURRENCY` (4,
+`SCHEDULE_TICK_CONCURRENCY` env-overridable) via `Promise.allSettled`. What did
+**not** change is the part that matters: each post still takes its own
+conditional `SCHEDULED → PUBLISHING` claim, so exactly-once holds within a
+chunk, across chunks, and across overlapping invocations. The per-post work
+moved verbatim into `claimAndPublishPost`, which is total by construction — a
+sibling's failure cannot abort the chunk.
+
+The budget is now checked per chunk rather than per post, so overrun is bounded
+by one chunk's slowest post. Tests cover measured peak concurrency, the bound
+holding, exactly-once under 6-way concurrency, two overlapping ticks, sibling
+isolation on failure, and chunk-level budget stopping. The pre-existing serial
+budget test was pinned to `concurrency: 1` rather than weakened.
+
+### X video streaming (priority 2)
+`src/lib/social/x.ts`, `src/lib/publish.ts`
+
+`new Response(blob.stream).arrayBuffer()` pinned up to the full 100 MB video
+limit in memory, then `.slice()`-ed another copy per 4 MB segment.
+
+`uploadXMedia` now takes an `XMediaSource` (`{ totalBytes, readChunk }`)
+instead of a buffer. X's INIT only needs `total_bytes`, which `Media.size`
+already carries, so peak memory is one segment. `readChunk` takes inclusive
+bounds so a private-blob ranged read maps to it one-to-one — the same model
+the TikTok video path already used. A short read aborts before sending a
+corrupt segment. `bufferedXMediaSource()` adapts callers that genuinely hold
+bytes (the existing tests).
+
+### Social token encryption (priority 3)
+`src/lib/social-token-crypto.ts` + every read/write site
+
+AES-256-GCM envelope encryption for `SocialAccount.accessToken` /
+`refreshToken`. Three constraints shaped it:
+
+**No schema change.** The ciphertext is self-describing
+(`pvenc.v1.<keyId>.<iv>.<tag>.<ct>`) and lives in the existing `String`
+columns, so the key id travels inside the value and rotation needs no extra
+column. Production's missing migration history is untouched.
+
+**The rotation compare-and-swap is unchanged.** Every provider's
+`ensureFresh*Token` persists with
+`updateMany({ where: { id, accessToken: <value as read> } })`. Because AES-GCM
+is randomized, re-encrypting that comparand would never match and every
+refresh would silently fall into the "lost the race" branch. So ciphertext
+stays **opaque** through that path — the value read from the row is the value
+compared against it — and decryption happens only where a token is used or
+returned. A dedicated test asserts the CAS comparand is the stored ciphertext,
+that the caller receives plaintext, and that the database receives ciphertext.
+
+**Rollout is reversible.** Reads accept plaintext and ciphertext, writes
+encrypt only when `SOCIAL_TOKEN_KEY` is set. Deploying this with no key is a
+literal no-op. Order: deploy → set the key → `npm run backfill:token-encryption`
+(dry-run by default; idempotent; CAS-guarded so it never overwrites a
+concurrent rotation).
+
+Better Auth's `Account` table is still **not** encrypted: its token columns are
+written by the library's adapter, so it needs a library-supported hook. That
+remains open.
+
+A static guard in `tests/security-hardening.test.ts` now covers both
+directions — no wide reads, and no token write that bypasses
+`encryptAccountTokens` / `encryptRotatedTokens`.
+
+### Migration drift protection (priority 5)
+`scripts/check-schema-drift.ts`, `.github/workflows/ci.yml`
+
+A `schema-drift` CI job runs `prisma migrate diff --from-url … --exit-code`
+against production and fails the build on drift. Strictly read-only. It
+**refuses a pooled endpoint** (PgBouncer cannot serve introspection reliably)
+and requires the direct URL, which the operator has confirmed exists as
+`DATABASE_URL_UNPOOLED`. Without the `SCHEMA_DRIFT_DATABASE_URL` secret the
+job skips, so forks stay green.
+
+This replaces guessing: `tests/schema-drift.test.ts` only covers the columns
+someone remembered to list, which is exactly how a P2022 slipped through before.
+
+### Video validation (priority 6)
+`src/lib/media-video.ts`
+
+A bounded ISO base media (MP4/MOV) box parser that recovers the declared
+duration from `moov` → `mvhd`. Pure arithmetic over a few hundred KB read by
+HTTP Range — no ffmpeg, no demuxer, nothing that could exceed the function
+budget. Handles 32- and 64-bit box sizes, mvhd v0 and v1, and the
+non-faststart layout (trailing `moov`) via one extra tail read.
+
+A file that declares zero or negative duration is rejected as damaged at
+upload time instead of failing minutes later at publish. Everything else
+**fails open** — an undeterminable duration allows the upload, because the
+security boundary is the signature check that already ran and rejecting valid
+files over an unusual layout would trade a real failure for a hypothetical one.
+WebM is not parsed (variable-length EBML) and is documented as such.
+
+`MEDIA_MAX_VIDEO_SECONDS` exists but is **deliberately unset**: see below.
+
+## Still NOT implemented — and why
+
+### Storage quota (priority 4): architecture proposed, limits are yours
+
+No byte quota exists. Scale is unlimited monthly posts x 4 media x 100 MB,
+forever; Free is up to ~6 GB of permanent storage per identity per month at $0.
+`Media` has no TTL.
+
+Per the instruction not to invent business limits, here is the design, not an
+implementation:
+
+**Measurement.** `SUM(Media.size) WHERE userId` — served by the existing
+`Media @@index([userId])`. No new table, so no migration. Exact, and cheap
+because media rows per user are bounded by 4 per post.
+
+**Enforcement point.** `reserveUploadPathname` already loads a per-post count;
+add the per-user byte sum to that same `Promise.all` and reject before a
+pathname is minted. Rejecting at reservation is strictly better than at
+registration — no bytes are uploaded at all.
+
+**Atomicity.** Same problem and same solution as the per-post cap (P1.2): a
+plain sum-then-decide races. Reuse `pg_advisory_xact_lock` keyed on `userId`
+inside the registration transaction. No counter column, therefore no migration.
+
+**Entitlement.** `maxStorageBytes: number | null` in `PlanEntitlements`
+(`src/lib/plans.ts`), `null` meaning unlimited so the shipped state is
+unchanged until real numbers are chosen.
+
+**Retention.** Separately, media attached to posts published more than N months
+ago could be swept by the existing cron. Both N and the per-plan byte caps are
+pricing decisions.
+
+Two inputs are needed before building this: the per-plan byte limits, and
+whether retention is acceptable product behaviour. The abuse ceiling is already
+bounded by the race-free per-post cap and the orphan sweep, so this is a cost
+question rather than a security one.
+
+### Video duration cap
+`MEDIA_MAX_VIDEO_SECONDS` is implemented and tested but **unset**, so duration
+is measured and logged, never used to reject. Every platform has its own cap;
+choosing Postvia's is a product decision. Set the env var to switch it on.
+
+### Provider poll budgets vs the 60s ceiling
+See "Still broken on Hobby" above. Needs either a plan upgrade or a deliberate
+product decision to clamp.
+
+---
+
+## NOT IMPLEMENTED — and why (round 1)
+
+### P0.1 — Cron frequency: **RESOLVED as blocked — the plan is Hobby**
+
+**VERIFIED 2026-09-17: the Vercel plan is Hobby**, which permits one cron
+invocation per day. The audit's `*/5 * * * *` recommendation is therefore
+blocked on a paid plan, not on code. `vercel.json` stays daily, and
+`tests/cron-schedule.test.ts` now asserts that explicitly so nobody tightens it
+into a failing deploy. The original reasoning is kept below for the record.
+
+### P0.1 (original) — Cron frequency: **BLOCKED, needs an infrastructure decision**
 
 The audit's top recommendation is `0 3 * * *` → `*/5 * * * *`. **It was not
 applied**, because the repository's evidence about the Vercel plan is

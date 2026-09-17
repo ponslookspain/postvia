@@ -23,10 +23,14 @@ import {
   type SchedulingDb,
 } from "@/lib/scheduling";
 
-// One scheduled video publish can poll Meta's container for up to ~4
-// minutes; the tick stops claiming new posts at the internal budget
-// (CRON_TICK_BUDGET_MS) and the rest wait for the next invocation.
-export const maxDuration = 300;
+// Vercel Hobby caps an invocation at 60s and clamps anything larger, so this
+// declares what actually happens rather than an aspirational 300. The tick
+// stops claiming new posts at `cronTickBudgetMs()` (derived from this same
+// ceiling) and the rest wait for the next invocation.
+//
+// On a plan with a higher ceiling, raise this AND set FUNCTION_MAX_DURATION_MS
+// so the tick budget follows — see docs/backend-audit-followup.md.
+export const maxDuration = 60;
 
 async function handleCron(request: NextRequest): Promise<NextResponse> {
   void request;

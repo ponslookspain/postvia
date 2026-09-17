@@ -217,12 +217,12 @@ describe("X retry / idempotency hardening", () => {
       const bytes = new Uint8Array(512).buffer as ArrayBuffer;
       const first = await xmod.uploadXMedia(
         "AT-1",
-        { bytes, mediaType: "image/jpeg", mediaCategory: "tweet_image" },
+        { source: xmod.bufferedXMediaSource(bytes), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
         deps()
       );
       const second = await xmod.uploadXMedia(
         "AT-1",
-        { bytes, mediaType: "image/jpeg", mediaCategory: "tweet_image" },
+        { source: xmod.bufferedXMediaSource(bytes), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
         deps()
       );
       assert.equal(first.state, "ready");
@@ -239,7 +239,7 @@ describe("X retry / idempotency hardening", () => {
       const bytes = new Uint8Array(256).buffer as ArrayBuffer;
       const result = await xmod.uploadXMedia(
         "AT-1",
-        { bytes, mediaType: "image/jpeg", mediaCategory: "tweet_image" },
+        { source: xmod.bufferedXMediaSource(bytes), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
         deps()
       );
       // uploadXMedia returns the id to the caller only; no tweet is

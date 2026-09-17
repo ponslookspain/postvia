@@ -325,3 +325,99 @@ describe("security hardening: social tokens never leave via a wide select", () =
     assert.ok(/\bselect\s*:/.test(socialAccountReads(good)[0]));
   });
 });
+
+/**
+ * Write-side credential guard (audit H1).
+ *
+ * Reads are guarded above; this is the other direction. Every write that
+ * carries a social token must route through the encryption boundary, or it
+ * silently persists plaintext — the exact failure this work exists to remove.
+ * Static for the same reason as the read guard: the risk is a write site
+ * nobody remembered, which no runtime test would exercise.
+ */
+describe("security hardening: social token writes go through encryption", () => {
+  const SRC = new URL("../src/", import.meta.url);
+
+  function sourceFiles(dir: URL): URL[] {
+    const out: URL[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const child = new URL(
+        `${entry.name}${entry.isDirectory() ? "/" : ""}`,
+        dir
+      );
+      if (entry.isDirectory()) out.push(...sourceFiles(child));
+      else if (entry.name.endsWith(".ts")) out.push(child);
+    }
+    return out;
+  }
+
+  /** Write call sites against socialAccount, with their args object. */
+  function socialAccountWrites(source: string): string[] {
+    const writes: string[] = [];
+    const pattern =
+      /socialAccount\s*\.\s*(create|createMany|update|updateMany|upsert)\s*\(/g;
+    for (const match of source.matchAll(pattern)) {
+      let depth = 0;
+      let i = match.index + match[0].length - 1;
+      const start = i;
+      for (; i < source.length; i++) {
+        if (source[i] === "(") depth++;
+        else if (source[i] === ")") {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+      writes.push(source.slice(start, i + 1));
+    }
+    return writes;
+  }
+
+  /** A write that carries no token field needs no encryption. */
+  function carriesToken(write: string): boolean {
+    return /\b(accessToken|refreshToken)\b/.test(write);
+  }
+
+  function goesThroughBoundary(write: string): boolean {
+    return (
+      /encryptAccountTokens\s*\(/.test(write) ||
+      // The rotation path builds its sealed object just above the call.
+      /data:\s*persisted\b/.test(write)
+    );
+  }
+
+  test("every SocialAccount write carrying a token is encrypted", () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles(SRC)) {
+      const source = readFileSync(file, "utf8");
+      for (const write of socialAccountWrites(source)) {
+        if (!carriesToken(write)) continue;
+        if (goesThroughBoundary(write)) continue;
+        offenders.push(fileURLToPath(file));
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      "these writes persist a social token without encrypting it:\n" +
+        offenders.join("\n")
+    );
+  });
+
+  test("a write with no token field is correctly ignored", () => {
+    // e.g. the creator-info route updating only `username`.
+    const usernameOnly = `prisma.socialAccount.updateMany({ where: { id }, data: { username: "x" } })`;
+    const writes = socialAccountWrites(usernameOnly);
+    assert.equal(writes.length, 1);
+    assert.equal(carriesToken(writes[0]), false);
+  });
+
+  test("the guard actually detects an unencrypted token write", () => {
+    // Proves the matcher is not vacuously passing.
+    const bad = `prisma.socialAccount.update({ where: { id }, data: { accessToken: token } })`;
+    const good = `prisma.socialAccount.update({ where: { id }, data: encryptAccountTokens({ accessToken: token }) })`;
+    const badWrite = socialAccountWrites(bad)[0];
+    const goodWrite = socialAccountWrites(good)[0];
+    assert.ok(carriesToken(badWrite) && !goesThroughBoundary(badWrite));
+    assert.ok(carriesToken(goodWrite) && goesThroughBoundary(goodWrite));
+  });
+});

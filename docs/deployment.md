@@ -52,15 +52,26 @@ Cron: `vercel.json` → `0 3 * * *` → `/api/cron/publish-scheduled`
 (once daily; scheduled posts can go out up to ~24h late; sub-daily needs a
 paid Vercel plan). Authenticated by `CRON_SECRET`.
 
-> **The "Hobby-plan maximum" claim above is unverified and may be stale.**
-> Three routes declare `maxDuration = 300`, which exceeds the Hobby 60s
-> ceiling, and `.vercel/repo.json` records a team org. Either this project is
-> on Pro (and the cron should be `*/5 * * * *`), or `maxDuration` is being
-> silently clamped to 60s — in which case Threads video publishing, which
-> polls for up to 240s, is being killed mid-poll. Confirm the plan in the
-> Vercel dashboard; see `docs/backend-audit-followup.md` (P0.1).
-> `tests/cron-schedule.test.ts` already pins the safety invariants, so
-> tightening the schedule is a one-line change once the plan is known.
+> **VERIFIED 2026-09-17: the plan is Hobby.** One cron per day is the maximum,
+> so the daily schedule is correct and a tighter one would fail deployment.
+> `tests/cron-schedule.test.ts` asserts this.
+>
+> **Consequences of the 60s Hobby function ceiling** (see
+> `docs/backend-audit-followup.md`, Round 2):
+> - `maxDuration` in the cron/publish/retry routes now declares `60`, matching
+>   what the platform actually enforces. It previously declared `300`, which
+>   was silently clamped.
+> - The tick budget derives from that ceiling (`cronTickBudgetMs()`). It was
+>   `240_000` — four times the wall — so it could never fire and the function
+>   was killed mid-publish rather than stopping gracefully.
+> - **Provider polling still exceeds the ceiling** (Threads video 240s,
+>   Instagram/TikTok 150s, X 120s). A long video publish is killed mid-poll;
+>   it is resumable, not corrupted, but only finishes on the next daily tick.
+>   Fixing this needs either a paid plan or a decision to clamp those budgets.
+>
+> On a paid plan: raise the `maxDuration` declarations, set
+> `FUNCTION_MAX_DURATION_MS` so the tick budget follows, and set the cron to
+> `*/5 * * * *`.
 
 ## Database (Neon, `neondb`, `public` schema)
 

@@ -9,9 +9,10 @@ import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { STALE_PUBLISHING_MS } from "@/lib/scheduling";
 import { reportError } from "@/lib/diagnostics";
 
-// Retrying a video target can again take minutes; same background pattern
-// as the publish route. Claims and resume semantics stay in publishPostTargets.
-export const maxDuration = 300;
+// Same 60s Hobby ceiling as the publish route (see there). Claims and resume
+// semantics stay in publishPostTargets, so a retry killed by the ceiling is
+// resumable rather than lost.
+export const maxDuration = 60;
 
 export async function POST(
   request: NextRequest,

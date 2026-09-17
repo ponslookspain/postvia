@@ -4,7 +4,10 @@ import { XProvider } from "@/lib/social/x";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { getEffectivePlan } from "@/lib/entitlements";
-import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
+import {
+  createSocialAccountRaceSafe,
+  encryptAccountTokens,
+} from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   gateOAuthCallback,
@@ -112,7 +115,7 @@ export async function GET(request: NextRequest) {
       // check-then-act); a concurrently deleted row simply updates nothing.
       await prisma.socialAccount.updateMany({
         where: { id: existingAccount.id, userId: user.id },
-        data: accountData,
+        data: encryptAccountTokens(accountData),
       });
     } else {
       // Abuse gate for fresh links (reconnects above skip it).

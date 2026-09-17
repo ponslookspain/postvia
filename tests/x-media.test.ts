@@ -193,6 +193,126 @@ describe("X media support (v2 chunked upload)", () => {
       };
     }
 
+    /**
+     * Streaming upload (audit P2).
+     *
+     * The publish path used to buffer the entire file with
+     * `new Response(stream).arrayBuffer()` before uploading — up to the full
+     * 100 MB video limit resident in a function that has 60s and finite
+     * memory on Hobby. X's INIT only needs `total_bytes`, which the Media row
+     * already carries, so the bytes can be read one segment at a time.
+     */
+    test("streams: never reads more than one segment at a time", async () => {
+      route("media/upload/initialize", (call) => {
+        const body = JSON.parse(call.bodyText);
+        assert.equal(
+          body.total_bytes,
+          9 * 1024 * 1024,
+          "INIT is told the length without any bytes being read"
+        );
+        return json(200, { data: { id: "mid-s", expires_after_secs: 86400 } });
+      });
+      route("media/upload/mid-s/append", () => json(200, {}));
+      route("media/upload/mid-s/finalize", () => json(200, { data: { id: "mid-s" } }));
+
+      const total = 9 * 1024 * 1024;
+      const reads: [number, number][] = [];
+      let peakRead = 0;
+      const result = await xmod.uploadXMedia(
+        "AT-1",
+        {
+          source: {
+            totalBytes: total,
+            readChunk: async (start, endInclusive) => {
+              reads.push([start, endInclusive]);
+              const length = endInclusive - start + 1;
+              peakRead = Math.max(peakRead, length);
+              return new Uint8Array(length).buffer as ArrayBuffer;
+            },
+          },
+          mediaType: "video/mp4",
+          mediaCategory: "tweet_video",
+        },
+        deps()
+      );
+
+      assert.deepEqual(result, { state: "ready", mediaId: "mid-s" });
+      assert.ok(
+        peakRead <= 4 * 1024 * 1024,
+        `peak resident read was ${peakRead}B — the point is to never hold the file`
+      );
+      // Inclusive, contiguous, gapless, and exactly covering the entity.
+      assert.deepEqual(reads, [
+        [0, 4 * 1024 * 1024 - 1],
+        [4 * 1024 * 1024, 8 * 1024 * 1024 - 1],
+        [8 * 1024 * 1024, total - 1],
+      ]);
+    });
+
+    test("streams: a short read aborts instead of uploading a corrupt segment", async () => {
+      route("media/upload/initialize", () =>
+        json(200, { data: { id: "mid-short", expires_after_secs: 86400 } })
+      );
+      route("media/upload/mid-short/append", () => json(200, {}));
+
+      const result = await xmod.uploadXMedia(
+        "AT-1",
+        {
+          source: {
+            totalBytes: 8 * 1024 * 1024,
+            // Truncated: the store disagrees with the length given at INIT.
+            readChunk: async () => new Uint8Array(16).buffer as ArrayBuffer,
+          },
+          mediaType: "video/mp4",
+          mediaCategory: "tweet_video",
+        },
+        deps()
+      );
+
+      assert.equal(result.state, "failed");
+      assert.equal(
+        calls.filter((c) => c.url.includes("/append")).length,
+        0,
+        "no segment is sent once the read is known to be short"
+      );
+    });
+
+    test("streams: a read failure fails the upload, never a partial tweet", async () => {
+      route("media/upload/initialize", () =>
+        json(200, { data: { id: "mid-err", expires_after_secs: 86400 } })
+      );
+      route("media/upload/mid-err/finalize", () => json(200, { data: { id: "mid-err" } }));
+
+      const result = await xmod.uploadXMedia(
+        "AT-1",
+        {
+          source: {
+            totalBytes: 1024,
+            readChunk: async () => {
+              throw new Error("blob store unavailable");
+            },
+          },
+          mediaType: "image/jpeg",
+          mediaCategory: "tweet_image",
+        },
+        deps()
+      );
+
+      assert.equal(result.state, "failed");
+      assert.equal(
+        calls.filter((c) => c.url.includes("/finalize")).length,
+        0,
+        "FINALIZE must not run after a failed read"
+      );
+    });
+
+    test("bufferedXMediaSource slices lazily and reports the true length", async () => {
+      const source = xmod.bufferedXMediaSource(bytes(10));
+      assert.equal(source.totalBytes, 10);
+      const chunk = await source.readChunk(2, 5);
+      assert.equal(chunk.byteLength, 4, "inclusive bounds, like HTTP Range");
+    });
+
     test("image: INIT → APPEND → FINALIZE without processing → ready", async () => {
       route("media/upload/initialize", (call) => {
         const body = JSON.parse(call.bodyText);
@@ -212,7 +332,7 @@ describe("X media support (v2 chunked upload)", () => {
       );
       const result = await xmod.uploadXMedia(
         "AT-1",
-        { bytes: bytes(1024), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
+        { source: xmod.bufferedXMediaSource(bytes(1024)), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
         deps()
       );
       assert.deepEqual(result, { state: "ready", mediaId: "mid-1" });
@@ -228,7 +348,7 @@ describe("X media support (v2 chunked upload)", () => {
       const size = 9 * 1024 * 1024;
       const result = await xmod.uploadXMedia(
         "AT-1",
-        { bytes: bytes(size), mediaType: "video/mp4", mediaCategory: "tweet_video" },
+        { source: xmod.bufferedXMediaSource(bytes(size)), mediaType: "video/mp4", mediaCategory: "tweet_video" },
         deps()
       );
       assert.deepEqual(result, { state: "ready", mediaId: "mid-9" });
@@ -264,7 +384,7 @@ describe("X media support (v2 chunked upload)", () => {
       });
       const result = await xmod.uploadXMedia(
         "AT-1",
-        { bytes: bytes(2048), mediaType: "video/mp4", mediaCategory: "tweet_video" },
+        { source: xmod.bufferedXMediaSource(bytes(2048)), mediaType: "video/mp4", mediaCategory: "tweet_video" },
         deps()
       );
       assert.deepEqual(result, { state: "ready", mediaId: "mid-v" });
@@ -289,7 +409,7 @@ describe("X media support (v2 chunked upload)", () => {
       );
       const result = await xmod.uploadXMedia(
         "AT-1",
-        { bytes: bytes(128), mediaType: "video/mp4", mediaCategory: "tweet_video" },
+        { source: xmod.bufferedXMediaSource(bytes(128)), mediaType: "video/mp4", mediaCategory: "tweet_video" },
         deps()
       );
       assert.equal(result.state, "failed");
@@ -302,7 +422,7 @@ describe("X media support (v2 chunked upload)", () => {
       );
       const result = await xmod.uploadXMedia(
         "AT-1",
-        { bytes: bytes(64), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
+        { source: xmod.bufferedXMediaSource(bytes(64)), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
         deps()
       );
       assert.equal(result.state, "failed");
@@ -312,7 +432,7 @@ describe("X media support (v2 chunked upload)", () => {
     test("empty bytes fail without any network call", async () => {
       const result = await xmod.uploadXMedia(
         "AT-1",
-        { bytes: bytes(0), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
+        { source: xmod.bufferedXMediaSource(bytes(0)), mediaType: "image/jpeg", mediaCategory: "tweet_image" },
         deps()
       );
       assert.equal(result.state, "failed");

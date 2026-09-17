@@ -21,6 +21,13 @@ import {
   type SignatureCheck,
 } from "@/lib/media-signature";
 import {
+  checkVideoDuration,
+  isIsoBaseMediaMime,
+  probeIsoBaseMediaDuration,
+  VIDEO_HEAD_PROBE_BYTES,
+  VIDEO_TAIL_PROBE_BYTES,
+} from "@/lib/media-video";
+import {
   logDiagnostic,
   logErrorDiagnostic,
   mediaTrace,
@@ -400,9 +407,12 @@ export const liveMediaRegistrationStore: MediaRegistrationStore = {
  * "retry me" — the blob is always removed before this is raised.
  */
 export class MediaRegistrationRejected extends Error {
-  readonly reason: "media-cap" | "signature-mismatch";
+  readonly reason: "media-cap" | "signature-mismatch" | "video-invalid";
 
-  constructor(reason: "media-cap" | "signature-mismatch", message: string) {
+  constructor(
+    reason: "media-cap" | "signature-mismatch" | "video-invalid",
+    message: string
+  ) {
     super(message);
     this.name = "MediaRegistrationRejected";
     this.reason = reason;
@@ -497,6 +507,64 @@ export async function claimMediaSlot(
     await tx.create(data);
     return "created";
   });
+}
+
+/**
+ * Inspects a stored video's container for a declared duration and rejects
+ * files that prove themselves unusable (audit P2).
+ *
+ * Costs at most two ranged reads of a few hundred KB — the front of the file,
+ * and the back only when `moov` is not at the front (the non-faststart layout
+ * most phone exports produce). No demuxing, no transcoding, nothing that
+ * could exceed the function budget.
+ *
+ * Fail-open: an undeterminable duration allows the upload. The security
+ * boundary is the signature check that already ran; this is a quality gate.
+ */
+export async function verifyStoredVideo(
+  pathname: string,
+  mimeType: string,
+  size: number,
+  fetchRange: (
+    pathname: string,
+    range: string
+  ) => Promise<ArrayBuffer | null> = defaultFetchHead
+): Promise<{ ok: true; durationSeconds: number | null } | { ok: false; error: string }> {
+  if (!isIsoBaseMediaMime(mimeType)) {
+    // WebM duration lives in a variable-length EBML element; parsing it is a
+    // separate exercise and is deliberately not attempted here.
+    return { ok: true, durationSeconds: null };
+  }
+
+  const readOrNull = async (range: string): Promise<Uint8Array | undefined> => {
+    try {
+      const buffer = await fetchRange(pathname, range);
+      return buffer ? new Uint8Array(buffer) : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const head = await readOrNull(
+    `bytes=0-${Math.min(VIDEO_HEAD_PROBE_BYTES, size) - 1}`
+  );
+  let probe = probeIsoBaseMediaDuration(head ?? new Uint8Array(0));
+
+  // `moov` at the front is the faststart layout; otherwise look at the end.
+  if (probe.ok && probe.durationSeconds === null && size > VIDEO_HEAD_PROBE_BYTES) {
+    const tailStart = Math.max(0, size - VIDEO_TAIL_PROBE_BYTES);
+    const tail = await readOrNull(`bytes=${tailStart}-${size - 1}`);
+    if (tail) {
+      probe = probeIsoBaseMediaDuration(head ?? new Uint8Array(0), tail);
+    }
+  }
+
+  if (!probe.ok) return probe;
+
+  const durationCheck = checkVideoDuration(probe.durationSeconds);
+  if (!durationCheck.ok) return durationCheck;
+
+  return { ok: true, durationSeconds: probe.durationSeconds };
 }
 
 /** Removes rejected bytes. Never masks the rejection it is cleaning up after. */
@@ -600,6 +668,40 @@ export async function registerCompletedUpload(
       }
     );
     throw new MediaRegistrationRejected("signature-mismatch", signature.error);
+  }
+
+  // Video containers get a second, cheap inspection: a file that declares no
+  // playable content fails here rather than minutes later at publish time.
+  if (outcome.createInput.type === "VIDEO") {
+    const video = await verifyStoredVideo(
+      meta.pathname,
+      meta.contentType,
+      meta.size
+    );
+    if (!video.ok) {
+      await discardRejectedBlob(meta.pathname, "video-invalid");
+      logErrorDiagnostic(
+        "media",
+        "upload rejected: unusable video container",
+        new Error(video.error),
+        mediaTrace({
+          stage: "media-video",
+          userId: outcome.userId,
+          postId: outcome.postId,
+          pathname: meta.pathname,
+        })
+      );
+      throw new MediaRegistrationRejected("video-invalid", video.error);
+    }
+    logDiagnostic("media", "video container inspected", {
+      ...mediaTrace({
+        stage: "media-video",
+        userId: outcome.userId,
+        postId: outcome.postId,
+        pathname: meta.pathname,
+      }),
+      durationSeconds: video.durationSeconds,
+    });
   }
 
   // Cheap advisory pre-check BEFORE the (billed) canonical transformation, so

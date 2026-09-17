@@ -18,6 +18,7 @@ import {
 } from "@/lib/abuse";
 import { logDiagnostic, reportError } from "@/lib/diagnostics";
 import { runAccountDeleteFlow } from "@/lib/delete-resources";
+import { decryptToken } from "@/lib/social-token-crypto";
 
 const CONFIRMATION_PHRASE = "delete";
 
@@ -177,17 +178,18 @@ export async function DELETE(request: NextRequest) {
     // exposes no revoke endpoint — its call is an honest no-op).
     for (const account of accounts) {
       try {
+        // Providers need the real token, so decrypt at the point of use.
+        // A decryption failure is caught below like any other revocation
+        // failure: best-effort revocation must never block the wipe.
+        const token = decryptToken(account.accessToken);
         if (account.platform === "X") {
-          await new XProvider().revokeToken(account.accessToken);
+          await new XProvider().revokeToken(token);
         } else if (account.platform === "THREADS") {
-          await new ThreadsProvider().revokeToken(account.accessToken);
+          await new ThreadsProvider().revokeToken(token);
         } else if (account.platform === "TIKTOK") {
-          await new TiktokProvider().revokeToken(account.accessToken);
+          await new TiktokProvider().revokeToken(token);
         } else if (account.platform === "INSTAGRAM") {
-          await new InstagramProvider().revokeToken(
-            account.accessToken,
-            account.externalId
-          );
+          await new InstagramProvider().revokeToken(token, account.externalId);
         }
       } catch {
         // Best-effort: revocation failure must not block account deletion
