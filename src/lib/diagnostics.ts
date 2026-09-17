@@ -1,6 +1,8 @@
 import * as Sentry from "@sentry/nextjs";
 import { createHash } from "node:crypto";
 
+export { scrubRequestPath } from "./request-scrub";
+
 /**
  * Log-safe blob path: the user id is a stable identifier and must never
  * reach logs, so media paths collapse to a constant (post id, random
@@ -227,15 +229,6 @@ export function scrubValue(value: unknown, depth = 0): unknown {
     return out;
   }
   return value;
-}
-
-/**
- * Keeps only the pathname of a request path (`/blog?name=foo` -> `/blog`)
- * so OAuth codes and other query secrets never reach Sentry.
- */
-export function scrubRequestPath(path: string): string {
-  const queryIndex = path.indexOf("?");
-  return queryIndex === -1 ? path : path.slice(0, queryIndex);
 }
 
 /**
