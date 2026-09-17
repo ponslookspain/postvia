@@ -46,14 +46,15 @@ full before/after mapping).
   the `dark` class is set on `<html>` by a blocking script before first
   paint (`src/hooks/use-theme.ts`), the choice persists in
   `localStorage`, and it is switched from Appearance in the account menu.
-- Near-black canvas (`--background`), near-white text, neutral gray
-  surfaces. No cream, no warm tints, no gradients, no glow.
-- **One brand hue:** red primary (`--primary`, light
-  `oklch(0.58 0.22 19)`), reserved for primary actions. It is kept a
-  step off `--error` (hue ~27) in hue and lightness so a call to action
-  never reads as a failure.
-- The scheduled state uses **info blue**, not the brand hue: a routine
-  future-dated post must not look like an alert.
+- Warm paper canvas in light (`--background` #F5F4EE), warm charcoal in
+  dark (`--background` #262624). Surfaces split by tone, hairline borders
+  only (#E3E2DE / #34332F). No gradients, no glow, no heavy shadows.
+- **One brand hue:** PostVIA Blue (`--primary`, light #2971C6 / dark
+  #5FA1F3), reserved for primary actions, active navigation, selected
+  tabs, links, focus states and main CTAs. Red is reserved for
+  error/destructive only.
+- The scheduled state uses **info blue** (same hue as brand): a routine
+  future-dated post is a quiet status tint, never a full alert surface.
 - Semantic colors only where they mean something: destructive,
   success/warning status dots, per-platform glyph accents (Instagram).
 

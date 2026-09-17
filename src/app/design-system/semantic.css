@@ -25,34 +25,34 @@
 
 :root {
 	/* —— Background ————————————————————————————————————————————————————————
-	   The page canvas. Near-white in light, near-black in dark. */
-	--background: oklch(1 0 0);
+	   Warm paper canvas. Light #F5F4EE, dark warm charcoal #262624. */
+	--background: #f5f4ee;
 
 	/* —— Foreground ————————————————————————————————————————————————————————
 	   Ink on the canvas, and its quiet counterpart for metadata. */
-	--foreground: oklch(0.145 0 0);
-	--muted-foreground: oklch(0.556 0 0);
+	--foreground: #20201e;
+	--muted-foreground: #77766f;
 
 	/* —— Muted ————————————————————————————————————————————————————————————
 	   The neutral fill: hovers, inset wells, disabled chrome. */
-	--muted: oklch(0.97 0 0);
+	--muted: #eeede8;
 
 	/* —— Panel ————————————————————————————————————————————————————————————
 	   A block on the page. One shade off the canvas and carrying NO outline:
 	   blocks are separated by tone, not by a drawn box. `Card` renders on it.
 	   A block nested inside a panel goes the other way (`--background`) so it
 	   reads as inset rather than vanishing. */
-	--panel: oklch(0.974 0 0);
+	--panel: #f0efeb;
 	--panel-foreground: var(--foreground);
 
 	/* —— Surface ——————————————————————————————————————————————————————————
 	   Raised and floating surfaces. `card` is a block that may lift off the
 	   page; `popover` is genuinely floating UI (popover, dialog, drawer,
 	   toast, select menu) and is the only tier where a shadow is allowed. */
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
+	--card: #faf9f5;
+	--card-foreground: #20201e;
+	--popover: #faf9f5;
+	--popover-foreground: #20201e;
 
 	/* —— Elevation ————————————————————————————————————————————————————————
 	   PostVIA elevates by TONE, not by shadow. The ladder below is the whole
@@ -70,59 +70,55 @@
 	   ring. The default border colour is applied in `@layer base`
 	   (`globals.css`) — never as an unlayered `*` rule, which would outrank
 	   and silently disable every `border-*` utility. */
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
+	--border: #e3e2de;
+	--input: #dedcd5;
+	--ring: #2971c6;
 
 	/* —— Primary ——————————————————————————————————————————————————————————
-	   One brand hue: crimson, reserved for primary actions. Held a step off
-	   `--error` in hue (~19 vs ~27) and lightness so a call to action never
-	   reads as a failure. Navigation never wears it. */
-	--primary: oklch(0.58 0.22 19);
-	--primary-foreground: oklch(0.985 0 0);
+	   One brand hue: PostVIA Blue #2971C6 (light) / #5FA1F3 (dark).
+	   Reserved for primary actions, active navigation, selected tabs,
+	   links, focus states and main CTAs. Never a large decorative surface.
+	   Red is reserved for error/destructive only. */
+	--primary: #2971c6;
+	--primary-foreground: #ffffff;
 
 	/* —— Status ———————————————————————————————————————————————————————————
-	   Status hues appear in dots and badges only, never as page decoration.
-	   `success` / `warning` are the PostVIA Moss and Honey values; `error`
-	   is the canonical failure hue; `info` is the blue the SCHEDULED state
-	   uses — deliberately not the brand hue, because a routine future-dated
-	   post must not look like an alert.
+	   Calm modern status hues in dots and badges only, never as page
+	   decoration. `info` shares the brand blue — it marks routine states
+	   like SCHEDULED, not alerts.
 	   Each `-foreground` is the legible ink on top of its filled hue. */
-	--success: oklch(0.55 0.15 150);
-	--success-foreground: oklch(1 0 0);
-	--warning: oklch(0.62 0.15 75);
-	--warning-foreground: oklch(0.445 0.087 78.294);
-	--error: oklch(0.577 0.245 27.325);
-	--error-foreground: oklch(1 0 0);
-	--info: oklch(0.61 0.203 255.637);
-	--info-foreground: oklch(1 0 0);
+	--success: #2f8f5b;
+	--success-foreground: #ffffff;
+	--warning: #c58a24;
+	--warning-foreground: #3d2c0e;
+	--error: #c84b4b;
+	--error-foreground: #ffffff;
+	--info: #2971c6;
+	--info-foreground: #ffffff;
 
 	/* —— Status sub-steps —————————————————————————————————————————————————
 	   Fill/focus/border/hover chrome for status-coloured controls (e.g. a
-	   status `Button` variant). These formalise values already shipped
-	   through the Radian compatibility layer — each aliases the matching
-	   foundation primitive (`foundations.css`), so light/dark and every
-	   computed pixel stay exactly as they were; only the name moves from
-	   Radian's vocabulary (`--color-emerald-accent`) to PostVIA's
-	   (`--success-accent`). `info` also gets its own `-text`: one step
-	   darker than `--info` itself, for ink on a light info fill. */
-	--success-accent: var(--color-emerald-accent);
-	--success-focus: var(--color-emerald-focus);
-	--success-border: var(--color-emerald-border);
-	--success-hover: var(--color-emerald-hover);
-	--warning-accent: var(--color-amber-accent);
-	--warning-focus: var(--color-amber-focus);
-	--warning-border: var(--color-amber-border);
-	--warning-hover: var(--color-amber-hover);
-	--error-accent: var(--color-red-accent);
-	--error-focus: var(--color-red-focus);
-	--error-border: var(--color-red-border);
-	--error-hover: var(--color-red-hover);
-	--info-text: var(--color-light-blue-text);
-	--info-accent: var(--color-light-blue-accent);
-	--info-focus: var(--color-light-blue-focus);
-	--info-border: var(--color-light-blue-border);
-	--info-hover: var(--color-light-blue-hover);
+	   status `Button` variant). Derived from the calm status hues above via
+	   `color-mix` against the current surface, so light/dark stay tonal and
+	   no second copy of any colour exists. `info-text` is the legible ink
+	   on a light info fill. */
+	--success-accent: color-mix(in srgb, var(--success) 12%, var(--card));
+	--success-focus: color-mix(in srgb, var(--success) 18%, var(--card));
+	--success-border: color-mix(in srgb, var(--success) 38%, var(--border));
+	--success-hover: color-mix(in srgb, var(--success) 88%, black);
+	--warning-accent: color-mix(in srgb, var(--warning) 14%, var(--card));
+	--warning-focus: color-mix(in srgb, var(--warning) 20%, var(--card));
+	--warning-border: color-mix(in srgb, var(--warning) 42%, var(--border));
+	--warning-hover: color-mix(in srgb, var(--warning) 88%, black);
+	--error-accent: color-mix(in srgb, var(--error) 12%, var(--card));
+	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
+	--error-border: color-mix(in srgb, var(--error) 38%, var(--border));
+	--error-hover: color-mix(in srgb, var(--error) 88%, black);
+	--info-text: var(--info);
+	--info-accent: color-mix(in srgb, var(--info) 12%, var(--card));
+	--info-focus: color-mix(in srgb, var(--info) 18%, var(--card));
+	--info-border: color-mix(in srgb, var(--info) 38%, var(--border));
+	--info-hover: color-mix(in srgb, var(--info) 88%, black);
 
 	/* —— Overlay ——————————————————————————————————————————————————————————
 	   Translucent ink washes for hover/press states and hairlines drawn as a
@@ -137,15 +133,16 @@
 	/* —— Navigation ———————————————————————————————————————————————————————
 	   The sidebar rail is a shade off the page so rail and content are told
 	   apart by tone rather than by a divider. `sidebar-accent` is the active
-	   nav pill: a quiet neutral fill, never the brand hue. */
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.58 0.22 19);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
+	   nav pill: a quiet neutral fill. `sidebar-primary` is the single blue
+	   action hue for primary controls inside the rail. */
+	--sidebar: #faf9f5;
+	--sidebar-foreground: #3b3a35;
+	--sidebar-primary: #2971c6;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #e9e6dc;
+	--sidebar-accent-foreground: #20201e;
+	--sidebar-border: #e3e2de;
+	--sidebar-ring: #2971c6;
 
 	/* —— Legacy aliases ———————————————————————————————————————————————————
 	   Kept because call sites still use them. They are ALIASES, never
@@ -167,54 +164,58 @@
 	--signal: var(--primary);
 	--signal-foreground: var(--primary-foreground);
 	--accent: var(--muted);
-	--accent-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.967 0.001 286.375);
-	--secondary-foreground: oklch(0.21 0.006 285.885);
+	--accent-foreground: #20201e;
+	--secondary: #e9e6dc;
+	--secondary-foreground: #20201e;
 }
 
 .dark {
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--muted-foreground: oklch(0.708 0 0);
+	--background: #262624;
+	--foreground: #f5f4ee;
+	--muted-foreground: #a4a39d;
 
-	--muted: oklch(0.269 0 0);
+	--muted: #30302c;
 
-	--panel: oklch(0.185 0 0);
+	--panel: #222120;
 
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
+	--card: #2c2c2b;
+	--card-foreground: #f5f4ee;
+	--popover: #2c2c2b;
+	--popover-foreground: #f5f4ee;
 
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.556 0 0);
+	--border: #34332f;
+	--input: #3a3935;
+	--ring: #5fa1f3;
 
-	--primary: oklch(0.62 0.22 19);
-	--primary-foreground: oklch(0.985 0 0);
+	--primary: #5fa1f3;
+	--primary-foreground: #0f0f0e;
 
-	/* `success` / `warning` / `error` lift for contrast on the dark canvas.
-	   `info` keeps one value across both themes, matching the blue
-	   primitive it was taken from, and the `-foreground` inks stay legible
-	   on either — so neither is restated here. */
-	--success: oklch(0.72 0.15 150);
-	--warning: oklch(0.78 0.13 75);
-	--error: oklch(0.704 0.191 22.216);
+	/* Calm dark status hues — legible on warm charcoal. `-foreground`
+	   inks stay legible on either canvas. Sub-steps derive from the hues
+	   above via `color-mix` (see `:root`), so they follow automatically. */
+	--success: #69b887;
+	--success-foreground: #102217;
+	--warning: #d6a64a;
+	--warning-foreground: #261d0d;
+	--error: #e06a6a;
+	--error-foreground: #260f0f;
+	--info: #5fa1f3;
+	--info-foreground: #0f0f0e;
 
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.62 0.22 19);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
+	--sidebar: #1f1e1d;
+	--sidebar-foreground: #e6e5df;
+	--sidebar-primary: #5fa1f3;
+	--sidebar-primary-foreground: #0f0f0e;
+	--sidebar-accent: #0f0f0e;
+	--sidebar-accent-foreground: #f5f4ee;
+	--sidebar-border: #34332f;
+	--sidebar-ring: #5fa1f3;
 
 	/* Legacy aliases: see `:root`. Only the two that hold a real value need
 	   a dark counterpart. */
-	--accent-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.274 0.006 286.033);
-	--secondary-foreground: oklch(0.985 0 0);
+	--accent-foreground: #f5f4ee;
+	--secondary: #30302c;
+	--secondary-foreground: #f5f4ee;
 }
 
 /* ----------------------------------------------------------------------------

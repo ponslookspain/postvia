@@ -112,23 +112,23 @@ Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).
 
 | Group | Token | Light | Dark |
 | --- | --- | --- | --- |
-| Background | `--background` | `oklch(1 0 0)` | `oklch(0.145 0 0)` |
-| Foreground | `--foreground` | `oklch(0.145 0 0)` | `oklch(0.985 0 0)` |
-| Muted | `--muted` | `oklch(0.97 0 0)` | `oklch(0.269 0 0)` |
-| Muted | `--muted-foreground` | `oklch(0.556 0 0)` | `oklch(0.708 0 0)` |
-| Panel | `--panel` | `oklch(0.974 0 0)` | `oklch(0.185 0 0)` |
+| Background | `--background` | `#F5F4EE` | `#262624` |
+| Foreground | `--foreground` | `#20201E` | `#F5F4EE` |
+| Muted | `--muted` | `#EEEDE8` | `#30302C` |
+| Muted | `--muted-foreground` | `#77766F` | `#A4A39D` |
+| Panel | `--panel` | `#F0EFEB` | `#222120` |
 | Panel | `--panel-foreground` | → `--foreground` | → `--foreground` |
-| Surface | `--card` / `--card-foreground` | `oklch(1 0 0)` / `oklch(0.145 0 0)` | `oklch(0.205 0 0)` / `oklch(0.985 0 0)` |
-| Surface | `--popover` / `--popover-foreground` | `oklch(1 0 0)` / `oklch(0.145 0 0)` | `oklch(0.205 0 0)` / `oklch(0.985 0 0)` |
+| Surface | `--card` / `--card-foreground` | `#FAF9F5` / `#20201E` | `#2C2C2B` / `#F5F4EE` |
+| Surface | `--popover` / `--popover-foreground` | `#FAF9F5` / `#20201E` | `#2C2C2B` / `#F5F4EE` |
 | Elevation | `--elevation-sunken / -surface / -raised / -overlay` | → `muted / panel / card / popover` | same aliases |
-| Border | `--border` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 10%)` |
-| Border | `--input` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 15%)` |
-| Border | `--ring` | `oklch(0.708 0 0)` | `oklch(0.556 0 0)` |
-| Primary | `--primary` / `--primary-foreground` | `oklch(0.58 0.22 19)` / `oklch(0.985 0 0)` | `oklch(0.62 0.22 19)` / `oklch(0.985 0 0)` |
-| Success | `--success` / `--success-foreground` | `oklch(0.55 0.15 150)` / `oklch(1 0 0)` | `oklch(0.72 0.15 150)` / same |
-| Warning | `--warning` / `--warning-foreground` | `oklch(0.62 0.15 75)` / `oklch(0.445 0.087 78.294)` | `oklch(0.78 0.13 75)` / same |
-| Error | `--error` / `--error-foreground` | `oklch(0.577 0.245 27.325)` / `oklch(1 0 0)` | `oklch(0.704 0.191 22.216)` / same |
-| Info | `--info` / `--info-foreground` | `oklch(0.61 0.203 255.637)` / `oklch(1 0 0)` | same | 
+| Border | `--border` | `#E3E2DE` | `#34332F` |
+| Border | `--input` | `#DEDCD5` | `#3A3935` |
+| Border | `--ring` | `#2971C6` | `#5FA1F3` |
+| Primary | `--primary` / `--primary-foreground` | `#2971C6` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
+| Success | `--success` / `--success-foreground` | `#2F8F5B` / `#FFFFFF` | `#69B887` / `#102217` |
+| Warning | `--warning` / `--warning-foreground` | `#C58A24` / `#3D2C0E` | `#D6A64A` / `#261D0D` |
+| Error | `--error` / `--error-foreground` | `#C84B4B` / `#FFFFFF` | `#E06A6A` / `#260F0F` |
+| Info | `--info` / `--info-foreground` | `#2971C6` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
 | Navigation | `--sidebar`, `--sidebar-foreground`, `--sidebar-primary(-foreground)`, `--sidebar-accent(-foreground)`, `--sidebar-border`, `--sidebar-ring` | rail one shade off the page | rail one shade off the page |
 
 Meaning, in one line each:
@@ -144,9 +144,9 @@ Meaning, in one line each:
   ladder above is the whole elevation system.
 - **Border** — hairlines for structural splits only. An outline on a block
   is an accent, never a default.
-- **Primary** — one brand hue (crimson), reserved for primary actions. Held
-  a step off `error` in hue (~19 vs ~27) so a CTA never reads as a failure.
-  Navigation never wears it.
+- **Primary** — one brand hue (PostVIA Blue #2971C6 / #5FA1F3),
+  reserved for primary actions, active navigation, selected tabs, links,
+  focus and main CTAs. Red is reserved for error/destructive only.
 - **Success / Warning / Error / Info** — status hues live in dots and badges
   only. `info` is the SCHEDULED state: a routine future-dated post must not
   look like an alert.

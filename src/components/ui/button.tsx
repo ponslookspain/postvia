@@ -60,7 +60,7 @@ const buttonVariants = cva(
 				variant: "strong",
 				color: "primary",
 				className:
-					"bg-primary font-medium text-primary-foreground hover:bg-primary focus-visible:ring-primary focus-visible:outline-none",
+					"bg-primary font-medium text-primary-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-primary focus-visible:outline-none",
 			},
 			{
 				variant: "strong",
@@ -98,7 +98,7 @@ const buttonVariants = cva(
 				variant: "soft",
 				color: "primary",
 				className:
-					"bg-accent font-medium text-primary hover:bg-ring focus-visible:ring-ring focus-visible:outline-none",
+					"bg-accent font-medium text-primary hover:bg-muted focus-visible:ring-ring focus-visible:outline-none",
 			},
 			{
 				variant: "soft",
@@ -174,7 +174,7 @@ const buttonVariants = cva(
 				variant: "ghost",
 				color: "primary",
 				className:
-					"bg-transparent text-primary font-medium hover:bg-ring focus-visible:outline-none focus-visible:ring-ring",
+					"bg-transparent text-primary font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-ring",
 			},
 			{
 				variant: "ghost",

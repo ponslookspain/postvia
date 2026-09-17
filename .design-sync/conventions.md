@@ -43,7 +43,7 @@ are defined for every one.
 | Foreground | `text-foreground`, `text-muted-foreground` | ink; metadata |
 | Muted | `bg-muted` | neutral fill, hovers, inset wells |
 | Border | `border-border`, `border-input`, `ring-ring` | hairline; field edge; focus ring |
-| Primary | `bg-primary`, `text-primary-foreground` | the one brand hue (crimson) |
+| Primary | `bg-primary`, `text-primary-foreground` | the one brand hue (PostVIA Blue) |
 | Status | `bg-success`, `bg-warning`, `bg-error`, `bg-info` | dots and badges only |
 
 Never write a hex, a Tailwind palette colour (`bg-red-500`), or `bg-white` /
@@ -70,10 +70,11 @@ metadata `text-xs`. Four half-steps exist for the in-between sizes:
 3. **Status hues live in dots and badges only**, never as page decoration. Use
    `StatusBadge` / `StatusDot` with a status string (`DRAFT`, `SCHEDULED`,
    `PUBLISHING`, `PUBLISHED`, `PARTIALLY_PUBLISHED`, `FAILED`). `SCHEDULED` is
-   **info blue, not the brand hue** — a routine future-dated post must not read
-   as an alert.
-4. **Navigation never wears the brand hue.** The active nav pill is a quiet
-   neutral fill; crimson is for actions.
+   a quiet **info-blue status tint** — a routine future-dated post must not
+   read as an alert surface.
+4. **Navigation stays tonal.** The active nav pill is a quiet neutral fill
+   (`sidebar-accent`); the single blue (`sidebar-primary` / `primary`) is
+   for primary actions, links, selected tabs, focus and CTAs.
 5. **Use `PlatformIcon` for X, Threads, TikTok and Instagram.** `lucide-react`
    ships no brand icons, and importing `InstagramIcon` is a hard build error.
 6. **Dark is the product default**, light is opt-in. Both themes are complete.
