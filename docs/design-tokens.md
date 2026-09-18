@@ -114,32 +114,30 @@ both themes because they stay legible on either canvas.
 Surfaces, Borders and Elevation are tone decisions rather than raw scales,
 so they live in the semantic layer.
 
-### Tonal scales (Color System 2.0, Phase 1 — additive, no consumers)
+### Tonal scales (Color System 2.0 — Phase 2 mapped)
 
-Six PostVIA-owned tonal scales in `foundations.css`, reserved for the future
-Phase 2 semantic mapping. Each scale follows the 1 → 12 progression
+Six PostVIA-owned tonal scales in `foundations.css`, consumed ONLY by
+`semantic.css` (§2). Each scale follows the 1 → 12 progression
 (1 whisper · 2 very subtle · 3 soft surface · 4 hover · 5 active ·
 6 subtle border · 7 border · 8 strong border/input · 9 solid ·
 10 solid hover · 11 accessible text · 12 strongest text).
 
-| Scale | Hue family | Materialized steps | Intended Phase 2 consumers |
+| Scale | Hue family | Materialized steps | Semantic consumers |
 | --- | --- | --- | --- |
-| `paper` | neutral / warm | 1, 2, 3, 6, 7, 8, 11, 12 | surfaces, borders, neutral text |
-| `signal` | brand blue | 3, 7, 9, 11 | primary soft / border / solid / text + focus |
-| `moss` | success green | 3, 7, 9, 11 | success soft / border / solid / text |
-| `harvest` | warning amber | 3, 7, 9, 11 | warning soft / border / solid / text |
-| `clay` | error red | 3, 7, 9, 11 | error soft / border / solid / text |
-| `sky` | info blue | 3, 7, 9, 11 | info soft / border / solid / text (tuned independently of `signal`) |
+| `paper` | neutral / warm | 1, 2, 3, 4, 5, 6, 7, 8, 11, 12 | background(1) · panel(2) · card(3) · popover(4) · border-subtle(5) · border(6) · border-strong(7) · input(8) |
+| `signal` | brand blue | 3, 7, 9, 11 | primary-soft / -border / solid / -text + ring + info solid |
+| `moss` | success green | 3, 7, 9, 11 | success-accent(soft) / -border / solid / -text |
+| `harvest` | warning amber | 3, 7, 9, 11 | warning-accent(soft) / -border / solid / -text |
+| `clay` | error red | 3, 7, 9, 11 | error-accent(soft) / -border / solid / -text |
+| `sky` | info blue | 3, 7, 9, 11 | info-accent(soft) / -border (solid and text share the brand `signal` steps; `sky-9` stays reserved) |
 
 Rules: steps are plain `:root` / `.dark` properties (not `@theme`
 `--color-*` entries), so Tailwind emits no utilities for them and components
-cannot consume them directly — the only future consumer is `semantic.css`.
-Unmaterialized steps (4, 5, 10, and the rest) stay reserved; they can be
-added later without renumbering. Values are PostVIA-owned OKLCH picks
-anchored near today's semantic hues, not copied from any external palette.
-
-**Semantic mapping is unchanged.** No `semantic.css` token points at these
-steps yet; rendered output is identical. The remapping is Phase 2 work.
+cannot consume them directly. Unmaterialized steps (10, 12 on hue scales,
+and the rest) stay reserved; they can be added later without renumbering.
+Values are PostVIA-owned OKLCH picks, not copied from any external palette.
+`signal-9` and `harvest-9` carry computed WCAG gates (see `semantic.css`):
+link-text 4.89 and warning-ink-on-solid 4.60, both above their predecessors.
 
 ## 2. Semantic tokens — canonical
 
@@ -147,52 +145,56 @@ Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).
 
 | Group | Token | Light | Dark |
 | --- | --- | --- | --- |
-| Background | `--background` | `#F5F4EE` | `#262624` |
+| Background | `--background` | → `paper-1` (≈ `#F5F4EE`) | → `paper-1` (≈ `#262624`) |
 | Foreground | `--foreground` | `#20201E` | `#F5F4EE` |
 | Muted | `--muted` | `#E7E5DE` | `#38362F` |
 | Muted | `--muted-foreground` | `#65645D` | `#B3B2AC` |
-| Panel | `--panel` | `#F0EFEB` | `#222120` |
+| Panel | `--panel` | → `paper-2` (≈ `#F7F6F0`) | → `paper-2` (≈ `#2A2927`) |
 | Panel | `--panel-foreground` | → `--foreground` | → `--foreground` |
-| Surface | `--card` / `--card-foreground` | `#FAF9F5` / `#20201E` | `#2C2C2B` / `#F5F4EE` |
-| Surface | `--popover` / `--popover-foreground` | `#FAF9F5` / `#20201E` | `#2C2C2B` / `#F5F4EE` |
-| Elevation | `--elevation-sunken / -surface / -raised / -overlay` | → `muted / panel / card / popover` | same aliases |
-| Border | `--border` | `#E3E2DE` | `#34332F` |
-| Border | `--input` | `#DEDCD5` | `#3A3935` |
-| Border | `--ring` | `#2971C6` | `#5FA1F3` |
-| Primary | `--primary` / `--primary-foreground` | `#286FC2` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
-| Success | `--success` / `--success-foreground` | `#2F8F5B` / `#FFFFFF` | `#69B887` / `#102217` |
-| Warning | `--warning` / `--warning-foreground` | `#C58A24` / `#3D2C0E` | `#D6A64A` / `#261D0D` |
-| Error | `--error` / `--error-foreground` | `#C84B4B` / `#FFFFFF` | `#E06A6A` / `#260F0F` |
-| Info | `--info` / `--info-foreground` | `#2971C6` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
+| Surface | `--card` / `--card-foreground` | → `paper-3` (≈ `#FAF9F5`) / `#20201E` | → `paper-3` (≈ `#2D2C2B`) / `#F5F4EE` |
+| Surface | `--popover` / `--popover-foreground` | → `paper-4` (≈ `#FCFBF7`) / `#20201E` | → `paper-4` (≈ `#302F2C`) / `#F5F4EE` |
+| Elevation | `--elevation-sunken / -surface / -raised / -overlay` | → `muted / panel / card / popover` | same aliases (raised ≠ overlay since Phase 2) |
+| Border | `--border-subtle` / `--border` / `--border-strong` | → `paper-5 / -6 / -7` | → `paper-5 / -6 / -7` |
+| Border | `--input` | → `paper-8` | → `paper-8` |
+| Border | `--ring` | → `signal-9` | → `signal-9` |
+| Primary | `--primary` / `--primary-foreground` | → `signal-9` / `#FFFFFF` | → `signal-9` / `#0F0F0E` |
+| Primary | `--primary-soft` / `--primary-border` / `--primary-text` | → `signal-3 / -7 / -11` | → `signal-3 / -7 / -11` |
+| Success | `--success` / `--success-foreground` | → `moss-9` / `#FFFFFF` | → `moss-9` / `#102217` |
+| Warning | `--warning` / `--warning-foreground` | → `harvest-9` / `#3D2C0E` | → `harvest-9` / `#261D0D` |
+| Error | `--error` / `--error-foreground` | → `clay-9` / `#FFFFFF` | → `clay-9` / `#260F0F` |
+| Info | `--info` / `--info-foreground` | → `signal-9` / `#FFFFFF` | → `signal-9` / `#0F0F0E` |
+| Status steps | `<status>-accent / -border / -text` | → step `3 / 7 / 11` of its scale | → step `3 / 7 / 11` of its scale |
 | Navigation | `--sidebar`, `--sidebar-foreground`, `--sidebar-primary(-foreground)`, `--sidebar-accent(-foreground)`, `--sidebar-border`, `--sidebar-ring` | rail one shade off the page | rail one shade off the page |
 
 Meaning, in one line each:
 
-- **Background** — the page canvas.
+- **Background** — the page canvas (`paper-1`).
 - **Foreground / Muted** — ink, and its quiet counterpart for metadata.
-- **Panel** — a block on the page: one shade off the canvas, **no outline**.
-  A block nested inside a panel goes the other way (`bg-background`) so it
-  reads as inset.
-- **Surface** — `card` is a block that may lift; `popover` is genuinely
-  floating UI and is the only tier where a shadow is allowed.
+- **Panel** — a block on the page (`paper-2`): one rung above the canvas,
+  **no outline**. A block nested inside a panel goes the other way
+  (`bg-background`) so it reads as inset.
+- **Surface** — `card` (`paper-3`) is a block that may lift; `popover`
+  (`paper-4`) is genuinely floating UI and is the only tier where a shadow
+  is allowed. Tiers lighten monotonically from the canvas in both themes.
 - **Elevation** — PostVIA elevates by **tone**, not shadow. The four-step
   ladder above is the whole elevation system.
-- **Border** — hairlines for structural splits only. An outline on a block
-  is an accent, never a default.
-- **Primary** — one brand hue (PostVIA Blue #286FC2 / #5FA1F3),
-  reserved for primary actions, active navigation, selected tabs, links,
-  focus and main CTAs. Red is reserved for error/destructive only.
+- **Border** — `border-subtle` / `border` are hairlines for structural
+  splits only; `border-strong` / `input` are functional edges. An outline
+  on a block is an accent, never a default.
+- **Primary** — one brand hue (`signal-9` solid, `signal-11` text,
+  `signal-3` soft, `signal-7` border), reserved for primary actions,
+  active navigation, selected tabs, links, focus and main CTAs. Red is
+  reserved for error/destructive only. The old near-duplicate `#2971C6`
+  (`ring`, `info`, `sidebar-*`) is unified onto `signal-9`.
 - **Success / Warning / Error / Info** — status hues live in dots and badges
-  only. `info` is the SCHEDULED state: a routine future-dated post must not
-  look like an alert.
+  only. `info` is the brand solid: the SCHEDULED state is a routine
+  future-dated post and must not look like an alert. Soft/border/text steps
+  come from `moss` / `harvest` / `clay` / `sky`, hand-tuned per theme.
 - **Status text inks** — the ONLY status colours allowed for running text:
-  `--success-text` (`#26774A` / `var(--success)`), `--warning-text`
-  (`#896119` / `var(--warning)`), `--error-text` (`#B04545` / `#E78282`),
-  `--info-text` (`#2569B6` / `#65A5F3`). The base hues are fills and dots
-  (exempt from text contrast) and fail 4.5:1 as copy on light surfaces
-  (measured 2026-09 with axe in real Chromium). Status chips
-  (`StatusBadge`) keep the hue in the dot + tinted shell and set the label
-  in neutral `text-foreground`.
+  step 11 of each scale. The base solids are fills and dots (exempt from
+  text contrast). Status chips (`StatusBadge`) use canonical
+  `bg-*-accent` + `border-*-border` shells (no `/10` · `/30` opacity
+  recipe) and keep the label in neutral `text-foreground`.
 
 ### Legacy aliases (canonical layer, deprecated names)
 
