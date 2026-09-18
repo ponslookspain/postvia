@@ -67,14 +67,16 @@
 	--popover-foreground: #20201e;
 
 	/* —— Elevation ————————————————————————————————————————————————————————
-	   PostVIA elevates by TONE, not by shadow. The ladder below is the whole
-	   elevation system; `shadow-md` / `shadow-lg` are reserved for the
-	   floating tier and are applied by the primitives themselves. Each rung
-	   is now a distinct tone (raised ≠ overlay). */
-	--elevation-sunken: var(--muted);
-	--elevation-surface: var(--panel);
-	--elevation-raised: var(--card);
-	--elevation-overlay: var(--popover);
+	   PostVIA elevates by TONE, not by shadow: sunken (`muted`) → surface
+	   (`panel`) → raised (`card`) → overlay (`popover`), each a distinct
+	   tone. `shadow-md` / `shadow-lg` are reserved for the floating tier and
+	   are applied by the primitives themselves. There used to be a parallel
+	   `--elevation-*` alias set naming these four rungs, but it was never
+	   exposed under `--color-*` in the `@theme inline` block below, so
+	   `bg-elevation-raised` (and friends) compiled to nothing everywhere it
+	   was used — a second, non-functional vocabulary for the same four
+	   tokens. Removed; call sites now name the tier directly
+	   (`bg-muted` / `bg-panel` / `bg-card` / `bg-popover`). */
 
 	/* —— Border ———————————————————————————————————————————————————————————
 	   Four neutral edge roles on the `paper` ramp, weakest first.

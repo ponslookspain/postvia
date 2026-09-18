@@ -32,9 +32,9 @@ function Calendar({
 				day_button:
 					"text-center rounded-lg text-foreground text-sm font-medium hover:bg-overlay-4 cursor-pointer size-9 p-0 hover:group-data-selected:bg-primary group-data-disabled:pointer-events-none group-data-disabled:line-through group-data-selected:bg-primary group-data-selected:text-primary-foreground hover:group-[.rdp-outside]:group-data-selected:bg-primary group-[.rdp-outside]:group-data-selected:text-primary-foreground group-[.range-middle]:group-[.rdp-outside]:group-data-selected:text-primary hover:group-[.range-middle]:group-[.rdp-outside]:group-data-selected:bg-muted group-data-selected:text-primary-foreground group-data-disabled:text-muted-foreground group-data-outside:text-muted-foreground group-data-today:border group-data-today:border-primary group-data-today:text-primary group-data-today:group-data-selected:text-primary-foreground hover:group-[.range-middle]:group-data-selected:bg-muted group-[.range-middle]:group-data-selected:text-primary group-[.range-middle]:group-data-selected:bg-muted group-[.range-middle]:group-data-selected:text-primary group-data-selected:group-data-outside:text-primary",
 				button_previous:
-					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-bg bg-elevation-raised font-medium text-muted-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
+					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background bg-card font-medium text-muted-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
 				button_next:
-					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-bg bg-elevation-raised font-medium text-muted-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
+					"cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background bg-card font-medium text-muted-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border aria-disabled:opacity-50 rounded-lg p-1.5 flex justify-center items-center size-7",
 				range_start: "range-start",
 				range_middle: "range-middle",
 				range_end: "range-end",
@@ -48,7 +48,7 @@ function Calendar({
 				},
 			}}
 			className={cn(
-				"bg-elevation-raised border-border rounded-xl border p-3",
+				"bg-card border-border rounded-xl border p-3",
 				className
 			)}
 			showOutsideDays={showOutsideDays}

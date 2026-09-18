@@ -148,7 +148,7 @@
        shares the brand `signal-9`).
      - `paper-0` sits BELOW the surface ladder (1–4), on the opposite side
        from the borders (5–8): it is the one sunken rung, backing
-       `--muted`/`--elevation-sunken`. It was added after Phase 2 shipped
+       `--muted` (the sunken elevation tier). It was added after Phase 2 shipped
        1–4/11/12 without a place for the recessed role, which left `--muted`
        a hand-written literal while every surface around it moved onto the
        scale — in dark that literal (`#38362f`, L* 33.25) ended up

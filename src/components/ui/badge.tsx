@@ -36,7 +36,7 @@ const badgeVariants = cva(
 			color: {
 				primary: "",
 				error: "",
-				neutral: "bg-elevation-raised border-overlay-12",
+				neutral: "bg-card border-overlay-12",
 			},
 		},
 		defaultVariants: {
