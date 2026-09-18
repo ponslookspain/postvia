@@ -37,6 +37,9 @@ Never commit real values. Sources checked: `src/**`, `prisma/schema.prisma`,
 | `PG_INTEGRATION` | server-only | no | local test only | `1` enables `npm run test:pg` against an isolated DB (never production) | Local-only |
 | `E2E_BASE` | server-only | no | local test only | Base URL for `scripts/e2e-otp-check.ts` | Local-only |
 | `BLOB_STORE_ID` | server-only | no | local scripts | Vercel Blob store used by `scripts/reset-data.ts` | Local scripts only |
+| `FUNCTION_MAX_DURATION_MS` | server-only | no | per-env | Wall-clock ceiling (ms) for one function invocation; tick budget derives 70% from it (src). Default `60000` (Vercel Hobby); set higher only on a paid plan | Optional tuning; no CI value needed |
+| `SCHEDULE_TICK_CONCURRENCY` | server-only | no | all | How many posts one scheduler tick publishes in parallel (src). Default `4` | Optional tuning; no CI value needed |
+| `MEDIA_MAX_VIDEO_SECONDS` | server-only | no | all | Optional outer bound on video length (src). Deliberately unset by default: duration is measured and logged, never used to reject; choosing the limit is a product decision | Optional tuning, unset; no CI value needed |
 
 Vercel-provided (read, never set): `VERCEL_ENV`, `VERCEL_URL`,
 `VERCEL_PROJECT_PRODUCTION_URL`. `NODE_ENV` switches dev/prod defaults.
