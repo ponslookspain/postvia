@@ -50,6 +50,13 @@ export default defineConfig({
       // The webServer inherits the ambient env (DATABASE_URL_*, secrets).
       // Never set production values here.
       NODE_ENV: "development",
+      // Ordinary browser E2E must not touch Resend: without this the booted
+      // `next dev` picks RESEND_API_KEY up from .env.local and every
+      // throwaway signup fires a real (422-rejected) verification email.
+      // Empty string counts as absent (see src/lib/email.ts getResend), so
+      // the default is Resend-off like CI; an ambient RESEND_API_KEY passes
+      // through untouched for explicit OTP runs (see docs/e2e.md).
+      RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
     },
   },
 });
