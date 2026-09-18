@@ -312,7 +312,22 @@ test.describe("browser smoke", () => {
             .then(() => true)
             .catch(() => false);
           if (!opened) await trigger.click();
-          await expect(item).toBeVisible({ timeout: 15_000 });
+          try {
+            await expect(item).toBeVisible({ timeout: 15_000 });
+          } catch (error) {
+            // Diagnostics for CI: annotations are invisible in the list
+            // reporter, so print the captured browser errors to stdout.
+            console.log(
+              `[smoke-diagnostic] ${urlPattern} menu never opened. console.error: ${JSON.stringify(consoleErrors.slice(0, 10))}`
+            );
+            console.log(
+              `[smoke-diagnostic] ${urlPattern} menu never opened. pageerror: ${pageErrors.map((e) => String(e?.message ?? e)).slice(0, 5).join(" | ")}`
+            );
+            console.log(
+              `[smoke-diagnostic] role=menu count: ${await page.getByRole("menu").count()}, menuitem count: ${await page.getByRole("menuitem").count()}, trigger visible: ${await trigger.isVisible()}`
+            );
+            throw error;
+          }
           await item.click();
           await expect(page).toHaveURL(urlPattern, { timeout: 15_000 });
         };
