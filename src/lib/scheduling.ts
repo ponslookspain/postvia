@@ -1,6 +1,7 @@
 import type { PublishOutcome } from "@/lib/publish";
 import { selectPublishableTargetIds } from "@/lib/publish";
 import { reportError } from "@/lib/diagnostics";
+import { emitLateSchedule } from "@/lib/publish-observability";
 import { recoverStalePublishing } from "./scheduling/recover-stale";
 
 /**
@@ -86,6 +87,15 @@ export const CRON_TICK_BUDGET_MS = Math.floor(
  * for normal traffic; it exists to cap the *read*, not the work.
  */
 export const SCHEDULE_TICK_BATCH = 200;
+
+/**
+ * A scheduled post that starts later than this after its `scheduledAt`
+ * emits a `late_schedule` observability event (per target, once per claim).
+ * 1h keeps the daily-cron reality (`0 3 * * *`) useful: intraday posts are
+ * routinely hours late by design, and flagging every minute of queue delay
+ * would be noise. Observability-only — never gates publishing.
+ */
+export const LATE_THRESHOLD_MS = 60 * 60_000;
 
 /**
  * How many posts one tick publishes at a time.
@@ -286,7 +296,7 @@ export async function runScheduledPublishTick(deps: {
     // the siblings that are already in flight. This mirrors how
     // `publishTargetsInParallel` already isolates targets within a post.
     const settled = await Promise.allSettled(
-      chunk.map((post) => claimAndPublishPost(db, deps.publish, post))
+      chunk.map((post) => claimAndPublishPost(db, deps.publish, post, now))
     );
 
     for (const [index, result] of settled.entries()) {
@@ -321,7 +331,8 @@ async function claimAndPublishPost(
     account?: SocialAccountRow,
     target?: { id: string; platform: string }
   ) => Promise<PublishOutcome>,
-  post: StoredPost
+  post: StoredPost,
+  now: Date
 ): Promise<"published" | "failed" | "skipped"> {
   const claim = await db.post.updateMany({
     where: { id: post.id, status: "SCHEDULED" },
@@ -333,6 +344,22 @@ async function claimAndPublishPost(
   const target = post.targets.find((candidate) =>
     publishableIds.includes(candidate.id)
   );
+
+  // Late-schedule detection (observability-only): per first publishable
+  // target, once per claim. No target yet → no event (never magic ids).
+  if (target && post.scheduledAt) {
+    const latenessMs = now.getTime() - post.scheduledAt.getTime();
+    if (latenessMs > LATE_THRESHOLD_MS) {
+      emitLateSchedule({
+        provider: target.platform,
+        postId: post.id,
+        targetId: target.id,
+        // Best-effort: re-published overdue targets are repeats.
+        attempt: target.status === "FAILED" ? 2 : 1,
+        duration: latenessMs,
+      });
+    }
+  }
 
   try {
     const outcome = await publish(

@@ -477,7 +477,11 @@ export async function ensureFreshThreadsToken(
     accessToken: string;
     expiresAt: Date | null;
   },
-  store?: ThreadsTokenStore
+  store?: ThreadsTokenStore,
+  // Observability-only hook: fired iff THIS worker performs a refresh
+  // network call (never on fast-path or concurrent reuse, never with
+  // token values). Type-only import — erased at runtime.
+  notify?: import("@/lib/publish-observability").TokenRefreshNotify
 ): Promise<string> {
   const db: ThreadsTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
@@ -497,7 +501,13 @@ export async function ensureFreshThreadsToken(
     // Another worker refreshed concurrently; reuse its rotated token.
     return decryptToken(current.accessToken);
   }
-  const tokens = await refreshThreadsToken(decryptToken(current.accessToken));
+  let tokens: { accessToken: string; expiresAt?: Date };
+  try {
+    tokens = await refreshThreadsToken(decryptToken(current.accessToken));
+  } catch (error) {
+    notify?.("refresh_failed");
+    throw error;
+  }
   const next: { accessToken: string; expiresAt?: Date } = {
     accessToken: tokens.accessToken,
     ...(tokens.expiresAt ? { expiresAt: tokens.expiresAt } : {}),
@@ -526,6 +536,7 @@ export async function ensureFreshThreadsToken(
     // to a plain update so the token still rotates, then return it.
     await db.update({ where: { id: account.id }, data: persisted });
   }
+  notify?.("refreshed");
   return next.accessToken;
 }
 

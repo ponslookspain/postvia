@@ -284,7 +284,11 @@ export async function ensureFreshTiktokToken(
     refreshToken: string | null;
     expiresAt: Date | null;
   },
-  store?: TiktokTokenStore
+  store?: TiktokTokenStore,
+  // Observability-only hook: fired iff THIS worker performs a refresh
+  // network call (never on fast-path or concurrent reuse, never with
+  // token values). Type-only import — erased at runtime.
+  notify?: import("@/lib/publish-observability").TokenRefreshNotify
 ): Promise<string> {
   const db: TiktokTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
@@ -306,6 +310,7 @@ export async function ensureFreshTiktokToken(
   }
   const refreshToken = current.refreshToken;
   if (!refreshToken) {
+    notify?.("refresh_failed");
     throw new TiktokApiError(
       "token_expired",
       "TikTok access expired. Reconnect your TikTok account.",
@@ -318,6 +323,7 @@ export async function ensureFreshTiktokToken(
   } catch (error) {
     // Preserve TikTok's terminal refresh codes so callers can map them
     // to "reconnect" without parsing messages. Never attach tokens.
+    notify?.("refresh_failed");
     if (error instanceof TiktokApiError && isTiktokAuthErrorCode(error.code)) {
       throw error;
     }
@@ -352,6 +358,7 @@ export async function ensureFreshTiktokToken(
     // to a plain update so tokens still rotate, then return them.
     await db.update({ where: { id: account.id }, data: persisted });
   }
+  notify?.("refreshed");
   return next.accessToken;
 }
 

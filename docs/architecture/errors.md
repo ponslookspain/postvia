@@ -69,6 +69,22 @@ codes and HTTP 429/5xx → retryable; terminal rejects → non-retryable;
 config-missing messages → `ProviderError`). Pilots: TikTok publish
 only. X/Threads/Instagram/Stripe keep their current mappers.
 
+## Publishing observability (companion, not error telemetry)
+
+Per-target structured events live in `src/lib/publish-observability.ts`
+and reuse this model without extending it: raw errors are classified
+with the existing taxonomy/`normalizeProviderError` (and
+`isRateLimitSignal` for provable 429/rate-limit detection), but only a
+safe `status` enum reaches the logs — never `message`, `stack`,
+`providerCode` values, responses, or bodies. Payload is exactly
+`provider|postId|targetId|duration|attempt|status` (compile-time type +
+runtime allowlist pick). Emission goes through `logDiagnostic` only;
+`reportError`/Sentry are deliberately NOT called per attempt (terminal
+provider rejections are user-visible outcomes, not incidents). See
+`docs/posting.md` ("Publishing observability") for the taxonomy and
+`tests/publish-observability.test.ts` for the contract, negative, and
+multi-target cases.
+
 ## Backward compatibility
 
 - `{ error: string }` is the contract; `code`/`retryable`/`details`

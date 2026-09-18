@@ -134,7 +134,11 @@ export async function ensureFreshXToken(
     refreshToken: string | null;
     expiresAt: Date | null;
   },
-  store?: XTokenStore
+  store?: XTokenStore,
+  // Observability-only hook: fired iff THIS worker performs a refresh
+  // network call (never on fast-path or concurrent reuse, never with
+  // token values). Type-only import — erased at runtime.
+  notify?: import("@/lib/publish-observability").TokenRefreshNotify
 ): Promise<string> {
   const db: XTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
@@ -161,6 +165,7 @@ export async function ensureFreshXToken(
   }
   const refreshToken = current.refreshToken;
   if (!refreshToken) {
+    notify?.("refresh_failed");
     throw new XApiError(
       "token_expired",
       "X access expired. Reconnect your X account.",
@@ -173,6 +178,7 @@ export async function ensureFreshXToken(
   } catch (error) {
     // Preserve terminal refresh codes so callers can map them to
     // "reconnect" without parsing messages. Never attach tokens.
+    notify?.("refresh_failed");
     if (error instanceof XApiError && isXAuthErrorCode(error.code)) {
       throw error;
     }
@@ -208,6 +214,7 @@ export async function ensureFreshXToken(
     // to a plain update so tokens still rotate, then return them.
     await db.update({ where: { id: account.id }, data: persisted });
   }
+  notify?.("refreshed");
   return next.accessToken;
 }
 

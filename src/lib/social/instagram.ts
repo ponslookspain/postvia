@@ -266,7 +266,11 @@ export async function ensureFreshInstagramToken(
     accessToken: string;
     expiresAt: Date | null;
   },
-  store?: InstagramTokenStore
+  store?: InstagramTokenStore,
+  // Observability-only hook: fired iff THIS worker performs a refresh
+  // network call (never on fast-path or concurrent reuse, never with
+  // token values). Type-only import — erased at runtime.
+  notify?: import("@/lib/publish-observability").TokenRefreshNotify
 ): Promise<string> {
   const db: InstagramTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
@@ -286,7 +290,12 @@ export async function ensureFreshInstagramToken(
     // Another worker refreshed concurrently; reuse its rotated token.
     return decryptToken(current.accessToken);
   }
-  const refreshed = await refreshInstagramToken(decryptToken(current.accessToken));
+  const refreshed = await refreshInstagramToken(
+    decryptToken(current.accessToken)
+  ).catch((error: unknown) => {
+    notify?.("refresh_failed");
+    throw error;
+  });
   const next = {
     accessToken: refreshed.accessToken,
     expiresAt: refreshed.expiresAt,
@@ -315,6 +324,7 @@ export async function ensureFreshInstagramToken(
     // to a plain update so the token still rotates, then return it.
     await db.update({ where: { id: account.id }, data: persisted });
   }
+  notify?.("refreshed");
   return next.accessToken;
 }
 
