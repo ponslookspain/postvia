@@ -88,22 +88,29 @@
 	--border: var(--paper-6);
 	--border-strong: var(--paper-7);
 	--input: var(--paper-8);
-	--ring: #2971c6;
+	--ring: var(--signal-9);
 
 	/* —— Primary ——————————————————————————————————————————————————————————
-	   One brand hue: PostVIA Blue #286FC2 (light) / #5FA1F3 (dark).
-	   Reserved for primary actions, active navigation, selected tabs,
-	   links, focus states and main CTAs. Never a large decorative surface.
-	   Red is reserved for error/destructive only.
-	   Light holds 4.5:1 as link text on the canvas (the previous #2971C6
-	   measured 4.46 and failed axe on small link copy). */
-	--primary: #286fc2;
+	   One brand hue on the `signal` scale: `signal-9` is the solid (primary
+	   actions, active navigation, selected tabs, links, focus states, main
+	   CTAs), `signal-11` the running-text ink, `signal-3`/`signal-7` the
+	   soft surface and border. Never a large decorative surface. Red is
+	   reserved for error/destructive only.
+	   `signal-9` holds 4.5:1 both as link text on the canvas (computed
+	   4.89, above the previous #286FC2) and for white on solid (5.55);
+	   the old near-duplicate #2971C6 (`ring`, `info`, `sidebar-*`) is
+	   unified onto the same step. */
+	--primary: var(--signal-9);
 	--primary-foreground: #ffffff;
+	--primary-soft: var(--signal-3);
+	--primary-border: var(--signal-7);
+	--primary-text: var(--signal-11);
 
 	/* —— Status ———————————————————————————————————————————————————————————
 	   Calm modern status hues in dots and badges only, never as page
-	   decoration. `info` shares the brand blue — it marks routine states
-	   like SCHEDULED, not alerts.
+	   decoration. `info` IS the brand solid (`signal-9`) — it marks routine
+	   states like SCHEDULED, not alerts; its soft/border/text steps are
+	   independently tuned `sky` tints (Group D).
 	   Each `-foreground` is the legible ink on top of its filled hue. */
 	--success: #2f8f5b;
 	--success-foreground: #ffffff;
@@ -111,7 +118,7 @@
 	--warning-foreground: #3d2c0e;
 	--error: #c84b4b;
 	--error-foreground: #ffffff;
-	--info: #2971c6;
+	--info: var(--signal-9);
 	--info-foreground: #ffffff;
 
 	/* —— Status sub-steps —————————————————————————————————————————————————
@@ -138,7 +145,7 @@
 	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
 	--error-border: color-mix(in srgb, var(--error) 38%, var(--border));
 	--error-hover: color-mix(in srgb, var(--error) 88%, black);
-	--info-text: var(--info);
+	--info-text: var(--signal-11);
 	--info-accent: color-mix(in srgb, var(--info) 12%, var(--card));
 	--info-focus: color-mix(in srgb, var(--info) 18%, var(--card));
 	--info-border: color-mix(in srgb, var(--info) 38%, var(--border));
@@ -161,12 +168,12 @@
 	   action hue for primary controls inside the rail. */
 	--sidebar: #faf9f5;
 	--sidebar-foreground: #3b3a35;
-	--sidebar-primary: #2971c6;
+	--sidebar-primary: var(--signal-9);
 	--sidebar-primary-foreground: #ffffff;
 	--sidebar-accent: #e9e6dc;
 	--sidebar-accent-foreground: #20201e;
 	--sidebar-border: #e3e2de;
-	--sidebar-ring: #2971c6;
+	--sidebar-ring: var(--signal-9);
 
 	/* —— Legacy aliases ———————————————————————————————————————————————————
 	   Kept because call sites still use them. They are ALIASES, never
@@ -202,9 +209,6 @@
 	--popover: var(--paper-4);
 	--popover-foreground: #f5f4ee;
 
-	--ring: #5fa1f3;
-
-	--primary: #5fa1f3;
 	--primary-foreground: #0f0f0e;
 
 	/* Calm dark status hues — legible on warm charcoal. `-foreground`
@@ -218,21 +222,17 @@
 	--warning-foreground: #261d0d;
 	--error: #e06a6a;
 	--error-foreground: #260f0f;
-	--info: #5fa1f3;
 	--info-foreground: #0f0f0e;
 	--success-text: var(--success);
 	--warning-text: var(--warning);
 	--error-text: #e78282;
-	--info-text: #65a5f3;
 
 	--sidebar: #1f1e1d;
 	--sidebar-foreground: #e6e5df;
-	--sidebar-primary: #5fa1f3;
 	--sidebar-primary-foreground: #0f0f0e;
 	--sidebar-accent: #0f0f0e;
 	--sidebar-accent-foreground: #f5f4ee;
 	--sidebar-border: #34332f;
-	--sidebar-ring: #5fa1f3;
 }
 
 /* ----------------------------------------------------------------------------
@@ -268,6 +268,9 @@
 	/* Primary */
 	--color-primary: var(--primary);
 	--color-primary-foreground: var(--primary-foreground);
+	--color-primary-soft: var(--primary-soft);
+	--color-primary-border: var(--primary-border);
+	--color-primary-text: var(--primary-text);
 
 	/* Success · Warning · Error · Info */
 	--color-success: var(--success);

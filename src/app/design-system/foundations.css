@@ -166,10 +166,13 @@
 	--paper-11: oklch(0.45 0.02 95);
 	--paper-12: oklch(0.28 0.02 95);
 
-	/* signal — brand blue */
+	/* signal — brand blue.
+	   `signal-9` is gated on computed WCAG contrast (Group C): 4.89 as
+	   link text on the canvas and 5.55 for white on solid, both above the
+	   previous #286FC2 (4.46 / 5.07). */
 	--signal-3: oklch(0.94 0.03 255);
 	--signal-7: oklch(0.7 0.1 255);
-	--signal-9: oklch(0.55 0.15 255);
+	--signal-9: oklch(0.52 0.14 255);
 	--signal-11: oklch(0.48 0.15 255);
 
 	/* moss — success green */
