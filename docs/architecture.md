@@ -29,6 +29,8 @@ Sentry (error reporting), Vercel Cron (scheduler trigger).
 | `abuse.ts` | Identity resolution/merge, risk, tombstones, rate limits, OAuth gates, ledgers |
 | `free-post-kernel.ts` | Atomic Free post creation (identity + per-user claim + insert in one `$transaction`) |
 | `entitlements.ts` | Effective plan, usage, per-user quota ledger (`PostUsage`) |
+| `dashboard.ts` | Server-side dashboard fetch + view model (`parseDashboardParams` / `getDashboard` / `buildDashboardViewModel`); reuses `dashboard-analytics.ts` pure utilities and `entitlements.ts` billing rules, never replaces them |
+| `dashboard-analytics.ts` | Pure dashboard analytics/formatting utilities (no Prisma, no I/O) |
 | `plans.ts` | Plan ids, prices, entitlements (single source of truth) |
 | `social-accounts.ts` | Race-safe `SocialAccount` create/disconnect lookup |
 | `social/` | Per-provider OAuth, token refresh, publish primitives (`x`, `threads`, `tiktok`, `instagram`, `provider`, `pkce`) |

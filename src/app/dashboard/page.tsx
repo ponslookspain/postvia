@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { PlusIcon, UsersIcon } from "lucide-react";
-import { prisma } from "@/lib/prisma";
 import { requireOnboardedUser } from "@/lib/onboarding";
 import { formatStatusLabel } from "@/lib/utils";
-import { getDisplayPostsUsed, getEffectivePlan, getRemainingQuota, getUsage } from "@/lib/entitlements";
+import { getDashboard, parseDashboardParams } from "@/lib/dashboard";
 import { AppShell } from "@/components/AppShell";
 import {
   PageContainer,
@@ -23,35 +22,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import {
-  bucketWeeks,
-  buildInsights,
-  formatRelativeTime,
-  summarizePlatforms,
-} from "@/lib/dashboard-analytics";
 import { DashboardPostFilter } from "@/app/dashboard/DashboardPostFilter";
 import { PostRow } from "@/app/dashboard/PostRow";
 import { ActivityChart } from "@/app/dashboard/ActivityChart";
 import { InsightList } from "@/app/dashboard/InsightList";
 import { NextUp } from "@/app/dashboard/NextUp";
-import { OutcomeDonut, type OutcomeSegment } from "@/app/dashboard/OutcomeDonut";
-import { Channels, type ChannelRow } from "@/app/dashboard/Channels";
+import { OutcomeDonut } from "@/app/dashboard/OutcomeDonut";
+import { Channels } from "@/app/dashboard/Channels";
 
 export const dynamic = "force-dynamic";
-
-const FILTERABLE_STATUSES = [
-  "DRAFT",
-  "SCHEDULED",
-  "PUBLISHING",
-  "PUBLISHED",
-  "PARTIALLY_PUBLISHED",
-  "FAILED",
-];
-
-const postFeedInclude = {
-  targets: { include: { socialAccount: { select: { username: true } } } },
-  media: { take: 1 as const, select: { id: true, type: true } },
-};
 
 /** Daypart greeting from server time. Single primary CTA lives in the header. */
 function greetingFor(name: string): string {
@@ -67,213 +46,34 @@ export default async function DashboardPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireOnboardedUser();
-  const params = await searchParams;
-  const rawQ = typeof params.q === "string" ? params.q.trim() : "";
-  const rawStatus = typeof params.status === "string" ? params.status : "all";
-  const q = rawQ.slice(0, 100);
-  const statusFilter = FILTERABLE_STATUSES.includes(rawStatus)
-    ? rawStatus
-    : "all";
-
-  // Activity window for the charts: bounded reads only, volumes capped
-  // by plan maxima, so server-side bucketing stays cheap.
-  const twelveWeeksAgo = new Date();
-  twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 7 * 12);
-
-  // One groupBy replaces the per-status count queries; total is the sum of
-  // the same groups. All independent reads run in parallel.
-  const [
-    statusGroups,
-    recentPosts,
-    attentionPosts,
-    upcomingPosts,
-    accounts,
-    effective,
-    usage,
-    targetStats,
-    recentActivity,
-    accountPulse,
-  ] = await Promise.all([
-    prisma.post.groupBy({
-      by: ["status"],
-      where: { userId: user.id },
-      _count: { _all: true },
-    }),
-    prisma.post.findMany({
-      where: {
-        userId: user.id,
-        ...(statusFilter !== "all" ? { status: statusFilter as never } : {}),
-        ...(q ? { text: { contains: q, mode: "insensitive" } } : {}),
-      },
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: postFeedInclude,
-    }),
-    prisma.post.findMany({
-      where: {
-        userId: user.id,
-        status: { in: ["FAILED", "PARTIALLY_PUBLISHED", "PUBLISHING"] },
-      },
-      take: 5,
-      orderBy: { updatedAt: "desc" },
-      include: postFeedInclude,
-    }),
-    prisma.post.findMany({
-      where: { userId: user.id, status: "SCHEDULED" },
-      take: 3,
-      orderBy: { scheduledAt: "asc" },
-      include: postFeedInclude,
-    }),
-    prisma.socialAccount.findMany({
-      where: { userId: user.id },
-      select: { id: true, platform: true, username: true, expiresAt: true },
-      orderBy: [{ platform: "asc" }, { username: "asc" }],
-    }),
-    getEffectivePlan({ userId: user.id, userEmail: user.email }),
-    getUsage(user.id),
-    prisma.postTarget.groupBy({
-      by: ["platform", "status"],
-      where: { post: { userId: user.id } },
-      _count: { _all: true },
-    }),
-    prisma.post.findMany({
-      where: { userId: user.id, createdAt: { gte: twelveWeeksAgo } },
-      select: { createdAt: true, status: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.postTarget.groupBy({
-      by: ["socialAccountId"],
-      where: { post: { userId: user.id }, socialAccountId: { not: null } },
-      _count: { _all: true },
-      _max: { publishedAt: true },
-    }),
-  ]);
-
-  const countsByStatus = Object.fromEntries(
-    statusGroups.map((group) => [group.status, group._count._all])
-  ) as Partial<Record<string, number>>;
-  const totalPosts = statusGroups.reduce(
-    (sum, group) => sum + group._count._all,
-    0
-  );
-  const drafts = countsByStatus.DRAFT ?? 0;
-  const scheduled = countsByStatus.SCHEDULED ?? 0;
-  const published = countsByStatus.PUBLISHED ?? 0;
-
+  const filter = parseDashboardParams(await searchParams);
   const now = new Date();
-  const expiredAccounts = accounts.filter(
-    (account) =>
-      account.expiresAt && new Date(account.expiresAt).getTime() <= now.getTime()
-  );
-
-  const byPlatform = new Map<
-    string,
-    { platform: string; usernames: string[]; expired: boolean }
-  >();
-  for (const account of accounts) {
-    const entry = byPlatform.get(account.platform) ?? {
-      platform: account.platform,
-      usernames: [],
-      expired: false,
-    };
-    entry.usernames.push(account.username);
-    if (
-      account.expiresAt &&
-      new Date(account.expiresAt).getTime() <= now.getTime()
-    ) {
-      entry.expired = true;
-    }
-    byPlatform.set(account.platform, entry);
-  }
-
-  const isOnboarding = totalPosts === 0 && accounts.length === 0;
-  const isFiltered = q !== "" || statusFilter !== "all";
-  const quota = getRemainingQuota(effective, usage);
-  const monthlyLimit = effective.entitlements.monthlyPosts;
-  // Free progress reflects the shared identity-level allowance
-  // (AbuseFreeUsage), not just this user's own posts. Paid plans keep the
-  // per-user counter. Server-side enforcement stays authoritative.
-  const displayPostsUsed = getDisplayPostsUsed(effective, usage);
-  const usagePercent =
-    monthlyLimit === null
-      ? 0
-      : Math.min(
-          100,
-          Math.round((displayPostsUsed / Math.max(1, monthlyLimit)) * 100)
-        );
-  const resetDate = new Date(usage.monthStart);
-  resetDate.setMonth(resetDate.getMonth() + 1);
-  const resetLabel = resetDate.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
+  const vm = await getDashboard({
+    userId: user.id,
+    userEmail: user.email,
+    filter,
+    now,
   });
 
-  const failed =
-    (countsByStatus.FAILED ?? 0) + (countsByStatus.PARTIALLY_PUBLISHED ?? 0);
-  const publishing = countsByStatus.PUBLISHING ?? 0;
-
-  // The page opens the way a person would: the month's rhythm in one
-  // sentence. It deliberately never names the next post's time — the
-  // block below owns that, and saying it twice is what made the old
-  // dashboard read like a machine reciting its own state.
-  const nextPost = upcomingPosts[0] ?? null;
-  const openingLine =
-    published > 0 && scheduled > 0
-      ? `${published} ${published === 1 ? "post" : "posts"} published this month, ${scheduled} still lined up.`
-      : published > 0
-        ? `${published} ${published === 1 ? "post" : "posts"} published this month. Nothing scheduled right now.`
-        : scheduled > 0
-          ? `Nothing has gone out this month yet — ${scheduled} ${scheduled === 1 ? "post is" : "posts are"} lined up.`
-          : drafts > 0
-            ? `${drafts} ${drafts === 1 ? "draft is" : "drafts are"} waiting — pick one up whenever you're ready.`
-            : "Nothing scheduled yet. Write your first post whenever you like.";
-
-  // Twelve near-empty bars and a one-segment donut are ceremony, not
-  // insight: the charts only earn their place once there is history.
-  const hasHistoryWorthCharting = totalPosts >= 3;
-  const weeks = bucketWeeks(recentActivity, 12, now);
-  const platformSummary = summarizePlatforms(
-    targetStats.map((group) => ({
-      platform: group.platform,
-      status: group.status,
-      count: group._count._all,
-    }))
-  );
-  const platformSuccess = new Map(
-    platformSummary.platforms.map((row) => [row.platform, row])
-  );
-  const pulseByAccount = new Map(
-    accountPulse.map((row) => [row.socialAccountId, row])
-  );
-  const channelRows: ChannelRow[] = [...byPlatform.values()].map((entry) => {
-    const summary = platformSuccess.get(entry.platform);
-    let lastPublished: Date | null = null;
-    for (const account of accounts) {
-      if (account.platform !== entry.platform) continue;
-      const pulse = pulseByAccount.get(account.id);
-      const at = pulse?._max.publishedAt ?? null;
-      if (at && (!lastPublished || at > lastPublished)) lastPublished = at;
-    }
-    return {
-      platform: entry.platform,
-      usernames: entry.usernames,
-      expired: entry.expired,
-      published: summary?.published ?? 0,
-      lastPublishedLabel: lastPublished
-        ? formatRelativeTime(lastPublished, now)
-        : null,
-    };
-  });
-  const insights = buildInsights({
-    expiredCount: expiredAccounts.length,
-    postsLeft: quota.postsLeft,
-  });
-  const segments: OutcomeSegment[] = [
-    { label: "Published", value: published, className: "text-primary", dotClassName: "bg-primary" },
-    { label: "Scheduled", value: scheduled + publishing, className: "text-muted-foreground", dotClassName: "bg-muted-foreground/60" },
-    { label: "Drafts", value: drafts, className: "text-muted-foreground/60", dotClassName: "bg-muted-foreground/40" },
-    { label: "Failed", value: failed, className: "text-error", dotClassName: "bg-error" },
-  ];
+  const { q, status: statusFilter, isFiltered } = vm.filter;
+  const {
+    attentionPosts,
+    recentPosts,
+    nextPost,
+    channelRows,
+    insights,
+    weeks,
+    segments,
+    effective,
+    monthlyLimit,
+    displayPostsUsed,
+    usagePercent,
+    resetLabel,
+    quota,
+    openingLine,
+    isOnboarding,
+    hasHistoryWorthCharting,
+  } = vm;
 
   return (
     <AppShell user={user}>
@@ -363,7 +163,7 @@ export default async function DashboardPage({
 
             {insights.length > 0 && <InsightList insights={insights} />}
 
-            {nextPost && <NextUp post={nextPost} now={now} />}
+            {nextPost && <NextUp post={nextPost} now={vm.now} />}
 
             <Section labelledBy="recent-posts-heading">
             <Card size="sm">
