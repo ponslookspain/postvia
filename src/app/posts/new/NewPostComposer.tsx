@@ -34,6 +34,7 @@ import {
 import { waitForMediaRegistration } from "@/lib/media-registration";
 import {
   canSubmitComposer,
+  buildMediaAccept,
   continueEditingFromSaved,
   defaultSelectedAccountIds,
   getFailedPublishActions,
@@ -48,6 +49,7 @@ import {
 } from "@/lib/composer-media";
 import { createSingleFlight, newOperationId } from "@/lib/idempotency";
 import { reportError } from "@/lib/diagnostics";
+import { getEffectiveMediaConstraints } from "@/lib/platforms/overrides";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -322,6 +324,16 @@ export default function NewPostComposer({
   const selectedAccounts = accounts.filter((account) =>
     selectedAccountIds.includes(account.id)
   );
+  // Platform-aware media gating: effective constraints for the current
+  // selection (null = global-only, e.g. empty selection). Existing media
+  // is never removed — incompatibility keeps surfacing through the
+  // existing preview validation + disabled submit; only new adds are
+  // gated, and the gate recomputes reactively on every selection change.
+  const effectiveMedia = getEffectiveMediaConstraints(
+    selectedAccounts.map((account) => account.platform)
+  );
+  const effectiveMaxMedia = effectiveMedia?.maxItems ?? MAX_MEDIA;
+  const mediaAccept = buildMediaAccept(effectiveMedia?.mimeTypes ?? null);
   const platform: Platform = selectedAccounts[0]?.platform ?? "THREADS";
   const charCount = countCharacters(text);
   const previews = buildComposerPreviews(
@@ -616,9 +628,14 @@ export default function NewPostComposer({
     const plan = planMediaAdd({
       files,
       existingCount: media.length,
-      maxMedia: MAX_MEDIA,
+      maxMedia: effectiveMaxMedia,
       selectedAccountIds,
       accounts,
+      effective: effectiveMedia ?? undefined,
+      existingMedia: media.map((item) => ({
+        type: item.kind,
+        mimeType: item.file.type,
+      })),
     });
     for (const item of plan.rejected) {
       toast.add({
@@ -633,7 +650,7 @@ export default function NewPostComposer({
     if (plan.limitExceeded) {
       toast.add({
         title: "Too many files",
-        description: `You can attach up to ${MAX_MEDIA} files per post.`,
+        description: `You can attach up to ${effectiveMaxMedia} file${effectiveMaxMedia === 1 ? "" : "s"} per post.`,
         type: "warning",
       });
       return;
@@ -662,11 +679,11 @@ export default function NewPostComposer({
     setMedia((prev) => {
       // Backstop for a same-tick double submit: never exceed the limit,
       // and revoke the just-created URLs when rejecting.
-      if (prev.length + pending.length > MAX_MEDIA) {
+      if (prev.length + pending.length > effectiveMaxMedia) {
         for (const item of pending) URL.revokeObjectURL(item.previewUrl);
         toast.add({
           title: "Too many files",
-          description: `You can attach up to ${MAX_MEDIA} files per post.`,
+          description: `You can attach up to ${effectiveMaxMedia} file${effectiveMaxMedia === 1 ? "" : "s"} per post.`,
           type: "warning",
         });
         return prev;
@@ -1324,7 +1341,8 @@ export default function NewPostComposer({
                 (preview) => `${preview.label} (${preview.maxLength})`
               )}
             media={media}
-            maxMedia={MAX_MEDIA}
+            maxMedia={effectiveMaxMedia}
+            accept={mediaAccept}
             disabled={saving || publishing || scheduling}
             mediaUploadNote={mediaUploadNote}
             canRetry={savedId !== null}

@@ -33,6 +33,7 @@ export function ComposerCard({
   onAddFiles,
   onRemove,
   onRetry,
+  accept,
 }: {
   text: string;
   onTextChange: (value: string) => void;
@@ -47,6 +48,7 @@ export function ComposerCard({
   onAddFiles: (files: File[]) => void;
   onRemove: (key: string) => void;
   onRetry: (key: string) => void;
+  accept?: string;
 }) {
   return (
     <Card>
@@ -108,6 +110,7 @@ export function ComposerCard({
           onAddFiles={onAddFiles}
           onRemove={onRemove}
           onRetry={onRetry}
+          accept={accept}
         />
       </CardContent>
     </Card>

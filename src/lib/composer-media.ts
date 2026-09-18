@@ -1,6 +1,12 @@
 import { validateMediaInput, type MediaKind } from "@/lib/media";
 import type { PlanId } from "@/lib/plans";
 import { TIKTOK_PHOTO_MAX_BYTES } from "@/domain/social/tiktok-photo-limits";
+import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
+import {
+  validateTargetMedia,
+  type EffectiveMediaConstraints,
+  type ValidatableMediaItem,
+} from "@/lib/platforms/overrides";
 
 /**
  * Stage A helpers for the new-post composer. Pure functions only — no DOM,
@@ -50,14 +56,43 @@ export function planMediaAdd(args: {
   maxMedia: number;
   selectedAccountIds: readonly string[];
   accounts: readonly { id: string; platform: string }[];
+  /**
+   * Platform-aware add gate. Absent = legacy global-only behavior
+   * (byte-for-byte unchanged). Present = additionally enforce the
+   * effective count and the structural per-platform rules (kind, MIME,
+   * mixing, single-video) via the same `validateTargetMedia` the server
+   * uses — size-free by design (size violations keep surfacing on the
+   * preview/upload layer).
+   */
+  effective?: EffectiveMediaConstraints;
+  /** Existing media for mixing/multiple-video checks (size-free). */
+  existingMedia?: readonly ValidatableMediaItem[];
 }): MediaAddPlan {
   const accepted: { file: MediaFileLike; kind: MediaKind }[] = [];
+  // Size-free mirror of the accepted set for structural platform checks
+  // (kind/MIME/mixing/count only — never byte caps).
+  const acceptedItems: ValidatableMediaItem[] = [];
   const rejected: { name: string; error: string }[] = [];
   const tiktokSelected = args.accounts.some(
     (account) =>
       account.platform === "TIKTOK" &&
       args.selectedAccountIds.includes(account.id)
   );
+  const effectivePlatforms = args.effective
+    ? [
+        ...new Set(
+          args.accounts
+            .filter((account) =>
+              args.selectedAccountIds.includes(account.id)
+            )
+            .map((account) => account.platform)
+            .filter((platform) => {
+              const caps = getPlatformCapabilities(platform as never);
+              return Boolean(caps) && caps.implemented;
+            })
+        ),
+      ]
+    : [];
   for (const file of args.files) {
     const validation = validateMediaInput(file.type, file.size);
     if (!validation.ok) {
@@ -67,7 +102,31 @@ export function planMediaAdd(args: {
       });
       continue;
     }
+    if (args.effective) {
+      const candidate: ValidatableMediaItem = {
+        type: validation.kind,
+        mimeType: file.type,
+      };
+      const current: readonly ValidatableMediaItem[] = [
+        ...(args.existingMedia ?? []),
+        ...acceptedItems,
+        candidate,
+      ];
+      const blocker = effectivePlatforms
+        .map((platform) =>
+          validateTargetMedia(
+            getPlatformCapabilities(platform as never),
+            current
+          )
+        )
+        .find((verdict) => !verdict.ok);
+      if (blocker && !blocker.ok) {
+        rejected.push({ name: file.name, error: blocker.error });
+        continue;
+      }
+    }
     accepted.push({ file, kind: validation.kind });
+    acceptedItems.push({ type: validation.kind, mimeType: file.type });
   }
   if (accepted.length === 0) {
     return {
@@ -77,7 +136,11 @@ export function planMediaAdd(args: {
       deselectAccountIds: [],
     };
   }
-  if (args.existingCount + accepted.length > args.maxMedia) {
+  const limit = Math.min(
+    args.maxMedia,
+    args.effective?.maxItems ?? args.maxMedia
+  );
+  if (args.existingCount + accepted.length > limit) {
     return {
       accepted,
       rejected,
@@ -218,6 +281,50 @@ function withTiktokSizeHint(
 
 /** Upload parallelism: faster batches without hammering the webhook. */
 export const MEDIA_UPLOAD_CONCURRENCY = 2;
+
+/**
+ * Global picker hint (UX only — never a validation boundary). Used when
+ * no effective platform intersection applies (empty selection or stubs).
+ */
+export const GLOBAL_MEDIA_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.mp4,.m4v,.webm,.mov";
+
+/** Canonical display order for the picker hint (MIME, then extensions). */
+const ACCEPT_MIME_ORDER = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+] as const;
+
+const ACCEPT_EXTENSIONS: Record<string, string[]> = {
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/png": [".png"],
+  "image/webp": [".webp"],
+  "image/gif": [".gif"],
+  "video/mp4": [".mp4", ".m4v"],
+  "video/webm": [".webm"],
+  "video/quicktime": [".mov"],
+};
+
+/**
+ * Build the file-picker `accept` hint from an effective MIME
+ * intersection. Falls back to the global hint when unconstrained or
+ * when the intersection cannot be represented — per-target validation
+ * still rejects incompatible files.
+ */
+export function buildMediaAccept(mimeTypes: readonly string[] | null): string {
+  if (!mimeTypes) return GLOBAL_MEDIA_ACCEPT;
+  const mimes = ACCEPT_MIME_ORDER.filter((mime) => mimeTypes.includes(mime));
+  if (mimes.length === 0) return GLOBAL_MEDIA_ACCEPT;
+  return [
+    ...mimes,
+    ...mimes.flatMap((mime) => ACCEPT_EXTENSIONS[mime] ?? []),
+  ].join(",");
+}
 
 /**
  * Worker-pool map with a hard concurrency cap. Results keep input order;

@@ -1,5 +1,10 @@
 import type { Platform } from "@prisma/client";
-import { isMediaKind, type MediaKind } from "../media/policy";
+import {
+  isMediaKind,
+  MAX_MEDIA_PER_POST,
+  MEDIA_LIMITS,
+  type MediaKind,
+} from "../media/policy";
 import {
   getPlatformCapabilities,
   type CapabilityField,
@@ -330,6 +335,135 @@ if (!caps.implemented) {
       }
     }
   return { ok: true };
+}
+
+/**
+ * Media constraints shared by every selected platform, derived from the
+ * capability registry (not a second source of truth — a view over it).
+ *
+ * Postvia publishes ONE common media set to all targets of a post, so a
+ * file is addable only when it satisfies EVERY selected implemented
+ * platform: counts take the minimum, MIME types the intersection, and
+ * the mixing/multiple-video flags the AND. Callers use this for UX
+ * gating (add button, counter, picker hint) only — server validation
+ * (`validateTargetMedia` per target) stays authoritative, and file size
+ * is deliberately NOT part of the add gate (size violations keep
+ * surfacing on the preview/upload layer).
+ */
+export type EffectiveMediaConstraints = {
+  /** Minimum `maxItems` across the selection, clamped to the global upload ceiling. */
+  maxItems: number;
+  /**
+   * MIME intersection across the selection. `null` means unconstrained
+   * (fail-safe: keep the global picker); per-target validation still
+   * rejects incompatible files.
+   */
+  mimeTypes: readonly string[] | null;
+  /** True when every selected platform accepts images / videos. */
+  allowImage: boolean;
+  allowVideo: boolean;
+  /** AND across the selection (matches `validateTargetMedia` structure). */
+  supportsMixedMedia: boolean;
+  supportsMultipleVideos: boolean;
+  /**
+   * Per-kind byte caps stricter than global, where any selected platform
+   * defines them. Informational for the preview layer — the add gate
+   * ignores size by design.
+   */
+  maxFileSizeBytes?: {
+    image?: number;
+    video?: number;
+  };
+  /** Implemented platforms the constraints were derived from. */
+  platforms: readonly Platform[];
+};
+
+/**
+ * Derive add-gate constraints for a multi-platform selection. Returns
+ * `null` when no implemented platform is selected (empty selection or
+ * stubs only) — callers then keep the global-only behavior.
+ */
+export function getEffectiveMediaConstraints(
+  platforms: readonly Platform[]
+): EffectiveMediaConstraints | null {
+  const caps = platforms
+    .map((platform) => getPlatformCapabilities(platform))
+    .filter(
+      (entry): entry is PlatformCapabilities =>
+        Boolean(entry) && entry.implemented
+    );
+  if (caps.length === 0) return null;
+
+  const maxItems = Math.min(
+    MAX_MEDIA_PER_POST,
+    ...caps.map((entry) => entry.media.maxItems)
+  );
+
+  // A platform without its own list accepts the global set.
+  const globalMimes: readonly string[] = [
+    ...MEDIA_LIMITS.IMAGE.mimeTypes,
+    ...MEDIA_LIMITS.VIDEO.mimeTypes,
+  ];
+  // Seed with the global set (every registry MIME is a subset of it),
+  // so the result is the exact intersection across the selection.
+  const narrowed = caps
+    .map((entry) => entry.media.mimeTypes ?? globalMimes)
+    .reduce<readonly string[]>(
+      (intersection, list) =>
+        intersection.filter((mime) => list.includes(mime)),
+      globalMimes
+    );
+  // Empty intersection must never brick the picker: fall back to the
+  // global hint while per-target validation keeps rejecting mismatches.
+  const mimeTypes = narrowed.length > 0 ? narrowed : null;
+
+  const requiredKinds = [
+    ...new Set(
+      caps
+        .map((entry) => entry.media.requiredKind)
+        .filter((kind): kind is MediaKind => kind !== undefined)
+    ),
+  ];
+  const kindsAgree = requiredKinds.length <= 1;
+  const allowImage =
+    kindsAgree &&
+    (requiredKinds[0] === undefined || requiredKinds[0] === "IMAGE") &&
+    caps.every((entry) => supportsMediaKind(entry, "IMAGE"));
+  const allowVideo =
+    kindsAgree &&
+    (requiredKinds[0] === undefined || requiredKinds[0] === "VIDEO") &&
+    caps.every((entry) => supportsMediaKind(entry, "VIDEO"));
+
+  const imageCap = Math.min(
+    ...caps
+      .map((entry) => entry.media.maxFileSizeBytes?.image)
+      .filter((cap): cap is number => cap !== undefined)
+  );
+  const videoCap = Math.min(
+    ...caps
+      .map((entry) => entry.media.maxFileSizeBytes?.video)
+      .filter((cap): cap is number => cap !== undefined)
+  );
+
+  return {
+    maxItems,
+    mimeTypes,
+    allowImage,
+    allowVideo,
+    supportsMixedMedia: caps.every((entry) => entry.media.supportsMixedMedia),
+    supportsMultipleVideos: caps.every(
+      (entry) => entry.media.supportsMultipleVideos
+    ),
+    ...(Number.isFinite(imageCap) || Number.isFinite(videoCap)
+      ? {
+          maxFileSizeBytes: {
+            ...(Number.isFinite(imageCap) ? { image: imageCap } : {}),
+            ...(Number.isFinite(videoCap) ? { video: videoCap } : {}),
+          },
+        }
+      : {}),
+    platforms: caps.map((entry) => entry.platform),
+  };
 }
 
 /**
