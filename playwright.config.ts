@@ -21,6 +21,14 @@ const basePort = (() => {
     return "3100";
   }
 })();
+// Browser UI auth origin for the booted server (see webServer.env below).
+const e2eOrigin = (() => {
+  try {
+    return new URL(BASE_URL).origin;
+  } catch {
+    return "http://127.0.0.1:3100";
+  }
+})();
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -57,6 +65,16 @@ export default defineConfig({
       // the default is Resend-off like CI; an ambient RESEND_API_KEY passes
       // through untouched for explicit OTP runs (see docs/e2e.md).
       RESEND_API_KEY: process.env.RESEND_API_KEY ?? "",
+      // Browser UI auth (authClient) sends Origin + Sec-Fetch headers, so
+      // Better Auth force-validates the origin even without cookies. The
+      // hardcoded allowlist covers localhost:3000 but not the E2E base
+      // (http://127.0.0.1:3100): without this, UI sign-in/sign-out die with
+      // 403 INVALID_ORIGIN while API-authenticated specs pass — the exact
+      // split that broke auth.login and account.delete locally. Same origin
+      // the CI `e2e` job trusts; an ambient value is preserved (appended).
+      BETTER_AUTH_TRUSTED_ORIGINS: [e2eOrigin, process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? ""]
+        .filter(Boolean)
+        .join(","),
     },
   },
 });
