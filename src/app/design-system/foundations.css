@@ -181,10 +181,12 @@
 	--moss-9: oklch(0.56 0.13 155);
 	--moss-11: oklch(0.5 0.12 155);
 
-	/* harvest — warning amber */
+	/* harvest — warning amber.
+	   `harvest-9` is gated on computed WCAG contrast (Group D): 4.60 for
+	   the dark warning ink on solid, above the previous #C58A24 (4.50). */
 	--harvest-3: oklch(0.955 0.035 80);
 	--harvest-7: oklch(0.75 0.1 80);
-	--harvest-9: oklch(0.66 0.13 80);
+	--harvest-9: oklch(0.68 0.12 80);
 	--harvest-11: oklch(0.52 0.1 80);
 
 	/* clay — error red */

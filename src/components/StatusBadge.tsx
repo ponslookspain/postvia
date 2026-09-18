@@ -65,13 +65,13 @@ export function StatusBadge({
     <Badge
       variant={style.variant}
       className={cn(
-        status === "SCHEDULED" && "border-info/30 bg-info/10",
-        status === "PUBLISHED" && "border-success/30 bg-success/10",
+        status === "SCHEDULED" && "border-info-border bg-info-accent",
+        status === "PUBLISHED" && "border-success-border bg-success-accent",
         status === "PUBLISHING" &&
-          "border-warning/30 bg-warning/10",
+          "border-warning-border bg-warning-accent",
         status === "PARTIALLY_PUBLISHED" &&
-          "border-warning/30 bg-warning/10",
-        status === "FAILED" && "border-error/30 bg-error-accent",
+          "border-warning-border bg-warning-accent",
+        status === "FAILED" && "border-error-border bg-error-accent",
         className
       )}
     >

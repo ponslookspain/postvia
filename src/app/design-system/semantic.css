@@ -109,46 +109,49 @@
 	/* —— Status ———————————————————————————————————————————————————————————
 	   Calm modern status hues in dots and badges only, never as page
 	   decoration. `info` IS the brand solid (`signal-9`) — it marks routine
-	   states like SCHEDULED, not alerts; its soft/border/text steps are
-	   independently tuned `sky` tints (Group D).
+	   states like SCHEDULED, not alerts; its soft/border steps are
+	   independently tuned `sky` tints. Each solid is a tonal step 9
+	   (`moss` / `harvest` / `clay`), each running-text ink a step 11.
 	   Each `-foreground` is the legible ink on top of its filled hue. */
-	--success: #2f8f5b;
+	--success: var(--moss-9);
 	--success-foreground: #ffffff;
-	--warning: #c58a24;
+	--warning: var(--harvest-9);
 	--warning-foreground: #3d2c0e;
-	--error: #c84b4b;
+	--error: var(--clay-9);
 	--error-foreground: #ffffff;
 	--info: var(--signal-9);
 	--info-foreground: #ffffff;
 
 	/* —— Status sub-steps —————————————————————————————————————————————————
-	   Fill/focus/border/hover chrome for status-coloured controls (e.g. a
-	   status `Button` variant). Derived from the calm status hues above via
-	   `color-mix` against the current surface, so light/dark stay tonal and
-	   no second copy of any colour exists. The `*-text` inks are the ONLY
-	   status colours allowed for running text: the base hues are fills and
-	   dots (exempt from text contrast) and fail 4.5:1 as copy on light
-	   surfaces (measured 2026-09). */
-	--success-text: #26774a;
-	--warning-text: #896119;
-	--error-text: #b04545;
-	--info-text: #2569b6;
-	--success-accent: color-mix(in srgb, var(--success) 12%, var(--card));
-	--success-focus: color-mix(in srgb, var(--success) 18%, var(--card));
-	--success-border: color-mix(in srgb, var(--success) 38%, var(--border));
-	--success-hover: color-mix(in srgb, var(--success) 88%, black);
-	--warning-accent: color-mix(in srgb, var(--warning) 14%, var(--card));
-	--warning-focus: color-mix(in srgb, var(--warning) 20%, var(--card));
-	--warning-border: color-mix(in srgb, var(--warning) 42%, var(--border));
-	--warning-hover: color-mix(in srgb, var(--warning) 88%, black);
-	--error-accent: color-mix(in srgb, var(--error) 12%, var(--card));
-	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
-	--error-border: color-mix(in srgb, var(--error) 38%, var(--border));
-	--error-hover: color-mix(in srgb, var(--error) 88%, black);
+	   Hand-tuned tonal steps, one per theme — no `color-mix` derivation, so
+	   dark values are optically tuned rather than mirrored. `-accent` is
+	   the soft surface (step 3) and `-border` the status edge (step 7);
+	   `-focus` / `-hover` stay `color-mix`-derived until Phase 5 cleanup.
+	   The `*-text` inks (step 11) are the ONLY status colours allowed for
+	   running text: the base solids are fills and dots (exempt from text
+	   contrast). Computed WCAG gates (light, on canvas): success-text
+	   4.98, warning-text 4.91, error-text 5.20, info-text 5.83; white on
+	   success-solid 4.37, warning ink on solid 4.60, white on error-solid
+	   4.81 — each at or above its pre-Phase-2 value. */
+	--success-text: var(--moss-11);
+	--warning-text: var(--harvest-11);
+	--error-text: var(--clay-11);
 	--info-text: var(--signal-11);
-	--info-accent: color-mix(in srgb, var(--info) 12%, var(--card));
+	--success-accent: var(--moss-3);
+	--success-focus: color-mix(in srgb, var(--success) 18%, var(--card));
+	--success-border: var(--moss-7);
+	--success-hover: color-mix(in srgb, var(--success) 88%, black);
+	--warning-accent: var(--harvest-3);
+	--warning-focus: color-mix(in srgb, var(--warning) 20%, var(--card));
+	--warning-border: var(--harvest-7);
+	--warning-hover: color-mix(in srgb, var(--warning) 88%, black);
+	--error-accent: var(--clay-3);
+	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
+	--error-border: var(--clay-7);
+	--error-hover: color-mix(in srgb, var(--error) 88%, black);
+	--info-accent: var(--sky-3);
 	--info-focus: color-mix(in srgb, var(--info) 18%, var(--card));
-	--info-border: color-mix(in srgb, var(--info) 38%, var(--border));
+	--info-border: var(--sky-7);
 	--info-hover: color-mix(in srgb, var(--info) 88%, black);
 
 	/* —— Overlay ——————————————————————————————————————————————————————————
@@ -212,20 +215,17 @@
 	--primary-foreground: #0f0f0e;
 
 	/* Calm dark status hues — legible on warm charcoal. `-foreground`
-	   inks stay legible on either canvas. Sub-steps derive from the hues
-	   above via `color-mix` (see `:root`), so they follow automatically.
-	   Text inks: error needs a lighter step to hold 4.5:1 as copy
-	   (measured 2026-09); success/warning/info already hold it. */
-	--success: #69b887;
+	   inks stay legible on either canvas. Soft/border/solid/text steps are
+	   the hand-tuned tonal ramps from `:root` (same aliases, dark values),
+	   not mirrored derivations. Success/warning text reuse their solids;
+	   error text is its own lighter step. */
 	--success-foreground: #102217;
-	--warning: #d6a64a;
 	--warning-foreground: #261d0d;
-	--error: #e06a6a;
 	--error-foreground: #260f0f;
 	--info-foreground: #0f0f0e;
 	--success-text: var(--success);
 	--warning-text: var(--warning);
-	--error-text: #e78282;
+	--error-text: var(--clay-11);
 
 	--sidebar: #1f1e1d;
 	--sidebar-foreground: #e6e5df;
