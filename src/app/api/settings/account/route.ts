@@ -9,20 +9,45 @@ import { deleteBlobs } from "@/lib/blob";
 import { cancelStripeSubscriptionNow, getStripeClient } from "@/lib/stripe";
 import {
   emailSignal,
+  gateWriteRequest,
   getAbusePepper,
   googleSignal,
   socialSignal,
+  WRITE_LIMIT_ACCOUNT_DELETE,
   type SignalInput,
 } from "@/lib/abuse";
-import { reportError } from "@/lib/diagnostics";
+import { logDiagnostic, reportError } from "@/lib/diagnostics";
+import { runAccountDeleteFlow } from "@/lib/delete-resources";
+import { decryptToken } from "@/lib/social-token-crypto";
 
 const CONFIRMATION_PHRASE = "delete";
 
 export async function DELETE(request: NextRequest) {
+  // Hoisted so the failure report below can name the user without re-reading
+  // the session on an already-failing path.
+  let userId: string | undefined;
   try {
     const user = await getApiUser();
+    userId = user?.id;
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Destructive + irreversible: persistent gate on top of session +
+    // exact confirmation phrase, so a stolen-session burst cannot be
+    // scripted into rapid re-creation/deletion loops.
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "account-delete",
+        userMax: WRITE_LIMIT_ACCOUNT_DELETE,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     const body = await request.json().catch(() => null);
@@ -36,8 +61,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Explicit select. The access token IS needed here (remote revocation
+    // below), but the refresh token and the rest of the row are not — the
+    // narrower the credential surface on any given path, the fewer places a
+    // future change can leak one.
     const accounts = await prisma.socialAccount.findMany({
       where: { userId: user.id },
+      select: {
+        id: true,
+        platform: true,
+        externalId: true,
+        accessToken: true,
+      },
     });
 
     const googleLinks = await prisma.account.findMany({
@@ -143,57 +178,91 @@ export async function DELETE(request: NextRequest) {
     // exposes no revoke endpoint — its call is an honest no-op).
     for (const account of accounts) {
       try {
+        // Providers need the real token, so decrypt at the point of use.
+        // A decryption failure is caught below like any other revocation
+        // failure: best-effort revocation must never block the wipe.
+        const token = decryptToken(account.accessToken);
         if (account.platform === "X") {
-          await new XProvider().revokeToken(account.accessToken);
+          await new XProvider().revokeToken(token);
         } else if (account.platform === "THREADS") {
-          await new ThreadsProvider().revokeToken(account.accessToken);
+          await new ThreadsProvider().revokeToken(token);
         } else if (account.platform === "TIKTOK") {
-          await new TiktokProvider().revokeToken(account.accessToken);
+          await new TiktokProvider().revokeToken(token);
         } else if (account.platform === "INSTAGRAM") {
-          await new InstagramProvider().revokeToken(
-            account.accessToken,
-            account.externalId
-          );
+          await new InstagramProvider().revokeToken(token, account.externalId);
         }
       } catch {
         // Best-effort: revocation failure must not block account deletion
       }
     }
 
-    try {
-      await deleteBlobs(mediaToDelete.map((m) => m.pathname));
-    } catch {
+    // DB-first, matching the policy in delete-resources.ts. Deleting the
+    // bytes before the transaction (the previous order) left the user alive
+    // with Media rows pointing at bytes that no longer existed whenever the
+    // transaction failed — unrecoverable. This way a failed transaction
+    // removes nothing, and a failed blob delete leaves sweepable orphans.
+    const outcome = await runAccountDeleteFlow({
+      userId: user.id,
+      mediaPathnames: mediaToDelete.map((m) => m.pathname),
+      deleteAccountRows: async () => {
+        await prisma.$transaction(
+          async (tx) => {
+            await tx.postTarget.deleteMany({
+              where: { post: { userId: user.id } },
+            });
+            await tx.media.deleteMany({ where: { userId: user.id } });
+            await tx.post.deleteMany({ where: { userId: user.id } });
+            await tx.socialAccount.deleteMany({ where: { userId: user.id } });
+            await tx.session.deleteMany({ where: { userId: user.id } });
+            await tx.account.deleteMany({ where: { userId: user.id } });
+            await tx.userPreferences.deleteMany({ where: { userId: user.id } });
+            if (tombstones.length > 0) {
+              await tx.abuseTombstone.createMany({
+                data: tombstones.map((tomb) => ({
+                  kind: tomb.kind,
+                  valueHash: tomb.valueHash,
+                  identityId: tombstoneIdentityId,
+                })),
+                skipDuplicates: true,
+              });
+            }
+            await tx.user.delete({ where: { id: user.id } });
+          },
+          {
+            // A heavy account (many posts/targets) can exceed the 5s default
+            // and abort mid-wipe. The work is all local DDL-free deletes, so
+            // a longer ceiling is safe — and it now runs BEFORE any network
+            // call, so no connection is parked on storage latency.
+            timeout: 20_000,
+            maxWait: 10_000,
+          }
+        );
+      },
+      deleteBlobs,
+    });
+
+    if (outcome.outcome === "failed") {
+      // Nothing was removed; the account is intact and the user can retry.
       return NextResponse.json(
-        { error: "Failed to delete media" },
+        { error: "Failed to delete account" },
         { status: 500 }
       );
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.postTarget.deleteMany({
-        where: { post: { userId: user.id } },
+    if (outcome.outcome === "deleted-with-orphans") {
+      // The account IS gone — that is what the user asked for. The leftover
+      // bytes carry no rows, so the capped orphan sweep reclaims them.
+      // Already reported with context inside the flow.
+      logDiagnostic("account", "account deleted with sweepable orphan blobs", {
+        orphanCount: outcome.orphanPathnames.length,
       });
-      await tx.media.deleteMany({ where: { userId: user.id } });
-      await tx.post.deleteMany({ where: { userId: user.id } });
-      await tx.socialAccount.deleteMany({ where: { userId: user.id } });
-      await tx.session.deleteMany({ where: { userId: user.id } });
-      await tx.account.deleteMany({ where: { userId: user.id } });
-      await tx.userPreferences.deleteMany({ where: { userId: user.id } });
-      if (tombstones.length > 0) {
-        await tx.abuseTombstone.createMany({
-          data: tombstones.map((tomb) => ({
-            kind: tomb.kind,
-            valueHash: tomb.valueHash,
-            identityId: tombstoneIdentityId,
-          })),
-          skipDuplicates: true,
-        });
-      }
-      await tx.user.delete({ where: { id: user.id } });
-    });
+    }
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    // Never a bare catch: a silent 500 here once hid a real failure for the
+    // most destructive operation in the product.
+    reportError("account", "account delete failed", error, { userId });
     return NextResponse.json(
       { error: "Failed to delete account" },
       { status: 500 }

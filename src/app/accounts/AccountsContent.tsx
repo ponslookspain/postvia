@@ -9,7 +9,12 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusDot } from "@/components/StatusBadge";
 import { ErrorBlock } from "@/components/StateBlock";
 import { UpgradeCta } from "@/components/billing/BillingWidgets";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -283,8 +288,10 @@ export default function AccountsContent({
         />
       ) : message ? (
         <Alert color="neutral" variant="outline" className="mb-6">
-          <AlertTitle>Accounts</AlertTitle>
-          <AlertDescription>{message.text}</AlertDescription>
+          <AlertContent>
+            <AlertTitle>Accounts</AlertTitle>
+            <AlertDescription>{message.text}</AlertDescription>
+          </AlertContent>
         </Alert>
       ) : null}
 
@@ -300,7 +307,7 @@ export default function AccountsContent({
                   <div className="flex items-center gap-3">
                     <span
                       aria-hidden="true"
-                      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-accent text-primary-text"
+                      className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-primary"
                     >
                       <PlatformIcon
                         platform={config.platform}
@@ -339,7 +346,7 @@ export default function AccountsContent({
                         return (
                           <li
                             key={account.id}
-                            className="flex items-center gap-3 rounded-lg border border-soft bg-fill1 px-3 py-2"
+                            className="flex items-center gap-3 rounded-lg bg-muted px-3 py-2"
                           >
                             <Avatar className="size-8 shrink-0">
                               <AvatarFallback>
@@ -440,7 +447,7 @@ export default function AccountsContent({
           if (!open) setPendingDisconnect(null);
         }}
       >
-        <DialogContent>
+        <DialogContent data-testid="disconnect-dialog">
           <DialogHeader>
             <DialogTitle>Disconnect account?</DialogTitle>
             <DialogDescription>
@@ -460,6 +467,7 @@ export default function AccountsContent({
               variant="destructive"
               onClick={() => void confirmPendingDisconnect()}
               disabled={disconnecting !== null}
+              data-testid="confirm-disconnect"
             >
               {disconnecting !== null && <Spinner data-icon="inline-start" />}
               Disconnect

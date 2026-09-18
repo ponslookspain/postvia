@@ -1,8 +1,20 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
 
 // Local class-name merger (replaces the `cn` package): conditional join
 // via clsx, Tailwind conflict resolution via tailwind-merge.
+//
+// Custom DS font-size tokens (foundations.css: --text-label/meta/prose/micro)
+// must be registered in the font-size group: tailwind-merge's default config
+// classifies unknown text-* classes as text-color, which silently drops the
+// size class whenever it is merged with a text color via cn().
+const twMerge = extendTailwindMerge({
+	extend: {
+		classGroups: {
+			"font-size": ["text-label", "text-meta", "text-prose", "text-micro"],
+		},
+	},
+});
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

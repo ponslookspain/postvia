@@ -7,7 +7,12 @@ import { TriangleAlertIcon } from "lucide-react";
 import { GoogleButton } from "@/components/GoogleButton";
 import { AuthShell } from "@/components/AuthShell";
 import type { PlanId } from "@/lib/plans";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import {
   OTP_RATE_LIMITED_CODE,
   formatOtpRateLimitMessage,
@@ -85,14 +90,16 @@ export function SignupForm({
         {error && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>
-              {rateLimited ? "Too many code requests" : "Something went wrong"}
-            </AlertTitle>
-            <AlertDescription aria-live="polite">
-              {rateLimited && retryRemaining > 0
-                ? formatOtpRateLimitMessage(retryRemaining)
-                : error}
-            </AlertDescription>
+            <AlertContent>
+              <AlertTitle>
+                {rateLimited ? "Too many code requests" : "Something went wrong"}
+              </AlertTitle>
+              <AlertDescription aria-live="polite">
+                {rateLimited && retryRemaining > 0
+                  ? formatOtpRateLimitMessage(retryRemaining)
+                  : error}
+              </AlertDescription>
+            </AlertContent>
           </Alert>
         )}
 

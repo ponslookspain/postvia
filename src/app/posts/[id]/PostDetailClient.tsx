@@ -20,7 +20,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -499,8 +504,10 @@ export default function PostDetailPage({
       {post.status === "FAILED" && post.errorMessage && (
         <Alert color="error" variant="outline" className="mb-6">
           <TriangleAlertIcon />
-          <AlertTitle>Publication failed</AlertTitle>
-          <AlertDescription>{post.errorMessage}</AlertDescription>
+          <AlertContent>
+            <AlertTitle>Publication failed</AlertTitle>
+            <AlertDescription>{post.errorMessage}</AlertDescription>
+          </AlertContent>
         </Alert>
       )}
 
@@ -568,7 +575,7 @@ export default function PostDetailPage({
                       onRemove={(mediaId) => void handleDeleteMedia(mediaId)}
                     />
                   )}
-                  <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                  <p className="text-prose leading-relaxed break-words whitespace-pre-wrap">
                     {post.text}
                   </p>
                   {post.status === "DRAFT" && (
@@ -621,7 +628,7 @@ export default function PostDetailPage({
                             : ""}
                         </p>
                         {targetItem.errorMessage && (
-                          <p className="truncate text-xs text-error-text">
+                          <p className="truncate text-xs text-error">
                             Couldn&apos;t publish to{" "}
                             {formatPlatformName(targetItem.platform)}.
                           </p>
@@ -832,8 +839,10 @@ export default function PostDetailPage({
             {rescheduleError && (
               <Alert color="error" variant="outline">
                 <TriangleAlertIcon />
-                <AlertTitle>Cannot save time</AlertTitle>
-                <AlertDescription>{rescheduleError}</AlertDescription>
+                <AlertContent>
+                  <AlertTitle>Cannot save time</AlertTitle>
+                  <AlertDescription>{rescheduleError}</AlertDescription>
+                </AlertContent>
               </Alert>
             )}
           </FieldGroup>
@@ -867,7 +876,7 @@ export default function PostDetailPage({
       </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent data-testid="delete-post-dialog">
           <DialogHeader>
             <DialogTitle>Delete this post?</DialogTitle>
             <DialogDescription>
@@ -887,6 +896,7 @@ export default function PostDetailPage({
               variant="destructive"
               onClick={() => void handleDelete()}
               disabled={deleting}
+              data-testid="confirm-delete-post"
             >
               {deleting && <Spinner data-icon="inline-start" />}
               {deleting ? "Deleting..." : "Delete post"}

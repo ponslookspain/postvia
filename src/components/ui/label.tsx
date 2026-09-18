@@ -8,7 +8,7 @@ function Label({ className, ...props }: LabelProps) {
 	return (
 		<LabelPrimitive.Root
 			className={cn(
-				"peer-disabled:text-fg-disabled peer-has-disabled:text-fg-disabled text-sm font-medium peer-disabled:cursor-not-allowed",
+				"peer-disabled:text-muted-foreground peer-has-disabled:text-muted-foreground text-sm font-medium peer-disabled:cursor-not-allowed",
 				className
 			)}
 			{...props}

@@ -1,6 +1,6 @@
 import type { Instrumentation } from "next";
 import * as Sentry from "@sentry/nextjs";
-import { scrubRequestPath } from "@/lib/diagnostics";
+import { scrubRequestPath } from "@/lib/request-scrub";
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {

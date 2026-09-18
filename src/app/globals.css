@@ -1,271 +1,39 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./utility.css";
+
+/* ============================================================================
+   PostVIA Design System — entry point
+   ----------------------------------------------------------------------------
+   The design system is two files, imported in dependency order. Read them
+   in this order too; `docs/design-tokens.md` is the written companion.
+
+     1. foundations.css     raw scales — colour primitives, typography,
+                            spacing, radius, motion
+     2. semantic.css        CANONICAL PostVIA tokens: background, surface,
+                            panel, foreground, muted, border, primary,
+                            success, warning, error, info, navigation
+
+   `src/components/ui` (and every call site) speaks this vocabulary directly.
+   There is no Radian alias layer any more — `compat-radian.css` was removed
+   once every consumer was migrated onto the names above (see
+   `docs/design-tokens.md`, "Radian removal").
+
+   What stays in this file: the `dark` variant, base-layer resets and the
+   keyframes/reduced-motion rules. No token may be defined here.
+   ========================================================================= */
+@import "./design-system/foundations.css";
+@import "./design-system/semantic.css";
 
 @custom-variant dark (&:is(.dark *));
-
-:root {
-  /* ——— Canonical surfaces & foreground.
-     Values are held on these names (used across pages as
-     bg-background, text-foreground, border-border, ...); the Radian
-     short names (bg, fill1-4, fg-*) alias them in the @theme block. ——— */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  /* Panel surface: a shade off the page, carrying no outline. Blocks are
-     separated by tone, not by a drawn box — see docs/design-system.md.
-     Currently applied on the dashboard; becomes the Card default once the
-     rule is rolled out to the rest of the pages. */
-  --panel: oklch(0.974 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-
-  /* ——— PostVIA brand. Contract decision: brand red (crimson, hue ~19)
-     instead of the Radian default violet-blue (#623DF5). Kept distinct
-     in hue/chroma from --error (hue ~27) so primary actions and error
-     states stay visually separable even though both read as "red". ——— */
-  --primary: oklch(0.58 0.22 19);
-  --primary-foreground: oklch(0.985 0 0);
-
-  /* ——— Canonical status hues.
-     --error holds the value; --destructive is a compat alias for the
-     legacy name still used by pages (variant="destructive",
-     text-destructive, ...). Do not fork new error names.
-     --success/--warning bases stay PostVIA Moss/Honey per contract
-     (dispatch-desk: status hues live only in dots/badges); their
-     sub-tokens map to the Radian emerald/amber palettes below. ——— */
-  --error: oklch(0.577 0.245 27.325);
-  --destructive: var(--error);
-  --success: oklch(0.55 0.15 150);
-  --warning: oklch(0.62 0.15 75);
-  /* Postvia dispatch-desk tokens. One signal color only: signal aliases
-     primary, reserved for scheduled state and primary actions. Status hues
-     appear solely in dots and badges, never as page decoration.
-     Paper #FFFFFF · Wash #F5F5F3 · Line #E6E6E1 · Ink #1A1B1E
-     Signal #2E3BEB · Moss #15803D · Honey #B54708 · Ember #C81E1E */
-  --signal: var(--primary);
-  --signal-foreground: var(--primary-foreground);
-  /* Layout scale (product tokens, not Radian). Pages: narrow 48rem
-     (forms), default 64rem (lists), wide 76rem (calendar, composer).
-     Section rhythm is 2.5rem. */
-  --page-narrow: 48rem;
-  --page-default: 64rem;
-  --page-wide: 76rem;
-  --section-gap: 2.5rem;
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --radius: 0.875rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.58 0.22 19);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-destructive: var(--destructive);
-  --color-error: var(--error);
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-signal: var(--signal);
-  --color-signal-foreground: var(--signal-foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-heading);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-panel: var(--panel);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-/* Radian semantic contract.
-   Canonical source: https://radianui.com/docs/fundamentals/colors.md
-   (bg/fill1-4, fg ramp, border ramp, primary/success/error/warning/info
-   families, elevation, white/black-inverse) + the 17-hue OKLCH palette in
-   utility.css. Values below are confirmed against those docs except where
-   a KNOWN GAP is noted — gaps must be resolved with designer values,
-   never invented ad hoc.
-   Direction:
-     PostVIA value holders (:root above) → Radian names (here) → components.
-   Aliases use var() so the .dark overrides below apply automatically.
-   KNOWN GAPS (no visual change until a designer decides):
-     - primary-hover/border/accent reuse the base/accent/ring instead of
-       hue-matched steps (docs: hover #7655F6, border #9981f8,
-       accent #ECE8FC pastel).
-     - fill2/fill3 collapse to --accent, fill1/fill4 to --muted (docs
-       define four distinct steps: #F9F9FA/#F4F4F6/#E9E9EC/#DEDEE3).
-     - fg-secondary/tertiary/disabled share --muted-foreground.
-     - success/warning bases stay PostVIA Moss/Honey by product decision;
-       only their sub-tokens use the Radian emerald/amber palettes.
-   --color-stroke is intentionally absent: stock Radian does not define
-   it either. chart-* tokens were removed: unused anywhere in src and not
-   part of the Radian color system. */
-@theme {
-  /* primary family → PostVIA signal/indigo */
-  --color-primary-fg: var(--primary-foreground);
-  --color-primary-text: var(--primary);
-  --color-primary-border: var(--primary);
-  --color-primary-hover: var(--primary);
-  --color-primary-accent: var(--accent);
-  --color-primary-focus: var(--ring);
-
-  /* success sub-tokens → Radian emerald palette (base --color-success
-     stays PostVIA, mapped above) */
-  --color-success-fg: var(--color-emerald-fg);
-  --color-success-accent: var(--color-emerald-accent);
-  --color-success-focus: var(--color-emerald-focus);
-  --color-success-border: var(--color-emerald-border);
-  --color-success-hover: var(--color-emerald-hover);
-  --color-success-text: var(--success);
-
-  /* error family → canonical --error + Radian red palette */
-  --color-error-fg: var(--color-red-fg);
-  --color-error-accent: var(--color-red-accent);
-  --color-error-focus: var(--color-red-focus);
-  --color-error-border: var(--color-red-border);
-  --color-error-hover: var(--color-red-hover);
-  --color-error-text: var(--error);
-
-  /* warning sub-tokens → Radian amber palette (base --color-warning
-     stays PostVIA, mapped above) */
-  --color-warning-fg: var(--color-amber-fg);
-  --color-warning-accent: var(--color-amber-accent);
-  --color-warning-focus: var(--color-amber-focus);
-  --color-warning-border: var(--color-amber-border);
-  --color-warning-hover: var(--color-amber-hover);
-  --color-warning-text: var(--warning);
-
-  /* info family → Radian light-blue palette (no PostVIA counterpart) */
-  --color-info: var(--color-light-blue);
-  --color-info-fg: var(--color-light-blue-fg);
-  --color-info-accent: var(--color-light-blue-accent);
-  --color-info-focus: var(--color-light-blue-focus);
-  --color-info-border: var(--color-light-blue-border);
-  --color-info-hover: var(--color-light-blue-hover);
-  --color-info-text: var(--color-light-blue-text);
-
-  /* surfaces → PostVIA */
-  --color-bg: var(--background);
-  --color-fill1: var(--muted);
-  --color-fill2: var(--accent);
-  --color-fill3: var(--accent);
-  --color-fill4: var(--muted);
-  --color-fg: var(--foreground);
-  --color-fg-secondary: var(--muted-foreground);
-  --color-fg-tertiary: var(--muted-foreground);
-  --color-fg-disabled: var(--muted-foreground);
-  --color-fg-inverse: var(--background);
-
-  /* translucent surfaces → mixes of PostVIA ink (recipe mirrors Radian) */
-  --color-alpha: color-mix(in oklch, var(--foreground) 12%, transparent);
-  --color-soft: var(--accent);
-  --color-soft-alpha: color-mix(in oklch, var(--foreground) 8%, transparent);
-  --color-fill1-alpha: color-mix(in oklch, var(--foreground) 4%, transparent);
-  --color-fill2-alpha: color-mix(in oklch, var(--foreground) 8%, transparent);
-  --color-fill3-alpha: color-mix(in oklch, var(--foreground) 12%, transparent);
-  --color-fill4-alpha: color-mix(in oklch, var(--foreground) 16%, transparent);
-
-  /* elevation → PostVIA card surface */
-  --color-elevation-negative: var(--muted);
-  --color-elevation-level1: var(--card);
-  --color-elevation-level2: var(--card);
-
-  /* inverse pair follows the theme (light: white/black, dark: flipped) */
-  --color-white-inverse: var(--background);
-  --color-black-inverse: var(--foreground);
-
-  /* sidebar short names missing from the PostVIA layer above */
-  --color-sidebar-fg: var(--sidebar-foreground);
-  --color-sidebar-accent-fg: var(--sidebar-accent-foreground);
-
-  /* typography compat: Radian --font-body tracks PostVIA sans stack.
-     No webfont added, no visual change. */
-  --font-body: var(--font-sans);
-}
 
 body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
-/* The default border color lives in @layer base below, on purpose: an
+/* The default border colour lives in @layer base below, on purpose: an
    unlayered `* { border-color }` rule outranks every Tailwind utility
    (unlayered styles beat layered ones), which silently disabled every
-   border-* color class in the app. */
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --signal: var(--primary);
-  --signal-foreground: var(--primary-foreground);
-  --success: oklch(0.72 0.15 150);
-  --warning: oklch(0.78 0.13 75);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --panel: oklch(0.185 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.62 0.22 19);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --error: oklch(0.704 0.191 22.216);
-  --destructive: var(--error);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.62 0.22 19);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
+   border-* colour class in the app. */
 
 @layer base {
   * {
@@ -277,13 +45,13 @@ body {
   html {
     @apply font-sans;
   }
-  /* Postvia type scale (Inter body + DM Sans headings, left-aligned):
-     page title 24/32 semibold tight · section title 18/28 medium ·
-     body 14/20 · meta 12/16 muted. Descriptions cap at 68ch.
-     Radian H1-H6/body/label specs: NOT CONFIRMED (typography playground
-     values are not published as text); do not invent a scale here. */
+  /* Type scale: Inter body + DM Sans headings, left-aligned. Page title
+     24/32 semibold tight · section title 18/28 medium · body 14/20 ·
+     meta 12/16 muted. Descriptions cap at `--measure-prose`. The four
+     half-steps between those (10/11/13/15px) are named in
+     foundations.css. */
   ::selection {
-    background: color-mix(in oklch, var(--signal) 18%, transparent);
+    background: color-mix(in oklch, var(--primary) 18%, transparent);
   }
 }
 

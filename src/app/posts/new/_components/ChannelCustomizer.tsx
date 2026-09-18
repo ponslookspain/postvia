@@ -84,11 +84,11 @@ export function ChannelCustomizer({
           return (
             <div key={account.id}>
               {!expanded ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-panel px-3 py-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-muted px-3 py-2">
                   <p className="flex min-w-0 items-center gap-2 text-sm">
                     <span
                       aria-hidden="true"
-                      className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+                      className="flex size-6 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground"
                     >
                       <PlatformIcon
                         platform={account.platform}
@@ -118,7 +118,7 @@ export function ChannelCustomizer({
                     <p className="flex min-w-0 items-center gap-2 text-sm">
                       <span
                         aria-hidden="true"
-                        className="flex size-6 shrink-0 items-center justify-center rounded-md bg-signal/10 text-signal"
+                        className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"
                       >
                         <PlatformIcon
                           platform={account.platform}

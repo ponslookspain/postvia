@@ -32,6 +32,11 @@ const RECOMMENDED = [
   "CRON_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
+  // Absent => social OAuth tokens are stored in PLAINTEXT. Deliberately a
+  // warning rather than a boot requirement: encryption is opt-in so the code
+  // can ship before the key exists, and existing plaintext rows keep working
+  // after it does. See docs/backend-audit-followup.md for the rollout order.
+  "SOCIAL_TOKEN_KEY",
 ];
 
 function walk(dir: string, out: string[] = []): string[] {

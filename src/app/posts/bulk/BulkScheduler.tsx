@@ -35,7 +35,12 @@ import { getPlan, type PlanId } from "@/lib/plans";
 import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
 import { PageHeader } from "@/components/PageHeader";
 import { PageContainer, PageSections } from "@/components/layout/PageContainer";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -827,35 +832,37 @@ export function BulkScheduler({
               {pendingDupes.length > 0 && (
                 <Alert color="neutral" variant="outline">
                   <TriangleAlertIcon />
-                  <AlertTitle>Video already in this batch</AlertTitle>
-                  <AlertDescription>
-                    <span className="block max-w-full truncate">
-                      {pendingDupes.map((file) => file.name).join(", ")}
-                    </span>
-                    Add{" "}
-                    {pendingDupes.length === 1 ? "it" : "them"} again as{" "}
-                    {pendingDupes.length === 1 ? "a separate" : "separate"} scheduled{" "}
-                    {pendingDupes.length === 1 ? "post" : "posts"}?
-                    <span className="mt-2 flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={confirmPendingDupes}
-                        disabled={running}
-                      >
-                        Add anyway
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={skipPendingDupes}
-                        disabled={running}
-                      >
-                        Skip
-                      </Button>
-                    </span>
-                  </AlertDescription>
+                  <AlertContent>
+                    <AlertTitle>Video already in this batch</AlertTitle>
+                    <AlertDescription>
+                      <span className="block max-w-full truncate">
+                        {pendingDupes.map((file) => file.name).join(", ")}
+                      </span>
+                      Add{" "}
+                      {pendingDupes.length === 1 ? "it" : "them"} again as{" "}
+                      {pendingDupes.length === 1 ? "a separate" : "separate"} scheduled{" "}
+                      {pendingDupes.length === 1 ? "post" : "posts"}?
+                      <span className="mt-2 flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={confirmPendingDupes}
+                          disabled={running}
+                        >
+                          Add anyway
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={skipPendingDupes}
+                          disabled={running}
+                        >
+                          Skip
+                        </Button>
+                      </span>
+                    </AlertDescription>
+                  </AlertContent>
                 </Alert>
               )}
               <input
@@ -892,7 +899,7 @@ export function BulkScheduler({
                   onChange={(e) => setText(e.target.value)}
                   placeholder="Write something worth publishing..."
                   rows={3}
-                  className="min-h-24 text-[15px] leading-relaxed"
+                  className="min-h-24 text-prose leading-relaxed"
                 />
               </Field>
             </CardContent>
@@ -931,7 +938,7 @@ export function BulkScheduler({
               <FieldGroup>
               <div
                 aria-live="polite"
-                className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-[13px] leading-5 text-muted-foreground tabular-nums"
+                className="flex items-start gap-2 rounded-lg bg-muted/60 px-3 py-2 text-label leading-5 text-muted-foreground tabular-nums"
               >
                 <CalendarClockIcon
                   aria-hidden="true"
@@ -1033,7 +1040,7 @@ export function BulkScheduler({
                             className={cn(
                               "h-6 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40",
                               active
-                                ? "border-signal/30 bg-signal/10 text-signal"
+                                ? "border-primary/30 bg-primary/10 text-primary"
                                 : "border-border bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground"
                             )}
                           >
@@ -1048,31 +1055,35 @@ export function BulkScheduler({
               {fileProblems.size > 0 && (
                 <Alert color="neutral" variant="outline">
                   <TriangleAlertIcon className="text-warning" />
-                  <AlertTitle>Unsupported combination</AlertTitle>
-                  <AlertDescription>
-                    <span className="mb-1 block">
-                      Fix these before scheduling — nothing has been uploaded yet.
-                    </span>
-                    <ul className="flex list-disc flex-col gap-0.5 pl-4">
-                      {bulkIssues.slice(0, 8).map((issue) => (
-                        <li key={`${issue.fileName}-${issue.accountId}`}>
-                          {issue.message}
-                        </li>
-                      ))}
-                    </ul>
-                    {bulkIssues.length > 8 && (
-                      <span className="mt-1 block">
-                        …and {bulkIssues.length - 8} more.
+                  <AlertContent>
+                    <AlertTitle>Unsupported combination</AlertTitle>
+                    <AlertDescription>
+                      <span className="mb-1 block">
+                        Fix these before scheduling — nothing has been uploaded yet.
                       </span>
-                    )}
-                  </AlertDescription>
+                      <ul className="flex list-disc flex-col gap-0.5 pl-4">
+                        {bulkIssues.slice(0, 8).map((issue) => (
+                          <li key={`${issue.fileName}-${issue.accountId}`}>
+                            {issue.message}
+                          </li>
+                        ))}
+                      </ul>
+                      {bulkIssues.length > 8 && (
+                        <span className="mt-1 block">
+                          …and {bulkIssues.length - 8} more.
+                        </span>
+                      )}
+                    </AlertDescription>
+                  </AlertContent>
                 </Alert>
               )}
               {configError && (
                 <Alert color="neutral" variant="outline">
                   <TriangleAlertIcon className="text-warning" />
-                  <AlertTitle>Cannot start batch</AlertTitle>
-                  <AlertDescription>{configError}</AlertDescription>
+                  <AlertContent>
+                    <AlertTitle>Cannot start batch</AlertTitle>
+                    <AlertDescription>{configError}</AlertDescription>
+                  </AlertContent>
                 </Alert>
               )}
               </FieldGroup>
@@ -1158,11 +1169,13 @@ export function BulkScheduler({
               )}
               {finished && !allDone && (
                 <Alert color="neutral" variant="outline">
-                  <AlertTitle>Batch partially scheduled</AlertTitle>
-                  <AlertDescription>
-                    {doneCount} of {items.length} posts scheduled. Retry the
-                    failed items or remove them.
-                  </AlertDescription>
+                  <AlertContent>
+                    <AlertTitle>Batch partially scheduled</AlertTitle>
+                    <AlertDescription>
+                      {doneCount} of {items.length} posts scheduled. Retry the
+                      failed items or remove them.
+                    </AlertDescription>
+                  </AlertContent>
                 </Alert>
               )}
             </CardContent>

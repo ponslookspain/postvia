@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+/playwright/.auth/
+/tests/e2e/.auth/
 
 # next.js
 /.next/
@@ -42,3 +46,19 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# design-sync
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+/index.d.ts
+/dist/
+.design-sync/component-docs/
+.design-sync/fonts/
+
+# Graphify
+graphify-out/cost.json
+graphify-out/cache/
+graphify-out/.graphify_root

@@ -27,6 +27,7 @@ import { EmailNotConfiguredError, isEmailConfigured } from "@/lib/email";
 import { parsePlanParam } from "@/lib/plans";
 import {
   OTP_SEND_COOLDOWN_SECONDS,
+  OTP_SEND_IP_MAX_PER_HOUR,
   OTP_SEND_MAX_PER_HOUR,
 } from "@/lib/otp-config";
 import { OTP_RATE_LIMITED_CODE } from "@/lib/otp-rate-limit";
@@ -110,6 +111,13 @@ export async function requestOtp(input: {
   email: string;
   mode: OtpMode;
   planHint?: unknown;
+  /**
+   * Validated caller IP (first XFF entry / x-real-ip, shape-checked by
+   * getClientIp). Optional so existing callers/tests keep working; when
+   * absent only the per-email buckets apply. Never trusted for identity —
+   * rate bucket only, and a spoofed value can at most shift buckets.
+   */
+  ip?: string | null;
 }): Promise<OtpRequestResult> {
   const email = normalizeOtpEmail(input.email);
   if (!isValidOtpEmail(email)) {
@@ -140,13 +148,14 @@ export async function requestOtp(input: {
   }
 
   // Persistent per-email buckets (hashed, never raw PII): cooldown + hourly
-  // cap. Fail-open with a log line — abuse bookkeeping must not block
+  // cap, plus a roomy per-IP hourly cap against email rotation from one
+  // source. Fail-open with a log line — abuse bookkeeping must not block
   // legitimate mail, same discipline as resend-verification.
   try {
     const pepper = getAbusePepper();
     const hourKey = hashRateKey(["otp-send", email], pepper);
     const coolKey = hashRateKey(["otp-send-cool", email], pepper);
-    const [hour, cool] = await Promise.all([
+    const checks = [
       checkAbuseRateDetailed({
         scope: "otp-send",
         keyHash: hourKey,
@@ -161,11 +170,23 @@ export async function requestOtp(input: {
         windowMs: OTP_SEND_COOLDOWN_SECONDS * 1000,
         stores: liveAbuseStores,
       }),
-    ]);
-    if (!hour.allowed || !cool.allowed) {
+    ];
+    if (input.ip) {
+      checks.push(
+        checkAbuseRateDetailed({
+          scope: "otp-send-ip",
+          keyHash: hashRateKey(["otp-send-ip", input.ip], pepper),
+          max: OTP_SEND_IP_MAX_PER_HOUR,
+          windowMs: 60 * 60_000,
+          stores: liveAbuseStores,
+        })
+      );
+    }
+    const results = await Promise.all(checks);
+    if (results.some((r) => !r.allowed)) {
       // Real remaining wait: latest-safe of the denied buckets.
       // Hourly cap yields up to ~3600s; cooldown yields up to 60s.
-      const retryAfterSeconds = maxDeniedRetryAfterSeconds([hour, cool]);
+      const retryAfterSeconds = maxDeniedRetryAfterSeconds(results);
       return {
         ok: false,
         error: "Too many codes requested. Please wait a minute and try again.",

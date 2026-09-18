@@ -76,7 +76,7 @@ export function ActivityChart({ weeks }: { weeks: WeekBucket[] }) {
                     width={barWidth}
                     height={Math.max(failedHeight, 2)}
                     rx={3}
-                    className="fill-destructive"
+                    className="fill-error"
                   />
                 )}
                 {index % 3 === 0 && (
@@ -84,7 +84,7 @@ export function ActivityChart({ weeks }: { weeks: WeekBucket[] }) {
                     x={x + barWidth / 2}
                     y={height - 4}
                     textAnchor="middle"
-                    className="fill-muted-foreground text-[10px]"
+                    className="fill-muted-foreground text-micro"
                   >
                     {week.label}
                   </text>

@@ -240,8 +240,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Explicit select: this row carries live publishing credentials
+    // (accessToken/refreshToken) and nothing on this path needs them. An
+    // unselected findMany pulls them into a request that then serializes a
+    // derived object back to the client — one careless change away from
+    // leaking them. Only the fields the selection validator and the target
+    // rows actually read are loaded.
     const accounts = await prisma.socialAccount.findMany({
       where: { id: { in: selectedIds }, userId: user.id },
+      select: { id: true, userId: true, platform: true },
     });
 
     if (selectedIds.length !== accounts.length) {

@@ -25,3 +25,12 @@ export const OTP_SEND_COOLDOWN_SECONDS = 60;
 /** Max verify attempts per email-hash per 10 minutes (outer rate shell). */
 export const OTP_VERIFY_MAX_PER_WINDOW = 20;
 export const OTP_VERIFY_WINDOW_MS = 10 * 60_000;
+
+/**
+ * Per-IP OTP guards (email-rotation protection). Roomy on purpose: many
+ * legitimate users can share one egress IP (NAT), so the IP bucket never
+ * decides alone — it only stops unbounded email rotation from a single
+ * source. The per-email buckets stay authoritative.
+ */
+export const OTP_SEND_IP_MAX_PER_HOUR = 50;
+export const OTP_VERIFY_IP_MAX_PER_WINDOW = 100;

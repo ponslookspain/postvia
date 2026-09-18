@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requestOtp, type OtpMode } from "@/lib/otp";
+import { getClientIp } from "@/lib/abuse";
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 
 /**
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
       email: body?.email,
       mode,
       planHint: body?.plan,
+      ip: getClientIp(request),
     });
     if (!result.ok) {
       const body: Record<string, unknown> = { error: result.error };

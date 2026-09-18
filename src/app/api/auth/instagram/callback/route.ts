@@ -3,7 +3,10 @@ import { oauthRedirect, safeProviderError } from "@/lib/oauth-redirect";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEffectivePlan } from "@/lib/entitlements";
-import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
+import {
+  createSocialAccountRaceSafe,
+  encryptAccountTokens,
+} from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   gateOAuthCallback,
@@ -102,8 +105,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Only the id is used (reconnect updates by id); matching the X and
+    // Threads callbacks, which already select narrowly. Loading the whole row
+    // here would pull the existing access token into the request for nothing.
     const existing = await prisma.socialAccount.findFirst({
       where: { userId: user.id, platform: "INSTAGRAM", externalId: profile.id },
+      select: { id: true },
     });
     const accountData = {
       username: profile.username,
@@ -117,7 +124,7 @@ export async function GET(request: NextRequest) {
       // this user's row atomically; a concurrently deleted row updates nothing.
       await prisma.socialAccount.updateMany({
         where: { id: existing.id, userId: user.id },
-        data: accountData,
+        data: encryptAccountTokens(accountData),
       });
     } else {
       // Abuse gate for fresh links (reconnects above skip it).

@@ -1,0 +1,116 @@
+{
+  "projectId": "5d92ab93-23d1-48e1-9673-b8b244d0d4f7",
+  "pkg": "postvia",
+  "globalName": "POSTVIA",
+  "shape": "package",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.json",
+  "cssEntry": ".design-sync/.cache/postvia.css",
+  "extraFonts": [
+    ".design-sync/fonts/ds-fonts.css"
+  ],
+  "docsDir": ".design-sync/component-docs",
+  "guidelinesGlob": [
+    "docs/design-system.md",
+    "docs/design-tokens.md"
+  ],
+  "buildCmd": "npm run build && node .design-sync/compile-css.mjs && node .design-sync/harvest-fonts.mjs && npx tsc -p .design-sync/tsconfig.ds.json && node .design-sync/gen-component-docs.mjs",
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "900x700"
+    },
+    "Drawer": {
+      "cardMode": "single",
+      "viewport": "900x700"
+    },
+    "DropdownMenu": {
+      "cardMode": "single",
+      "viewport": "900x700"
+    },
+    "Popover": {
+      "cardMode": "single",
+      "viewport": "900x700"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "900x700"
+    },
+    "Select": {
+      "cardMode": "single",
+      "viewport": "900x700"
+    },
+    "Card": {
+      "cardMode": "column"
+    },
+    "Alert": {
+      "cardMode": "column"
+    },
+    "Banner": {
+      "cardMode": "column"
+    },
+    "Empty": {
+      "cardMode": "column"
+    },
+    "Progress": {
+      "cardMode": "column"
+    },
+    "Skeleton": {
+      "cardMode": "column"
+    },
+    "Spinner": {
+      "cardMode": "column"
+    },
+    "Toaster": {
+      "cardMode": "column"
+    },
+    "Checkbox": {
+      "cardMode": "column"
+    },
+    "Field": {
+      "cardMode": "column"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "Label": {
+      "cardMode": "column"
+    },
+    "RadioGroup": {
+      "cardMode": "column"
+    },
+    "Switch": {
+      "cardMode": "column"
+    },
+    "TextArea": {
+      "cardMode": "column"
+    },
+    "Sidebar": {
+      "cardMode": "single",
+      "primaryStory": "AppShellExpanded",
+      "viewport": "900x700"
+    },
+    "Avatar": {
+      "cardMode": "column"
+    },
+    "Badge": {
+      "cardMode": "column"
+    },
+    "PlatformIcon": {
+      "cardMode": "column"
+    },
+    "StatusBadge": {
+      "cardMode": "column"
+    },
+    "Divider": {
+      "cardMode": "column"
+    },
+    "Collapsible": {
+      "cardMode": "column"
+    },
+    "Tabs": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

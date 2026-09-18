@@ -1,0 +1,285 @@
+/* ============================================================================
+   PostVIA Design System — 2. SEMANTIC TOKENS
+   ----------------------------------------------------------------------------
+   THIS FILE IS THE CANONICAL SOURCE OF TRUTH for PostVIA colour, surface and
+   border meaning. Components and pages consume these names directly — via
+   the Tailwind utilities exposed in the `@theme inline` block at the bottom
+   — and nothing else. There used to be a `compat-radian.css` alias layer on
+   top of this file, translating Radian's own token vocabulary
+   (`bg-fill1`, `text-fg-secondary`, …) onto these names; it has been
+   removed now that every call site speaks PostVIA's vocabulary directly.
+
+   Two rules keep the layer honest:
+     1. A value is written down exactly once. Everything that shares it is a
+        `var()` alias, so a theme override reaches every consumer.
+     2. A name means one thing. There is no second `accent`, no second
+        `error`. If a new meaning is needed, it gets a new name.
+
+   Theming: `.dark` is applied to <html> by the blocking script in
+   `src/hooks/use-theme.ts` (dark is the product default, light is opt-in).
+   Because `:root` and `.dark` are therefore the SAME element, an alias such
+   as `--panel-foreground: var(--foreground)` only has to be declared once —
+   it resolves against whichever `--foreground` is in effect. Aliases are
+   listed in `:root` only; `.dark` restates real values.
+   ========================================================================= */
+
+:root {
+	/* —— Background ————————————————————————————————————————————————————————
+	   Warm paper canvas. Light #F5F4EE, dark warm charcoal #262624. */
+	--background: #f5f4ee;
+
+	/* —— Foreground ————————————————————————————————————————————————————————
+	   Ink on the canvas, and its quiet counterpart for metadata. */
+	--foreground: #20201e;
+	--muted-foreground: #77766f;
+
+	/* —— Muted ————————————————————————————————————————————————————————————
+	   The neutral fill: hovers, inset wells, disabled chrome. */
+	--muted: #e7e5de;
+
+	/* —— Panel ————————————————————————————————————————————————————————————
+	   A block on the page. One shade off the canvas and carrying NO outline:
+	   blocks are separated by tone, not by a drawn box. `Card` renders on it.
+	   A block nested inside a panel goes the other way (`--background`) so it
+	   reads as inset rather than vanishing. */
+	--panel: #f0efeb;
+	--panel-foreground: var(--foreground);
+
+	/* —— Surface ——————————————————————————————————————————————————————————
+	   Raised and floating surfaces. `card` is a block that may lift off the
+	   page; `popover` is genuinely floating UI (popover, dialog, drawer,
+	   toast, select menu) and is the only tier where a shadow is allowed. */
+	--card: #faf9f5;
+	--card-foreground: #20201e;
+	--popover: #faf9f5;
+	--popover-foreground: #20201e;
+
+	/* —— Elevation ————————————————————————————————————————————————————————
+	   PostVIA elevates by TONE, not by shadow. The ladder below is the whole
+	   elevation system; `shadow-md` / `shadow-lg` are reserved for the
+	   floating tier and are applied by the primitives themselves. */
+	--elevation-sunken: var(--muted);
+	--elevation-surface: var(--panel);
+	--elevation-raised: var(--card);
+	--elevation-overlay: var(--popover);
+
+	/* —— Border ———————————————————————————————————————————————————————————
+	   `border` is the hairline used for structural splits (header from list,
+	   filter from results). An outline on a block is an ACCENT, never a
+	   default. `input` is the functional field edge; `ring` is the focus
+	   ring. The default border colour is applied in `@layer base`
+	   (`globals.css`) — never as an unlayered `*` rule, which would outrank
+	   and silently disable every `border-*` utility. */
+	--border: #e3e2de;
+	--input: #dedcd5;
+	--ring: #2971c6;
+
+	/* —— Primary ——————————————————————————————————————————————————————————
+	   One brand hue: PostVIA Blue #2971C6 (light) / #5FA1F3 (dark).
+	   Reserved for primary actions, active navigation, selected tabs,
+	   links, focus states and main CTAs. Never a large decorative surface.
+	   Red is reserved for error/destructive only. */
+	--primary: #2971c6;
+	--primary-foreground: #ffffff;
+
+	/* —— Status ———————————————————————————————————————————————————————————
+	   Calm modern status hues in dots and badges only, never as page
+	   decoration. `info` shares the brand blue — it marks routine states
+	   like SCHEDULED, not alerts.
+	   Each `-foreground` is the legible ink on top of its filled hue. */
+	--success: #2f8f5b;
+	--success-foreground: #ffffff;
+	--warning: #c58a24;
+	--warning-foreground: #3d2c0e;
+	--error: #c84b4b;
+	--error-foreground: #ffffff;
+	--info: #2971c6;
+	--info-foreground: #ffffff;
+
+	/* —— Status sub-steps —————————————————————————————————————————————————
+	   Fill/focus/border/hover chrome for status-coloured controls (e.g. a
+	   status `Button` variant). Derived from the calm status hues above via
+	   `color-mix` against the current surface, so light/dark stay tonal and
+	   no second copy of any colour exists. `info-text` is the legible ink
+	   on a light info fill. */
+	--success-accent: color-mix(in srgb, var(--success) 12%, var(--card));
+	--success-focus: color-mix(in srgb, var(--success) 18%, var(--card));
+	--success-border: color-mix(in srgb, var(--success) 38%, var(--border));
+	--success-hover: color-mix(in srgb, var(--success) 88%, black);
+	--warning-accent: color-mix(in srgb, var(--warning) 14%, var(--card));
+	--warning-focus: color-mix(in srgb, var(--warning) 20%, var(--card));
+	--warning-border: color-mix(in srgb, var(--warning) 42%, var(--border));
+	--warning-hover: color-mix(in srgb, var(--warning) 88%, black);
+	--error-accent: color-mix(in srgb, var(--error) 12%, var(--card));
+	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
+	--error-border: color-mix(in srgb, var(--error) 38%, var(--border));
+	--error-hover: color-mix(in srgb, var(--error) 88%, black);
+	--info-text: var(--info);
+	--info-accent: color-mix(in srgb, var(--info) 12%, var(--card));
+	--info-focus: color-mix(in srgb, var(--info) 18%, var(--card));
+	--info-border: color-mix(in srgb, var(--info) 38%, var(--border));
+	--info-hover: color-mix(in srgb, var(--info) 88%, black);
+
+	/* —— Overlay ——————————————————————————————————————————————————————————
+	   Translucent ink washes for hover/press states and hairlines drawn as a
+	   tint instead of a flat fill. Named by opacity since there is no
+	   qualitative difference between the steps, only strength. Promoted
+	   from the Radian compatibility layer's `alpha` / `fill*-alpha` family
+	   — same `color-mix` recipe, same computed colour. */
+	--overlay-4: color-mix(in oklch, var(--foreground) 4%, transparent);
+	--overlay-8: color-mix(in oklch, var(--foreground) 8%, transparent);
+	--overlay-12: color-mix(in oklch, var(--foreground) 12%, transparent);
+
+	/* —— Navigation ———————————————————————————————————————————————————————
+	   The sidebar rail is a shade off the page so rail and content are told
+	   apart by tone rather than by a divider. `sidebar-accent` is the active
+	   nav pill: a quiet neutral fill. `sidebar-primary` is the single blue
+	   action hue for primary controls inside the rail. */
+	--sidebar: #faf9f5;
+	--sidebar-foreground: #3b3a35;
+	--sidebar-primary: #2971c6;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #e9e6dc;
+	--sidebar-accent-foreground: #20201e;
+	--sidebar-border: #e3e2de;
+	--sidebar-ring: #2971c6;
+
+	/* —— Legacy aliases ———————————————————————————————————————————————————
+	   Kept because call sites still use them. They are ALIASES, never
+	   values: each resolves to a canonical token above, so there is exactly
+	   one place to change. Do not add new names here.
+	   History: `--destructive` (legacy name for the failure hue, prefer
+	   `--error`), `--signal` (legacy name for the brand hue, prefer
+	   `--primary`) and `--secondary` (quiet neutral button fill) were
+	   removed once repo-wide usage analysis showed zero consumers of the
+	   utilities. `variant="destructive"` remains live as Button API and
+	   maps directly to `--error`; it never depended on the token.
+
+	   --accent       the neutral fill step. It carried a value identical to
+	                  `--muted` in both themes, so it is stated as an alias
+	                  rather than a second copy of the same colour. */
+	--accent: var(--muted);
+}
+
+.dark {
+	--background: #262624;
+	--foreground: #f5f4ee;
+	--muted-foreground: #a4a39d;
+
+	--muted: #38362f;
+
+	--panel: #222120;
+
+	--card: #2c2c2b;
+	--card-foreground: #f5f4ee;
+	--popover: #2c2c2b;
+	--popover-foreground: #f5f4ee;
+
+	--border: #34332f;
+	--input: #3a3935;
+	--ring: #5fa1f3;
+
+	--primary: #5fa1f3;
+	--primary-foreground: #0f0f0e;
+
+	/* Calm dark status hues — legible on warm charcoal. `-foreground`
+	   inks stay legible on either canvas. Sub-steps derive from the hues
+	   above via `color-mix` (see `:root`), so they follow automatically. */
+	--success: #69b887;
+	--success-foreground: #102217;
+	--warning: #d6a64a;
+	--warning-foreground: #261d0d;
+	--error: #e06a6a;
+	--error-foreground: #260f0f;
+	--info: #5fa1f3;
+	--info-foreground: #0f0f0e;
+
+	--sidebar: #1f1e1d;
+	--sidebar-foreground: #e6e5df;
+	--sidebar-primary: #5fa1f3;
+	--sidebar-primary-foreground: #0f0f0e;
+	--sidebar-accent: #0f0f0e;
+	--sidebar-accent-foreground: #f5f4ee;
+	--sidebar-border: #34332f;
+	--sidebar-ring: #5fa1f3;
+}
+
+/* ----------------------------------------------------------------------------
+   Tailwind exposure
+   ----------------------------------------------------------------------------
+   `@theme inline` so the utilities point straight at the tokens above and
+   pick up the `.dark` override without a second indirection. This block is
+   the complete list of PostVIA colour utilities; anything outside it is a
+   foundation primitive.
+-------------------------------------------------------------------------- */
+@theme inline {
+	/* Background · Foreground · Muted */
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+
+	/* Panel · Surface */
+	--color-panel: var(--panel);
+	--color-panel-foreground: var(--panel-foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+
+	/* Border */
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+
+	/* Primary */
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+
+	/* Success · Warning · Error · Info */
+	--color-success: var(--success);
+	--color-success-foreground: var(--success-foreground);
+	--color-warning: var(--warning);
+	--color-warning-foreground: var(--warning-foreground);
+	--color-error: var(--error);
+	--color-error-foreground: var(--error-foreground);
+	--color-info: var(--info);
+	--color-info-foreground: var(--info-foreground);
+
+	/* Status sub-steps */
+	--color-success-accent: var(--success-accent);
+	--color-success-focus: var(--success-focus);
+	--color-success-border: var(--success-border);
+	--color-success-hover: var(--success-hover);
+	--color-warning-accent: var(--warning-accent);
+	--color-warning-focus: var(--warning-focus);
+	--color-warning-border: var(--warning-border);
+	--color-warning-hover: var(--warning-hover);
+	--color-error-accent: var(--error-accent);
+	--color-error-focus: var(--error-focus);
+	--color-error-border: var(--error-border);
+	--color-error-hover: var(--error-hover);
+	--color-info-text: var(--info-text);
+	--color-info-accent: var(--info-accent);
+	--color-info-focus: var(--info-focus);
+	--color-info-border: var(--info-border);
+	--color-info-hover: var(--info-hover);
+
+	/* Overlay */
+	--color-overlay-4: var(--overlay-4);
+	--color-overlay-8: var(--overlay-8);
+	--color-overlay-12: var(--overlay-12);
+
+	/* Navigation */
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+
+	/* Legacy alias — see the `:root` block. */
+	--color-accent: var(--accent);
+}

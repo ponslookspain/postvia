@@ -3,13 +3,42 @@
 Source of truth for the **implemented** visual language. No roadmaps,
 no proposals — only what the code does today.
 
+Companion document: [`design-tokens.md`](design-tokens.md) — the token
+inventory, the legacy-API mapping and the list of known gaps. This file is
+the *rules*; that one is the *parts*.
+
+## Canonical layer
+
+The design system is two files, imported in dependency order from
+`src/app/globals.css`:
+
+```
+src/app/design-system/foundations.css      1. raw scales
+src/app/design-system/semantic.css         2. CANONICAL PostVIA tokens
+```
+
+`semantic.css` is the source of truth: background, surface, panel,
+foreground, muted, border, primary, success, warning, error, info,
+navigation, in both themes. Every component and page consumes these names
+directly (`bg-panel`, `text-muted-foreground`, `border-error`, …) — there is
+no alias layer between them. There used to be a third file,
+`compat-radian.css`, translating those names into Radian's own vocabulary
+(`bg`, `fill1`-`fill4`, the `fg` ramp, `<family>-fg`…) so the RadianUI-
+generated primitives in `src/components/ui` could keep their original
+classnames; it has been removed now that every call site was migrated onto
+the canonical names (see `docs/design-tokens.md`, "Radian removal", for the
+full before/after mapping).
+
 ## Base
 
-- **Radian UI** (`default` style, `components.json`), Tailwind v4,
-  Radix UI primitives, Lucide icons, `cn()` for conditional classes.
-- `components.json` pins the Radian configuration (paths, aliases,
-  icon library); primitives live in `src/components/ui`, PostVIA
-  custom components (`Field`, `Toast`, avatar extensions) beside them.
+- **Radian UI** (`default` style) originally generated the primitives'
+  structure; the components now live in-tree as PostVIA primitives. Tailwind v4
+  supplies styling, Radix UI (`@radix-ui/react-*`) supplies accessibility
+  behaviour, Lucide supplies icons, `cn()` handles conditional classes.
+- Primitives live in `src/components/ui`, PostVIA custom components
+  (`Field`, `Toast`, avatar extensions) beside them. There is no
+  `components.json` any more — it was the RadianUI generator's config,
+  dead weight once nothing in the repo runs that generator.
 
 ## Color philosophy
 
@@ -17,14 +46,15 @@ no proposals — only what the code does today.
   the `dark` class is set on `<html>` by a blocking script before first
   paint (`src/hooks/use-theme.ts`), the choice persists in
   `localStorage`, and it is switched from Appearance in the account menu.
-- Near-black canvas (`--background`), near-white text, neutral gray
-  surfaces. No cream, no warm tints, no gradients, no glow.
-- **One brand hue:** red primary (`--primary`, light
-  `oklch(0.58 0.22 19)`), reserved for primary actions. It is kept a
-  step off `--error` (hue ~27) in hue and lightness so a call to action
-  never reads as a failure.
-- The scheduled state uses **info blue**, not the brand hue: a routine
-  future-dated post must not look like an alert.
+- Warm paper canvas in light (`--background` #F5F4EE), warm charcoal in
+  dark (`--background` #262624). Surfaces split by tone, hairline borders
+  only (#E3E2DE / #34332F). No gradients, no glow, no heavy shadows.
+- **One brand hue:** PostVIA Blue (`--primary`, light #2971C6 / dark
+  #5FA1F3), reserved for primary actions, active navigation, selected
+  tabs, links, focus states and main CTAs. Red is reserved for
+  error/destructive only.
+- The scheduled state uses **info blue** (same hue as brand): a routine
+  future-dated post is a quiet status tint, never a full alert surface.
 - Semantic colors only where they mean something: destructive,
   success/warning status dots, per-platform glyph accents (Instagram).
 
@@ -33,7 +63,7 @@ no proposals — only what the code does today.
 - **Blocks are separated by tone, not by a drawn box.** A tile sits on
   `--panel`, one shade off the page, and carries no outline. `Card` does
   this by default; hand-rolled tiles use `bg-panel` and no border class.
-- **A block nested inside a tile goes the other way** — `bg-bg`, so it
+- **A block nested inside a tile goes the other way** — `bg-background`, so it
   reads as inset instead of vanishing into an identically toned panel.
 - An outline is an accent, not a default: it is legitimate only when it
   marks something out (the highlighted plan, an aria-invalid field). The
@@ -53,7 +83,7 @@ no proposals — only what the code does today.
   the block title. That is the same relationship the `Next up` block
   uses; aligning the text instead would push the highlight past the
   block's padding and break the even gap.
-- Hover is `bg-fill1-alpha` — a 4% lift. It must stay clearly below the
+- Hover is `bg-overlay-4` — a 4% lift. It must stay clearly below the
   tone of any thumbnail or icon tile inside the row, otherwise hovering
   reads as the row lighting up rather than being pointed at.
 - **Rows are separated by spacing, not hairlines.** A hairline and a
@@ -70,7 +100,8 @@ no proposals — only what the code does today.
 ## Typography
 
 - Body **Inter** (`--font-sans`), headings **DM Sans**
-  (`--font-heading`); Geist variables retained but not primary.
+  (`--font-heading`), monospace **Geist Mono** (`--font-mono`, used for
+  dense numeric/data labels only).
 - Scale: page titles large/semibold, section titles medium, body
   14–15px relaxed, metadata 12–13px muted. Left-aligned, sentence
   case, no decorative serif, no single-word accent coloring.
@@ -84,10 +115,10 @@ no proposals — only what the code does today.
 
 ## Buttons (rule)
 
-- Use the `Button` API exactly as installed: `default / outline /
-  secondary / ghost / destructive / link`, sizes `default / xs / sm /
-  lg`, icon sizes `icon / icon-xs / icon-sm / icon-lg` (Radian
-  implementation underneath, PostVIA-compatible props on top).
+- Use the `Button` API exactly as installed: `default / secondary /
+  outline / ghost / destructive / link` (`destructive` maps to the error
+  hue), sizes `default / sm / lg`, icon size `icon-sm` — one direct cva
+  layer, no mapping underneath.
 - **No separate button sizing system.** Do not add `size` props,
   `h-*`/`min-h-*`, paddings or radii to individual buttons to make
   them match each other; do not add global button CSS.
@@ -98,16 +129,19 @@ no proposals — only what the code does today.
 ## Inputs / forms
 
 - `FieldGroup + Field + FieldLabel`, validation via `data-invalid` on
-   the `Field` and `aria-invalid` on the control. Native date/time
+    the `Field` and `aria-invalid` on the control. Native date/time
     inputs keep their functional borders. Filter collections use the
-    Radian `Tabs` primitive (`ui/tabs.tsx`, URL-driven links), not
+    `Tabs` primitive (`ui/tabs.tsx`, URL-driven links), not
    hand-rolled strips; plain underline treatments remain for inline
    text links only.
 
 ## Cards
 
-- `Card` is the block primitive: `rounded-2xl`, `bg-panel`, no outline,
-  with header/title/description/action/content/footer composition.
+- `Card` is the primary surface primitive: `rounded-2xl`, `bg-card`
+  (one step lighter than the canvas), no outline, with
+  header/title/description/action/content/footer composition. Nested
+  content inside a card goes darker (`bg-muted`); grouped secondary
+  areas use `bg-panel`.
 - Its `size="sm"` padding rule (`data-[size=sm]:…px-4`) outranks a
   `px-0` passed by a caller, so content inside a card is always inset by
   the card padding. Align rules and rows to that inset rather than
@@ -117,15 +151,17 @@ no proposals — only what the code does today.
 
 ## Navigation / sidebar
 
-- Radian sidebar primitive (`ui/sidebar.tsx`, `ui/tooltip.tsx`,
+- Sidebar primitive (`ui/sidebar.tsx`, `ui/tooltip.tsx`,
   `ui/drawer.tsx`, `hooks/use-mobile.ts`): `SidebarProvider`,
   icon-collapsible rail (`16rem` / `3rem`), tooltips in collapsed mode,
   keyboard toggle, mobile Drawer.
-- `variant="inset"` + `theme="gray"`: the rail is a shade off the page
-  and the content sits on it as a rounded panel, so the two are told
-  apart by tone rather than by a divider.
+- `variant="floating"` + `theme="gray"`: the rail is a separate rounded
+  surface (`bg-sidebar`, 8px canvas inset) floating on the continuous
+  `bg-background` canvas; the main content sits directly on that canvas
+  with no outer card, so rail and content are told apart by tone rather
+  than by a divider.
 - Nav items are **pills** (`rounded-full`); the active one is a quiet
-  neutral fill, never the brand hue — the red is for actions.
+  neutral fill, never the brand hue — the blue is for actions.
 - Collapsed geometry is arithmetic, not eyeballing: the rail is `3rem`
   and a nav button is `size-8`, so the group padding must be `px-2` for
   the icons to sit centered. Same for the header, where the wordmark is
@@ -145,7 +181,7 @@ no proposals — only what the code does today.
 
 - Month timetable grid (fixed geometry, drag-to-reschedule, overflow
   popover, dots on mobile, drafts rail). Scheduling date uses the
-  Radian `Calendar` in a `Popover` (`ui/calendar.tsx`,
+  `Calendar` in a `Popover` (`ui/calendar.tsx`,
   `ScheduleDatePicker.tsx`); time stays a native time input.
   `react-day-picker` + `date-fns` are the only UI-adjacent runtime
   dependencies and belong to that component.
@@ -209,8 +245,9 @@ no proposals — only what the code does today.
 
 ## Hard rules
 
-1. No new global design tokens without necessity — extend the Radian
-   + PostVIA token system instead of forking it.
+1. No new global design tokens without necessity — extend the canonical
+   layer (`src/app/design-system/semantic.css`) instead of forking it.
+   A new value goes there; a new alias goes nowhere.
 2. No second button sizing system, ever.
 3. No Magic UI / decorative animation libraries.
 4. No raw status/brand hex values in components — semantic tokens or

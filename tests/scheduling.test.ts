@@ -68,8 +68,27 @@ function createFakeDb(seed: { posts: PostRow[] }) {
 
   const db: SchedulingDb = {
     post: {
-      findMany: async (args) =>
-        posts.filter((p) => matchesWhere(p as unknown as Record<string, unknown>, args.where)).map(clonePost),
+      // Honors orderBy + take so the batching contract is actually exercised
+      // (Array.prototype.sort is stable, so ties keep insertion order —
+      // matching how the real index scan behaves for equal sort keys).
+      findMany: async (args) => {
+        const matched = posts.filter((p) =>
+          matchesWhere(p as unknown as Record<string, unknown>, args.where)
+        );
+        const orderKey = args.orderBy
+          ? (Object.keys(args.orderBy)[0] as keyof PostRow)
+          : null;
+        const sorted = orderKey
+          ? [...matched].sort((a, b) => {
+              const av = dateValue(a[orderKey])?.getTime() ?? 0;
+              const bv = dateValue(b[orderKey])?.getTime() ?? 0;
+              return av - bv;
+            })
+          : matched;
+        const limited =
+          typeof args.take === "number" ? sorted.slice(0, args.take) : sorted;
+        return limited.map(clonePost);
+      },
       updateMany: async ({ where, data }) => {
         let count = 0;
         for (const p of posts) {
@@ -301,6 +320,10 @@ describe("runScheduledPublishTick (due-post processing)", () => {
       now: NOW,
       clock: () => clockValue,
       tickBudgetMs: 240_000,
+      // Serial mode: the budget is re-checked between every post. The
+      // chunked behaviour that the default concurrency produces is covered
+      // separately in "bounded tick concurrency".
+      concurrency: 1,
     });
 
     assert.equal(stats.published, 1);
@@ -347,6 +370,317 @@ describe("runScheduledPublishTick (due-post processing)", () => {
 
     assert.equal(stats.published, 1);
     assert.deepEqual(published, ["p1"]);
+  });
+});
+
+describe("bounded tick batching (P0.2)", () => {
+  /** n due posts, each scheduled one minute further in the past than the last. */
+  function dueBacklog(n: number): PostRow[] {
+    return Array.from({ length: n }, (_, i) =>
+      scheduledPost({
+        id: `p${i}`,
+        // p0 is the most recently due, p{n-1} the oldest-due.
+        scheduledAt: new Date(NOW.getTime() - (i + 1) * MIN),
+        targets: [
+          {
+            id: `t${i}`,
+            postId: `p${i}`,
+            status: "PENDING",
+            platform: "THREADS",
+            externalPostId: null,
+            publishedAt: null,
+          },
+        ],
+      })
+    );
+  }
+
+  test("a due-set larger than the batch claims only batchSize posts", async () => {
+    const { db, posts } = createFakeDb({ posts: dueBacklog(10) });
+    const { fn, published } = okPublish();
+
+    const stats = await runScheduledPublishTick({
+      db,
+      publish: fn,
+      now: NOW,
+      batchSize: 4,
+    });
+
+    assert.equal(stats.checked, 4, "only one batch is read");
+    assert.equal(published.length, 4);
+    assert.equal(
+      posts.filter((p) => p.status === "SCHEDULED").length,
+      6,
+      "the rest stay SCHEDULED for the next tick — bounded, not dropped"
+    );
+  });
+
+  test("the batch is oldest-DUE-first, not oldest-created-first", async () => {
+    // Every post is created at the same instant, so only scheduledAt can
+    // produce this ordering: p9 is the longest overdue.
+    const { db } = createFakeDb({ posts: dueBacklog(10) });
+    const { fn, published } = okPublish();
+
+    await runScheduledPublishTick({
+      db,
+      publish: fn,
+      now: NOW,
+      batchSize: 3,
+    });
+
+    assert.deepEqual(published, ["p9", "p8", "p7"]);
+  });
+
+  test("successive ticks drain the backlog without re-publishing a claimed post", async () => {
+    const { db, posts } = createFakeDb({ posts: dueBacklog(10) });
+    const published: string[] = [];
+    const { fn } = okPublish(published);
+
+    for (let tick = 0; tick < 3; tick++) {
+      await runScheduledPublishTick({ db, publish: fn, now: NOW, batchSize: 4 });
+    }
+
+    assert.equal(published.length, 10, "backlog drains across ticks");
+    assert.equal(
+      new Set(published).size,
+      10,
+      "the conditional claim still guarantees one publish per post"
+    );
+    assert.equal(posts.filter((p) => p.status === "SCHEDULED").length, 0);
+  });
+
+  test("overlapping ticks over one batch still publish each post once", async () => {
+    const { db } = createFakeDb({ posts: dueBacklog(6) });
+    const published: string[] = [];
+    const { fn } = okPublish(published);
+
+    // Two invocations racing over the same bounded batch (a */5 cadence can
+    // overlap a tick that runs close to maxDuration).
+    await Promise.all([
+      runScheduledPublishTick({ db, publish: fn, now: NOW, batchSize: 6 }),
+      runScheduledPublishTick({ db, publish: fn, now: NOW, batchSize: 6 }),
+    ]);
+
+    assert.equal(published.length, 6);
+    assert.equal(new Set(published).size, 6, "no duplicate publish");
+  });
+
+  test("the recovery pass is bounded and oldest-stuck-first", async () => {
+    const stuck = Array.from({ length: 8 }, (_, i) =>
+      scheduledPost({
+        id: `s${i}`,
+        status: "PUBLISHING",
+        // s7 has been stuck the longest.
+        updatedAt: new Date(NOW.getTime() - STALE_PUBLISHING_MS - (i + 1) * MIN),
+        scheduledAt: new Date(NOW.getTime() - MIN),
+        targets: [
+          {
+            id: `st${i}`,
+            postId: `s${i}`,
+            status: "PUBLISHING",
+            platform: "THREADS",
+            externalPostId: null,
+            publishedAt: null,
+          },
+        ],
+      })
+    );
+    const { db, posts } = createFakeDb({ posts: stuck });
+
+    const stats = await recoverStalePublishing(db, NOW, { batchSize: 3 });
+
+    assert.equal(stats.recovered, 3, "only one batch is recovered per pass");
+    const recovered = posts
+      .filter((p) => p.status === "SCHEDULED")
+      .map((p) => p.id);
+    assert.deepEqual(recovered, ["s5", "s6", "s7"].sort());
+  });
+});
+
+describe("bounded tick concurrency", () => {
+  function dueBatch(n: number): PostRow[] {
+    return Array.from({ length: n }, (_, i) =>
+      scheduledPost({
+        id: `c${i}`,
+        scheduledAt: new Date(NOW.getTime() - (n - i) * MIN),
+        targets: [
+          {
+            id: `ct${i}`,
+            postId: `c${i}`,
+            status: "PENDING",
+            platform: "THREADS",
+            externalPostId: null,
+            publishedAt: null,
+          },
+        ],
+      })
+    );
+  }
+
+  /** Publish that records max observed overlap, so concurrency is measurable. */
+  function trackingPublish(delayTicks = 1) {
+    let inFlight = 0;
+    let peak = 0;
+    const order: string[] = [];
+    return {
+      get peak() {
+        return peak;
+      },
+      order,
+      fn: async (post: { id: string; text: string }) => {
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        order.push(post.id);
+        for (let i = 0; i < delayTicks; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        inFlight--;
+        return { ok: true, externalPostId: `ext-${post.id}` } as const;
+      },
+    };
+  }
+
+  test("posts publish simultaneously up to the concurrency limit", async () => {
+    const { db } = createFakeDb({ posts: dueBatch(8) });
+    const publisher = trackingPublish(2);
+
+    const stats = await runScheduledPublishTick({
+      db,
+      publish: publisher.fn,
+      now: NOW,
+      concurrency: 4,
+    });
+
+    assert.equal(stats.published, 8);
+    assert.equal(publisher.peak, 4, "four posts were genuinely in flight at once");
+  });
+
+  test("concurrency never exceeds the configured limit", async () => {
+    const { db } = createFakeDb({ posts: dueBatch(10) });
+    const publisher = trackingPublish(3);
+
+    await runScheduledPublishTick({
+      db,
+      publish: publisher.fn,
+      now: NOW,
+      concurrency: 2,
+    });
+
+    assert.equal(publisher.peak, 2, "the bound is a bound, not a suggestion");
+  });
+
+  test("concurrency: 1 reproduces the previous serial behaviour", async () => {
+    const { db } = createFakeDb({ posts: dueBatch(5) });
+    const publisher = trackingPublish(2);
+
+    await runScheduledPublishTick({
+      db,
+      publish: publisher.fn,
+      now: NOW,
+      concurrency: 1,
+    });
+
+    assert.equal(publisher.peak, 1);
+  });
+
+  test("each post is still claimed exactly once under concurrency", async () => {
+    const { db, posts } = createFakeDb({ posts: dueBatch(12) });
+    const publisher = trackingPublish(1);
+
+    const stats = await runScheduledPublishTick({
+      db,
+      publish: publisher.fn,
+      now: NOW,
+      concurrency: 6,
+    });
+
+    assert.equal(publisher.order.length, 12);
+    assert.equal(
+      new Set(publisher.order).size,
+      12,
+      "the conditional claim still guarantees one publish per post"
+    );
+    assert.equal(stats.published, 12);
+    // The fake publisher does not finalize status (the real
+    // publishPostTargets does), so what the tick itself owns is the claim:
+    // every post left SCHEDULED and none was claimed twice.
+    assert.equal(
+      posts.filter((p) => p.status === "SCHEDULED").length,
+      0,
+      "every post was claimed"
+    );
+    assert.equal(stats.skipped, 0, "no post was claimed by a second worker");
+  });
+
+  test("two overlapping concurrent ticks publish each post once", async () => {
+    const { db } = createFakeDb({ posts: dueBatch(8) });
+    const publisher = trackingPublish(2);
+
+    await Promise.all([
+      runScheduledPublishTick({ db, publish: publisher.fn, now: NOW, concurrency: 4 }),
+      runScheduledPublishTick({ db, publish: publisher.fn, now: NOW, concurrency: 4 }),
+    ]);
+
+    assert.equal(
+      new Set(publisher.order).size,
+      publisher.order.length,
+      "no post was published twice across overlapping invocations"
+    );
+    assert.equal(new Set(publisher.order).size, 8);
+  });
+
+  test("one post failing does not abort its in-flight siblings", async () => {
+    const { db, posts } = createFakeDb({ posts: dueBatch(4) });
+    const published: string[] = [];
+
+    const stats = await runScheduledPublishTick({
+      db,
+      publish: async (post) => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (post.id === "c1") throw new Error("provider exploded");
+        published.push(post.id);
+        return { ok: true, externalPostId: `ext-${post.id}` } as const;
+      },
+      now: NOW,
+      concurrency: 4,
+    });
+
+    assert.equal(stats.published, 3, "siblings completed");
+    assert.equal(stats.failed, 1);
+    assert.deepEqual(published.sort(), ["c0", "c2", "c3"]);
+    const failed = posts.find((p) => p.id === "c1");
+    assert.equal(failed?.status, "FAILED", "the failing post is still repaired");
+    assert.equal(failed?.targets[0].status, "FAILED");
+  });
+
+  test("the budget is checked per chunk and stops the next one", async () => {
+    const { db, posts } = createFakeDb({ posts: dueBatch(12) });
+    let clockValue = 0;
+
+    const stats = await runScheduledPublishTick({
+      db,
+      publish: async (post) => {
+        // Blow the budget while the first chunk is in flight.
+        clockValue = 99_000;
+        return { ok: true, externalPostId: `ext-${post.id}` } as const;
+      },
+      now: NOW,
+      clock: () => clockValue,
+      tickBudgetMs: 42_000,
+      concurrency: 4,
+    });
+
+    assert.equal(
+      stats.checked,
+      4,
+      "the in-flight chunk completes; the next chunk is not started"
+    );
+    assert.equal(stats.published, 4);
+    assert.equal(
+      posts.filter((p) => p.status === "SCHEDULED").length,
+      8,
+      "the remainder waits for the next invocation, still in due order"
+    );
   });
 });
 

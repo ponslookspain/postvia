@@ -3,6 +3,7 @@ import { handleUploadPresigned } from "@vercel/blob/client";
 import type { HandleUploadPresignedBody } from "@vercel/blob/client";
 import { getApiUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { gateWriteRequest, WRITE_LIMIT_MEDIA_UPLOAD } from "@/lib/abuse";
 import { MEDIA_LIMITS, validateMediaInput } from "@/lib/media";
 import {
   createPutSignedToken,
@@ -78,6 +79,18 @@ export async function POST(request: NextRequest) {
         const user = await getApiUser();
         if (!user) {
           throw new Error("Not authenticated");
+        }
+        // Bound the signed-token mint rate per user+IP (persistent buckets):
+        // tokens carry a 5-min TTL, so an unbounded mint is upload-amplification.
+        if (
+          !(await gateWriteRequest({
+            request,
+            userId: user.id,
+            scope: "media-upload",
+            userMax: WRITE_LIMIT_MEDIA_UPLOAD,
+          }))
+        ) {
+          throw new Error("Too many upload requests. Please wait before trying again.");
         }
         const parsed = parseClientPayload(clientPayload);
         if (!parsed.ok) {

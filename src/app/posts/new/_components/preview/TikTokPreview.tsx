@@ -40,7 +40,7 @@ export function TikTokPreview({
           <div className="flex aspect-[9/16] max-h-96 w-full flex-col items-center justify-center gap-2.5 p-6 text-center">
             <span
               aria-hidden="true"
-              className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+              className="flex size-10 items-center justify-center rounded-xl bg-card text-muted-foreground"
             >
               <ClapperboardIcon className="size-5" />
             </span>
@@ -81,7 +81,7 @@ export function TikTokPreview({
             </p>
           )}
           {privacy && (
-            <p className="text-[11px] text-white/70">Privacy: {privacy}</p>
+            <p className="text-meta text-white/70">Privacy: {privacy}</p>
           )}
         </div>
       </div>

@@ -10,9 +10,11 @@ import {
 } from "@/lib/abuse";
 import {
   ABUSE_EVENT_RETENTION_MS,
+  RATE_BUCKET_GRACE_MS,
   retentionCutoff,
   STRIPE_EVENT_RETENTION_MS,
   sweepAbuseEvents,
+  sweepRateBuckets,
   sweepStripeEvents,
 } from "@/lib/retention";
 import {
@@ -21,10 +23,14 @@ import {
   type SchedulingDb,
 } from "@/lib/scheduling";
 
-// One scheduled video publish can poll Meta's container for up to ~4
-// minutes; the tick stops claiming new posts at the internal budget
-// (CRON_TICK_BUDGET_MS) and the rest wait for the next invocation.
-export const maxDuration = 300;
+// Vercel Hobby caps an invocation at 60s and clamps anything larger, so this
+// declares what actually happens rather than an aspirational 300. The tick
+// stops claiming new posts at `cronTickBudgetMs()` (derived from this same
+// ceiling) and the rest wait for the next invocation.
+//
+// On a plan with a higher ceiling, raise this AND set FUNCTION_MAX_DURATION_MS
+// so the tick budget follows — see docs/backend-audit-followup.md.
+export const maxDuration = 60;
 
 async function handleCron(request: NextRequest): Promise<NextResponse> {
   void request;
@@ -81,6 +87,17 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     reportError("cron", "abuse event sweep failed", error);
   }
+  // Persistent rate-limit buckets: dead once resetAt passes, kept a further
+  // grace window so the sweep never races an in-flight reset. Same
+  // best-effort contract as the sweeps above — a failure never fails the tick.
+  let rateBuckets = 0;
+  try {
+    rateBuckets = await sweepRateBuckets(
+      retentionCutoff(nowMs, RATE_BUCKET_GRACE_MS)
+    );
+  } catch (error) {
+    reportError("cron", "rate bucket sweep failed", error);
+  }
   return NextResponse.json({
     ok: true,
     ...stats,
@@ -88,6 +105,7 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
     tombstones,
     stripeEvents,
     abuseEvents,
+    rateBuckets,
   });
 }
 

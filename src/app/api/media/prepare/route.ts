@@ -20,9 +20,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Auth first: unauthenticated callers get 401 without burning quota,
+    // and the gate below always runs for authenticated users.
     const user = await getApiUser();
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
     if (
-      user &&
       !(await gateWriteRequest({
         request,
         userId: user.id,

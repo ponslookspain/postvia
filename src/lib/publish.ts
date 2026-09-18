@@ -266,6 +266,10 @@ async function resolveTargetAccount(
   if (!matchTargetAccount(postUserId, target, account)) {
     return null;
   }
+  // Tokens stay AS STORED here (possibly encrypted). Each provider's
+  // `ensureFresh*Token` needs the raw stored value for its rotation
+  // compare-and-swap and decrypts internally at the point of use — see
+  // social-token-crypto.ts. Decrypting here would break that CAS.
   return account;
 }
 
@@ -392,17 +396,28 @@ async function executeXTarget(
           await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
           return failedOutcome(target, error);
         }
-        const blob = await fetchPrivateBlob(item.pathname);
-        if (!blob?.stream) {
-          const error = "The stored media could not be read for X upload. Retry the post.";
-          await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
-          return failedOutcome(target, error);
-        }
-        const bytes = await new Response(blob.stream).arrayBuffer();
+        // Ranged reads instead of buffering the whole file: X's INIT only
+        // needs the byte count, which the Media row already carries, so peak
+        // memory is one 4 MB segment rather than up to the full 100 MB video
+        // limit. Same model the TikTok video path already uses.
         const uploaded = await uploadXMedia(
           accessToken,
           {
-            bytes,
+            source: {
+              totalBytes: item.size,
+              readChunk: async (start, endInclusive) => {
+                const blob = await fetchPrivateBlob(
+                  item.pathname,
+                  `bytes=${start}-${endInclusive}`
+                );
+                if (!blob?.stream) {
+                  throw new Error(
+                    "The stored media could not be read for X upload. Retry the post."
+                  );
+                }
+                return new Response(blob.stream).arrayBuffer();
+              },
+            },
             mediaType: item.mimeType,
             mediaCategory: xMediaCategoryForMime(item.mimeType),
           }

@@ -4,7 +4,10 @@ import { ThreadsProvider } from "@/lib/social/threads";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { getEffectivePlan } from "@/lib/entitlements";
-import { createSocialAccountRaceSafe } from "@/lib/social-accounts";
+import {
+  createSocialAccountRaceSafe,
+  encryptAccountTokens,
+} from "@/lib/social-accounts";
 import {
   gateNewSocialLink,
   gateOAuthCallback,
@@ -110,7 +113,7 @@ export async function GET(request: NextRequest) {
       // this user's row atomically; a concurrently deleted row updates nothing.
       await prisma.socialAccount.updateMany({
         where: { id: existingAccount.id, userId: user.id },
-        data: accountData,
+        data: encryptAccountTokens(accountData),
       });
     } else {
       // Abuse gate for fresh links (reconnects above skip it): one external

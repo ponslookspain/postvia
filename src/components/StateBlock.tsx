@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import { TriangleAlertIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import {
   Empty,
   EmptyContent,
@@ -62,11 +67,13 @@ export function ErrorBlock({
   return (
     <Alert color="error" variant="outline" className={className}>
       <TriangleAlertIcon />
-      <AlertTitle>{title}</AlertTitle>
-      <AlertDescription>
-        {description}
-        {action && <span className="mt-2 block">{action}</span>}
-      </AlertDescription>
+      <AlertContent>
+        <AlertTitle>{title}</AlertTitle>
+        <AlertDescription>
+          {description}
+          {action && <span className="mt-2 block">{action}</span>}
+        </AlertDescription>
+      </AlertContent>
     </Alert>
   );
 }

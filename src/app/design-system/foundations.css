@@ -1,0 +1,150 @@
+/* ============================================================================
+   PostVIA Design System — 1. FOUNDATIONS
+   ----------------------------------------------------------------------------
+   Raw, theme-agnostic scales. Nothing here names a product meaning; the
+   meaning is assigned one layer up, in `semantic.css`.
+
+   Layer order (see `globals.css`):
+     foundations.css  → semantic.css → @layer base
+
+   Canonical for:  Colors (primitives) · Typography · Spacing · Radius.
+                    (Surfaces, Borders and Elevation are tone decisions and
+                    therefore live in `semantic.css`.)
+
+   Rule: every value below is consumed by the product or by a component
+   primitive. Add a step only when a real consumer needs it.
+   ========================================================================= */
+
+/* ----------------------------------------------------------------------------
+   Typography
+   ----------------------------------------------------------------------------
+   Families are supplied by `next/font` in `src/app/layout.tsx`:
+     --font-sans        Inter       (body)
+     --font-heading     DM Sans     (headings, `font-heading`)
+     --font-geist-mono  Geist Mono  (monospace)
+
+   `@theme inline` is required: the value is inlined into the utility instead
+   of being re-emitted as a custom property, so `--font-sans` keeps pointing at
+   the next/font variable on <html> rather than forming a self-reference.
+
+   Scale — the four documented steps come from Tailwind's own ramp:
+     page title  text-2xl / leading-8  (24 / 32, semibold, tracking-tight)
+     section     text-lg  / leading-7  (18 / 28, medium)
+     body        text-sm               (14 / 20)
+     meta        text-xs               (12 / 16, muted)
+
+   PostVIA also uses four half-steps that Tailwind's ramp does not contain.
+   They were once written as arbitrary values (`text-[15px]`, …) in ~50
+   places; the sizes below are those exact values, named. Font size only —
+   line height stays with the call site, exactly as the arbitrary values did.
+-------------------------------------------------------------------------- */
+@theme inline {
+	--font-sans: var(--font-sans);
+	--font-heading: var(--font-heading);
+	--font-mono: var(--font-geist-mono);
+}
+
+@theme {
+	--text-micro: 0.625rem; /* 10px — chart axis labels, switch glyphs */
+	--text-meta: 0.6875rem; /* 11px — timestamps, column headers, chips  */
+	--text-label: 0.8125rem; /* 13px — dense controls, secondary rows     */
+	--text-prose: 0.9375rem; /* 15px — post body, composer, lead copy     */
+}
+
+/* ----------------------------------------------------------------------------
+   Spacing & layout
+   ----------------------------------------------------------------------------
+   The step scale is Tailwind's (`--spacing`, 0.25rem), stated here so the
+   base unit is part of the design system rather than an implicit default.
+   On top of it sit the three PostVIA page widths and the section rhythm,
+   consumed by `PageContainer` / `PageSections`.
+-------------------------------------------------------------------------- */
+@theme {
+	--spacing: 0.25rem;
+}
+
+:root {
+	/* Page measures — narrow: single-column forms (Billing, Settings);
+	   default: lists (Dashboard, Posts, Accounts); wide: Calendar, composer. */
+	--page-narrow: 48rem;
+	--page-default: 64rem;
+	--page-wide: 76rem;
+
+	/* Vertical rhythm between major page sections. */
+	--section-gap: 2.5rem;
+
+	/* Reading measure for descriptions and helper copy. */
+	--measure-prose: 68ch;
+}
+
+/* ----------------------------------------------------------------------------
+   Radius
+   ----------------------------------------------------------------------------
+   One base value; every step is derived from it, so the geometry of the whole
+   product moves together. Buttons are the exception: they are always fully
+   rounded pills and carry `rounded-full` from the size variant.
+   Never add an arbitrary radius at a call site.
+-------------------------------------------------------------------------- */
+:root {
+	--radius: 0.875rem;
+}
+
+@theme inline {
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ----------------------------------------------------------------------------
+   Colors — primitives
+   ----------------------------------------------------------------------------
+   The raw hues that back the one place a component still needs a raw tint:
+   the `AvatarFallback` color axis (`bg-<hue>-accent` + `text-<hue>-text`).
+   `semantic.css` gives the same hues their product names (`error`, `success`,
+   `warning`, `info`); product code must not reach past `semantic.css`.
+
+   Only the two consumed steps (`-accent`, `-text`) are declared. History: this
+   was a 17-hue generator palette exposing `base / accent / focus / border /
+   hover / text / fg`; every hue and step without a consumer was removed once
+   the Badge/Avatar color axes stopped spanning them (see
+   `docs/design-tokens.md`, "Radian removal").
+-------------------------------------------------------------------------- */
+@theme {
+	/* red */
+	--color-red-accent: oklch(0.956 0.02 17.516);
+	--color-red-text: oklch(0.571 0.212 27.25);
+
+	/* amber */
+	--color-amber-accent: oklch(0.976 0.024 83.417);
+	--color-amber-text: oklch(0.445 0.087 78.294);
+
+	/* emerald */
+	--color-emerald-accent: oklch(0.979 0.023 156.788);
+	--color-emerald-text: oklch(0.538 0.133 149.927);
+
+	/* light-blue */
+	--color-light-blue-accent: oklch(0.966 0.014 246.134);
+	--color-light-blue-text: oklch(0.507 0.141 252.875);
+}
+
+.dark {
+	/* red */
+	--color-red-accent: oklch(0.258 0.066 22.841);
+	--color-red-text: oklch(0.719 0.175 22.489);
+
+	/* amber */
+	--color-amber-accent: oklch(0.266 0.037 83.24);
+	--color-amber-text: oklch(0.834 0.159 79.507);
+
+	/* emerald */
+	--color-emerald-accent: oklch(0.272 0.054 152.092);
+	--color-emerald-text: oklch(0.775 0.212 148.516);
+
+	/* light-blue */
+	--color-light-blue-accent: oklch(0.253 0.042 249.823);
+	--color-light-blue-text: oklch(0.748 0.122 249.759);
+}

@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -172,8 +177,10 @@ export function AdminBillingPanel() {
         {error && (
           <Alert color="error" variant="outline">
             <TriangleAlertIcon />
-            <AlertTitle>Something went wrong</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertContent>
+              <AlertTitle>Something went wrong</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </AlertContent>
           </Alert>
         )}
         <FieldGroup>

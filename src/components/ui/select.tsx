@@ -61,8 +61,8 @@ const selectTriggerVariants = cva(
 	`
     /* PostVIA compat: previous Trigger was w-fit pill. w-fit stays the
        base so explicit className="w-full" still wins via tailwind-merge. */
-    flex bg-bg w-fit items-center outline-none border border-border shadow-xs shadow-black/5 transition-shadow 
-    text-fg data-placeholder:text-fg-tertiary focus-visible:ring-primary-focus  focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 
+    flex bg-background w-fit items-center outline-none border border-border shadow-xs shadow-black/5 transition-shadow 
+    text-foreground data-placeholder:text-muted-foreground focus-visible:ring-ring  focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 
     disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 
     aria-invalid:border-error aria-invalid:ring-error
     [[data-invalid=true]_&]:border-error [[data-invalid=true]_&]:ring-error
@@ -70,9 +70,9 @@ const selectTriggerVariants = cva(
 	{
 		variants: {
 			size: {
-				"28": "gap-0.5 h-7 px-2 py-1.5 text-[13px] rounded-md",
+				"28": "gap-0.5 h-7 px-2 py-1.5 text-label rounded-md",
 				"32": "gap-0.5 h-8 px-2 py-1.5 text-sm rounded-md",
-			// Radian default: h-9 follows the standard radius progression
+			// Default control: h-9 follows the standard radius progression
 			// (36 → rounded-lg).
 			"36": "gap-1 h-9 px-2.5 py-2 text-sm rounded-lg",
 				"40": "gap-1 h-10 px-3 py-2.5 text-sm rounded-lg",
@@ -180,7 +180,7 @@ function SelectContent({
 			<SelectPrimitive.Content
 				data-slot="select-content"
 				className={cn(
-					"border-border bg-elevation-level2 text-fg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md shadow-black/5",
+					"border-border bg-elevation-raised text-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md shadow-black/5",
 					position === "popper" &&
 						"data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1.5 data-[side=right]:translate-x-1.5 data-[side=top]:-translate-y-1",
 					className
@@ -207,7 +207,7 @@ function SelectLabel({ className, ...props }: SelectLabelProps) {
 		<SelectPrimitive.Label
 			data-slot="select-label"
 			className={cn(
-				"text-fg px-2 py-1.5 text-xs font-medium uppercase",
+				"text-foreground px-2 py-1.5 text-xs font-medium uppercase",
 				className
 			)}
 			{...props}
@@ -222,7 +222,7 @@ function SelectItem({ className, children, ...props }: SelectItemProps) {
 		<SelectPrimitive.Item
 			data-slot="select-item"
 			className={cn(
-				"text-fg focus:bg-fill1-alpha relative flex w-full cursor-pointer items-center rounded-sm py-1.5 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50",
+				"text-foreground focus:bg-overlay-4 relative flex w-full cursor-pointer items-center rounded-sm py-1.5 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50",
 				indicatorPosition === "left" ? "ps-8 pe-2" : "ps-2 pe-8",
 				className
 			)}
@@ -237,7 +237,7 @@ function SelectItem({ className, children, ...props }: SelectItemProps) {
 							indicatorPosition === "left" ? "start-2" : "end-2"
 						)}>
 						<SelectPrimitive.ItemIndicator>
-							<Check className="text-fg-secondary size-5" />
+							<Check className="text-muted-foreground size-5" />
 						</SelectPrimitive.ItemIndicator>
 					</span>
 				))}

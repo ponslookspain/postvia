@@ -59,7 +59,7 @@ function BulletList({ bullets }: { bullets: readonly string[] }) {
         >
           <span
             aria-hidden="true"
-            className="mt-[7px] size-1.5 shrink-0 rounded-full bg-signal"
+            className="mt-[7px] size-1.5 shrink-0 rounded-full bg-primary"
           />
           {bullet}
         </li>
@@ -82,7 +82,7 @@ function StepCopy({
       <h3 className="font-heading text-xl font-semibold tracking-tight">
         {heading}
       </h3>
-      <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
+      <p className="mt-2 max-w-xl text-prose leading-relaxed text-muted-foreground">
         {text}
       </p>
       <div className="mt-5">
@@ -195,7 +195,7 @@ export function HowItWorks() {
                   </span>
                   <span
                     className={cn(
-                      "min-w-0 truncate text-[13px] font-medium sm:text-sm",
+                      "min-w-0 truncate text-label font-medium sm:text-sm",
                       !isActive && "text-muted-foreground group-hover:text-foreground"
                     )}
                   >
@@ -252,7 +252,7 @@ export function HowItWorks() {
                       <h3 className="font-heading text-xl font-semibold tracking-tight">
                         {step.heading}
                       </h3>
-                      <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
+                      <p className="mt-2 max-w-xl text-prose leading-relaxed text-muted-foreground">
                         {step.text}
                       </p>
                     </div>

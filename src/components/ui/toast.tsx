@@ -155,7 +155,7 @@ function ToastIcon({ type }: { type: string | undefined }) {
 
   if (type === "error") {
     icon = (
-      <OctagonXIcon className="text-error-text" aria-hidden="true" />
+      <OctagonXIcon className="text-error" aria-hidden="true" />
     )
   }
 
@@ -224,6 +224,7 @@ export {
   ToastClose,
   ToastContent,
   ToastDescription,
+  ToastIcon,
   ToastPortal,
   ToastProvider,
   ToastTitle,

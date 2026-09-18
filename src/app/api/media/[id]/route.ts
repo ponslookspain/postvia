@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
 import { fetchPrivateBlob, deleteBlobs } from "@/lib/blob";
 import { runMediaDeleteFlow } from "@/lib/delete-resources";
+import { rangeLength, resolveRange, toRangeHeader } from "@/lib/http-range";
 
 export async function GET(
   request: NextRequest,
@@ -27,17 +28,39 @@ export async function GET(
     // only this user's own browser stores it - no cross-user exposure,
     // including after deletion (ids are never recycled).
     const etag = `"${media.id}"`;
-    const range = request.headers.get("range");
+    const rangeHeader = request.headers.get("range");
     // Only short-circuit full reads; never shortcut a byte-range request
     // (that would break resumable/video byte fetching).
-    if (!range && request.headers.get("if-none-match") === etag) {
+    if (!rangeHeader && request.headers.get("if-none-match") === etag) {
       return new NextResponse(null, {
         status: 304,
         headers: { ETag: etag, "Cache-Control": "private, max-age=3600" },
       });
     }
 
-    const result = await fetchPrivateBlob(media.pathname, range);
+    // `Media.size` is the stored object's true length (written from the head
+    // of the canonical object), so range satisfiability is decided here
+    // without a second round-trip to the store.
+    const range = resolveRange(rangeHeader, media.size);
+
+    // A range that starts past the entity is answered without touching the
+    // store at all — 416 must carry `Content-Range: bytes * /size` so the
+    // client can correct itself.
+    if (range.kind === "unsatisfiable") {
+      return new NextResponse(null, {
+        status: 416,
+        headers: {
+          "Content-Range": range.contentRange,
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "private, max-age=3600",
+        },
+      });
+    }
+
+    const result = await fetchPrivateBlob(
+      media.pathname,
+      range.kind === "partial" ? toRangeHeader(range) : null
+    );
     if (!result) {
       return NextResponse.json(
         { error: "Media not found" },
@@ -55,11 +78,17 @@ export async function GET(
     headers.set("ETag", etag);
     headers.set("Accept-Ranges", "bytes");
 
-    const contentLength = result.headers.get("content-length");
-    if (contentLength) headers.set("Content-Length", contentLength);
+    if (range.kind === "partial") {
+      // 206 + Content-Range is what makes seeking work. Returning 200 here
+      // (the previous behavior) tells the client the partial body is the
+      // WHOLE entity, which truncates video playback at the first chunk.
+      headers.set("Content-Range", range.contentRange);
+      headers.set("Content-Length", String(rangeLength(range)));
+      return new Response(result.stream, { status: 206, headers });
+    }
 
-    const contentRange = result.headers.get("content-range");
-    if (contentRange) headers.set("Content-Range", contentRange);
+    const contentLength = result.headers.get("content-length");
+    headers.set("Content-Length", contentLength ?? String(media.size));
 
     return new Response(result.stream, { status: 200, headers });
   } catch {

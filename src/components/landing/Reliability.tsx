@@ -77,7 +77,7 @@ export function Reliability() {
                 key={guarantee.title}
                 className="grid gap-1 border-t border-border py-4 sm:grid-cols-[220px_minmax(0,1fr)] sm:gap-6"
               >
-                <h3 className="text-[15px] font-medium">{guarantee.title}</h3>
+                <h3 className="text-prose font-medium">{guarantee.title}</h3>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   {guarantee.text}
                 </p>

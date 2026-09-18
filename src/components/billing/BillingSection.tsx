@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -254,16 +259,18 @@ export function BillingSection({
               initial.postsLimit !== null &&
               initial.postsUsed >= initial.postsLimit && (
                 <Alert color="neutral" variant="outline">
-                  <AlertTitle>
-                    You&apos;ve reached your {initial.postsLimit} free posts
-                    this month.
-                  </AlertTitle>
-                  <AlertDescription>
-                    <UpgradeCta
-                      reason="New posts are paused until your allowance resets next month."
-                      upgradeTo="growth"
-                    />
-                  </AlertDescription>
+                  <AlertContent>
+                    <AlertTitle>
+                      You&apos;ve reached your {initial.postsLimit} free posts
+                      this month.
+                    </AlertTitle>
+                    <AlertDescription>
+                      <UpgradeCta
+                        reason="New posts are paused until your allowance resets next month."
+                        upgradeTo="growth"
+                      />
+                    </AlertDescription>
+                  </AlertContent>
                 </Alert>
               )}
             <div>
@@ -289,48 +296,58 @@ export function BillingSection({
             </div>
             {initial.status === "CANCELLING" && periodEnd && (
               <Alert color="neutral" variant="outline">
-                <AlertTitle>Canceling on {periodEnd}</AlertTitle>
-                <AlertDescription>
-                  Full access until then; afterwards the Free plan applies.
-                </AlertDescription>
+                <AlertContent>
+                  <AlertTitle>Canceling on {periodEnd}</AlertTitle>
+                  <AlertDescription>
+                    Full access until then; afterwards the Free plan applies.
+                  </AlertDescription>
+                </AlertContent>
               </Alert>
             )}
             {initial.checkoutResult === "cancelled" && (
               <Alert color="neutral" variant="outline">
-                <AlertTitle>Checkout canceled</AlertTitle>
-                <AlertDescription>
-                  No charge was made. You can subscribe any time.
-                </AlertDescription>
+                <AlertContent>
+                  <AlertTitle>Checkout canceled</AlertTitle>
+                  <AlertDescription>
+                    No charge was made. You can subscribe any time.
+                  </AlertDescription>
+                </AlertContent>
               </Alert>
             )}
             {initial.checkoutPending && (
               <Alert color="neutral" variant="outline">
-                <AlertTitle>Payment processing</AlertTitle>
-                <AlertDescription>
-                  Your checkout is confirming with the payment provider. Your
-                  plan activates automatically once it is confirmed — no need
-                  to pay again.
-                </AlertDescription>
+                <AlertContent>
+                  <AlertTitle>Payment processing</AlertTitle>
+                  <AlertDescription>
+                    Your checkout is confirming with the payment provider. Your
+                    plan activates automatically once it is confirmed — no need
+                    to pay again.
+                  </AlertDescription>
+                </AlertContent>
               </Alert>
             )}
             {(initial.status === "PAST_DUE" || initial.status === "UNPAID") && (
               <Alert color="neutral" variant="outline">
-                <AlertTitle>Payment needs attention</AlertTitle>
-                <AlertDescription>
-                  Update your payment method to keep your plan. Your posts
-                  and accounts are kept.
-                </AlertDescription>
+                <AlertContent>
+                  <AlertTitle>Payment needs attention</AlertTitle>
+                  <AlertDescription>
+                    Update your payment method to keep your plan. Your posts
+                    and accounts are kept.
+                  </AlertDescription>
+                </AlertContent>
               </Alert>
             )}
             {(initial.status === "CANCELED" || initial.status === "EXPIRED") && (
               <Alert color="neutral" variant="outline">
-                <AlertTitle>
-                  {initial.status === "CANCELED" ? "Subscription canceled" : "Subscription expired"}
-                </AlertTitle>
-                <AlertDescription>
-                  The Free plan applies now. Your posts and accounts are kept —
-                  resubscribe any time to unlock paid limits again.
-                </AlertDescription>
+                <AlertContent>
+                  <AlertTitle>
+                    {initial.status === "CANCELED" ? "Subscription canceled" : "Subscription expired"}
+                  </AlertTitle>
+                  <AlertDescription>
+                    The Free plan applies now. Your posts and accounts are kept —
+                    resubscribe any time to unlock paid limits again.
+                  </AlertDescription>
+                </AlertContent>
               </Alert>
             )}
             {error && (
@@ -403,14 +420,14 @@ export function BillingSection({
                 key={plan.id}
                 className={cn(
                   "h-full",
-                  recommended && "border-signal/30 bg-signal/10"
+                  recommended && "border-primary/30 bg-primary/10"
                 )}
               >
                 <CardHeader>
                   <div className="flex flex-wrap items-center gap-2">
                     <CardTitle>{plan.name}</CardTitle>
                     {recommended && (
-                      <Badge variant="strong" color="primary" className="border-signal/30 bg-signal/10 text-signal">
+                      <Badge variant="strong" color="primary" className="border-primary/30 bg-primary/10 text-primary">
                         Recommended
                       </Badge>
                     )}
@@ -433,7 +450,7 @@ export function BillingSection({
                           aria-hidden="true"
                           className={cn(
                             "mt-0.5 size-4 shrink-0",
-                            recommended ? "text-signal" : "text-muted-foreground"
+                            recommended ? "text-primary" : "text-muted-foreground"
                           )}
                         />
                         <span>{feature}</span>

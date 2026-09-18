@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   checkAbuseRate,
   getAbusePepper,
+  getClientIp,
   hashRateKey,
   liveAbuseStores,
 } from "@/lib/abuse";
 import { logErrorDiagnostic } from "@/lib/diagnostics";
 import { normalizeOtpEmail, isValidOtpEmail } from "@/lib/otp";
 import {
+  OTP_VERIFY_IP_MAX_PER_WINDOW,
   OTP_VERIFY_MAX_PER_WINDOW,
   OTP_VERIFY_WINDOW_MS,
 } from "@/lib/otp-config";
@@ -38,6 +40,20 @@ export async function POST(request: NextRequest) {
         windowMs: OTP_VERIFY_WINDOW_MS,
         stores: liveAbuseStores,
       });
+      // Roomy per-IP shell against distributed guessing across rotated
+      // emails from one source; per-email bucket stays authoritative.
+      if (allowed) {
+        const ip = getClientIp(request);
+        if (ip) {
+          allowed = await checkAbuseRate({
+            scope: "otp-verify-ip",
+            keyHash: hashRateKey(["otp-verify-ip", ip], pepper),
+            max: OTP_VERIFY_IP_MAX_PER_WINDOW,
+            windowMs: OTP_VERIFY_WINDOW_MS,
+            stores: liveAbuseStores,
+          });
+        }
+      }
     } catch (error) {
       logErrorDiagnostic("abuse", "otp-verify rate gate failed", error);
     }

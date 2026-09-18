@@ -7,9 +7,11 @@ import { gateWriteRequest, WRITE_LIMIT_PUBLISH } from "@/lib/abuse";
 import { publishPostTargets } from "@/lib/publish";
 import { reportError } from "@/lib/diagnostics";
 
-// Threads/TikTok video publishing can keep processing for minutes; the
-// work continues in the background (waitUntil) within this 300s window.
-export const maxDuration = 300;
+// Vercel Hobby clamps an invocation to 60s, so declaring 300 was fiction.
+// The background work (waitUntil) therefore has ~60s, not minutes: a video
+// target that outlives it stays PUBLISHING with its externalJobId persisted
+// and is finished by the cron resume path — recoverable, never duplicated.
+export const maxDuration = 60;
 
 export async function POST(
   request: NextRequest,

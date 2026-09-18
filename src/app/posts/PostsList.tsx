@@ -82,7 +82,7 @@ function MediaThumb({ post }: { post: PostListItem }) {
         </span>
       )}
       {post.mediaCount > 1 && (
-        <span className="absolute right-1 bottom-1 rounded-md bg-foreground/80 px-1.5 py-0.5 text-[11px] font-medium text-primary-foreground tabular-nums">
+        <span className="absolute right-1 bottom-1 rounded-md bg-foreground/80 px-1.5 py-0.5 text-meta font-medium text-primary-foreground tabular-nums">
           +{post.mediaCount - 1}
         </span>
       )}
@@ -359,10 +359,10 @@ export function PostsList({
           />
         )
       ) : (
-        <div className="overflow-hidden rounded-xl bg-panel">
+        <div className="overflow-hidden rounded-xl bg-card">
           <div
             aria-hidden="true"
-            className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border bg-muted/40 px-4 py-2.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase md:grid"
+            className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border bg-muted/40 px-4 py-2.5 text-meta font-medium tracking-wide text-muted-foreground uppercase md:grid"
           >
             <span>Media</span>
             <span>Content</span>
@@ -375,7 +375,7 @@ export function PostsList({
             {visible.map((post) => (
               <li
                 key={post.id}
-                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-fill1-alpha md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4 md:px-4 md:py-3.5"
+                className="grid grid-cols-[56px_minmax(0,1fr)_44px] items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-overlay-4 md:grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] md:gap-4 md:px-4 md:py-3.5"
               >
                 <Link
                   href={`/posts/${post.id}`}
@@ -439,11 +439,11 @@ export function PostsList({
                     </span>
                   ))}
                 </span>
-                <span className="hidden min-w-0 items-center gap-1.5 text-[13px] text-muted-foreground md:flex">
+                <span className="hidden min-w-0 items-center gap-1.5 text-label text-muted-foreground md:flex">
                   <StatusDot status={post.status} />
                   {formatStatusLabel(post.status)}
                 </span>
-                <span className="hidden min-w-0 truncate text-[13px] text-muted-foreground tabular-nums md:block">
+                <span className="hidden min-w-0 truncate text-label text-muted-foreground tabular-nums md:block">
                   {formatPostDate({
                     status: post.status,
                     publishedAt: toDate(post.publishedAt),
@@ -478,7 +478,7 @@ export function PostsList({
                     {loadingMore ? "Loading…" : "Load more"}
                   </Button>
                   {loadError && (
-                    <p role="alert" className="text-sm text-error-text">
+                    <p role="alert" className="text-sm text-error">
                       {loadError}
                     </p>
                   )}

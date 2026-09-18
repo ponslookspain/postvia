@@ -49,8 +49,29 @@ schedule). Required dashboard policy, to be set manually (one time):
 Do not claim the repo or docs switch these triggers off by themselves.
 
 Cron: `vercel.json` → `0 3 * * *` → `/api/cron/publish-scheduled`
-(once daily — Hobby-plan maximum; scheduled posts can go out up to ~24h
-late; sub-daily needs a paid Vercel plan). Authenticated by `CRON_SECRET`.
+(once daily; scheduled posts can go out up to ~24h late; sub-daily needs a
+paid Vercel plan). Authenticated by `CRON_SECRET`.
+
+> **VERIFIED 2026-09-17: the plan is Hobby.** One cron per day is the maximum,
+> so the daily schedule is correct and a tighter one would fail deployment.
+> `tests/cron-schedule.test.ts` asserts this.
+>
+> **Consequences of the 60s Hobby function ceiling** (see
+> `docs/backend-audit-followup.md`, Round 2):
+> - `maxDuration` in the cron/publish/retry routes now declares `60`, matching
+>   what the platform actually enforces. It previously declared `300`, which
+>   was silently clamped.
+> - The tick budget derives from that ceiling (`cronTickBudgetMs()`). It was
+>   `240_000` — four times the wall — so it could never fire and the function
+>   was killed mid-publish rather than stopping gracefully.
+> - **Provider polling still exceeds the ceiling** (Threads video 240s,
+>   Instagram/TikTok 150s, X 120s). A long video publish is killed mid-poll;
+>   it is resumable, not corrupted, but only finishes on the next daily tick.
+>   Fixing this needs either a paid plan or a decision to clamp those budgets.
+>
+> On a paid plan: raise the `maxDuration` declarations, set
+> `FUNCTION_MAX_DURATION_MS` so the tick budget follows, and set the cron to
+> `*/5 * * * *`.
 
 ## Database (Neon, `neondb`, `public` schema)
 

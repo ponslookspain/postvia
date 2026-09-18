@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { CalendarClockIcon, TriangleAlertIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -89,7 +94,7 @@ export function ScheduleDialog({
             : null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent data-testid="schedule-dialog">
         <DialogHeader>
           <DialogTitle>Schedule post</DialogTitle>
           <DialogDescription>
@@ -133,8 +138,10 @@ export function ScheduleDialog({
           {scheduleError && (
             <Alert color="error" variant="outline">
               <TriangleAlertIcon />
-              <AlertTitle>Cannot schedule</AlertTitle>
-              <AlertDescription>{scheduleError}</AlertDescription>
+              <AlertContent>
+                <AlertTitle>Cannot schedule</AlertTitle>
+                <AlertDescription>{scheduleError}</AlertDescription>
+              </AlertContent>
             </Alert>
           )}
           {scheduleError &&
@@ -152,7 +159,7 @@ export function ScheduleDialog({
               </div>
             )}
           {quotaBlocked ? (
-            <p className="text-[13px] leading-5 text-muted-foreground">
+            <p className="text-label leading-5 text-muted-foreground">
               {quotaReason ?? "This plan includes a fixed number of posts per month."}{" "}
               <Link
                 href="/billing"
@@ -165,7 +172,7 @@ export function ScheduleDialog({
             blockReason && (
               <p
                 role="status"
-                className="text-[13px] leading-5 text-muted-foreground"
+                className="text-label leading-5 text-muted-foreground"
               >
                 {blockReason}
               </p>
@@ -176,7 +183,11 @@ export function ScheduleDialog({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={!canSave || scheduling}>
+          <Button
+            onClick={onConfirm}
+            disabled={!canSave || scheduling}
+            data-testid="confirm-schedule"
+          >
             {scheduling && <Spinner data-icon="inline-start" />}
             <CalendarClockIcon data-icon="inline-start" />
             {scheduling ? "Scheduling..." : "Confirm schedule"}

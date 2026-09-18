@@ -284,12 +284,54 @@ export const auth = betterAuth({
       trustedProviders: isGoogleOAuthConfigured() ? ["google"] : [],
     },
   },
+  session: {
+    /**
+     * Signed session cookie cache (P1.7).
+     *
+     * `getApiUser()` runs on every API route and every server page, and each
+     * call was a Session + User read — by volume the single most frequent
+     * query in the product. The cache serves those reads from a cookie the
+     * server HMAC-signs (`strategy: "compact"`, the 1.7.4 default), so it
+     * cannot be forged with BETTER_AUTH_SECRET intact.
+     *
+     * THE TRADE, stated plainly: a session revoked server-side (its row
+     * deleted without the browser signing out) stays usable until the cache
+     * expires. That is why:
+     * - `maxAge` is 60s, not the 5-minute default — the window is the whole
+     *   cost of this change, so it is kept as small as is still useful;
+     * - `refreshCache` is left at its default `false`, so the cache can NEVER
+     *   extend itself statelessly past `maxAge`; at expiry it goes back to
+     *   the database.
+     *
+     * What the window does NOT affect, verified against this version:
+     * - sign-out: `deleteSessionCookie` expires the cache cookie alongside
+     *   the token cookie, so logout is immediate, not eventual;
+     * - a rotated session token: the session route compares the cached
+     *   token against the token cookie and discards the cache on mismatch;
+     * - billing and entitlements: `getEffectivePlan` reads Subscription from
+     *   the database directly and never from the session, so a plan change
+     *   is never served stale;
+     * - the admin gate: `ADMIN_EMAILS` is read from the environment per
+     *   request, and changing an account's email to an admin address already
+     *   requires controlling that mailbox.
+     */
+    cookieCache: {
+      enabled: true,
+      maxAge: 60,
+    },
+  },
   advanced: {
     backgroundTasks: {
       handler: waitUntil,
     },
   },
 });
+
+/**
+ * The cache window, re-exported so tests can assert the security trade
+ * stays bounded instead of silently drifting toward the 5-minute default.
+ */
+export const SESSION_COOKIE_CACHE_MAX_AGE_SECONDS = 60;
 
 export type AuthUser = {
   id: string;

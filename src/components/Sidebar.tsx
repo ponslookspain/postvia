@@ -52,10 +52,12 @@ export function Sidebar({
   userEmail: string;
   plan: PlanId;
 }) {
-  // Canonical Radian structure (radianui.com/docs/components/sidebar):
+  // Sidebar structure:
   // SidebarProvider lives in AppShell and wraps both this Sidebar and
-  // SidebarInset as direct children, so the peer-data-[variant=inset]
-  // styles on SidebarInset resolve. No visibility classes here — the
+  // SidebarInset as direct children. The rail is `variant="floating"`:
+  // a separate surface on the bg-background canvas with an 8px inset,
+  // so SidebarInset stays plain canvas (its inset card styles only
+  // resolve for `variant="inset"`). No visibility classes here — the
   // primitive hides itself on mobile (hidden md:block / hidden md:flex
   // + Drawer branch) and sizes via its own --sidebar-width gap.
   const pathname = usePathname();
@@ -88,7 +90,7 @@ export function Sidebar({
   }
 
   return (
-    <SidebarPrimitive variant="inset" collapsible="icon" theme="gray">
+    <SidebarPrimitive variant="floating" collapsible="icon" theme="gray">
       <SidebarHeader
         className={cn(
           "flex-row items-center border-b border-border py-3.5",
@@ -136,7 +138,7 @@ export function Sidebar({
           <div className="px-3 pt-1 pb-2">
             <Link
               href="/billing"
-              className="block rounded-xl bg-bg p-3 outline-none transition-colors hover:bg-fill1 focus-visible:ring-2 focus-visible:ring-primary-focus"
+              className="block rounded-xl bg-background p-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
             >
               <p className="flex items-center gap-1.5 text-sm leading-5 font-medium">
                 <SparklesIcon className="size-4 shrink-0" aria-hidden="true" />
@@ -145,7 +147,7 @@ export function Sidebar({
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 More posts, more accounts and Bulk scheduling.
               </p>
-              <p className="mt-2 text-xs leading-4 font-medium text-primary-text underline underline-offset-4">
+              <p className="mt-2 text-xs leading-4 font-medium text-primary underline underline-offset-4">
                 View plans
               </p>
             </Link>
@@ -159,7 +161,7 @@ export function Sidebar({
           <DropdownMenuTrigger
             aria-label="Account menu"
             className={cn(
-              "flex w-full items-center rounded-lg outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-primary-focus",
+              "flex w-full items-center rounded-lg outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
               collapsed ? "justify-center p-1" : "gap-2.5 px-1.5 py-1.5"
             )}
           >
@@ -241,7 +243,7 @@ export function Sidebar({
             <DropdownMenuDivider />
             <DropdownMenuItem
               onSelect={() => void handleSignOut()}
-              className="text-error-text [&_svg]:text-error-text"
+              className="text-error [&_svg]:text-error"
             >
               <LogOutIcon aria-hidden="true" />
               Sign out

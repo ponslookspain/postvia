@@ -30,7 +30,7 @@ const tabsListStyles = cva(
 				full: "data-[orientation=horizontal]:w-full data-[orientation=horizontal]:items-stretch data-[orientation=horizontal]:*:flex-1",
 			}, // default medium
 			variant: {
-				default: "bg-fill2",
+				default: "bg-accent",
 				open: "data-[orientation=horizontal]:border-b data-[orientation=vertical]:border-r border-border",
 				ghost: "",
 			},
@@ -54,15 +54,15 @@ const tabsListStyles = cva(
 )
 
 const tabsTriggerStyles = cva(
-	"inline-flex items-center justify-center text-sm [&>svg]:size-5 gap-1.5 focus-visible:ring focus-visible:ring-offset-1 whitespace-nowrap font-medium outline-none text-fg-secondary cursor-pointer data-[state=active]:text-fg w-max data-[orientation=vertical]:w-full [&>svg]:text-fg-tertiary [&>svg]:shrink-0 disabled:text-fg-disabled disabled:[&>svg]:text-fg-disabled disabled:cursor-not-allowed box-border",
+	"inline-flex items-center justify-center text-sm [&>svg]:size-5 gap-1.5 focus-visible:ring focus-visible:ring-offset-1 whitespace-nowrap font-medium outline-none text-muted-foreground cursor-pointer data-[state=active]:text-foreground w-max data-[orientation=vertical]:w-full [&>svg]:text-muted-foreground [&>svg]:shrink-0 disabled:text-muted-foreground disabled:[&>svg]:text-muted-foreground disabled:cursor-not-allowed box-border",
 	{
 		variants: {
 			variant: {
 				default:
-					"data-[state=active]:bg-elevation-level2 border border-transparent data-[state=active]:border data-[state=active]:border-soft-alpha data-[state=active]:drop-shadow-xs",
+					"data-[state=active]:bg-elevation-raised border border-transparent data-[state=active]:border data-[state=active]:border-overlay-8 data-[state=active]:drop-shadow-xs",
 				open: "data-[orientation=horizontal]:border-b-2 data-[orientation=vertical]:border-r-2 border-transparent data-[state=active][orientation=horizontal]:border-b-2 data-[state=active][orientation=vertical]:border-r-2 data-[state=active]:border-primary",
 				ghost:
-					"data-[state=active]:bg-primary-accent data-[state=active]:text-primary-text",
+					"data-[state=active]:bg-accent data-[state=active]:text-primary",
 			},
 		},
 		compoundVariants: [

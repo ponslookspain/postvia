@@ -1480,6 +1480,31 @@ export function isRaceConflictError(error: unknown): boolean {
 }
 
 /**
+ * Postgres serialization/deadlock conflicts: the transaction aborted
+ * server-side (40001 serialization_failure, 40P01 deadlock_detected;
+ * Prisma P2034 "transaction failed, please retry"). A transaction that
+ * dies this way committed NOTHING, so re-running an idempotent body in a
+ * fresh transaction cannot double-grant — the conditional claims and the
+ * unique guards re-evaluate from the committed state.
+ *
+ * Detection is strict: Prisma code P2034, or the raw PG sqlstate/message
+ * fingerprints. Anything else (validation, FK, business denials) is NOT a
+ * serialization conflict and must never take the retry path.
+ */
+const SERIALIZATION_FINGERPRINTS = [
+  /40001/,
+  /40P01/,
+  /could not serialize/i,
+  /deadlock detected/i,
+];
+
+export function isSerializationConflictError(error: unknown): boolean {
+  if (prismaCode(error) === "P2034") return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return SERIALIZATION_FINGERPRINTS.some((re) => re.test(message));
+}
+
+/**
  * Best-effort wrapper for cosmetic writes/reads (touch timestamps, soft
  * signals, husk cleanup, telemetry-adjacent lookups). Outside a transaction
  * failures are ignored; INSIDE a transaction (kernel tx-bound stores) the
@@ -2060,6 +2085,16 @@ export const WRITE_LIMIT_ONBOARDING = 20;
 export const WRITE_LIMIT_SETTINGS = 30;
 export const WRITE_LIMIT_PUBLISH = 60;
 export const WRITE_LIMIT_RETRY = 60;
+/** PATCH/DELETE post edits (authenticated writes without a gate). */
+export const WRITE_LIMIT_POSTS_WRITE = 100;
+/** Blob signed-token mint (per-user; upstream of the 5-min TTL). */
+export const WRITE_LIMIT_MEDIA_UPLOAD = 200;
+/** Media status poll (composer polls ~500ms x 20s per upload). */
+export const WRITE_LIMIT_MEDIA_STATUS = 600;
+/** Destructive account wipe (session + confirmation already required). */
+export const WRITE_LIMIT_ACCOUNT_DELETE = 10;
+/** Per-account provider fan-out (TikTok creator-info per request). */
+export const WRITE_LIMIT_CREATOR_INFO = 120;
 /** Shared IP bucket is an order of magnitude roomier (NAT safety). */
 export const WRITE_PATH_IP_MULTIPLIER = 10;
 

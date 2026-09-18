@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
  * reads the same at every size.
  *
  * Dots carry the hue; badge shells stay quiet (neutral outline) except
- * Failed, which uses the error tint. Scheduled uses info blue — distinct
- * from both the red brand/primary accent and the red error state, so a
- * routine future-dated post never reads as a warning.
+ * Failed, which uses the error tint. Scheduled uses info blue — the same
+ * hue as the primary brand action, but only as a status dot/badge tint,
+ * so a routine future-dated post never reads as a warning.
  */
 const DOT_CLASS: Record<string, string> = {
   DRAFT: "bg-muted-foreground",
@@ -39,7 +39,7 @@ export function StatusDot({
   );
 }
 
-// PostVIA → Radian mapping: quiet outline shells, soft neutral fills,
+// PostVIA status mapping: quiet outline shells, soft neutral fills,
 // Failed keeps the error tint.
 const BADGE_STYLE: Record<string, { variant: "outline" | "soft"; color?: "error" }> = {
   DRAFT: { variant: "outline" },

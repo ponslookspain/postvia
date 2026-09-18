@@ -19,12 +19,6 @@
       "skillPath": "prisma-client-api/SKILL.md",
       "computedHash": "5dcc0793337151efa73a444e5adbc7e1c24180778e83b4fe94c9109c391bd333"
     },
-    "radian": {
-      "source": "Radian-OS/radianui",
-      "sourceType": "github",
-      "skillPath": "skills/radian/SKILL.md",
-      "computedHash": "4e9ac50add78d817b1649e33c648015fb3f19d40c36fd04df0f388abf8f7c08b"
-    },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",

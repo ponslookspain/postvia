@@ -7,8 +7,15 @@ import { HowItWorks } from "@/components/landing/HowItWorks";
 import { TailorPreview } from "@/components/landing/TailorPreview";
 import { CalendarBulk } from "@/components/landing/CalendarBulk";
 import { Reliability } from "@/components/landing/Reliability";
+import { HomeFeatures, HomePlatforms, HomeResources } from "@/components/landing/MarketingHub";
 import { Pricing } from "@/components/landing/Pricing";
 import { Faq, FinalCta, Footer } from "@/components/landing/Faq";
+import {
+  organizationSchema,
+  serializeJsonLd,
+  softwareApplicationSchema,
+  websiteSchema,
+} from "@/lib/seo/site";
 
 export const metadata: Metadata = {
   title: "Postvia — Publish everywhere. Stay in one place.",
@@ -38,6 +45,18 @@ export default function HomePage() {
   // Suspense boundary); /dashboard stays a separate route.
   return (
     <div className="min-h-screen overflow-x-clip bg-background font-sans text-foreground antialiased">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationSchema()) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteSchema()) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(softwareApplicationSchema()) }}
+      />
       <NavbarState />
       <main>
         <Hero />
@@ -47,8 +66,11 @@ export default function HomePage() {
         <TailorPreview />
         <CalendarBulk />
         <Reliability />
+        <HomePlatforms />
+        <HomeFeatures />
         <Pricing />
         <Faq />
+        <HomeResources />
         <FinalCta />
       </main>
       <Footer />

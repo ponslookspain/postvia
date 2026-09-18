@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getApiUser } from "@/lib/auth";
+import { gateWriteRequest, WRITE_LIMIT_POSTS_WRITE } from "@/lib/abuse";
 import { deleteBlobs } from "@/lib/blob";
 import { runPostDeleteFlow } from "@/lib/delete-resources";
 import { resolveScheduledAtUpdate } from "@/lib/schedule";
@@ -53,6 +54,19 @@ export async function PATCH(
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "posts-write",
+        userMax: WRITE_LIMIT_POSTS_WRITE,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
     let body: Record<string, unknown>;
     try {
@@ -195,7 +209,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -203,6 +217,19 @@ export async function DELETE(
     const user = await getApiUser();
     if (!user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    if (
+      !(await gateWriteRequest({
+        request,
+        userId: user.id,
+        scope: "posts-write",
+        userMax: WRITE_LIMIT_POSTS_WRITE,
+      }))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait before trying again." },
+        { status: 429 }
+      );
     }
 
     const existing = await findOwnedPost(id, user.id);

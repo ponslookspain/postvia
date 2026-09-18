@@ -1,3 +1,7 @@
+import {
+  decryptToken,
+  encryptRotatedTokens,
+} from "@/lib/social-token-crypto";
 import { prisma } from "@/lib/prisma";
 import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
 import type { MediaKind } from "@/lib/media";
@@ -264,7 +268,7 @@ export async function ensureFreshInstagramToken(
   const db: InstagramTokenStore = store ?? prisma.socialAccount;
   const now = Date.now();
   if (account.expiresAt && account.expiresAt.getTime() > now + 5 * 60_000) {
-    return account.accessToken;
+    return decryptToken(account.accessToken);
   }
   const stored = await db.findUnique({
     where: { id: account.id },
@@ -277,17 +281,21 @@ export async function ensureFreshInstagramToken(
     current.accessToken !== account.accessToken
   ) {
     // Another worker refreshed concurrently; reuse its rotated token.
-    return current.accessToken;
+    return decryptToken(current.accessToken);
   }
-  const refreshed = await refreshInstagramToken(current.accessToken);
+  const refreshed = await refreshInstagramToken(decryptToken(current.accessToken));
   const next = {
     accessToken: refreshed.accessToken,
     expiresAt: refreshed.expiresAt,
   };
+  // Encrypted for storage; `next` stays plaintext because it is also the
+  // return value. The CAS `where` below keeps using the value as READ from
+  // the row, so ciphertext compares byte-for-byte (see social-token-crypto).
+  const persisted = encryptRotatedTokens(next);
   try {
     const claimed = await db.updateMany({
       where: { id: account.id, accessToken: current.accessToken },
-      data: next,
+      data: persisted,
     });
     if (claimed.count === 0) {
       // Lost the rotation race: re-read the winner's token.
@@ -296,13 +304,13 @@ export async function ensureFreshInstagramToken(
         select: { accessToken: true, expiresAt: true },
       });
       if (winner && winner.accessToken !== current.accessToken) {
-        return winner.accessToken;
+        return decryptToken(winner.accessToken);
       }
     }
   } catch {
     // Conditional update unsupported (or transient DB error): fall back
     // to a plain update so the token still rotates, then return it.
-    await db.update({ where: { id: account.id }, data: next });
+    await db.update({ where: { id: account.id }, data: persisted });
   }
   return next.accessToken;
 }

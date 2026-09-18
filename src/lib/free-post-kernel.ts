@@ -7,6 +7,7 @@ import {
   isAbuseDisabled,
   isFailClosedAbuseError,
   isRaceConflictError,
+  isSerializationConflictError,
   isTransientAbuseError,
   linkUserWithClient,
   liveAbuseStores,
@@ -41,6 +42,64 @@ import { isIdempotencyConflict } from "@/lib/idempotency";
  * Paid plans and the admin bypass never enter this kernel: each paid
  * subscription keeps its own per-user limits (see route).
  */
+
+/**
+ * Bounded transaction attempts for the kernel body. The first attempt plus
+ * at most two retries: enough to ride out a cold-start serialization storm,
+ * small enough to never pile up under a sustained flood (the write-rate
+ * gates bound the arrival rate above this).
+ */
+export const FREE_POST_TX_MAX_ATTEMPTS = 3;
+
+/** Desynchronizing backoff between attempts (base × attempt + jitter). */
+export function txRetryBackoffMs(attempt: number): number {
+  return 25 * attempt + Math.floor(Math.random() * 25);
+}
+
+const txDelay = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/**
+ * Runs one transaction attempt, retrying ONLY error classes that prove the
+ * transaction committed nothing:
+ * - serialization/deadlock conflicts (40001/40P01/P2034): the database
+ *   aborted the transaction server-side — guaranteed rollback;
+ * - merge/link race conflicts (P2002/P2003/P2025): same guarantee,
+ *   pre-existing behavior.
+ *
+ * NEVER retried (rethrow immediately):
+ * - FreePostDeny: a business denial (quota exhausted / restricted). The
+ *   empty mutations already rolled back; retrying would only deny again.
+ * - idempotency-key conflicts: they prove a twin already COMMITTED its
+ *   post — the route resolves to the winner's row instead.
+ * - everything else (validation, FK, insert failures, unknown errors):
+ *   commit state is not provably-rolled-back, so a retry could double
+ *   insert. These propagate to the caller (logged 500 / gated fallback).
+ */
+export async function runWithTxRetry<T>(
+  runOnce: () => Promise<T>,
+  opts?: { maxAttempts?: number; backoffMs?: (attempt: number) => number }
+): Promise<T> {
+  const max = opts?.maxAttempts ?? FREE_POST_TX_MAX_ATTEMPTS;
+  const backoff = opts?.backoffMs ?? txRetryBackoffMs;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= max; attempt++) {
+    try {
+      return await runOnce();
+    } catch (error) {
+      if (error instanceof FreePostDeny) throw error;
+      if (isIdempotencyConflict(error)) throw error;
+      lastError = error;
+      const retryable =
+        isRaceConflictError(error) || isSerializationConflictError(error);
+      if (!retryable || attempt === max) throw error;
+      await txDelay(backoff(attempt));
+    }
+  }
+  throw lastError;
+}
 
 /** Thrown inside the transaction to signal a quota/risk denial (rolls back). */
 export class FreePostDeny extends Error {
@@ -318,9 +377,44 @@ export async function runFreePostBody<T>(input: {
     limit: input.limit,
     stores: input.stores,
   });
+  const period = input.period;
+  // Per-user unit claim. Runs on EVERY insert path (allow and observe):
+  // without it, an observe-mode identity denial would mint a post that
+  // consumes no ledger unit, letting a burst at the boundary exceed the
+  // monthly cap. Denial throws so all claims roll back (no phantom).
+  const claimUserUnit = async (): Promise<number | null> => {
+    let row = await input.quota.findUsage(input.userId, period);
+    if (!row) {
+      row = await input.quota.createUsage(
+        input.userId,
+        period,
+        await input.liveCount()
+      );
+    }
+    const granted = await input.quota.incrementIfBelowLimit(
+      row.id,
+      input.limit
+    );
+    if (!granted) {
+      const current = await input.quota.findUsage(input.userId, period);
+      return current?.count ?? input.limit;
+    }
+    return null;
+  };
+  const denyWith = (observed: number): never => {
+    void recordAbuseEvent({
+      identityId: resolution.identityId,
+      kind: "POST_DENY",
+    });
+    // Thrown (not returned) so the identity +1 above rolls back too.
+    throw new FreePostDeny("LIMIT", observed);
+  };
   if (!claim.ok) {
     if (!input.enforce) {
-      // Observe mode: allow without consuming the per-user ledger either.
+      // Observe mode: the identity verdict is telemetry-only, but the
+      // per-user ledger still gates inside the same transaction.
+      const observed = await claimUserUnit();
+      if (observed !== null) denyWith(observed);
       const value = await input.insert();
       return { value, identityId: resolution.identityId };
     }
@@ -330,25 +424,8 @@ export async function runFreePostBody<T>(input: {
     });
     throw new FreePostDeny("LIMIT", claim.observed);
   }
-  const period = input.period;
-  let row = await input.quota.findUsage(input.userId, period);
-  if (!row) {
-    row = await input.quota.createUsage(
-      input.userId,
-      period,
-      await input.liveCount()
-    );
-  }
-  const granted = await input.quota.incrementIfBelowLimit(row.id, input.limit);
-  if (!granted) {
-    const current = await input.quota.findUsage(input.userId, period);
-    void recordAbuseEvent({
-      identityId: resolution.identityId,
-      kind: "POST_DENY",
-    });
-    // Thrown (not returned) so the identity +1 above rolls back too.
-    throw new FreePostDeny("LIMIT", current?.count ?? input.limit);
-  }
+  const observed = await claimUserUnit();
+  if (observed !== null) denyWith(observed);
   // Insert throw propagates: both ledger claims roll back. No phantom.
   const value = await input.insert();
   return { value, identityId: resolution.identityId };
@@ -364,8 +441,10 @@ export async function runFreePostBody<T>(input: {
  * - Business/insert failures throw (the transaction already rolled back —
  *   nothing was consumed, so a retry is safe).
  * - A transaction aborted by a concurrent merge/link race (P2002/P2003/
- *   P2025) is retried exactly once: the body is idempotent (conditional
- *   claims, unique-guarded resolve) and an aborted tx committed nothing.
+ *   P2025) or a serialization/deadlock conflict (40001/40P01/P2034) is
+ *   retried boundedly (runWithTxRetry): the body is idempotent
+ *   (conditional claims, unique-guarded resolve) and an aborted tx
+ *   committed nothing.
  * - Transient store failure degrades to the legacy PostUsage-only path
  *   (still per-user gated) so an abuse-store blip never blocks legitimate
  *   users; that path itself claims + inserts without the identity ledger.
@@ -436,36 +515,28 @@ export async function createFreePostAtomic<T>(input: {
       }
     });
   try {
-    return await runOnce();
+    return await runWithTxRetry(runOnce);
   } catch (txError) {
-    let error: unknown = txError;
     // A unique violation on the idempotency key is NOT a merge/link race:
     // it proves a twin request with the same clientOperationId already
     // committed its post (unique checks only fail against committed rows —
     // an uncommitted twin would block, then proceed-or-fail on its own
-    // fate). Retrying would re-run the whole resolve+claim body just to
-    // fail the insert again, so skip straight to the route-level winner
-    // lookup. Every other race conflict keeps the single optimistic retry.
-    if (isRaceConflictError(txError) && !isIdempotencyConflict(txError)) {
-      // Optimistic-concurrency retry: a concurrent merge/link aborted our
-      // transaction (never a partial commit). The body is idempotent, so
-      // exactly one retry is safe and converts a razor-edge 500 into a
-      // transparent success.
-      try {
-        return await runOnce();
-      } catch (retryError) {
-        error = retryError;
-      }
-    }
+    // fate). runWithTxRetry already skipped it straight to the route-level
+    // winner lookup. Serialization/deadlock conflicts were retried
+    // boundedly inside runWithTxRetry for the same reason: an aborted tx
+    // never partially commits.
+    const error: unknown = txError;
     if (error instanceof FreePostDeny) {
       return { ok: false, code: error.code, observed: error.observed };
     }
     if (isFailClosedAbuseError(error)) throw error;
-    // Fallback ONLY on transient connectivity errors. Anything else
-    // (validation, FK, insert failures) propagates: the transaction already
-    // rolled back with nothing consumed, and a fallback claim here would
-    // burn PostUsage outside any transaction.
-    if (!isTransientAbuseError(error)) throw error;
+    // Fallback ONLY on transient connectivity/serialization errors (still
+    // per-user gated, never an over-grant). Anything else (validation, FK,
+    // insert failures) propagates: the transaction already rolled back
+    // with nothing consumed, and a fallback claim here would burn PostUsage
+    // outside any transaction.
+    if (!isTransientAbuseError(error) && !isSerializationConflictError(error))
+      throw error;
     // Transient: PostUsage-only fallback (per-user gate still enforced).
     // Deliberately no identity-ledger touch here: the failed transaction
     // already rolled back, and an extra observe-claim would consume phantom

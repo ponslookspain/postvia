@@ -16,20 +16,20 @@ export type InputWrapperProps = React.ComponentProps<"div"> &
 
 const inputVariants = cva(
 	`
-	flex w-full items-center bg-bg border border-alpha transition-[color,box-shadow] text-fg placeholder:text-fg-tertiary 
-	focus-visible:ring-primary-focus  focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2   
-	disabled:cursor-not-allowed disabled:opacity-60 disabled:text-fg-disabled disabled:bg-fill2-alpha
-	[&[readonly]]:bg-fill1 [&[readonly]]:cursor-not-allowed
-	file:h-full [&[type=file]]:py-0 file:border-solid file:border-alpha file:bg-transparent 
-	file:font-medium file:not-italic file:text-fg file:p-0 file:border-0 file:border-e
+	flex w-full items-center bg-background border border-overlay-12 transition-[color,box-shadow] text-foreground placeholder:text-muted-foreground 
+	focus-visible:ring-ring  focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2   
+	disabled:cursor-not-allowed disabled:opacity-60 disabled:text-muted-foreground disabled:bg-overlay-8
+	[&[readonly]]:bg-muted [&[readonly]]:cursor-not-allowed
+	file:h-full [&[type=file]]:py-0 file:border-solid file:border-overlay-12 file:bg-transparent 
+	file:font-medium file:not-italic file:text-foreground file:p-0 file:border-0 file:border-e
 	aria-invalid:border-error aria-invalid:ring-error-focus
   `,
 	{
 		variants: {
 			size: {
-				"28": "h-7 text-[13px] px-2 rounded-md file:pe-1.5 file:me-1.5",
+				"28": "h-7 text-label px-2 rounded-md file:pe-1.5 file:me-1.5",
 				"32": "h-8 text-sm px-2 rounded-md file:pe-3 file:me-3",
-			// Radian default: h-9 follows the standard radius progression
+			// Default control: h-9 follows the standard radius progression
 			// (36 → rounded-lg, like 40/44/48).
 			"36": "h-9 text-sm px-3 rounded-lg file:pe-2.5 file:me-2.5",
 				"40": "h-10 text-sm px-3 rounded-lg file:pe-3 file:me-3",
@@ -44,11 +44,11 @@ const inputVariants = cva(
 )
 
 const inputAddonVariants = cva(
-	"flex items-center shrink-0 justify-center bg-elevation-level1 border border-alpha shadow-xs shadow-[rgba(0,0,0,0.05)] text-fg-secondary [&_svg]:text-fg-tertiary",
+	"flex items-center shrink-0 justify-center bg-elevation-raised border border-overlay-12 shadow-xs text-muted-foreground [&_svg]:text-muted-foreground",
 	{
 		variants: {
 			size: {
-				"28": "h-7 min-w-7 text-[13px]  px-2 rounded-md [&_svg:not([class*=size-])]:size-4",
+				"28": "h-7 min-w-7 text-label  px-2 rounded-md [&_svg:not([class*=size-])]:size-4",
 				"32": "h-8 min-w-8 text-sm px-2  rounded-md [&_svg:not([class*=size-])]:size-4.5",
 				"36": "h-9 min-w-9 text-sm px-2.5 rounded-lg [&_svg:not([class*=size-])]:size-5",
 				"40": "h-10 min-w-10 text-sm px-3 rounded-lg [&_svg:not([class*=size-])]:size-5",
@@ -94,7 +94,7 @@ const inputGroupVariants = cva(
 const inputWrapperVariants = cva(
 	`
 	flex items-center gap-1.5
-	has-[:focus-visible]:ring-primary-accent
+	has-[:focus-visible]:ring-accent
 	has-[:focus-visible]:border-primary
 	has-[:focus-visible]:outline-none 
 	has-[:focus-visible]:ring-2
@@ -109,8 +109,8 @@ const inputWrapperVariants = cva(
 	[&_:is([data-slot=input],[data-slot=currency-input])]:w-full 
     [&_:is([data-slot=input],[data-slot=currency-input])]:outline-none 
     [&_:is([data-slot=input],[data-slot=currency-input])]:transition-colors 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:text-fg
-	[&_:is([data-slot=input],[data-slot=currency-input])]:placeholder:text-fg-tertiary 
+	[&_:is([data-slot=input],[data-slot=currency-input])]:text-foreground
+	[&_:is([data-slot=input],[data-slot=currency-input])]:placeholder:text-muted-foreground 
 	[&_:is([data-slot=input],[data-slot=currency-input])]:p-0
 	[&_:is([data-slot=input],[data-slot=currency-input])]:border-0 
 	[&_:is([data-slot=input],[data-slot=currency-input])]:bg-transparent 
@@ -120,7 +120,7 @@ const inputWrapperVariants = cva(
 	[&_:is([data-slot=input],[data-slot=currency-input])]:disabled:cursor-not-allowed
 	[&_:is([data-slot=input],[data-slot=currency-input])]:disabled:opacity-50
 
-	[&_svg]:text-fg-tertiary
+	[&_svg]:text-muted-foreground
 	[&_svg]:shrink-0
 
 	has-[[aria-invalid=true]]:border-error
@@ -137,7 +137,7 @@ const inputWrapperVariants = cva(
 				"48": "gap-2 h-12 [&_svg:not([class*=size-])]:size-5",
 			},
 			disabled: {
-				true: "cursor-not-allowed opacity-60 bg-fill1 has-[:focus-visible]:ring-0 has-[:focus-visible]:border-alpha [&_svg]:text-fg-tertiary",
+				true: "cursor-not-allowed opacity-60 bg-muted has-[:focus-visible]:ring-0 has-[:focus-visible]:border-overlay-12 [&_svg]:text-muted-foreground",
 				false: "",
 			},
 		},

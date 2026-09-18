@@ -74,7 +74,7 @@ function FaqItem({
           id={`faq-button-${index}`}
           className="flex w-full items-center justify-between gap-4 rounded-sm py-4 text-left outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
-          <span className="text-[15px] font-medium">{question}</span>
+          <span className="text-prose font-medium">{question}</span>
           <ChevronDownIcon
             aria-hidden="true"
             className={cn(
@@ -201,13 +201,18 @@ export function Footer() {
             className="grid grid-cols-2 gap-x-12 gap-y-2.5 sm:grid-cols-3"
           >
             {[
-              { href: "#how", label: "How it works" },
-              { href: "#pricing", label: "Pricing" },
-              { href: "#faq", label: "FAQ" },
+              { href: "/features", label: "Features" },
+              { href: "/social-media-scheduler", label: "Scheduler" },
+              { href: "/social-media-calendar", label: "Calendar" },
+              { href: "/cross-platform-publishing", label: "Publishing" },
+              { href: "/platforms/instagram", label: "Instagram" },
+              { href: "/platforms/tiktok", label: "TikTok" },
+              { href: "/platforms/threads", label: "Threads" },
+              { href: "/platforms/x", label: "X" },
+              { href: "/pricing", label: "Pricing" },
+              { href: "/#faq", label: "FAQ" },
               { href: "/privacy", label: "Privacy" },
               { href: "/terms", label: "Terms" },
-              { href: "/login", label: "Sign in" },
-              { href: "/signup", label: "Sign up" },
             ].map((link) => (
               <Link
                 key={link.label}

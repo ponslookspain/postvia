@@ -374,17 +374,24 @@ describe("bridge signing secret precedence", () => {
     }
   });
 
-  test("BETTER_AUTH_SECRET fallback keeps existing URLs verifying", () => {
+  test("no fallback: missing TIKTOK_BRIDGE_SECRET fails closed", () => {
     const savedBridge = process.env.TIKTOK_BRIDGE_SECRET;
     const savedAuth = process.env.BETTER_AUTH_SECRET;
     try {
       delete process.env.TIKTOK_BRIDGE_SECRET;
-      process.env.BETTER_AUTH_SECRET = "auth-secret-fallback";
-      const url = createTiktokMediaUrl({ mediaId: MEDIA_A, baseUrl: BASE, nowMs: NOW });
-      const parsed = parts(url);
+      process.env.BETTER_AUTH_SECRET = "auth-secret-must-not-work";
+      assert.throws(
+        () => createTiktokMediaUrl({ mediaId: MEDIA_A, baseUrl: BASE, nowMs: NOW }),
+        /not configured/
+      );
       assert.deepEqual(
-        verifyTiktokMediaToken({ ...parsed, secret: "auth-secret-fallback", nowMs: NOW }),
-        { ok: true }
+        verifyTiktokMediaToken({
+          mediaId: MEDIA_A,
+          expires: "9999999999",
+          sig: "x",
+          nowMs: NOW,
+        }),
+        { ok: false, reason: "unconfigured" }
       );
     } finally {
       if (savedBridge === undefined) delete process.env.TIKTOK_BRIDGE_SECRET;

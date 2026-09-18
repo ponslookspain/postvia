@@ -50,7 +50,7 @@ export function PreviewRail({
   return (
     <section
       aria-label="Preview"
-      className="flex min-w-0 flex-col rounded-2xl bg-panel p-4"
+      className="flex min-w-0 flex-col rounded-2xl bg-card p-4"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-lg font-medium tracking-tight">Preview</h2>

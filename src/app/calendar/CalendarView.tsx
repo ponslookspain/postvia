@@ -109,12 +109,12 @@ function DayPostChip({
       onDragStart={onDragStart}
       aria-label={`${post.text || "Untitled post"} (${post.status.toLowerCase()})`}
       className={cn(
-        "flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-transparent bg-fill2 px-1.5 outline-none transition-colors hover:border-border hover:bg-fill3 focus-visible:ring-2 focus-visible:ring-primary-focus",
+        "flex h-6 min-w-0 items-center gap-1.5 rounded-md border border-transparent bg-muted px-1.5 outline-none transition-colors hover:border-border hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
         dimmed && "opacity-50"
       )}
     >
       <StatusDot status={post.status} />
-      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+      <span className="shrink-0 text-meta text-muted-foreground tabular-nums">
         {postTime(post)}
       </span>
       <span className="min-w-0 flex-1 truncate text-xs">
@@ -135,7 +135,7 @@ function DayOverflow({
 }) {
   return (
     <Popover>
-      <PopoverTrigger className="flex h-5 shrink-0 items-center rounded-sm px-0.5 text-left text-[11px] font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+      <PopoverTrigger className="flex h-5 shrink-0 items-center rounded-sm px-0.5 text-left text-meta font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
         +{posts.length} more
       </PopoverTrigger>
       <PopoverContent
@@ -151,7 +151,7 @@ function DayOverflow({
                 className="flex h-6 min-w-0 items-center gap-1.5 rounded-md px-1 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <StatusDot status={post.status} />
-                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                <span className="shrink-0 text-meta text-muted-foreground tabular-nums">
                   {postTime(post)}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-xs">
@@ -368,8 +368,8 @@ export function CalendarView({
                   className={cn(
                     "flex h-20 flex-col gap-1 overflow-hidden bg-card p-1 sm:h-36 sm:p-1.5",
                     !inMonth && "bg-muted/40 text-muted-foreground",
-                    isToday && "bg-primary-accent",
-                    isOver && "bg-muted ring-2 ring-inset ring-primary-focus"
+                    isToday && "bg-muted",
+                    isOver && "bg-muted ring-2 ring-inset ring-ring"
                   )}
                 >
                   <span

@@ -20,4 +20,6 @@ as of the current tree; if anything disagrees with the code, the code wins.
 - [Workflow](workflow.md) — development/release process contract
 - [Design system](design-system.md) — implemented visual language: themes, tokens, surfaces, rows, voice
 - [Radian design contract (historical)](postvia-radian-design-contract.md) — reasoning behind the shadcn → Radian migration; superseded by the design system, do not quote as current rules
+- [Backend audit follow-up](backend-audit-followup.md) — **current**: what the backend audit fixed, what is blocked on an infrastructure/product decision, and the remaining risks
+- [Database pooling](DATABASE_POOLING.md) — open question: whether the production Postgres URL is pooled, and exactly how to settle it
 - [Audit report (archived 2026-09-15)](audit-report.md) — historical hardening findings (A–Q); resolved items marked `RESOLVED` inline, the rest not re-verified — do not quote as current issues

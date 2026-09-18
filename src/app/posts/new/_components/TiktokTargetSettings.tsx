@@ -1,7 +1,12 @@
 "use client";
 
 import { RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -17,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { isTikTokReconnectNeeded } from "@/lib/composer-media";
@@ -143,7 +149,7 @@ export function TiktokTargetSettings({
             <FieldLabel htmlFor={`${accountId}-cover`}>
               Cover timestamp (ms, optional)
             </FieldLabel>
-            <input
+            <Input
               id={`${accountId}-cover`}
               type="number"
               min={0}
@@ -162,7 +168,7 @@ export function TiktokTargetSettings({
                       : Math.max(0, Math.floor(Number(raw) || 0)),
                 });
               }}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="w-full"
               aria-describedby={`${accountId}-cover-hint`}
             />
             <FieldDescription id={`${accountId}-cover-hint`}>
@@ -181,33 +187,35 @@ export function TiktokTargetSettings({
       ) : (
         <Alert color="neutral" variant="outline">
           <TriangleAlertIcon />
-          <AlertTitle>
-            {isTikTokReconnectNeeded(creatorInfoError)
-              ? "Reconnect TikTok to set options"
-              : "TikTok options unavailable"}
-          </AlertTitle>
-          <AlertDescription>
-            {isTikTokReconnectNeeded(creatorInfoError)
-              ? "TikTok access expired or was revoked. Reconnect the account to change privacy and interaction settings."
-              : "Could not load this account's TikTok options. Publishing needs live TikTok settings — retry before posting."}
-          </AlertDescription>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {isTikTokReconnectNeeded(creatorInfoError) ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onOpenAccounts}
-              >
-                Open accounts
-              </Button>
-            ) : (
-              <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-                <RotateCcwIcon data-icon="inline-start" />
-                Retry
-              </Button>
-            )}
-          </div>
+          <AlertContent>
+            <AlertTitle>
+              {isTikTokReconnectNeeded(creatorInfoError)
+                ? "Reconnect TikTok to set options"
+                : "TikTok options unavailable"}
+            </AlertTitle>
+            <AlertDescription>
+              {isTikTokReconnectNeeded(creatorInfoError)
+                ? "TikTok access expired or was revoked. Reconnect the account to change privacy and interaction settings."
+                : "Could not load this account's TikTok options. Publishing needs live TikTok settings — retry before posting."}
+            </AlertDescription>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {isTikTokReconnectNeeded(creatorInfoError) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenAccounts}
+                >
+                  Open accounts
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+                  <RotateCcwIcon data-icon="inline-start" />
+                  Retry
+                </Button>
+              )}
+            </div>
+          </AlertContent>
         </Alert>
       )}
     </>
