@@ -25,8 +25,10 @@
 
 :root {
 	/* —— Background ————————————————————————————————————————————————————————
-	   Warm paper canvas. Light #F5F4EE, dark warm charcoal #262624. */
-	--background: #f5f4ee;
+	   Warm paper canvas (`paper-1`). Light ≈ #F5F4EE, dark warm charcoal
+	   ≈ #262624. The canvas is the base of the surface ladder: every tier
+	   above it is lighter, never darker. */
+	--background: var(--paper-1);
 
 	/* —— Foreground ————————————————————————————————————————————————————————
 	   Ink on the canvas, and its quiet counterpart for metadata.
@@ -42,26 +44,28 @@
 	--muted: #e7e5de;
 
 	/* —— Panel ————————————————————————————————————————————————————————————
-	   A block on the page. One shade off the canvas and carrying NO outline:
-	   blocks are separated by tone, not by a drawn box. `Card` renders on it.
-	   A block nested inside a panel goes the other way (`--background`) so it
-	   reads as inset rather than vanishing. */
-	--panel: #f0efeb;
+	   A block on the page (`paper-2`): one rung above the canvas and carrying
+	   NO outline — blocks are separated by tone, not by a drawn box. `Card`
+	   renders on it. A block nested inside a panel goes the other way
+	   (`--background`) so it reads as inset rather than vanishing. */
+	--panel: var(--paper-2);
 	--panel-foreground: var(--foreground);
 
 	/* —— Surface ——————————————————————————————————————————————————————————
-	   Raised and floating surfaces. `card` is a block that may lift off the
-	   page; `popover` is genuinely floating UI (popover, dialog, drawer,
-	   toast, select menu) and is the only tier where a shadow is allowed. */
-	--card: #faf9f5;
+	   Raised and floating surfaces. `card` (`paper-3`) is a block that may
+	   lift off the page; `popover` (`paper-4`) is genuinely floating UI
+	   (popover, dialog, drawer, toast, select menu), one rung above card,
+	   and is the only tier where a shadow is allowed. */
+	--card: var(--paper-3);
 	--card-foreground: #20201e;
-	--popover: #faf9f5;
+	--popover: var(--paper-4);
 	--popover-foreground: #20201e;
 
 	/* —— Elevation ————————————————————————————————————————————————————————
 	   PostVIA elevates by TONE, not by shadow. The ladder below is the whole
 	   elevation system; `shadow-md` / `shadow-lg` are reserved for the
-	   floating tier and are applied by the primitives themselves. */
+	   floating tier and are applied by the primitives themselves. Each rung
+	   is now a distinct tone (raised ≠ overlay). */
 	--elevation-sunken: var(--muted);
 	--elevation-surface: var(--panel);
 	--elevation-raised: var(--card);
@@ -174,7 +178,7 @@
 }
 
 .dark {
-	--background: #262624;
+	--background: var(--paper-1);
 	--foreground: #f5f4ee;
 	/* Lightened until the renderer (axe, real Chromium) passes 4.5:1 on
 	   every dark surface including the muted fill — the previous #A4A39D
@@ -183,11 +187,11 @@
 
 	--muted: #38362f;
 
-	--panel: #222120;
+	--panel: var(--paper-2);
 
-	--card: #2c2c2b;
+	--card: var(--paper-3);
 	--card-foreground: #f5f4ee;
-	--popover: #2c2c2b;
+	--popover: var(--paper-4);
 	--popover-foreground: #f5f4ee;
 
 	--border: #34332f;
