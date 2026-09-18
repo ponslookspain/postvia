@@ -4,7 +4,6 @@ import {
   makeBlobPathname,
   MAX_MEDIA_PER_POST,
   validateMediaInput,
-  type MediaKind,
 } from "@/lib/media";
 import {
   deleteBlobs,
@@ -42,9 +41,13 @@ export * from "@/domain/media/upload-rules";
 export type * from "@/domain/media/upload-rules";
 import {
   authorizeMediaUpload,
+  claimMediaSlot,
   validateCompletedUpload,
   MediaRegistrationRejected,
   type CompletedBlobInfo,
+  type MediaRegistrationStore,
+  type MediaRegistrationTx,
+  type MediaSlotClaim,
 } from "@/domain/media/upload-rules";
 
 /**
@@ -121,34 +124,6 @@ export async function reserveUploadPathname(input: {
   });
   return { ok: true, pathname };
 }
-
-/**
- * The three DB operations a completed upload needs, as a seam so the
- * registration contract (cap enforcement, idempotency) is testable without a
- * database. `withPostLock` must serialize concurrent registrations for one
- * post — see `liveMediaRegistrationStore`.
- */
-export type MediaRegistrationTx = {
-  countForPost: (postId: string, userId: string) => Promise<number>;
-  findByPathname: (pathname: string) => Promise<{ id: string } | null>;
-  create: (data: {
-    userId: string;
-    postId: string;
-    url: string;
-    pathname: string;
-    filename: string;
-    mimeType: string;
-    size: number;
-    type: MediaKind;
-  }) => Promise<void>;
-};
-
-export type MediaRegistrationStore = MediaRegistrationTx & {
-  withPostLock: <T>(
-    postId: string,
-    fn: (tx: MediaRegistrationTx) => Promise<T>
-  ) => Promise<T>;
-};
 
 function txFromClient(
   client: Pick<Prisma.TransactionClient, "media">
@@ -229,52 +204,6 @@ async function defaultFetchHead(
   const blob = await fetchPrivateBlob(pathname, range);
   if (!blob?.stream) return null;
   return new Response(blob.stream).arrayBuffer();
-}
-
-export type MediaSlotClaim = "created" | "duplicate" | "over-cap";
-
-/**
- * The race fix, isolated so it can be reasoned about (and tested) on its own.
- *
- * The per-post media cap used to be a `count()` in `/api/media/prepare`
- * followed — in a LATER, separate request — by an unconditional insert in the
- * upload-completed webhook. Nothing connected the two, so N concurrent
- * prepares all saw the same count, all got a reserved pathname, and all
- * registered: a post capped at 4 could end up with 20.
- *
- * Here the count and the insert are one critical section, serialized per post
- * by `withPostLock`. Concurrent completions on the last free slot therefore
- * grant exactly one winner — the same "exactly one winner" property the quota
- * ledgers get from their conditional increments, obtained with a lock instead
- * because there is no counter row to increment (and adding one would mean a
- * schema migration on a database with no migration history).
- *
- * Duplicate delivery is re-checked INSIDE the lock as well: a retried webhook
- * must collapse to a no-op rather than consume a second slot.
- */
-export async function claimMediaSlot(
-  store: MediaRegistrationStore,
-  data: {
-    userId: string;
-    postId: string;
-    url: string;
-    pathname: string;
-    filename: string;
-    mimeType: string;
-    size: number;
-    type: MediaKind;
-  }
-): Promise<MediaSlotClaim> {
-  return store.withPostLock(data.postId, async (tx) => {
-    const duplicate = await tx.findByPathname(data.pathname);
-    if (duplicate) return "duplicate";
-
-    const count = await tx.countForPost(data.postId, data.userId);
-    if (count >= MAX_MEDIA_PER_POST) return "over-cap";
-
-    await tx.create(data);
-    return "created";
-  });
 }
 
 /**
