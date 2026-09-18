@@ -97,7 +97,7 @@ export function BulkVideoRow({
           />
         )}
         {error && (
-          <span className="mt-0.5 block text-xs text-error">
+            <span className="mt-0.5 block text-xs text-error-text">
             {error}
           </span>
         )}

@@ -72,7 +72,7 @@ const badgeVariants = cva(
 			{
 				variant: "outline",
 				color: "error",
-				className: "text-error border border-error-border bg-transparent",
+				className: "text-error-text border border-error-border bg-transparent",
 			},
 			{
 				variant: "outline",
@@ -88,7 +88,7 @@ const badgeVariants = cva(
 			{
 				variant: "soft",
 				color: "error",
-				className: "bg-error-accent text-error border-overlay-8",
+				className: "bg-error-accent text-error-text border-overlay-8",
 			},
 			{
 				variant: "soft",

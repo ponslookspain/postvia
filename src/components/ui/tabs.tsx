@@ -131,11 +131,18 @@ function TabsList({
 }
 TabsList.displayName = TabsPrimitive.List.displayName
 
-function TabsTrigger({ className, ...props }: TabsTriggerProps) {
+function TabsTrigger({ className, asChild, ...props }: TabsTriggerProps) {
 	const { variant } = useTabsList()
 	return (
 		<TabsPrimitive.Trigger
 			data-slot="tabs-trigger"
+			asChild={asChild}
+			// asChild children (e.g. a Link tab) must not inherit the
+			// button-only `type` attribute — `<a type="button">` is invalid
+			// HTML and fails axe. A real <button> child keeps its own
+			// `type` (child props win over Slot props); an explicit caller
+			// `type` still wins via the props spread below.
+			{...(asChild ? { type: undefined } : null)}
 			className={cn(tabsTriggerStyles({ variant }), className)}
 			{...props}
 		/>

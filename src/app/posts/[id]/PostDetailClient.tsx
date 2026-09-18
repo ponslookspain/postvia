@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { pollPostSettled } from "@/lib/publish-poll";
 import type { MediaKind } from "@/lib/media";
@@ -286,6 +286,20 @@ export default function PostDetailPage({
   const [rescheduleInvalid, setRescheduleInvalid] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+
+  // The reschedule dialog is controlled without a DialogTrigger, so Radix
+  // has no trigger to restore focus to on close. Return focus to the
+  // opener (Schedule/Reschedule button) instead of dropping it to <body>.
+  useEffect(() => {
+    if (!rescheduleOpen) return;
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    return () => {
+      opener?.focus();
+    };
+  }, [rescheduleOpen]);
 
   const target = post.targets[0];
   const platform = target?.platform ?? "X";
@@ -628,7 +642,7 @@ export default function PostDetailPage({
                             : ""}
                         </p>
                         {targetItem.errorMessage && (
-                          <p className="truncate text-xs text-error">
+                          <p className="truncate text-xs text-error-text">
                             Couldn&apos;t publish to{" "}
                             {formatPlatformName(targetItem.platform)}.
                           </p>

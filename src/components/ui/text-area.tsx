@@ -39,7 +39,6 @@ function TextArea({
 }: TextAreaProps) {
 	return (
 		<textarea
-			role="textarea"
 			data-slot="textarea"
 			data-disabled={props.disabled ? "" : undefined}
 			className={cn(

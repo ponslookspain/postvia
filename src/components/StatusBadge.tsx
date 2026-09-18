@@ -39,15 +39,18 @@ export function StatusDot({
   );
 }
 
-// PostVIA status mapping: quiet outline shells, soft neutral fills,
-// Failed keeps the error tint.
-const BADGE_STYLE: Record<string, { variant: "outline" | "soft"; color?: "error" }> = {
+// PostVIA status mapping: quiet outline shells, soft neutral fills.
+// The label text is always neutral (text-foreground): status hues live in
+// the dot and the tinted shell, which are decorative next to the label.
+// Colored running text on those tints fails 4.5:1 in both themes
+// (measured 2026-09), while neutral text on the same shells passes easily.
+const BADGE_STYLE: Record<string, { variant: "outline" | "soft" }> = {
   DRAFT: { variant: "outline" },
   SCHEDULED: { variant: "outline" },
   PUBLISHING: { variant: "soft" },
   PUBLISHED: { variant: "soft" },
   PARTIALLY_PUBLISHED: { variant: "soft" },
-  FAILED: { variant: "soft", color: "error" },
+  FAILED: { variant: "soft" },
 };
 
 export function StatusBadge({
@@ -61,16 +64,14 @@ export function StatusBadge({
   return (
     <Badge
       variant={style.variant}
-      color={style.color}
       className={cn(
-        status === "SCHEDULED" &&
-          "border-info/30 bg-info/10 text-info dark:text-info",
-        status === "PUBLISHED" &&
-          "border-success/30 bg-success/10 text-success dark:text-success",
+        status === "SCHEDULED" && "border-info/30 bg-info/10",
+        status === "PUBLISHED" && "border-success/30 bg-success/10",
         status === "PUBLISHING" &&
-          "border-warning/30 bg-warning/10 text-warning dark:text-warning",
+          "border-warning/30 bg-warning/10",
         status === "PARTIALLY_PUBLISHED" &&
-          "border-warning/30 bg-warning/10 text-warning dark:text-warning",
+          "border-warning/30 bg-warning/10",
+        status === "FAILED" && "border-error/30 bg-error-accent",
         className
       )}
     >

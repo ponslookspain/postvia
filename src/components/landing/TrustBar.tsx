@@ -34,12 +34,12 @@ export function TrustBar() {
           <dl className="flex items-center gap-8 text-center md:text-left">
             {stats.map((stat) => (
               <div key={stat.label} className="flex flex-col">
-                <dd className="font-heading text-2xl font-semibold tracking-tight tabular-nums">
-                  {stat.value}
-                </dd>
-                <dt className="mt-1 text-xs text-muted-foreground">
+                <dt className="order-2 mt-1 text-xs text-muted-foreground">
                   {stat.label}
                 </dt>
+                <dd className="order-1 font-heading text-2xl font-semibold tracking-tight tabular-nums">
+                  {stat.value}
+                </dd>
               </div>
             ))}
           </dl>

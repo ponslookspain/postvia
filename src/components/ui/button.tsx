@@ -150,7 +150,11 @@ function Button({
 	return (
 		<button data-slot="button" className={classes} {...validProps}>
 			{loading && (
-				<Spinner variant="simple" size={BUTTON_SPINNER_SIZE[size]} />
+				<Spinner
+					variant="simple"
+					size={BUTTON_SPINNER_SIZE[size]}
+					aria-hidden="true"
+				/>
 			)}
 			{children}
 		</button>

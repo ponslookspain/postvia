@@ -77,27 +77,36 @@ export function OnboardingForm({ initialName = "" }: { initialName?: string }) {
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
-          <Field>
-            <FieldLabel id="onboarding-plan-label">Choose your plan</FieldLabel>
-            <div
-              role="radiogroup"
-              aria-labelledby="onboarding-plan-label"
-              className="flex flex-col gap-2"
-            >
+          <fieldset className="m-0 border-0 p-0">
+            <legend className="mb-2 text-sm font-medium">
+              Choose your plan
+            </legend>
+            <div className="flex flex-col gap-2">
               {PLANS.map((p) => (
-                <button
+                <label
                   key={p.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={plan === p.id}
-                  onClick={() => setPlan(p.id)}
                   className={cn(
-                    "flex items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors",
+                    "relative flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors",
+                    // State-driven visuals stay identical; the :focus-visible
+                    // ring follows the native input so keyboard users get a
+                    // visible indicator without any ARIA or JS key handling.
+                    "has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-ring has-[input:focus-visible]:ring-offset-2 has-[input:focus-visible]:ring-offset-background",
                     plan === p.id
                       ? "border-foreground bg-muted/60"
                       : "border-border hover:border-muted-foreground"
                   )}
                 >
+                  <input
+                    type="radio"
+                    name="plan"
+                    value={p.id}
+                    checked={plan === p.id}
+                    onChange={() => setPlan(p.id)}
+                    // Covers the whole card (invisible): every pointer lands
+                    // on the input itself, so mouse, touch, keyboard and
+                    // assistive tech all drive the native control directly.
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
                   <span>
                     <span className="block text-sm font-medium">
                       {p.name}
@@ -114,10 +123,10 @@ export function OnboardingForm({ initialName = "" }: { initialName?: string }) {
                   <span className="shrink-0 text-sm font-semibold tabular-nums">
                     {p.price === 0 ? "Free" : `€${p.price}/mo`}
                   </span>
-                </button>
+                </label>
               ))}
             </div>
-          </Field>
+          </fieldset>
           <Button type="submit" disabled={saving} className="w-full">
             {saving && <Spinner data-icon="inline-start" />}
             {saving

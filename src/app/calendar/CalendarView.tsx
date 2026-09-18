@@ -353,7 +353,7 @@ export function CalendarView({
               const isOver = dropKey === key;
               const visible = dayPosts.slice(0, MAX_VISIBLE_CHIPS);
               const overflow = dayPosts.slice(MAX_VISIBLE_CHIPS);
-              const dayLabel = `${Number(key.slice(8))} ${title}`;
+              const dayLabel = `${Number(key.slice(8))} ${title}${isToday ? ", today" : ""}`;
               return (
                 <div
                   key={key}
@@ -373,6 +373,7 @@ export function CalendarView({
                   )}
                 >
                   <span
+                    aria-current={isToday ? "date" : undefined}
                     className={cn(
                       "flex size-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums",
                       isToday && "bg-primary font-medium text-primary-foreground"
@@ -462,7 +463,8 @@ export function CalendarView({
             {drafts.length === 0 ? (
               <p className="text-sm leading-5 text-muted-foreground">
                 No unscheduled drafts. Drag a scheduled post between days
-                to move it, or create a new one.
+                to move it, or open a post to change its date from the
+                keyboard.
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5">
@@ -499,7 +501,8 @@ export function CalendarView({
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
             Only scheduled posts and unscheduled drafts can be moved.
-            Times shown in your local timezone.
+            Drag with a mouse, or open a post to reschedule it from the
+            keyboard. Times shown in your local timezone.
           </p>
         </aside>
       </div>

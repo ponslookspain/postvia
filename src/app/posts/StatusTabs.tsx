@@ -35,6 +35,11 @@ export function StatusTabs({ value }: { value: string }) {
             key={option}
             value={option}
             asChild
+            // URL-driven tabs: there is no tabpanel element (the filtered
+            // page itself is the panel), so the Radix-injected
+            // aria-controls would dangle at a missing id (axe critical).
+            // Arrow-key travel between triggers keeps working.
+            aria-controls={undefined}
           >
             <Link
               href={statusHref(option)}

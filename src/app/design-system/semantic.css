@@ -29,9 +29,13 @@
 	--background: #f5f4ee;
 
 	/* —— Foreground ————————————————————————————————————————————————————————
-	   Ink on the canvas, and its quiet counterpart for metadata. */
+	   Ink on the canvas, and its quiet counterpart for metadata.
+	   Muted holds 4.5:1 on every light surface, including translucent
+	   muted composites (out-of-month calendar cells render muted text on
+	   muted/40 over the grid base — the strictest pair, measured 2026-09
+	   with axe in real Chromium). */
 	--foreground: #20201e;
-	--muted-foreground: #77766f;
+	--muted-foreground: #65645d;
 
 	/* —— Muted ————————————————————————————————————————————————————————————
 	   The neutral fill: hovers, inset wells, disabled chrome. */
@@ -75,11 +79,13 @@
 	--ring: #2971c6;
 
 	/* —— Primary ——————————————————————————————————————————————————————————
-	   One brand hue: PostVIA Blue #2971C6 (light) / #5FA1F3 (dark).
+	   One brand hue: PostVIA Blue #286FC2 (light) / #5FA1F3 (dark).
 	   Reserved for primary actions, active navigation, selected tabs,
 	   links, focus states and main CTAs. Never a large decorative surface.
-	   Red is reserved for error/destructive only. */
-	--primary: #2971c6;
+	   Red is reserved for error/destructive only.
+	   Light holds 4.5:1 as link text on the canvas (the previous #2971C6
+	   measured 4.46 and failed axe on small link copy). */
+	--primary: #286fc2;
 	--primary-foreground: #ffffff;
 
 	/* —— Status ———————————————————————————————————————————————————————————
@@ -100,8 +106,14 @@
 	   Fill/focus/border/hover chrome for status-coloured controls (e.g. a
 	   status `Button` variant). Derived from the calm status hues above via
 	   `color-mix` against the current surface, so light/dark stay tonal and
-	   no second copy of any colour exists. `info-text` is the legible ink
-	   on a light info fill. */
+	   no second copy of any colour exists. The `*-text` inks are the ONLY
+	   status colours allowed for running text: the base hues are fills and
+	   dots (exempt from text contrast) and fail 4.5:1 as copy on light
+	   surfaces (measured 2026-09). */
+	--success-text: #26774a;
+	--warning-text: #896119;
+	--error-text: #b04545;
+	--info-text: #2569b6;
 	--success-accent: color-mix(in srgb, var(--success) 12%, var(--card));
 	--success-focus: color-mix(in srgb, var(--success) 18%, var(--card));
 	--success-border: color-mix(in srgb, var(--success) 38%, var(--border));
@@ -164,7 +176,10 @@
 .dark {
 	--background: #262624;
 	--foreground: #f5f4ee;
-	--muted-foreground: #a4a39d;
+	/* Lightened until the renderer (axe, real Chromium) passes 4.5:1 on
+	   every dark surface including the muted fill — the previous #A4A39D
+	   measured 3.73 effective on cards in 2026-09. */
+	--muted-foreground: #b3b2ac;
 
 	--muted: #38362f;
 
@@ -184,7 +199,9 @@
 
 	/* Calm dark status hues — legible on warm charcoal. `-foreground`
 	   inks stay legible on either canvas. Sub-steps derive from the hues
-	   above via `color-mix` (see `:root`), so they follow automatically. */
+	   above via `color-mix` (see `:root`), so they follow automatically.
+	   Text inks: error needs a lighter step to hold 4.5:1 as copy
+	   (measured 2026-09); success/warning/info already hold it. */
 	--success: #69b887;
 	--success-foreground: #102217;
 	--warning: #d6a64a;
@@ -193,6 +210,10 @@
 	--error-foreground: #260f0f;
 	--info: #5fa1f3;
 	--info-foreground: #0f0f0e;
+	--success-text: var(--success);
+	--warning-text: var(--warning);
+	--error-text: #e78282;
+	--info-text: #65a5f3;
 
 	--sidebar: #1f1e1d;
 	--sidebar-foreground: #e6e5df;
@@ -251,14 +272,17 @@
 	--color-success-focus: var(--success-focus);
 	--color-success-border: var(--success-border);
 	--color-success-hover: var(--success-hover);
+	--color-success-text: var(--success-text);
 	--color-warning-accent: var(--warning-accent);
 	--color-warning-focus: var(--warning-focus);
 	--color-warning-border: var(--warning-border);
 	--color-warning-hover: var(--warning-hover);
+	--color-warning-text: var(--warning-text);
 	--color-error-accent: var(--error-accent);
 	--color-error-focus: var(--error-focus);
 	--color-error-border: var(--error-border);
 	--color-error-hover: var(--error-hover);
+	--color-error-text: var(--error-text);
 	--color-info-text: var(--info-text);
 	--color-info-accent: var(--info-accent);
 	--color-info-focus: var(--info-focus);

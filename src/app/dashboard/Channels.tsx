@@ -24,7 +24,10 @@ export function Channels({ rows }: { rows: ChannelRow[] }) {
       {rows.map((row) => (
         <li key={row.platform} className="flex items-center gap-3 py-2">
           <Avatar className="size-9 shrink-0">
-            <AvatarFallback aria-label={formatPlatformName(row.platform)}>
+            <AvatarFallback
+              role="img"
+              aria-label={formatPlatformName(row.platform)}
+            >
               <PlatformIcon platform={row.platform} className="size-4" />
             </AvatarFallback>
           </Avatar>

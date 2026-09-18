@@ -48,18 +48,18 @@ const bannerVariants = cva(
 			{
 				color: "success",
 				variant: "soft",
-				className: "bg-success-accent text-success",
+				className: "bg-success-accent text-success-text",
 			},
 			{
 				color: "error",
 				variant: "soft",
-				className: "bg-error-accent text-error",
+				className: "bg-error-accent text-error-text",
 			},
 			{
 				color: "warning",
 				variant: "soft",
 				className:
-					"bg-warning-accent text-warning [&_[data-slot=banner-icon]]:text-warning-border",
+					"bg-warning-accent text-warning-text [&_[data-slot=banner-icon]]:text-warning-border",
 			},
 
 			// Strong
@@ -105,17 +105,17 @@ const bannerVariants = cva(
 			{
 				color: "success",
 				variant: "outline",
-				className: "bg-transparent text-success",
+				className: "bg-transparent text-success-text",
 			},
 			{
 				color: "error",
 				variant: "outline",
-				className: "bg-transparent text-error",
+				className: "bg-transparent text-error-text",
 			},
 			{
 				color: "warning",
 				variant: "outline",
-				className: "bg-transparent text-warning",
+				className: "bg-transparent text-warning-text",
 			},
 		],
 		defaultVariants: {

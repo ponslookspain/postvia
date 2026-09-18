@@ -456,6 +456,7 @@ export function PostsList({
                   <PostRowMenu
                     id={post.id}
                     status={post.status}
+                    postLabel={post.text || "Untitled post"}
                     onDeleted={handleDeleted}
                   />
                 </span>
@@ -478,7 +479,7 @@ export function PostsList({
                     {loadingMore ? "Loading…" : "Load more"}
                   </Button>
                   {loadError && (
-                    <p role="alert" className="text-sm text-error">
+                    <p role="alert" className="text-sm text-error-text">
                       {loadError}
                     </p>
                   )}

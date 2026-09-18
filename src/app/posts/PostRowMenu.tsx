@@ -37,10 +37,12 @@ import { reportError } from "@/lib/diagnostics";
 export function PostRowMenu({
   id,
   status,
+  postLabel,
   onDeleted,
 }: {
   id: string;
   status: string;
+  postLabel?: string;
   onDeleted?: (id: string) => void;
 }) {
   const router = useRouter();
@@ -104,7 +106,11 @@ export function PostRowMenu({
     <>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger
-          aria-label={`Actions for post`}
+          aria-label={
+            postLabel
+              ? `Actions for post: ${postLabel.slice(0, 60)}`
+              : "Actions for post"
+          }
           className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <MoreHorizontalIcon className="size-5" aria-hidden="true" />
@@ -139,7 +145,7 @@ export function PostRowMenu({
                 setMenuOpen(false);
                 setDeleteOpen(true);
               }}
-              className="text-error [&_svg]:text-error"
+              className="text-error-text [&_svg]:text-error-text"
             >
               <Trash2Icon aria-hidden="true" />
               Delete

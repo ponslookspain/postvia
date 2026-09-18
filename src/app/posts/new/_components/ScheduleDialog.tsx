@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { CalendarClockIcon, TriangleAlertIcon } from "lucide-react";
 import {
@@ -78,6 +79,19 @@ export function ScheduleDialog({
   onOpenDraft: (postId: string) => void;
 }) {
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // Controlled without a DialogTrigger (mounted only while `open`), so
+  // Radix has no trigger to restore focus to on close. Capture the opener
+  // on mount and return focus to it on unmount — keyboard users land back
+  // on the Schedule button instead of losing focus to <body>.
+  useEffect(() => {
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    return () => {
+      opener?.focus();
+    };
+  }, []);
   // Explains a disabled Confirm using the same flags canSave is built
   // from — no new validation logic. Date/time is advisory: it never
   // disables the button, but the user should see it before confirming.
@@ -105,9 +119,12 @@ export function ScheduleDialog({
         <FieldGroup>
           <div className="grid grid-cols-2 gap-4">
             <Field>
-              <FieldLabel htmlFor="schedule-date">Date</FieldLabel>
+              <FieldLabel id="schedule-date-label" htmlFor="schedule-date">
+                Date
+              </FieldLabel>
               <ScheduleDatePicker
                 id="schedule-date"
+                labelledBy="schedule-date-label"
                 value={scheduleDate}
                 onChange={onDateChange}
               />
