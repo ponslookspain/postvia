@@ -5,6 +5,20 @@ import {
 import { logDiagnostic, logErrorDiagnostic } from "@/lib/diagnostics";
 import { prisma } from "@/lib/prisma";
 import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
+import {
+  ThreadsApiError,
+  threadsErrorMessage,
+} from "@/domain/social/policies/threads";
+
+/**
+ * Pure Threads policies (auth classification, error mapping) live in
+ * `@/domain/social/policies/threads` and are re-exported here so existing
+ * `@/lib/social/threads` imports keep working. OAuth, token refresh, Prisma
+ * CAS, fetch, container pipeline and polling stay in this module.
+ * No behavior change.
+ */
+export * from "@/domain/social/policies/threads";
+export type * from "@/domain/social/policies/threads";
 
 const THREADS_AUTH_URL = "https://threads.net/oauth/authorize";
 const THREADS_TOKEN_URL = "https://graph.threads.net/oauth/access_token";
@@ -89,56 +103,6 @@ function logMetaError(scope: string, status: number, body: unknown): void {
     subcode: err?.error_subcode,
     fbtrace_id: err?.fbtrace_id,
   });
-}
-
-export class ThreadsApiError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly httpStatus: number
-  ) {
-    super(message);
-    this.name = "ThreadsApiError";
-  }
-}
-
-function threadsAuthSignal(status: number, code: string, message: string): boolean {
-  if (status === 401 || status === 403) return true;
-  if (code === "190") return true;
-  return (
-    /http 40[13]\b/i.test(message) ||
-    /invalid.*token|token.*invalid|token.*expired|session.*expired|revoked/i.test(
-      message
-    )
-  );
-}
-
-/**
- * True only for terminal auth failures (expired/revoked token). Used by
- * stale recovery so transient provider/rate-limit/5xx failures stay
- * resumable instead of failing the target and dropping the container.
- */
-export function isThreadsAuthError(error: unknown): boolean {
-  if (!(error instanceof ThreadsApiError)) return false;
-  return threadsAuthSignal(error.httpStatus, error.code, error.message);
-}
-
-/**
- * Human-readable mapping. Auth/token failures always mean the user must
- * reconnect; every other error keeps the raw Meta diagnostic so support
- * retains code/subcode/fbtrace_id.
- */
-export function threadsErrorMessage(error: unknown): string {
-  const message =
-    error instanceof Error && error.message
-      ? error.message
-      : "Threads publishing failed. Please try again.";
-  const status = error instanceof ThreadsApiError ? error.httpStatus : 0;
-  const code = error instanceof ThreadsApiError ? error.code : "";
-  if (threadsAuthSignal(status, code, message)) {
-    return "Threads access expired or was revoked. Reconnect your Threads account.";
-  }
-  return message;
 }
 
 function timeoutError(budget: PollBudget, lastStatus: string): string {
