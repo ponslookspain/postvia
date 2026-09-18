@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 import { Label } from "@/components/ui/label"
-import { Divider as Separator } from "@/components/ui/divider"
+import { Divider } from "@/components/ui/divider"
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -116,9 +116,9 @@ function FieldLabel({
 }
 
 function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="field-label"
+	return (
+		<div
+			data-slot="field-title"
       className={cn(
         "flex w-fit items-center gap-2 text-sm font-medium group-data-[disabled=true]/field:opacity-50",
         className
@@ -160,7 +160,7 @@ function FieldSeparator({
       )}
       {...props}
     >
-      <Separator decorative={false} className="absolute inset-0 top-1/2" />
+      <Divider decorative={false} className="absolute inset-0 top-1/2" />
       {children && (
         <span
           className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"

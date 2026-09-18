@@ -221,9 +221,11 @@ function DrawerContent({
 	return (
 		<DrawerPrimitives.Portal>
 			<DrawerPrimitives.Overlay
+				data-slot="drawer-overlay"
 				className={cn(backdropVariants({ backdrop }))}
 			/>
 			<DrawerPrimitives.Content
+				data-slot="drawer-content"
 				className={cn(
 					drawerVariants({ direction, variant, handle }),
 					className
@@ -241,12 +243,20 @@ function DrawerContent({
 }
 
 function DrawerHeader({ children, className }: DrawerHeaderProps) {
-	return <div className={cn("flex flex-col gap-1", className)}>{children}</div>
+	return (
+		<div
+			data-slot="drawer-header"
+			className={cn("flex flex-col gap-1", className)}>
+			{children}
+		</div>
+	)
 }
 
 function DrawerTitle({ children, className }: DrawerTitleProps) {
 	return (
-		<DrawerPrimitives.Title className={cn("text-lg font-semibold", className)}>
+		<DrawerPrimitives.Title
+			data-slot="drawer-title"
+			className={cn("text-lg font-semibold", className)}>
 			{children}
 		</DrawerPrimitives.Title>
 	)
@@ -255,6 +265,7 @@ function DrawerTitle({ children, className }: DrawerTitleProps) {
 function DrawerDescription({ children, className }: DrawerDescriptionProps) {
 	return (
 		<DrawerPrimitives.Description
+			data-slot="drawer-description"
 			className={cn("text-muted-foreground gap-1 text-sm", className)}>
 			{children}
 		</DrawerPrimitives.Description>
@@ -263,7 +274,9 @@ function DrawerDescription({ children, className }: DrawerDescriptionProps) {
 
 function DrawerBody({ children, className }: DrawerDescriptionProps) {
 	return (
-		<div className={cn("no-scrollbar flex-grow overflow-auto", className)}>
+		<div
+			data-slot="drawer-body"
+			className={cn("no-scrollbar flex-grow overflow-auto", className)}>
 			{children}
 		</div>
 	)
@@ -271,7 +284,9 @@ function DrawerBody({ children, className }: DrawerDescriptionProps) {
 
 function DrawerFooter({ children, className }: DrawerFooterProps) {
 	return (
-		<div className={cn("flex items-end justify-end gap-2", className)}>
+		<div
+			data-slot="drawer-footer"
+			className={cn("flex items-end justify-end gap-2", className)}>
 			{children}
 		</div>
 	)

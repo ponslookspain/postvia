@@ -115,6 +115,7 @@ function Badge({
 	if (asChild) {
 		return (
 			<Slot
+				data-slot="badge"
 				className={cn(badgeVariants({ variant, size, color }), className)}
 				{...props}>
 				{children}
@@ -124,6 +125,7 @@ function Badge({
 
 	return (
 		<span
+			data-slot="badge"
 			className={cn(badgeVariants({ variant, size, color }), className)}
 			{...props}>
 			{wrappedChildren}

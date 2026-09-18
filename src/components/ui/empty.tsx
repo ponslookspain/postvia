@@ -58,7 +58,7 @@ function EmptyMedia({
 }: EmptyMediaProps) {
 	return (
 		<div
-			data-slot="empty-icon"
+			data-slot="empty-media"
 			data-variant={variant}
 			className={cn(emptyMediaVariants({ variant, className }))}
 			{...props}

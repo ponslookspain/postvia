@@ -70,20 +70,14 @@ const inputAddonVariants = cva(
 const inputGroupVariants = cva(
 	`
 	flex items-stretch
-	[&_:is([data-slot=input],[data-slot=currency-input])]:grow
-	[&_[data-slot=input-addon]:has(+:is([data-slot=input],[data-slot=currency-input]))]:rounded-e-none [&_[data-slot=input-addon]:has(+:is([data-slot=input],[data-slot=currency-input]))]:border-e-0
-	[&_[data-slot=input-addon]:has(+[data-slot=datefield])]:rounded-e-none [&_[data-slot=input-addon]:has(+[data-slot=datefield])]:border-e-0 
-	[&_:is([data-slot=input],[data-slot=currency-input])+[data-slot=input-addon]]:rounded-s-none [&_:is([data-slot=input],[data-slot=currency-input])+[data-slot=input-addon]]:border-s-0
+	[&_[data-slot=input]]:grow
+	[&_[data-slot=input-addon]:has(+[data-slot=input])]:rounded-e-none [&_[data-slot=input-addon]:has(+[data-slot=input])]:border-e-0
+	[&_[data-slot=input]+[data-slot=input-addon]]:rounded-s-none [&_[data-slot=input]+[data-slot=input-addon]]:border-s-0
 	[&_[data-slot=input-addon]:has(+[data-slot=button])]:rounded-e-none
-	[&_:is([data-slot=input],[data-slot=currency-input])+[data-slot=button]]:rounded-s-none
-	[&_[data-slot=button]+:is([data-slot=input],[data-slot=currency-input])]:rounded-s-none
-	[&_[data-slot=input-addon]+:is([data-slot=input],[data-slot=currency-input])]:rounded-s-none
-	[&_[data-slot=input-addon]+[data-slot=datefield]]:[&_:is([data-slot=input],[data-slot=currency-input])]:rounded-s-none
-	[&_[data-slot=datefield]:has(+[data-slot=input-addon])]:[&_:is([data-slot=input],[data-slot=currency-input])]:rounded-e-none
-	[&_:is([data-slot=input],[data-slot=currency-input]):has(+[data-slot=button])]:rounded-e-none
-	[&_:is([data-slot=input],[data-slot=currency-input]):has(+[data-slot=input-addon])]:rounded-e-none
-	[&_[data-slot=datefield]]:grow
-	[&_[data-slot=datefield]+[data-slot=input-addon]]:rounded-s-none [&_[data-slot=datefield]+[data-slot=input-addon]]:border-s-0
+	[&_[data-slot=input]:has(+[data-slot=button])]:rounded-e-none
+	[&_[data-slot=button]+[data-slot=input]]:rounded-s-none
+	[&_[data-slot=input-addon]+[data-slot=input]]:rounded-s-none
+	[&_[data-slot=input]:has(+[data-slot=input-addon])]:rounded-e-none
   `,
 	{
 		variants: {},
@@ -100,25 +94,25 @@ const inputWrapperVariants = cva(
 	has-[:focus-visible]:ring-2
 
 	
-	[&_[data-slot=datefield]]:grow 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:rounded-none
-	[&_:is([data-slot=input],[data-slot=currency-input])]:data-focus-within:ring-transparent  
-	[&_:is([data-slot=input],[data-slot=currency-input])]:data-focus-within:ring-0
-	[&_:is([data-slot=input],[data-slot=currency-input])]:data-focus-within:border-0
-	[&_:is([data-slot=input],[data-slot=currency-input])]:flex 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:w-full 
-    [&_:is([data-slot=input],[data-slot=currency-input])]:outline-none 
-    [&_:is([data-slot=input],[data-slot=currency-input])]:transition-colors 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:text-foreground
-	[&_:is([data-slot=input],[data-slot=currency-input])]:placeholder:text-muted-foreground 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:p-0
-	[&_:is([data-slot=input],[data-slot=currency-input])]:border-0 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:bg-transparent 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:shadow-none 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:focus-visible:ring-0 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:h-auto 
-	[&_:is([data-slot=input],[data-slot=currency-input])]:disabled:cursor-not-allowed
-	[&_:is([data-slot=input],[data-slot=currency-input])]:disabled:opacity-50
+	[&_[data-slot=input]]:grow 
+	[&_[data-slot=input]]:rounded-none
+	[&_[data-slot=input]]:data-focus-within:ring-transparent  
+	[&_[data-slot=input]]:data-focus-within:ring-0
+	[&_[data-slot=input]]:data-focus-within:border-0
+	[&_[data-slot=input]]:flex 
+	[&_[data-slot=input]]:w-full 
+    [&_[data-slot=input]]:outline-none 
+    [&_[data-slot=input]]:transition-colors 
+	[&_[data-slot=input]]:text-foreground
+	[&_[data-slot=input]]:placeholder:text-muted-foreground 
+	[&_[data-slot=input]]:p-0
+	[&_[data-slot=input]]:border-0 
+	[&_[data-slot=input]]:bg-transparent 
+	[&_[data-slot=input]]:shadow-none 
+	[&_[data-slot=input]]:focus-visible:ring-0 
+	[&_[data-slot=input]]:h-auto 
+	[&_[data-slot=input]]:disabled:cursor-not-allowed
+	[&_[data-slot=input]]:disabled:opacity-50
 
 	[&_svg]:text-muted-foreground
 	[&_svg]:shrink-0

@@ -11,7 +11,6 @@ export type BannerTitleProps = React.HTMLAttributes<HTMLHeadingElement>
 export type BannerDescriptionProps = React.HTMLAttributes<HTMLParagraphElement>
 export type BannerContentProps = React.HTMLAttributes<HTMLDivElement>
 export type BannerIconProps = React.HTMLAttributes<HTMLDivElement>
-export type BannerToolbarProps = React.HTMLAttributes<HTMLDivElement>
 
 const bannerVariants = cva(
 	"flex items-center justify-center w-full gap-2 p-2 overflow-hidden",

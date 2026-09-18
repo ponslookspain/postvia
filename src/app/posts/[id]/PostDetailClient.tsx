@@ -51,6 +51,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";import { TextArea } from "@/components/ui/text-area";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { reportError } from "@/lib/diagnostics";
 
@@ -827,23 +828,21 @@ export default function PostDetailPage({
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <FieldLabel htmlFor="reschedule-date">Date</FieldLabel>
-                <input
+                <Input
                   id="reschedule-date"
                   type="date"
                   value={rescheduleDate}
                   min={localDateInputValue(new Date())}
                   onChange={(e) => setRescheduleDate(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </Field>
               <Field>
                 <FieldLabel htmlFor="reschedule-time">Time</FieldLabel>
-                <input
+                <Input
                   id="reschedule-time"
                   type="time"
                   value={rescheduleTime}
                   onChange={(e) => setRescheduleTime(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </Field>
             </div>

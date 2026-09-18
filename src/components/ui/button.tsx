@@ -2,7 +2,6 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
-import { Spinner } from "./spinner"
 
 // PostVIA Button — direct contract.
 //
@@ -45,24 +44,11 @@ const buttonVariants = cva(
 				"icon-sm":
 					"[&>svg]:size-4.5 text-sm px-1 rounded-full gap-1.5 h-8 px-2.5 py-1.5 aspect-square p-0",
 			},
-			loading: {
-				true: "",
-				false: "",
-			},
 		},
 		defaultVariants: {
 			variant: "default",
 			size: "default",
-			loading: false,
 		},
-		compoundVariants: [
-			// Link loading state (no underline when loading)
-			{
-				variant: "link",
-				loading: true,
-				className: "hover:no-underline",
-			},
-		],
 	}
 )
 
@@ -76,20 +62,10 @@ type PostVIAButtonVariant =
 
 type PostVIAButtonSize = "default" | "sm" | "lg" | "icon-sm"
 
-// Spinner pixel size per button size (matches the previous numeric mapping:
-// default/36, sm/32, lg/40, icon-sm/32).
-const BUTTON_SPINNER_SIZE: Record<PostVIAButtonSize, number> = {
-	default: 36,
-	sm: 32,
-	lg: 40,
-	"icon-sm": 32,
-}
-
 export type ButtonProps = Omit<React.ComponentProps<"button">, "color"> & {
 	variant?: PostVIAButtonVariant
 	size?: PostVIAButtonSize
 	asChild?: boolean
-	loading?: boolean
 	// Legacy BaseUI composition API (Link-as-button across the app).
 	// The render element becomes the Slot child; props merge the same way.
 	render?: React.ReactElement
@@ -103,7 +79,6 @@ function Button({
 	variant = "default",
 	size = "default",
 	asChild = false,
-	loading = false,
 	render,
 	...props
 }: ButtonProps) {
@@ -113,7 +88,6 @@ function Button({
 		buttonVariants({
 			variant,
 			size,
-			loading,
 		}),
 		// PostVIA geometry (design-system.md): buttons are always fully
 		// rounded pills. Radius lives in the size variants above
@@ -149,13 +123,6 @@ function Button({
 
 	return (
 		<button data-slot="button" className={classes} {...validProps}>
-			{loading && (
-				<Spinner
-					variant="simple"
-					size={BUTTON_SPINNER_SIZE[size]}
-					aria-hidden="true"
-				/>
-			)}
 			{children}
 		</button>
 	)

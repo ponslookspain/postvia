@@ -15,6 +15,7 @@ function Calendar({
 }: CalendarProps) {
 	return (
 		<DayPicker
+			data-slot="calendar"
 			classNames={{
 				months: "relative flex flex-col gap-5 p-0 sm:flex-row",
 				month_caption:
