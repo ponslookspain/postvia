@@ -298,8 +298,22 @@ test.describe("browser smoke", () => {
         await goViaSidebar("Dashboard", /\/dashboard/);
 
         const goViaAccountMenu = async (name: string, urlPattern: RegExp) => {
-          await sidebar.getByRole("button", { name: "Account menu" }).click();
-          await page.getByRole("menuitem", { name }).click();
+          const trigger = sidebar.getByRole("button", { name: "Account menu" });
+          const item = page.getByRole("menuitem", { name });
+          await trigger.click();
+          // Cold `next dev` servers hydrate seconds after the SSR HTML (and
+          // the URL) is already interactive for plain links: a trigger click
+          // that lands pre-hydration opens no menu, and the item click below
+          // would then wait until the test timeout. Toggle once more when
+          // the menu did not appear — bounded, and a genuinely broken menu
+          // still fails fast on the expect below instead of hanging.
+          const opened = await item
+            .waitFor({ state: "visible", timeout: 10_000 })
+            .then(() => true)
+            .catch(() => false);
+          if (!opened) await trigger.click();
+          await expect(item).toBeVisible({ timeout: 15_000 });
+          await item.click();
           await expect(page).toHaveURL(urlPattern, { timeout: 15_000 });
         };
 
