@@ -42,7 +42,8 @@ Sentry (error reporting), Vercel Cron (scheduler trigger).
 | `dashboard.ts` | Server-side dashboard fetch + view model (`parseDashboardParams` / `getDashboard` / `buildDashboardViewModel`); reuses `dashboard-analytics.ts` pure utilities and `entitlements.ts` billing rules, never replaces them |
 | `dashboard-types.ts` | Shared dashboard view-model types (`ChannelRow`, `OutcomeSegment`) — single source so `lib` never imports from `app` |
 | `dashboard-analytics.ts` | Pure dashboard analytics/formatting utilities (no Prisma, no I/O) |
-| `plans.ts` | Plan ids, prices, entitlements (single source of truth) |
+| `plans.ts` | Compatibility re-export of `domain/billing/plans.ts` (single source of truth) |
+| `domain/billing/plans.ts` | Canonical plan definitions + entitlement constants (`PlanId`, `PlanEntitlements`, `FeatureKey`, `PLANS`, `parsePlanParam`, `getPlan`). Dependency-free, client-safe |
 | `social-accounts.ts` | Race-safe `SocialAccount` create/disconnect lookup |
 | `social/` | Per-provider OAuth, token refresh, publish primitives (`x`, `threads`, `tiktok`, `instagram`) — infrastructure clients, stay in `lib` |
 | `domain/social/` | Pure social domain: platform capability registry (`capabilities`), target overrides/content validation (`overrides`), provider interfaces (`provider`), PKCE helpers (`pkce`). `src/lib/platforms/*` and `src/lib/social/{provider,pkce}.ts` are re-export shims. Runtime clients (`ensureFresh*Token`, fetch/poll/upload, Prisma CAS) stay in `src/lib/social/*`. Consumes `domain/media` (`MediaKind`, `isMediaKind`), never `lib/media` |
