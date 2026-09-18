@@ -60,11 +60,14 @@
 	   Raised and floating surfaces. `card` (`paper-3`) is a block that may
 	   lift off the page; `popover` (`paper-4`) is genuinely floating UI
 	   (popover, dialog, drawer, toast, select menu), one rung above card,
-	   and is the only tier where a shadow is allowed. */
+	   and is the only tier where a shadow is allowed. `-foreground` on both
+	   is an alias to `--foreground` (was a byte-identical literal in both
+	   themes — a value is written down exactly once, per the file's own
+	   rule at the top). */
 	--card: var(--paper-3);
-	--card-foreground: #20201e;
+	--card-foreground: var(--foreground);
 	--popover: var(--paper-4);
-	--popover-foreground: #20201e;
+	--popover-foreground: var(--foreground);
 
 	/* —— Elevation ————————————————————————————————————————————————————————
 	   PostVIA elevates by TONE, not by shadow: sunken (`muted`) → surface
@@ -154,7 +157,12 @@
 	--error-accent: var(--clay-3);
 	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
 	--error-border: var(--clay-7);
-	--error-hover: color-mix(in srgb, var(--error) 88%, black);
+	/* Mixes toward --foreground, not literal black: darkens in light
+	   (same as before) and LIGHTENS in dark, since --foreground is dark
+	   text there. Mixing toward black in both themes had the destructive
+	   Button's hover state darken an already light-on-dark hue in dark
+	   -- reducing contrast on hover instead of increasing it. */
+	--error-hover: color-mix(in srgb, var(--error) 88%, var(--foreground));
 	--info-accent: var(--sky-3);
 	--info-border: var(--sky-7);
 
@@ -185,7 +193,10 @@
 	--sidebar-primary-foreground: #ffffff;
 	--sidebar-accent: #e9e6dc;
 	--sidebar-accent-foreground: #20201e;
-	--sidebar-border: #e3e2de;
+	/* Was its own literal (#e3e2de), pre-dating Phase 2's --border
+	   remap onto paper-6 -- an accidental fifth border tone on the
+	   rail. Aliased so the rail edge tracks --border again. */
+	--sidebar-border: var(--border);
 	--sidebar-ring: var(--signal-9);
 
 	/* —— Legacy aliases ———————————————————————————————————————————————————
@@ -216,9 +227,9 @@
 	--panel: var(--paper-2);
 
 	--card: var(--paper-3);
-	--card-foreground: #f5f4ee;
+	--card-foreground: var(--foreground);
 	--popover: var(--paper-4);
-	--popover-foreground: #f5f4ee;
+	--popover-foreground: var(--foreground);
 
 	--primary-foreground: #0f0f0e;
 
@@ -240,7 +251,7 @@
 	--sidebar-primary-foreground: #0f0f0e;
 	--sidebar-accent: #0f0f0e;
 	--sidebar-accent-foreground: #f5f4ee;
-	--sidebar-border: #34332f;
+	--sidebar-border: var(--border);
 }
 
 /* ----------------------------------------------------------------------------
