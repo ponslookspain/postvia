@@ -123,7 +123,7 @@ Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).
 | Background | `--background` | `#F5F4EE` | `#262624` |
 | Foreground | `--foreground` | `#20201E` | `#F5F4EE` |
 | Muted | `--muted` | `#E7E5DE` | `#38362F` |
-| Muted | `--muted-foreground` | `#77766F` | `#A4A39D` |
+| Muted | `--muted-foreground` | `#65645D` | `#B3B2AC` |
 | Panel | `--panel` | `#F0EFEB` | `#222120` |
 | Panel | `--panel-foreground` | → `--foreground` | → `--foreground` |
 | Surface | `--card` / `--card-foreground` | `#FAF9F5` / `#20201E` | `#2C2C2B` / `#F5F4EE` |
@@ -132,7 +132,7 @@ Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).
 | Border | `--border` | `#E3E2DE` | `#34332F` |
 | Border | `--input` | `#DEDCD5` | `#3A3935` |
 | Border | `--ring` | `#2971C6` | `#5FA1F3` |
-| Primary | `--primary` / `--primary-foreground` | `#2971C6` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
+| Primary | `--primary` / `--primary-foreground` | `#286FC2` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
 | Success | `--success` / `--success-foreground` | `#2F8F5B` / `#FFFFFF` | `#69B887` / `#102217` |
 | Warning | `--warning` / `--warning-foreground` | `#C58A24` / `#3D2C0E` | `#D6A64A` / `#261D0D` |
 | Error | `--error` / `--error-foreground` | `#C84B4B` / `#FFFFFF` | `#E06A6A` / `#260F0F` |
@@ -152,12 +152,20 @@ Meaning, in one line each:
   ladder above is the whole elevation system.
 - **Border** — hairlines for structural splits only. An outline on a block
   is an accent, never a default.
-- **Primary** — one brand hue (PostVIA Blue #2971C6 / #5FA1F3),
+- **Primary** — one brand hue (PostVIA Blue #286FC2 / #5FA1F3),
   reserved for primary actions, active navigation, selected tabs, links,
   focus and main CTAs. Red is reserved for error/destructive only.
 - **Success / Warning / Error / Info** — status hues live in dots and badges
   only. `info` is the SCHEDULED state: a routine future-dated post must not
   look like an alert.
+- **Status text inks** — the ONLY status colours allowed for running text:
+  `--success-text` (`#26774A` / `var(--success)`), `--warning-text`
+  (`#896119` / `var(--warning)`), `--error-text` (`#B04545` / `#E78282`),
+  `--info-text` (`#2569B6` / `#65A5F3`). The base hues are fills and dots
+  (exempt from text contrast) and fail 4.5:1 as copy on light surfaces
+  (measured 2026-09 with axe in real Chromium). Status chips
+  (`StatusBadge`) keep the hue in the dot + tinted shell and set the label
+  in neutral `text-foreground`.
 
 ### Legacy aliases (canonical layer, deprecated names)
 
@@ -225,11 +233,11 @@ records each component's current public API.
 | Textarea | `ui/text-area.tsx` | previous defaults preserved (`min-h-16`, `resize-none`) |
 | Select | `ui/select.tsx` | trigger kept `w-fit` pill |
 | Checkbox | `ui/checkbox.tsx` | — |
-| Radio | `ui/radio-group.tsx` | — |
+| Radio | `ui/radio-group.tsx` | Library surface, currently unused in app — onboarding plan choice uses validated native `fieldset`/`radio` inputs (keyboard: one Tab stop, arrows move, no JS key handling; covered by `tests/e2e/a11y.spec.ts`) |
 | Switch | `ui/switch.tsx` | — |
-| Badge | `ui/badge.tsx` | `variant` `strong / outline / soft`, `size` `20 / 24`, semantic `color` `primary / error / neutral` (default); `BadgeDot`. Post statuses go through the `StatusBadge` domain gateway, never through a Badge color. History: the color axis spanned the full 17-hue palette plus `info / success / warning`, and a `28` size existed — zero call sites, removed. |
+| Badge | `ui/badge.tsx` | `variant` `strong / outline / soft`, `size` `20 / 24`, semantic `color` `primary / error / neutral` (default); `BadgeDot`. Post statuses go through the `StatusBadge` domain gateway, never through a Badge color — and `StatusBadge` labels are neutral `text-foreground` (hue lives in the dot + tinted shell, which passes 4.5:1 where colored running text did not). History: the color axis spanned the full 17-hue palette plus `info / success / warning`, and a `28` size existed — zero call sites, removed. |
 | Avatar | `ui/avatar.tsx` | default 32px (`size-8`); `data-size` drives `AvatarBadge`; PostVIA extension layer preserved verbatim. `AvatarFallback` tint axis narrowed to the four product hues (`red / emerald / amber / light-blue`); the default is muted monochrome. |
-| Tabs | `ui/tabs.tsx` | URL-driven links for status filters |
+| Tabs | `ui/tabs.tsx` | URL-driven links for status filters. `TabsTrigger asChild` strips the button-only `type` attribute (an `<a type="button">` is invalid HTML); URL-driven tab lists set `aria-controls={undefined}` because there is no tabpanel element (the filtered page is the panel) — arrow-key travel between triggers keeps working |
 | Tooltip | `ui/tooltip.tsx` | — |
 | Dropdown | `ui/dropdown-menu.tsx` | — |
 | Dialog | `ui/dialog.tsx`, `ui/drawer.tsx`, `ui/popover.tsx` | — |

@@ -67,7 +67,9 @@ metadata `text-xs`. Four half-steps exist for the in-between sizes:
    invalid field).
 2. **Buttons are always fully rounded pills.** Never pass `h-*`, `min-h-*`,
    padding, or a radius to a `Button`; the size variants own all of it. Icons use
-   `data-icon="inline-start|inline-end"` and carry no sizing classes.
+   `data-icon="inline-start|inline-end"` and carry no sizing classes. The one
+   exception is `min-h-11` (44px touch target) on `MobileComposerBar` actions
+   and the Settings danger-zone button — mobile/reach-critical actions only.
 3. **Status hues live in dots and badges only**, never as page decoration. Use
    `StatusBadge` / `StatusDot` with a status string (`DRAFT`, `SCHEDULED`,
    `PUBLISHING`, `PUBLISHED`, `PARTIALLY_PUBLISHED`, `FAILED`). `SCHEDULED` is

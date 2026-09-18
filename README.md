@@ -59,8 +59,8 @@ Vercel Preview is not part of daily development. Checks before commit:
 ## Stack
 
 - **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
-- **Styling:** Tailwind CSS v4, Radian UI on Radix UI primitives,
-  Lucide icons, Inter body + DM Sans headings
+- **Styling:** Tailwind CSS v4, PostVIA primitives on Radix UI
+  (behavior/accessibility layer), Lucide icons, Inter body + DM Sans headings
   (`--font-sans` / `--font-heading`; Geist variables retained, not primary),
   dark theme by default with a light opt-in
 - **Database:** PostgreSQL via Prisma 6
@@ -213,16 +213,17 @@ invariants and the fail-open/fail-closed matrix:
 - **Dark by default, light opt-in.** The theme class is set on `<html>`
   before first paint (`src/hooks/use-theme.ts`), persists in
   `localStorage` and is switched from Appearance in the account menu.
-- **Red brand hue** for primary actions, kept a step off the error red;
-  the scheduled state uses info blue so routine work never looks like an
-  alert.
+- **PostVIA Blue brand hue** for primary actions, kept distinct from the
+  error red; the scheduled state uses info blue so routine work never
+  looks like an alert.
 - **Blocks carry no outline:** a tile is `--panel`, one shade off the
-  page; a block nested inside a tile goes inset (`bg-bg`). List rows are
+  page; a block nested inside a tile goes inset (`bg-background`). List rows are
   rounded surfaces separated by spacing, not hairline bands.
 - Shared components (`src/components`): `PageHeader`, `StatusBadge`,
   `AuthShell`, `MobileTopBar`, `PageContainer` (page-width tokens
-  `--page-narrow/default/wide`), plus Radian UI primitives in
-  `src/components/ui` (Radix UI) and PostVIA custom components
+  `--page-narrow/default/wide`), plus PostVIA primitives in
+  `src/components/ui` (Radix UI as the behavior/accessibility layer) and
+  PostVIA custom components
   (`Field` forms, `Toast` notifications).
 - Conventions: `FieldGroup` + `Field` forms with `data-invalid` /
   `aria-invalid`, `Card` sections with full header composition, `Alert` for

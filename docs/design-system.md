@@ -49,7 +49,7 @@ full before/after mapping).
 - Warm paper canvas in light (`--background` #F5F4EE), warm charcoal in
   dark (`--background` #262624). Surfaces split by tone, hairline borders
   only (#E3E2DE / #34332F). No gradients, no glow, no heavy shadows.
-- **One brand hue:** PostVIA Blue (`--primary`, light #2971C6 / dark
+- **One brand hue:** PostVIA Blue (`--primary`, light #286FC2 / dark
   #5FA1F3), reserved for primary actions, active navigation, selected
   tabs, links, focus states and main CTAs. Red is reserved for
   error/destructive only.
@@ -151,10 +151,10 @@ full before/after mapping).
 
 ## Navigation / sidebar
 
-- Sidebar primitive (`ui/sidebar.tsx`, `ui/tooltip.tsx`,
-  `ui/drawer.tsx`, `hooks/use-mobile.ts`): `SidebarProvider`,
-  icon-collapsible rail (`16rem` / `3rem`), tooltips in collapsed mode,
-  keyboard toggle, mobile Drawer.
+- Sidebar primitive (`ui/sidebar.tsx` — including the co-located
+  `useIsMobile` hook — plus `ui/tooltip.tsx`, `ui/drawer.tsx`):
+  `SidebarProvider`, icon-collapsible rail (`16rem` / `3rem`), tooltips in
+  collapsed mode, keyboard toggle, mobile Drawer.
 - `variant="floating"` + `theme="gray"`: the rail is a separate rounded
   surface (`bg-sidebar`, 8px canvas inset) floating on the continuous
   `bg-background` canvas; the main content sits directly on that canvas
