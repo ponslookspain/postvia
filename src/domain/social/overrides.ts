@@ -1,5 +1,5 @@
 import type { Platform } from "@prisma/client";
-import { isMediaKind, type MediaKind } from "@/lib/media";
+import { isMediaKind, type MediaKind } from "../media/policy";
 import {
   getPlatformCapabilities,
   type CapabilityField,

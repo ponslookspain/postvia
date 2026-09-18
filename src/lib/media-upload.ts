@@ -23,6 +23,7 @@ import {
 import {
   checkVideoDuration,
   isIsoBaseMediaMime,
+  maxVideoDurationSeconds,
   probeIsoBaseMediaDuration,
   VIDEO_HEAD_PROBE_BYTES,
   VIDEO_TAIL_PROBE_BYTES,
@@ -561,7 +562,10 @@ export async function verifyStoredVideo(
 
   if (!probe.ok) return probe;
 
-  const durationCheck = checkVideoDuration(probe.durationSeconds);
+  const durationCheck = checkVideoDuration(
+    probe.durationSeconds,
+    maxVideoDurationSeconds()
+  );
   if (!durationCheck.ok) return durationCheck;
 
   return { ok: true, durationSeconds: probe.durationSeconds };

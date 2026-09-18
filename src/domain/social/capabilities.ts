@@ -1,5 +1,5 @@
 import type { Platform } from "@prisma/client";
-import type { MediaKind } from "@/lib/media";
+import type { MediaKind } from "../media/policy";
 
 export type CapabilityFieldType = "text" | "boolean" | "enum" | "number";
 

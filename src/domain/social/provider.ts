@@ -1,4 +1,4 @@
-import type { MediaKind } from "@/lib/media";
+import type { MediaKind } from "../media/policy";
 
 export interface PublishResult {
   success: boolean;
