@@ -447,7 +447,7 @@ export default function AccountsContent({
           if (!open) setPendingDisconnect(null);
         }}
       >
-        <DialogContent>
+        <DialogContent data-testid="disconnect-dialog">
           <DialogHeader>
             <DialogTitle>Disconnect account?</DialogTitle>
             <DialogDescription>
@@ -467,6 +467,7 @@ export default function AccountsContent({
               variant="destructive"
               onClick={() => void confirmPendingDisconnect()}
               disabled={disconnecting !== null}
+              data-testid="confirm-disconnect"
             >
               {disconnecting !== null && <Spinner data-icon="inline-start" />}
               Disconnect

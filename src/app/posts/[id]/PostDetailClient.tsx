@@ -876,7 +876,7 @@ export default function PostDetailPage({
       </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent data-testid="delete-post-dialog">
           <DialogHeader>
             <DialogTitle>Delete this post?</DialogTitle>
             <DialogDescription>
@@ -896,6 +896,7 @@ export default function PostDetailPage({
               variant="destructive"
               onClick={() => void handleDelete()}
               disabled={deleting}
+              data-testid="confirm-delete-post"
             >
               {deleting && <Spinner data-icon="inline-start" />}
               {deleting ? "Deleting..." : "Delete post"}

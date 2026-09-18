@@ -94,7 +94,7 @@ export function ScheduleDialog({
             : null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent data-testid="schedule-dialog">
         <DialogHeader>
           <DialogTitle>Schedule post</DialogTitle>
           <DialogDescription>
@@ -183,7 +183,11 @@ export function ScheduleDialog({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={!canSave || scheduling}>
+          <Button
+            onClick={onConfirm}
+            disabled={!canSave || scheduling}
+            data-testid="confirm-schedule"
+          >
             {scheduling && <Spinner data-icon="inline-start" />}
             <CalendarClockIcon data-icon="inline-start" />
             {scheduling ? "Scheduling..." : "Confirm schedule"}

@@ -101,6 +101,57 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3100/login)" = "200"
           kill "$(cat server.pid)"
 
+  # Browser E2E (Playwright, Chromium only): real user journeys against a
+  # throwaway CI database. CI-safe by design — no dev Blob store, no tunnel,
+  # no live Stripe, no real OAuth. The single UI OTP spec needs OTP_DEBUG_TOKEN
+  # + a working RESEND_API_KEY; without them it skips itself (documented in
+  # docs/e2e.md) and the rest of the suite still runs. Media full-chain and
+  # real OAuth/Stripe Checkout stay local/manual smoke.
+  e2e:
+    runs-on: ubuntu-latest
+    needs: pr
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postvia_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL_POSTGRES_PRISMA_URL: postgresql://postgres:postgres@localhost:5432/postvia_e2e?sslmode=disable
+      BETTER_AUTH_SECRET: ci-e2e-not-a-secret
+      ABUSE_HASH_PEPPER: ci-test-pepper-not-a-secret
+      OTP_E2E_DEBUG: "1"
+      OTP_DEBUG_TOKEN: ${{ secrets.OTP_DEBUG_TOKEN }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      E2E_BASE: http://127.0.0.1:3100
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma db push --accept-data-loss
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   # Production schema-drift gate.
   #
   # Production carries no _prisma_migrations history (migrations are applied
