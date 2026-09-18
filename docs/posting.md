@@ -54,6 +54,53 @@ Schedule: `vercel.json` cron `0 3 * * *` (**once daily** — Hobby-plan
 maximum; posts scheduled after 03:00 UTC can wait ~24h; sub-daily needs a
 paid Vercel plan). Validity window 24h (`SCHEDULE_VALIDITY_MS`).
 
+### Scheduler module layout (PARTIAL REFACTOR decision)
+
+```text
+src/lib/scheduling.ts
+    ├── cron infrastructure (isCronAuthorized, withCron)
+    ├── timing configuration (functionMaxDurationMs, cronTickBudgetMs, batches, concurrency)
+    ├── scheduler types (SchedulingDb, StoredPost, TickStats, …)
+    ├── tick orchestration (runScheduledPublishTick)
+    └── claim + publish repair (claimAndPublishPost, private)
+
+src/lib/scheduling/recover-stale.ts
+    └── stale recovery (recoverStalePublishing) + recovery-owned constants
+        (STALE_PUBLISHING_MS, SCHEDULE_VALIDITY_MS, STALE_RECOVERY_BATCH)
+```
+
+Only `recoverStalePublishing` was extracted (byte-for-byte, behavior
+unchanged); `src/lib/scheduling.ts` stays the facade and re-exports it plus
+the three constants, so consumer imports (`@/lib/scheduling`) are unchanged.
+Deliberately NOT created: `claim-scheduled.ts` (claim stays next to the
+tick and its publish repair — one consumer, no independent boundary),
+`schedule-validation.ts` (validation already lives in `src/lib/schedule.ts`
+— there was nothing to move), `schedule-state.ts` (no standalone state
+machine exists; transitions are inline conditional writes), `publish-tick.ts`
+(no separate useful boundary; the facade remains one cohesive pipeline).
+
+Dependency direction: `route → src/lib/scheduling.ts →
+src/lib/scheduling/recover-stale.ts`. `recover-stale.ts` imports scheduler
+types via `import type` only. Runtime circular dependency is absent.
+
+### Scheduler invariants (verified, do not change without a plan upgrade)
+
+- cron path: `/api/cron/publish-scheduled`; schedule: `0 3 * * *`
+- `maxDuration = 60` (cron route; Hobby ceiling)
+- `STALE_PUBLISHING_MS = 360000` (6 min; strictly above the function
+  ceiling, so recovery can never reset a live publish)
+- `SCHEDULE_VALIDITY_MS = 86400000` (24h; older stale posts expire to
+  `FAILED` instead of re-queueing)
+- `SCHEDULE_TICK_BATCH = 200`; `STALE_RECOVERY_BATCH = 100`
+- `SCHEDULE_TICK_CONCURRENCY = 4` (tick budget ratio 0.7 → 42s at Hobby)
+
+Claim: `SCHEDULED → PUBLISHING` via a conditional `updateMany`
+(`where: { id, status }`); lost claim returns `skipped`, never republishes.
+
+Tick order (must stay equivalent): recovery → due fetch (`SCHEDULED`,
+`scheduledAt <= now`, oldest-due-first) → batch → conditional claim →
+bounded concurrency → publish → aggregate repair → stats.
+
 ## Media
 
 `POST /api/media/prepare` (authorized pathname reservation) → presigned
