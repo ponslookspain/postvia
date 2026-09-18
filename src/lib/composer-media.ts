@@ -1,5 +1,6 @@
 import { validateMediaInput, type MediaKind } from "@/lib/media";
 import type { PlanId } from "@/lib/plans";
+import { TIKTOK_PHOTO_MAX_BYTES } from "@/domain/social/tiktok-photo-limits";
 
 /**
  * Stage A helpers for the new-post composer. Pure functions only — no DOM,
@@ -194,9 +195,10 @@ export function isComposerDirty(input: {
  * support up to 20 MB JPEG/WebP at the API, but the shared 10 MB upload
  * ceiling binds first (raising it is a separate infra decision). When a
  * TikTok target is selected, say so explicitly instead of letting the
- * generic limit read as a TikTok rejection.
+ * generic limit read as a TikTok rejection. The 20 MB bound is canonical
+ * in `@/domain/social/tiktok-photo-limits` (client-safe, no provider
+ * runtime in the browser bundle).
  */
-const TIKTOK_PHOTO_MAX_BYTES = 20 * 1024 * 1024;
 
 function withTiktokSizeHint(
   error: string,

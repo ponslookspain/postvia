@@ -12,6 +12,11 @@
  * Never Prisma, Stripe SDK, React, process.env, fetch, Blob SDK, Sentry,
  * diagnostics, `src/lib/*` or `src/app/*`.
  */
+import {
+  TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH,
+  TIKTOK_PHOTO_MAX_BYTES,
+  TIKTOK_PHOTO_TITLE_MAX_LENGTH,
+} from "../tiktok-photo-limits";
 
 export class TiktokApiError extends Error {
   constructor(
@@ -33,9 +38,16 @@ export const TIKTOK_CAPTION_MAX_LENGTH = 2200;
  * Both are optional per TikTok; callers fall back to the global post
  * text first, so empty text only reaches the gates below for textless
  * posts.
+ *
+ * Canonical values live in `../tiktok-photo-limits` (single source for
+ * the publish pipeline, composer preview, upload guidance and bulk);
+ * re-exported here so existing `@/lib/social/tiktok` import paths keep
+ * working with no behavior change.
  */
-export const TIKTOK_PHOTO_TITLE_MAX_LENGTH = 90;
-export const TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH = 4000;
+export {
+  TIKTOK_PHOTO_TITLE_MAX_LENGTH,
+  TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH,
+};
 
 export const TIKTOK_CHUNK_LIMIT = 64 * 1024 * 1024;
 const TIKTOK_SPLIT_CHUNK_SIZE = 20 * 1024 * 1024;
@@ -95,7 +107,8 @@ export type TiktokPublishSettings = {
 };
 
 export const TIKTOK_PHOTO_MAX_COUNT = 35;
-export const TIKTOK_PHOTO_MAX_BYTES = 20 * 1024 * 1024;
+/** Byte cap is canonical in `../tiktok-photo-limits`; re-exported for compat. */
+export { TIKTOK_PHOTO_MAX_BYTES };
 export const TIKTOK_PHOTO_MIME_TYPES = ["image/jpeg", "image/webp"] as const;
 
 export type TiktokMediaPolicyInput = {

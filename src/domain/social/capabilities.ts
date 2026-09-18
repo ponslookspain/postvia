@@ -1,5 +1,6 @@
 import type { Platform } from "@prisma/client";
 import type { MediaKind } from "../media/policy";
+import { X_IMAGE_MAX_BYTES } from "./policies/x";
 
 export type CapabilityFieldType = "text" | "boolean" | "enum" | "number";
 
@@ -57,8 +58,9 @@ export type PlatformCapabilities = {
      *     blocked globally before TikTok's own gate. Narrowing the global
      *     image ceiling per platform is out of scope; the publish pipeline
      *     (resolveTiktokMediaPolicy) stays authoritative at publish time.
-     * Sizes here mirror the provider constants (X_IMAGE_MAX_BYTES, …) —
-     * update both sides together; a unit test pins the equality.
+     * Sizes here reference the provider constants (X_IMAGE_MAX_BYTES, …)
+     * by construction — no parallel literals to keep in sync; a unit test
+     * pins the equality as defense-in-depth.
      */
     maxFileSizeBytes?: {
       image?: number;
@@ -72,8 +74,14 @@ export type PlatformCapabilities = {
   fields: readonly CapabilityField[];
 };
 
-/** 5 MB — mirrors X_IMAGE_MAX_BYTES in @/lib/social/x. */
-export const X_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+/**
+ * 5 MB — canonical provider cap (`X_IMAGE_MAX_BYTES` in
+ * `./policies/x`, enforced by `resolveXMediaPolicy`). Surfaced here as
+ * the pre-upload registry gate (`media.maxFileSizeBytes.image`) and as
+ * a named alias for existing import sites; the numeric value exists
+ * exactly once. No provider logic moves here.
+ */
+export const X_PHOTO_MAX_BYTES = X_IMAGE_MAX_BYTES;
 
 const THREADS: PlatformCapabilities = {
   platform: "THREADS",
