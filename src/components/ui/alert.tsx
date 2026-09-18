@@ -38,16 +38,16 @@ const alertVariants = cva(
 				"soft-outline":
 					"ring-1 ring-inset [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
 				outline:
-					"border border-accent [&_[data-slot=alert-close]]:text-muted-foreground [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
+					"border border-border [&_[data-slot=alert-close]]:text-muted-foreground [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
 			},
 		},
 		compoundVariants: [
 			// Soft variants
-			{ color: "neutral", variant: "soft", className: "bg-accent" },
+			{ color: "neutral", variant: "soft", className: "bg-muted" },
 			{
 				color: "primary",
 				variant: "soft",
-				className: "bg-accent text-primary",
+				className: "bg-muted text-primary",
 			},
 			{
 				color: "info",
@@ -98,12 +98,12 @@ const alertVariants = cva(
 			{
 				color: "neutral",
 				variant: "soft-outline",
-				className: "border-border bg-accent",
+				className: "border-border bg-muted",
 			},
 			{
 				color: "primary",
 				variant: "soft-outline",
-				className: "bg-accent text-primary border-primary",
+				className: "bg-muted text-primary border-primary",
 			},
 			{
 				color: "info",

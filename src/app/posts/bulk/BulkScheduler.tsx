@@ -1040,7 +1040,7 @@ export function BulkScheduler({
                             className={cn(
                               "h-6 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40",
                               active
-                                ? "border-primary/30 bg-primary/10 text-primary"
+                                ? "border-primary-border bg-primary-soft text-primary"
                                 : "border-border bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground"
                             )}
                           >

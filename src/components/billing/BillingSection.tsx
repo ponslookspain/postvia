@@ -422,14 +422,14 @@ export function BillingSection({
                 key={plan.id}
                 className={cn(
                   "h-full",
-                  recommended && "border-primary/30 bg-primary/10"
+                  recommended && "border-primary-border bg-primary-soft"
                 )}
               >
                 <CardHeader>
                   <div className="flex flex-wrap items-center gap-2">
                     <CardTitle>{plan.name}</CardTitle>
                     {recommended && (
-                      <Badge variant="soft" className="border-primary/30 bg-primary/10">
+                      <Badge variant="soft" className="border-primary-border bg-primary-soft">
                         Recommended
                       </Badge>
                     )}

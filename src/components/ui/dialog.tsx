@@ -91,7 +91,7 @@ function DialogContent({
 			<DialogPrimitive.Content
 				data-slot="dialog-content"
 				className={cn(
-					"bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 border-overlay-12 group fixed top-1/2 left-1/2 z-50 flex w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border shadow-lg duration-200 sm:max-w-lg",
+					"bg-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 border-overlay-12 group fixed top-1/2 left-1/2 z-50 flex w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl border shadow-lg duration-200 sm:max-w-lg",
 					className
 				)}
 				{...props}>
@@ -120,7 +120,7 @@ function DialogBody({
 	return (
 		<div
 			data-slot="dialog-body"
-			className={cn("border-accent border-t p-5", className)}
+			className={cn("border-border border-t p-5", className)}
 			{...props}
 		/>
 	)
@@ -132,7 +132,7 @@ function DialogFooter({ className, ...props }: DialogFooterProps) {
 		<div
 			data-slot="dialog-footer"
 			className={cn(
-				"border-accent flex justify-end gap-2 border-t p-4",
+				"border-border flex justify-end gap-2 border-t p-4",
 				className
 			)}
 			{...props}

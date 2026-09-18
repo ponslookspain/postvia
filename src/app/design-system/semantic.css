@@ -164,6 +164,12 @@
 	--overlay-8: color-mix(in oklch, var(--foreground) 8%, transparent);
 	--overlay-12: color-mix(in oklch, var(--foreground) 12%, transparent);
 
+	/* —— Switch thumb ————————————————————————————————————————————————————
+	   The switch knob rides on neutral and brand tracks in both states, so
+	   it stays light in both themes for track contrast (white on primary,
+	   white on the neutral track). */
+	--switch-thumb: #ffffff;
+
 	/* —— Navigation ———————————————————————————————————————————————————————
 	   The sidebar rail is a shade off the page so rail and content are told
 	   apart by tone rather than by a divider. `sidebar-accent` is the active
@@ -308,6 +314,9 @@
 	--color-overlay-4: var(--overlay-4);
 	--color-overlay-8: var(--overlay-8);
 	--color-overlay-12: var(--overlay-12);
+
+	/* Switch */
+	--color-switch-thumb: var(--switch-thumb);
 
 	/* Navigation */
 	--color-sidebar: var(--sidebar);

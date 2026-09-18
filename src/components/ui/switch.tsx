@@ -40,7 +40,7 @@ const switchVariants = cva(
 				"32": "w-14 h-8",
 			},
 			permanent: {
-				true: "bg-accent",
+				true: "bg-muted",
 				false: "data-[state=checked]:bg-primary",
 			},
 		},
@@ -55,7 +55,7 @@ const switchVariants = cva(
 // Thumb Variants
 const switchThumbVariants = cva(
 	`
-  pointer-events-none bg-white shadow-lg ring-0 transition-transform 
+  pointer-events-none bg-switch-thumb shadow-lg ring-0 transition-transform 
   data-[state=unchecked]:translate-x-[3px]
   rtl:data-[state=unchecked]:-translate-x-[3px]
   rtl:data-[state=checked]:-translate-x-[calc(100%-3px)]

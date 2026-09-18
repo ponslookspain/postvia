@@ -22,13 +22,13 @@ const buttonVariants = cva(
 					"bg-primary font-medium text-primary-foreground hover:brightness-95 dark:hover:brightness-110 focus-visible:ring-primary focus-visible:outline-none",
 				// Quiet neutral fill.
 				secondary:
-					"bg-accent font-medium text-foreground hover:bg-accent focus-visible:bg-background focus-visible:outline-none focus-visible:ring-border",
+					"bg-muted font-medium text-foreground hover:bg-muted focus-visible:bg-background focus-visible:outline-none focus-visible:ring-border",
 				// Raised surface with a hairline.
 				outline:
 					"bg-elevation-raised font-medium text-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border",
 				// Borderless action.
 				ghost:
-					"bg-transparent text-foreground font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-border",
+					"bg-transparent text-foreground font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-border",
 				// Destructive action. Maps to the semantic error hue.
 				destructive:
 					"bg-error font-medium text-error-foreground hover:bg-error-hover focus-visible:ring-error focus-visible:outline-none",

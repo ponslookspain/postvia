@@ -22,7 +22,7 @@ export function InsightList({ insights }: { insights: Insight[] }) {
               "flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3",
               problem
                 ? "border-error-border/40 bg-error-accent"
-                : "border-warning/30 bg-warning/10"
+                : "border-warning-border bg-warning-accent"
             )}
           >
             <p className="flex min-w-0 items-center gap-2.5 text-sm">

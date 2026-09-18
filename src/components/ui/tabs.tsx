@@ -30,7 +30,7 @@ const tabsListStyles = cva(
 				full: "data-[orientation=horizontal]:w-full data-[orientation=horizontal]:items-stretch data-[orientation=horizontal]:*:flex-1",
 			}, // default medium
 			variant: {
-				default: "bg-accent",
+				default: "bg-muted",
 				open: "data-[orientation=horizontal]:border-b data-[orientation=vertical]:border-r border-border",
 				ghost: "",
 			},
@@ -62,7 +62,7 @@ const tabsTriggerStyles = cva(
 					"data-[state=active]:bg-elevation-raised border border-transparent data-[state=active]:border data-[state=active]:border-overlay-8 data-[state=active]:drop-shadow-xs",
 				open: "data-[orientation=horizontal]:border-b-2 data-[orientation=vertical]:border-r-2 border-transparent data-[state=active][orientation=horizontal]:border-b-2 data-[state=active][orientation=vertical]:border-r-2 data-[state=active]:border-primary",
 				ghost:
-					"data-[state=active]:bg-accent data-[state=active]:text-primary",
+					"data-[state=active]:bg-muted data-[state=active]:text-primary",
 			},
 		},
 		compoundVariants: [

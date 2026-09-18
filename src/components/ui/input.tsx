@@ -16,11 +16,11 @@ export type InputWrapperProps = React.ComponentProps<"div"> &
 
 const inputVariants = cva(
 	`
-	flex w-full items-center bg-background border border-overlay-12 transition-[color,box-shadow] text-foreground placeholder:text-muted-foreground 
+	flex w-full items-center bg-background border border-input transition-[color,box-shadow] text-foreground placeholder:text-muted-foreground 
 	focus-visible:ring-ring  focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2   
 	disabled:cursor-not-allowed disabled:opacity-60 disabled:text-muted-foreground disabled:bg-overlay-8
 	[&[readonly]]:bg-muted [&[readonly]]:cursor-not-allowed
-	file:h-full [&[type=file]]:py-0 file:border-solid file:border-overlay-12 file:bg-transparent 
+	file:h-full [&[type=file]]:py-0 file:border-solid file:border-input file:bg-transparent 
 	file:font-medium file:not-italic file:text-foreground file:p-0 file:border-0 file:border-e
 	aria-invalid:border-error aria-invalid:ring-error-focus
   `,
@@ -44,7 +44,7 @@ const inputVariants = cva(
 )
 
 const inputAddonVariants = cva(
-	"flex items-center shrink-0 justify-center bg-elevation-raised border border-overlay-12 shadow-xs text-muted-foreground [&_svg]:text-muted-foreground",
+	"flex items-center shrink-0 justify-center bg-elevation-raised border border-input shadow-xs text-muted-foreground [&_svg]:text-muted-foreground",
 	{
 		variants: {
 			size: {
@@ -88,7 +88,7 @@ const inputGroupVariants = cva(
 const inputWrapperVariants = cva(
 	`
 	flex items-center gap-1.5
-	has-[:focus-visible]:ring-accent
+	has-[:focus-visible]:ring-ring
 	has-[:focus-visible]:border-primary
 	has-[:focus-visible]:outline-none 
 	has-[:focus-visible]:ring-2

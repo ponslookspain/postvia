@@ -136,7 +136,7 @@ export function ChannelStrip({
                       <AvatarFallback
                         className={cn(
                           selected && !accountDisabled
-                            ? "bg-primary/10 text-primary"
+                            ? "bg-primary-soft text-primary"
                             : "bg-muted text-muted-foreground"
                         )}
                       >

@@ -28,16 +28,16 @@ const bannerVariants = cva(
 				strong: "[&_[data-slot=banner-close]]:text-current",
 				soft: "[&_[data-slot=banner-close]]:text-current [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-foreground",
 				outline:
-					"border border-accent border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-muted-foreground [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-muted-foreground",
+					"border border-border border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-muted-foreground [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-muted-foreground",
 			},
 		},
 		compoundVariants: [
 			// Soft
-			{ color: "neutral", variant: "soft", className: "bg-accent" },
+			{ color: "neutral", variant: "soft", className: "bg-muted" },
 			{
 				color: "primary",
 				variant: "soft",
-				className: "bg-accent text-primary",
+				className: "bg-muted text-primary",
 			},
 			{
 				color: "info",

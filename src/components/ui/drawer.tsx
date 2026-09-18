@@ -45,7 +45,7 @@ export type DrawerCloseProps = {
 }
 
 const drawerVariants = cva(
-	"fixed z-50 bg-background flex flex-col gap-5 overflow-hidden",
+	"fixed z-50 bg-popover flex flex-col gap-5 overflow-hidden",
 	{
 		variants: {
 			variant: {

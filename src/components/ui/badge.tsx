@@ -83,7 +83,7 @@ const badgeVariants = cva(
 			{
 				variant: "soft",
 				color: "primary",
-				className: "bg-accent text-primary border-overlay-8",
+				className: "bg-muted text-primary border-overlay-8",
 			},
 			{
 				variant: "soft",
@@ -93,7 +93,7 @@ const badgeVariants = cva(
 			{
 				variant: "soft",
 				color: "neutral",
-				className: "bg-accent text-foreground border-overlay-8",
+				className: "bg-muted text-foreground border-overlay-8",
 			},
 		],
 	}

@@ -157,6 +157,7 @@ Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).
 | Border | `--border-subtle` / `--border` / `--border-strong` | → `paper-5 / -6 / -7` | → `paper-5 / -6 / -7` |
 | Border | `--input` | → `paper-8` | → `paper-8` |
 | Border | `--ring` | → `signal-9` | → `signal-9` |
+| Switch | `--switch-thumb` | `#FFFFFF` (both themes — the knob stays light for track contrast) | `#FFFFFF` |
 | Primary | `--primary` / `--primary-foreground` | → `signal-9` / `#FFFFFF` | → `signal-9` / `#0F0F0E` |
 | Primary | `--primary-soft` / `--primary-border` / `--primary-text` | → `signal-3 / -7 / -11` | → `signal-3 / -7 / -11` |
 | Success | `--success` / `--success-foreground` | → `moss-9` / `#FFFFFF` | → `moss-9` / `#102217` |
