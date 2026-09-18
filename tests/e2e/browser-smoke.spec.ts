@@ -326,6 +326,12 @@ test.describe("browser smoke", () => {
             console.log(
               `[smoke-diagnostic] role=menu count: ${await page.getByRole("menu").count()}, menuitem count: ${await page.getByRole("menuitem").count()}, trigger visible: ${await trigger.isVisible()}`
             );
+            console.log(
+              `[smoke-diagnostic] hydration probe: ${await page.evaluate(
+                () =>
+                  `readyState=${document.readyState} scripts=${document.querySelectorAll('script[src]').length} windowNext=${typeof (window as unknown as Record<string, unknown>).next} reactFiber=${Object.keys(document.documentElement).some((k) => k.startsWith("__react"))}`
+              )}`
+            );
             throw error;
           }
           await item.click();
