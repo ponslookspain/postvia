@@ -5,6 +5,21 @@ import {
 import { prisma } from "@/lib/prisma";
 import type { PublishMedia, PublishResult, SocialProvider } from "./provider";
 import type { MediaKind } from "@/lib/media";
+import {
+  InstagramApiError,
+  instagramErrorMessage,
+  resolveInstagramCaption,
+} from "@/domain/social/policies/instagram";
+
+/**
+ * Pure Instagram policies (error classification, caption validation) live in
+ * `@/domain/social/policies/instagram` and are re-exported here so existing
+ * `@/lib/social/instagram` imports keep working. OAuth, token refresh,
+ * Prisma CAS, fetch, container pipeline and polling stay in this module.
+ * No behavior change.
+ */
+export * from "@/domain/social/policies/instagram";
+export type * from "@/domain/social/policies/instagram";
 
 /**
  * Instagram provider via the Instagram Platform API (Instagram Login).
@@ -57,18 +72,6 @@ export function getInstagramAuthorizeUrl(state: string): string {
     force_authentication: "1",
   });
   return `${TIK.authorize}?${params.toString()}`;
-}
-
-export class InstagramApiError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly httpStatus: number,
-    readonly errorType?: string
-  ) {
-    super(message);
-    this.name = "InstagramApiError";
-  }
 }
 
 async function readJson(res: Response): Promise<Record<string, unknown> | null> {
@@ -389,17 +392,6 @@ export type InstagramPublishDeps = {
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_POLL_BUDGET_MS = 150_000;
 
-function validateCaption(caption: string): string | null {
-  const trimmed = caption.trim();
-  if (!trimmed) {
-    return "Instagram posts require a caption. Add text for Instagram.";
-  }
-  if (Array.from(trimmed).length > 2200) {
-    return "Instagram caption exceeds the 2200 character limit.";
-  }
-  return null;
-}
-
 /**
  * Poll the container and publish it once FINISHED. If the container is
  * already PUBLISHED/terminal, no publish call is made. Used both after
@@ -485,7 +477,7 @@ export async function publishInstagramMedia(
   let containerId = input.existingContainerId ?? null;
 
   if (!containerId) {
-    const captionError = validateCaption(input.caption);
+    const captionError = resolveInstagramCaption(input.caption);
     if (captionError) return { state: "invalid", error: captionError };
     try {
       containerId = await createInstagramContainer(accessToken, input.igUserId, {
@@ -506,36 +498,6 @@ export async function publishInstagramMedia(
     { igUserId: input.igUserId, containerId },
     deps
   );
-}
-
-/** Human-readable messages for known Instagram / Meta Graph error codes. */
-export function instagramErrorMessage(error: unknown): string {
-  if (!(error instanceof InstagramApiError)) {
-    return error instanceof Error && error.message
-      ? error.message
-      : "Instagram publishing failed. Please try again.";
-  }
-  const { code, message, errorType } = error;
-  if (code === "190" || errorType === "OAuthException" && /token|session/i.test(message)) {
-    return "Instagram access expired or was revoked. Reconnect your Instagram account.";
-  }
-  if (
-    code === "10" ||
-    code === "200" ||
-    /permission|scope/i.test(message)
-  ) {
-    return "Instagram rejected the request (missing permission or the account is not Business/Creator).";
-  }
-  if (/rate limit|too many/i.test(message) || code === "368") {
-    return "Instagram's publishing limit was reached (up to 100 posts / 24h). Try again later.";
-  }
-  if (/publishing limit/i.test(message)) {
-    return "Instagram's daily publishing limit (100 posts / 24h) was reached. Try again later.";
-  }
-  if (/media|url|jpeg|mp4|format|video/i.test(message)) {
-    return `Instagram could not use the media: ${message}. Use a JPEG photo or an MP4 video.`;
-  }
-  return message || "Instagram publishing failed. Please try again.";
 }
 
 /* ------------------------------ provider class ------------------------------ */
