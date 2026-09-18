@@ -18,6 +18,43 @@ Explicitly NOT in CI: real OAuth round-trips (X/Threads/TikTok/Instagram),
 full Blob chain (`prepare → PUT → webhook → Media row`), live Stripe
 Checkout/Portal, cron execution. Those are local/manual smoke (below).
 
+## Browser smoke
+
+`tests/e2e/browser-smoke.spec.ts` is the fast fail-fast gate in front of
+the journey suite (the CI `e2e` job runs it first; a red smoke stops the
+job before the full suite). One throwaway free user (`withFakeAccount`)
+covers all 8 routes; no form submits, no Stripe/OAuth/Blob/OTP, no
+destructive actions — depth lives in the journey specs below.
+
+- **Public smoke** (logged-out context): `/login` renders 200 + Email
+  field; `/dashboard` bounces to `/login` (a redirect is the correct
+  outcome and is asserted as such — never mistaken for a dashboard
+  render); `/billing` renders its signed-out contract — HTTP 200 with
+  "Sign in to view your plan" and a Sign in link, NOT a redirect.
+- **Authenticated smoke**: `response.status() === 200` + final URL + one
+  stable key-UI anchor per route (`/dashboard`, `/posts`, `/posts/new`,
+  `/calendar`, `/accounts`, `/billing`, `/settings`). Dashboard asserts
+  structure (Create post / View all links), never greeting copy.
+- **Navigation smoke**: real Sidebar clicks
+  (Dashboard → Posts → Calendar → Create post → Accounts → Dashboard)
+  plus account-menu clicks (Settings, Billing), each followed by
+  `toHaveURL`.
+- **Runtime policy**: `pageerror` fails the test; `console.error` is only
+  captured as a `smoke-console.error` annotation for diagnostics
+  (React/Next dev warnings must not make CI flaky).
+
+Run just the smoke locally (same env as the full suite):
+
+```bash
+E2E_BASE=http://127.0.0.1:3100 npx playwright test tests/e2e/browser-smoke.spec.ts
+```
+
+Headed / debug:
+
+```bash
+E2E_BASE=http://127.0.0.1:3100 npx playwright test tests/e2e/browser-smoke.spec.ts --headed
+```
+
 ## Prerequisites
 
 - Local Postgres (the suite refuses production-like origins; see
