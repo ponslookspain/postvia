@@ -5,7 +5,12 @@ const nextConfig: NextConfig = {
   // Local development only: allow the permanent ngrok development
   // hostname to fetch Next.js dev resources (/_next/hmr, React Refresh).
   // Dev-server-only setting — production behavior is unchanged.
-  allowedDevOrigins: ["lavish-passion-dipped.ngrok-free.dev"],
+  // 127.0.0.1 is the Playwright E2E base URL (see playwright.config.ts and
+  // the CI `e2e` job): without it Next 16 treats the IP origin as
+  // cross-origin, silently skips React hydration, and every JS-driven
+  // interaction (dropdown menus, dialogs, composer submits) is dead while
+  // SSR assertions still pass — the exact E2E failure this guards against.
+  allowedDevOrigins: ["lavish-passion-dipped.ngrok-free.dev", "127.0.0.1"],
   // Single canonical host: www.postvia.online 308-redirects to the apex.
   // The rule only matches the www host, so Preview/local hostnames are
   // untouched. Kills the www-vs-apex session/origin split class entirely.
