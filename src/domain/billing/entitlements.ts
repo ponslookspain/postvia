@@ -485,3 +485,82 @@ export function getRemainingQuota(
 export function isKnownPlanId(value: unknown): value is PlanId {
   return PLANS.some((plan) => plan.id === value);
 }
+
+/** Quota-ledger access, injected so tests run without a database. */
+export type QuotaClaimStore = {
+  findUsage: (
+    userId: string,
+    period: string
+  ) => Promise<{ id: string; count: number } | null>;
+  /** Creates the row backfilled from the live count; tolerates races. */
+  createUsage: (
+    userId: string,
+    period: string,
+    count: number
+  ) => Promise<{ id: string; count: number }>;
+  /**
+   * Atomically increments only while below the limit. Serialized by the
+   * row lock with the predicate re-evaluated after locking, so concurrent
+   * claims on the last slot grant exactly one winner.
+   */
+  incrementIfBelowLimit: (id: string, limit: number) => Promise<boolean>;
+};
+
+export type QuotaClaim = { ok: true } | { ok: false; observed: number };
+
+/**
+ * Claims one unit of the monthly post quota. Creates the ledger row lazily,
+ * backfilled from the live creation count so usage accrued before the
+ * first claim keeps counting. Never decrements: deletions cannot refill.
+ */
+export async function claimMonthlyQuota(input: {
+  userId: string;
+  period: string;
+  limit: number;
+  liveCount: number;
+  store: QuotaClaimStore;
+}): Promise<QuotaClaim> {
+  let row = await input.store.findUsage(input.userId, input.period);
+  if (!row) {
+    row = await input.store.createUsage(
+      input.userId,
+      input.period,
+      input.liveCount
+    );
+  }
+  const granted = await input.store.incrementIfBelowLimit(row.id, input.limit);
+  if (!granted) {
+    const current = await input.store.findUsage(input.userId, input.period);
+    return { ok: false, observed: current?.count ?? input.limit };
+  }
+  return { ok: true };
+}
+
+/**
+ * Creation path with quota enforcement. Unlimited plans and the admin
+ * bypass skip the ledger entirely. When the claim is denied nothing is
+ * inserted. When the insert throws after a granted claim the unit stays
+ * consumed — fail-closed, never an over-grant.
+ */
+export async function createWithMonthlyQuota<T>(input: {
+  userId: string;
+  limit: number | null;
+  bypass: boolean;
+  nowMs?: number;
+  liveCount: () => Promise<number>;
+  quota: QuotaClaimStore;
+  insert: () => Promise<T>;
+}): Promise<{ ok: true; value: T } | { ok: false; observed: number }> {
+  if (input.bypass || input.limit === null) {
+    return { ok: true, value: await input.insert() };
+  }
+  const claim = await claimMonthlyQuota({
+    userId: input.userId,
+    period: getPeriodKey(input.nowMs ?? Date.now()),
+    limit: input.limit,
+    liveCount: await input.liveCount(),
+    store: input.quota,
+  });
+  if (!claim.ok) return { ok: false, observed: claim.observed };
+  return { ok: true, value: await input.insert() };
+}

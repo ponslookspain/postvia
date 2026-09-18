@@ -39,7 +39,7 @@ Sentry (error reporting), Vercel Cron (scheduler trigger).
 | `abuse.ts` | Identity resolution/merge, risk, tombstones, rate limits, OAuth gates, ledgers |
 | `free-post-kernel.ts` | Atomic Free post creation (identity + per-user claim + insert in one `$transaction`) |
 | `entitlements.ts` | Live billing reads + quota ledger stores + admin gate + billing view (`getSubscription/getTestOverride/getEffectivePlan/getUsage/liveQuotaStore/assertCanConnectAccount/isAdminEmail/BillingView`); pure rules re-exported from `domain/billing/entitlements.ts` |
-| `domain/billing/entitlements.ts` | Canonical pure entitlement rules: plan/status mapping, period/expiry rules, effective-subscription resolution, feature/bulk/account gates, quota selectors, date helpers. Depends only on `domain/billing/plans`; live reads, quota stores and admin env stay in `lib` |
+| `domain/billing/entitlements.ts` | Canonical pure entitlement rules: plan/status mapping, period/expiry rules, effective-subscription resolution, feature/bulk/account gates, quota selectors, date helpers, quota-claim algorithm over the injected `QuotaClaimStore` port (`claimMonthlyQuota`, `createWithMonthlyQuota`). Depends only on `domain/billing/plans`; live reads, quota stores and admin env stay in `lib` |
 | `dashboard.ts` | Server-side dashboard fetch + view model (`parseDashboardParams` / `getDashboard` / `buildDashboardViewModel`); reuses `dashboard-analytics.ts` pure utilities and `entitlements.ts` billing rules, never replaces them |
 | `dashboard-types.ts` | Shared dashboard view-model types (`ChannelRow`, `OutcomeSegment`) — single source so `lib` never imports from `app` |
 | `dashboard-analytics.ts` | Pure dashboard analytics/formatting utilities (no Prisma, no I/O) |
