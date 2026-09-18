@@ -52,7 +52,8 @@ Sentry (error reporting), Vercel Cron (scheduler trigger).
 | `publish.ts` / `scheduling.ts` / `schedule.ts` | Publish engine, due-post claiming, schedule validation |
 | `bulk-schedule.ts` | Client/server bulk helpers (fan-out through `POST /api/posts`) |
 | `media*.ts`, `blob.ts` | Upload reservation, presigned flow, optimization, orphan sweep |
-| `stripe.ts`, `stripe-redirect.ts` | Stripe config/prices, webhook snapshot processing, redirect safety |
+| `stripe.ts`, `stripe-redirect.ts` | Live Stripe layer: SDK client, env-gated config wrappers, guarded webhook writer, dispatcher, reconcile/cancel; pure rules re-exported from `domain/billing/stripe-rules.ts`; redirect safety stays dependency-free |
+| `domain/billing/stripe-rules.ts` | Canonical pure Stripe rules: price mapping, key-mode/config resolution (caller-supplied env), status mapping, live-stake guards, snapshot parsers, ordering guards (`isStaleDelivery`), store ports, webhook outcome algebra. Depends only on `domain/billing/{plans,entitlements}` types; SDK/Prisma/env stay in `lib` |
 | `email.ts` | Resend verification mail only |
 | `diagnostics.ts` | Console pipeline + scrubbed Sentry bridge (`reportError`) |
 | `base-url.ts` | `BETTER_AUTH_URL` / Vercel URL resolution |
