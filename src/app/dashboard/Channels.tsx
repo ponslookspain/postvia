@@ -2,14 +2,9 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatPlatformName } from "@/lib/utils";
+import type { ChannelRow } from "@/lib/dashboard-types";
 
-export type ChannelRow = {
-  platform: string;
-  usernames: string[];
-  expired: boolean;
-  published: number;
-  lastPublishedLabel: string | null;
-};
+export type { ChannelRow };
 
 /**
  * Where posts go, said plainly. Success-rate bars used to live here;

@@ -27,8 +27,7 @@ import {
   type WeekBucket,
 } from "@/lib/dashboard-analytics";
 import type { Prisma } from "@prisma/client";
-import type { ChannelRow } from "@/app/dashboard/Channels";
-import type { OutcomeSegment } from "@/app/dashboard/OutcomeDonut";
+import type { ChannelRow, OutcomeSegment } from "@/lib/dashboard-types";
 
 export const FILTERABLE_STATUSES = [
   "DRAFT",

@@ -1,11 +1,6 @@
-export type OutcomeSegment = {
-  label: string;
-  value: number;
-  /** Stroke color class for the SVG arc. */
-  className: string;
-  /** Fill color class for the legend dot. */
-  dotClassName: string;
-};
+import type { OutcomeSegment } from "@/lib/dashboard-types";
+
+export type { OutcomeSegment };
 
 /**
  * Outcome distribution as a dependency-free SVG donut.

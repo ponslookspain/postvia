@@ -12,10 +12,20 @@ UI (src/app/*, src/components/*)
   ↓ fetch / server components
 API routes (src/app/api/*)
   ↓
-Domain libs (src/lib/*)
+Domain (src/domain/* — pure business logic, no Prisma/Stripe/Blob/Next I/O)
+  ↓ (domain may use pure shared helpers from src/lib only)
+Application / infrastructure libs (src/lib/*)
   ↓ PrismaClient (src/lib/prisma.ts, singleton)
 Neon PostgreSQL
 ```
+
+Migration is incremental by design: new or actively changing business
+logic goes to `src/domain/<domain>`; existing `src/lib` modules stay
+where they are until a real change justifies a split. `src/lib`
+modules that already moved keep compatibility re-export shims
+(e.g. `@/lib/platforms/capabilities` → `@/domain/social/capabilities`)
+so old imports keep working. `src/lib` never depends on `src/app`
+(shared view-model types live in `src/lib/*-types.ts`, not in pages).
 
 External services: Better Auth (auth), Stripe (billing), Resend (email),
 Vercel Blob (media), provider APIs (X / Threads / TikTok / Instagram),
@@ -30,10 +40,12 @@ Sentry (error reporting), Vercel Cron (scheduler trigger).
 | `free-post-kernel.ts` | Atomic Free post creation (identity + per-user claim + insert in one `$transaction`) |
 | `entitlements.ts` | Effective plan, usage, per-user quota ledger (`PostUsage`) |
 | `dashboard.ts` | Server-side dashboard fetch + view model (`parseDashboardParams` / `getDashboard` / `buildDashboardViewModel`); reuses `dashboard-analytics.ts` pure utilities and `entitlements.ts` billing rules, never replaces them |
+| `dashboard-types.ts` | Shared dashboard view-model types (`ChannelRow`, `OutcomeSegment`) — single source so `lib` never imports from `app` |
 | `dashboard-analytics.ts` | Pure dashboard analytics/formatting utilities (no Prisma, no I/O) |
 | `plans.ts` | Plan ids, prices, entitlements (single source of truth) |
 | `social-accounts.ts` | Race-safe `SocialAccount` create/disconnect lookup |
-| `social/` | Per-provider OAuth, token refresh, publish primitives (`x`, `threads`, `tiktok`, `instagram`, `provider`, `pkce`) |
+| `social/` | Per-provider OAuth, token refresh, publish primitives (`x`, `threads`, `tiktok`, `instagram`) — infrastructure clients, stay in `lib` |
+| `domain/social/` | Pure social domain: platform capability registry (`capabilities`), target overrides/content validation (`overrides`), provider interfaces (`provider`), PKCE helpers (`pkce`). `src/lib/platforms/*` and `src/lib/social/{provider,pkce}.ts` are re-export shims. Runtime clients (`ensureFresh*Token`, fetch/poll/upload, Prisma CAS) stay in `src/lib/social/*` |
 | `publish.ts` / `scheduling.ts` / `schedule.ts` | Publish engine, due-post claiming, schedule validation |
 | `bulk-schedule.ts` | Client/server bulk helpers (fan-out through `POST /api/posts`) |
 | `media*.ts`, `blob.ts` | Upload reservation, presigned flow, optimization, orphan sweep |

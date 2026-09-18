@@ -1,37 +1,9 @@
-import type { MediaKind } from "@/lib/media";
-
-export interface PublishResult {
-  success: boolean;
-  externalPostId?: string;
-  error?: string;
-}
-
 /**
- * A media attachment resolved to a URL the platform can fetch
- * (for Threads this is a short-lived signed URL into the PRIVATE
- * Vercel Blob store, scoped to exactly one blob pathname).
+ * Compatibility re-export.
+ *
+ * Canonical location: `@/domain/social/provider`.
+ * This shim keeps existing `@/lib/social/provider` imports working
+ * while new code should import from the domain module directly.
+ * No behavior change — pure re-export.
  */
-export interface PublishMedia {
-  url: string;
-  kind: MediaKind;
-}
-
-export interface SocialProvider {
-  getAuthorizeUrl(state: string, codeChallenge: string): string;
-  exchangeCode(code: string, codeVerifier: string): Promise<{
-    accessToken: string;
-    refreshToken?: string;
-    expiresAt?: Date;
-  }>;
-  getCurrentUser(accessToken: string): Promise<{
-    externalId: string;
-    username: string;
-  }>;
-  publishPost(
-    accessToken: string,
-    text: string,
-    externalId: string,
-    media?: PublishMedia
-  ): Promise<PublishResult>;
-  revokeToken(accessToken: string): Promise<boolean>;
-}
+export * from "@/domain/social/provider";
