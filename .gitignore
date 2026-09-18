@@ -53,3 +53,8 @@ ds-bundle/
 /dist/
 .design-sync/component-docs/
 .design-sync/fonts/
+
+# Graphify
+graphify-out/cost.json
+graphify-out/cache/
+graphify-out/.graphify_root
