@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth";
 import { gateWriteRequest, WRITE_LIMIT_MEDIA_PREPARE } from "@/lib/abuse";
 import { reserveUploadPathname } from "@/lib/media-upload";
+import {
+  AuthorizationError,
+  DomainError,
+  RateLimitError,
+  ValidationError,
+} from "@/lib/errors/domain-error";
+import { toApiResponse } from "@/lib/errors/to-response";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,17 +21,16 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json(
-        { error: "Invalid request body" },
-        { status: 400 }
-      );
+      const mapped = toApiResponse(new ValidationError("Invalid request body"));
+      return NextResponse.json(mapped.body, { status: mapped.status });
     }
 
     // Auth first: unauthenticated callers get 401 without burning quota,
     // and the gate below always runs for authenticated users.
     const user = await getApiUser();
     if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      const mapped = toApiResponse(new AuthorizationError("Not authenticated"));
+      return NextResponse.json(mapped.body, { status: mapped.status });
     }
     if (
       !(await gateWriteRequest({
@@ -34,10 +40,10 @@ export async function POST(request: NextRequest) {
         userMax: WRITE_LIMIT_MEDIA_PREPARE,
       }))
     ) {
-      return NextResponse.json(
-        { error: "Too many requests. Please wait before trying again." },
-        { status: 429 }
+      const mapped = toApiResponse(
+        new RateLimitError("Too many requests. Please wait before trying again.")
       );
+      return NextResponse.json(mapped.body, { status: mapped.status });
     }
     const result = await reserveUploadPathname({
       user,
@@ -48,14 +54,20 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      // Flat backward-compatible shape: same `error` string + added `code`.
+      const mapped = toApiResponse({
+        error: result.error,
+        status: result.status,
+        code: result.code,
+      });
+      return NextResponse.json(mapped.body, { status: mapped.status });
     }
 
     return NextResponse.json({ pathname: result.pathname });
   } catch {
-    return NextResponse.json(
-      { error: "Failed to prepare upload" },
-      { status: 500 }
+    const mapped = toApiResponse(
+      new DomainError("Failed to prepare upload", { code: "INTERNAL", status: 500 })
     );
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 }

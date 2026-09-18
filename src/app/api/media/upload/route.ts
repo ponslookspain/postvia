@@ -17,6 +17,49 @@ import {
   validateReservedPathname,
 } from "@/lib/media-upload";
 import { reportError } from "@/lib/diagnostics";
+import {
+  AuthorizationError,
+  DomainError,
+  RateLimitError,
+  ValidationError,
+} from "@/lib/errors/domain-error";
+import { toApiResponse } from "@/lib/errors/to-response";
+
+/** Map legacy plain-Error messages (SDK passthrough) to typed errors. */
+function mapUploadTokenError(error: unknown): DomainError {
+  if (error instanceof DomainError) return error;
+  const cause = error instanceof Error ? error : null;
+  const message = cause?.message ?? String(error ?? "");
+  if (message.includes("Not authenticated")) {
+    return new AuthorizationError("Not authenticated", { cause: error });
+  }
+  if (message.includes("Too many upload requests")) {
+    return new RateLimitError(message, { cause: error });
+  }
+  if (message.includes("Post not found")) {
+    return new DomainError("Post not found", {
+      code: "NOT_FOUND",
+      status: 404,
+      cause: error,
+    });
+  }
+  if (
+    message.includes("Multipart uploads are not supported") ||
+    message.includes("clientPayload") ||
+    message.includes("Invalid upload path") ||
+    message.includes("Unsupported file type") ||
+    message.includes("File exceeds") ||
+    message.includes("File is empty") ||
+    message.includes("could not be determined")
+  ) {
+    return new ValidationError(message, { cause: error });
+  }
+  return new DomainError("Upload handler failed", {
+    code: "INTERNAL",
+    status: 500,
+    cause: error,
+  });
+}
 
 /**
  * The upload-completed webhook may canonicalize a still image
@@ -43,7 +86,8 @@ export async function POST(request: NextRequest) {
   try {
     body = (await request.json()) as HandleUploadPresignedBody;
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    const mapped = toApiResponse(new ValidationError("Invalid request body"));
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 
   // Fail fast on missing Blob configuration (local dev without
@@ -59,12 +103,13 @@ export async function POST(request: NextRequest) {
       new Error(`Missing media configuration: ${uploadConfig.missing.join(", ")}`),
       { stage: body?.type ?? "unknown", missing: uploadConfig.missing }
     );
-    return NextResponse.json(
-      {
-        error: `Media storage is not configured on this environment (missing: ${uploadConfig.missing.join(", ")}). See docs/local-social-dev.md.`,
-      },
-      { status: 500 }
+    const mapped = toApiResponse(
+      new DomainError(
+        `Media storage is not configured on this environment (missing: ${uploadConfig.missing.join(", ")}). See docs/local-social-dev.md.`,
+        { code: "INTERNAL", status: 500 }
+      )
     );
+    return NextResponse.json(mapped.body, { status: mapped.status });
   }
 
   try {
@@ -74,11 +119,11 @@ export async function POST(request: NextRequest) {
       webhookPublicKey: process.env.BLOB_WEBHOOK_PUBLIC_KEY,
       getSignedToken: async (pathname, clientPayload, multipart) => {
         if (multipart) {
-          throw new Error("Multipart uploads are not supported");
+          throw new ValidationError("Multipart uploads are not supported");
         }
         const user = await getApiUser();
         if (!user) {
-          throw new Error("Not authenticated");
+          throw new AuthorizationError("Not authenticated");
         }
         // Bound the signed-token mint rate per user+IP (persistent buckets):
         // tokens carry a 5-min TTL, so an unbounded mint is upload-amplification.
@@ -90,11 +135,11 @@ export async function POST(request: NextRequest) {
             userMax: WRITE_LIMIT_MEDIA_UPLOAD,
           }))
         ) {
-          throw new Error("Too many upload requests. Please wait before trying again.");
+          throw new RateLimitError("Too many upload requests. Please wait before trying again.");
         }
         const parsed = parseClientPayload(clientPayload);
         if (!parsed.ok) {
-          throw new Error(parsed.error);
+          throw new ValidationError(parsed.error);
         }
         const { postId, filename, mimeType, size } = parsed.data;
 
@@ -103,16 +148,16 @@ export async function POST(request: NextRequest) {
           select: { userId: true },
         });
         if (!post) {
-          throw new Error("Post not found");
+          throw new DomainError("Post not found", { code: "NOT_FOUND", status: 404 });
         }
 
         if (!validateReservedPathname(pathname, user.id, postId)) {
-          throw new Error("Invalid upload path");
+          throw new ValidationError("Invalid upload path");
         }
 
         const validation = validateMediaInput(mimeType, size);
         if (!validation.ok) {
-          throw new Error(validation.error);
+          throw new ValidationError(validation.error);
         }
         const maximumSizeInBytes = MEDIA_LIMITS[validation.kind].maxBytes;
 
@@ -151,12 +196,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    reportError("media", "upload handler failed", error, {
+    const mapped = mapUploadTokenError(error);
+    reportError("media", "upload handler failed", mapped.cause ?? error, {
       stage: body?.type ?? "unknown",
+      code: mapped.code,
     });
-    return NextResponse.json(
-      { error: "Upload handler failed" },
-      { status: 400 }
-    );
+    const response = toApiResponse(mapped);
+    return NextResponse.json(response.body, { status: response.status });
   }
 }

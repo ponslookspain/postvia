@@ -27,8 +27,6 @@ import {
   type PlatformDispatch,
 } from "@/lib/platforms/providers";
 import {
-  isTiktokAuthErrorCode,
-  TiktokApiError,
   ensureFreshTiktokToken,
   fetchTiktokPublishStatus,
   publishTiktokDirectPhoto,
@@ -61,6 +59,7 @@ import {
 } from "@/lib/platforms/overrides";
 import { resolveThreadsMediaPolicy, type MediaKind } from "@/lib/media";
 import { createSignedGetUrl, fetchPrivateBlob } from "@/lib/blob";
+import { normalizeProviderError } from "@/lib/errors/normalize";
 
 export interface PublishOutcome {
   ok: boolean;
@@ -291,6 +290,27 @@ async function updateTargetFailure(
   });
 }
 
+/**
+ * TikTok failure boundary (unified error model pilot).
+ *
+ * Normalizes the raw provider error (`ProviderError` vs
+ * `ExternalProviderError`, `retryable`) but persists the SAME user-safe
+ * string as before (`tiktokErrorMessage`) into `postTarget.errorMessage`
+ * (still a plain string — no schema change). `clearJobId` semantics are
+ * intentionally unchanged: terminal TikTok states need a fresh init,
+ * while token-refresh failures keep the job id for resume and
+ * `processing` paths never fail at all.
+ */
+async function failTiktokTarget(
+  postId: string,
+  target: PublishTarget,
+  rawError: unknown,
+  options: { clearJobId?: boolean } = {}
+): Promise<PublishOutcome> {
+  const normalized = normalizeProviderError("tiktok", rawError, tiktokErrorMessage(rawError));
+  await updateTargetFailure(postId, target.id, normalized.safeMessage, options);
+  return failedOutcome(target, normalized.safeMessage);
+}
 
 async function executeTargetPublish(
   post: PublishPost,
@@ -708,9 +728,7 @@ async function executeTiktokTarget(
       ttlMs: TIKTOK_MEDIA_READ_TTL_MS,
     });
   } catch (error) {
-    const message = tiktokErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message);
-    return failedOutcome(target, message);
+    return failTiktokTarget(post.id, target, error);
   }
 
   const outcome = await publishTiktokDirectVideo(
@@ -840,9 +858,7 @@ async function executeTiktokPhotoTarget(
       }
     }
   } catch (error) {
-    const message = tiktokErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message);
-    return failedOutcome(target, message);
+    return failTiktokTarget(post.id, target, error);
   }
 
   const outcome = await publishTiktokDirectPhoto(
@@ -1055,14 +1071,18 @@ export async function resumeTiktokTarget(
     }
     return "pending";
   } catch (error) {
-    const code = error instanceof TiktokApiError ? error.code : "";
-    if (isTiktokAuthErrorCode(code)) {
+    // Auth-terminal (incl. rotated-refresh failures) fails the target so a
+    // manual retry starts fresh; transient provider failures stay pending
+    // for the next tick. Same outcomes as the previous
+    // `isTiktokAuthErrorCode` check, now via the normalized category.
+    const normalized = normalizeProviderError("tiktok", error, tiktokErrorMessage(error));
+    if (normalized.code === "EXTERNAL_AUTH_EXPIRED") {
       await prisma.postTarget.update({
         where: { id: targetId },
         data: {
           status: "FAILED",
           externalJobId: null,
-          errorMessage: tiktokErrorMessage(error),
+          errorMessage: normalized.safeMessage,
         },
       });
       return "failed";

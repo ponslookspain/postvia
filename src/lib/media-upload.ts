@@ -31,6 +31,7 @@ import {
   mediaTrace,
   safePathname,
 } from "@/lib/diagnostics";
+import type { ErrorCode } from "@/lib/errors/codes";
 
 /**
  * Pure upload rules (validation, codecs, security decisions) live in
@@ -57,7 +58,16 @@ import {
  */
 export type ReserveUploadResult =
   | { ok: true; pathname: string }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; code: ErrorCode };
+function reserveFailure(status: number, error: string): ReserveUploadResult {
+  const code: ErrorCode =
+    status === 401
+      ? "UNAUTHENTICATED"
+      : status === 404
+        ? "NOT_FOUND"
+        : "VALIDATION_FAILED";
+  return { ok: false, status, error, code };
+}
 export async function reserveUploadPathname(input: {
   user: { id: string } | null;
   postId: string;
@@ -68,10 +78,10 @@ export async function reserveUploadPathname(input: {
   // Pure input gates before any database work: unauthenticated or
   // post-less requests fail without touching Prisma.
   if (!input.user) {
-    return { ok: false, status: 401, error: "Not authenticated" };
+    return reserveFailure(401, "Not authenticated");
   }
   if (!input.postId) {
-    return { ok: false, status: 400, error: "postId is required" };
+    return reserveFailure(400, "postId is required");
   }
   // Ownership lookup and the per-post media count are independent reads
   // (both scoped by user id); every decision below still short-circuits
@@ -91,20 +101,19 @@ export async function reserveUploadPathname(input: {
     post,
     statedPostId: input.postId,
   });
-  if (!authorized.ok) return authorized;
+  if (!authorized.ok) return reserveFailure(authorized.status, authorized.error);
 
   const validation = validateMediaInput(input.mimeType, input.size);
   if (!validation.ok) {
-    return { ok: false, status: 400, error: validation.error };
+    return reserveFailure(400, validation.error);
   }
 
   const existing = existingMediaCount;
   if (existing >= MAX_MEDIA_PER_POST) {
-    return {
-      ok: false,
-      status: 400,
-      error: `A post can have at most ${MAX_MEDIA_PER_POST} media files`,
-    };
+    return reserveFailure(
+      400,
+      `A post can have at most ${MAX_MEDIA_PER_POST} media files`
+    );
   }
 
   const pathname = makeBlobPathname(

@@ -21,6 +21,7 @@ import {
   type TiktokChunkPlan,
   type ByteRange,
 } from "@/domain/social/policies/tiktok";
+import { ProviderError } from "@/lib/errors/domain-error";
 
 /**
  * Pure TikTok policies (media routing, error classification, post-info
@@ -137,7 +138,8 @@ async function postJson(
 /** Exchange an OAuth code for tokens (server-side only). */
 export async function exchangeTiktokCode(code: string): Promise<TiktokTokens> {
   const credentials = getTiktokCredentials();
-  if (!credentials) throw new Error("TikTok is not configured");
+  if (!credentials)
+    throw new ProviderError("TikTok is not configured", { provider: "tiktok" });
   const data = await postForm(`${TIKTOK_API_BASE}/v2/oauth/token/`, {
     client_key: credentials.clientKey,
     client_secret: credentials.clientSecret,
@@ -151,7 +153,8 @@ export async function exchangeTiktokCode(code: string): Promise<TiktokTokens> {
 /** Refresh an access token (TikTok rotates the refresh token as well). */
 export async function refreshTiktokToken(refreshToken: string): Promise<TiktokTokens> {
   const credentials = getTiktokCredentials();
-  if (!credentials) throw new Error("TikTok is not configured");
+  if (!credentials)
+    throw new ProviderError("TikTok is not configured", { provider: "tiktok" });
   const data = await postForm(`${TIKTOK_API_BASE}/v2/oauth/token/`, {
     client_key: credentials.clientKey,
     client_secret: credentials.clientSecret,

@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { createHash } from "node:crypto";
+import { DomainError } from "./errors/domain-error";
 
 export { scrubRequestPath } from "./request-scrub";
 
@@ -287,9 +288,29 @@ function isSentryConfigured(): boolean {
 }
 
 /**
+ * Expected outcomes (user error, not a bug): console-logged but never
+ * sent to Sentry as errors. Provider failures are NOT in this set —
+ * they are real incidents (warning when retryable, error otherwise).
+ */
+const EXPECTED_ERROR_CODES = new Set([
+  "VALIDATION_FAILED",
+  "UNAUTHENTICATED",
+  "FORBIDDEN",
+  "ENTITLEMENT_DENIED",
+  "RATE_LIMITED",
+  "NOT_FOUND",
+  "CONFLICT",
+]);
+
+/**
  * The single way to report a server/client error: same console shape as
  * logErrorDiagnostic plus a scrubbed Sentry event when configured.
  * Safe to call anywhere; never throws and never leaks secrets.
+ *
+ * Unified error model: `DomainError` values are classified — expected
+ * categories stay console-only, provider errors carry safe metadata
+ * (`code`, `provider`, `providerCode`, `httpStatus`) and retryable ones
+ * are sent as warnings. `cause` is never forwarded.
  */
 export function reportError(
   scope: string,
@@ -300,11 +321,35 @@ export function reportError(
   logErrorDiagnostic(scope, event, error, extra);
   if (!isSentryConfigured()) return;
   try {
-    const err =
-      error instanceof Error ? error : new Error(String(error));
+    const domain = error instanceof DomainError ? error : null;
+    if (domain && EXPECTED_ERROR_CODES.has(domain.code)) return;
+    let err = error instanceof Error ? error : new Error(String(error));
+    if (domain) {
+      // Forward name/message/stack only — `cause` may hold tokens or
+      // internal detail and must never reach Sentry.
+      const clean = new Error(domain.message);
+      clean.name = domain.name;
+      clean.stack = domain.stack;
+      err = clean;
+    }
+    const tags: Record<string, string> = { scope };
+    if (domain) {
+      tags.code = domain.code;
+      if (domain.provider) tags.provider = domain.provider;
+    }
+    const postviaContext: Record<string, string | number> = { scope, event };
+    if (domain) {
+      postviaContext.code = domain.code;
+      if (domain.provider) postviaContext.provider = domain.provider;
+      if (domain.providerCode) postviaContext.providerCode = domain.providerCode;
+      postviaContext.httpStatus = domain.status;
+    }
     Sentry.captureException(err, {
-      tags: { scope },
-      contexts: { postvia: { scope, event } },
+      tags,
+      level: domain?.retryable ? "warning" : "error",
+      // postviaContext holds only safe literals (scope/event/code/
+      // provider/providerCode/httpStatus) — nothing to scrub.
+      contexts: { postvia: postviaContext },
       extra: scrubValue({ ...(extra ?? {}) }) as Record<string, unknown>,
     });
   } catch {

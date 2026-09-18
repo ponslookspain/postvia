@@ -13,32 +13,15 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 import {
-  OTP_RATE_LIMITED_CODE,
   formatOtpRateLimitMessage,
   normalizeRetryAfterSeconds,
 } from "@/lib/otp-rate-limit";
+import { mapOtpError, parseApiError } from "@/lib/client-error-message";
 import { useOtpRetryCountdown } from "@/hooks/use-otp-retry-countdown";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-
-function mapOtpError(message: string): string {
-  const lower = message.toLowerCase();
-  if (lower.includes("expired")) {
-    return "This code has expired. Request a new one below.";
-  }
-  if (lower.includes("too many") || lower.includes("attempt")) {
-    return "Too many wrong attempts. Request a new code below.";
-  }
-  if (lower.includes("invalid") || lower.includes("incorrect")) {
-    return "Incorrect code. Check the email and try again.";
-  }
-  if (lower.includes("not found") || lower.includes("no account")) {
-    return "This code doesn't match an account. Start again from sign up or sign in.";
-  }
-  return "Unable to verify the code. Check it and try again.";
-}
 
 export function VerifyOtpForm({
   email,
@@ -126,8 +109,10 @@ export function VerifyOtpForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const retryAfter = normalizeRetryAfterSeconds(data.retryAfterSeconds);
-        if (res.status === 429 && data.code === OTP_RATE_LIMITED_CODE && retryAfter !== null) {
+        const parsed = parseApiError(data);
+        const retryAfter =
+          parsed.retryAfterSeconds ?? normalizeRetryAfterSeconds(data.retryAfterSeconds);
+        if (res.status === 429 && parsed.code === "RATE_LIMITED" && retryAfter !== null) {
           // Same structured response as signup/login; countdown is
           // display-only, the next resend is still server-gated.
           setResendRateLimited(true);

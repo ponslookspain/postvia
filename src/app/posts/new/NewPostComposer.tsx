@@ -48,6 +48,7 @@ import {
   type ScheduleFlowDenial,
 } from "@/lib/composer-media";
 import { createSingleFlight, newOperationId } from "@/lib/idempotency";
+import { parseApiError } from "@/lib/client-error-message";
 import { reportError } from "@/lib/diagnostics";
 import { getEffectiveMediaConstraints } from "@/lib/platforms/overrides";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -237,12 +238,14 @@ function parseScheduleDenial(data: {
   code?: unknown;
   reason?: unknown;
   upgradeTo?: unknown;
+  error?: unknown;
+  details?: unknown;
 } | null): ScheduleFlowDenial | null {
-  if (!data || data.code !== "UPGRADE_REQUIRED") return null;
+  const parsed = parseApiError(data);
+  if (parsed.code !== "ENTITLEMENT_DENIED") return null;
   return {
-    reason:
-      typeof data.reason === "string" ? data.reason : "Plan limit reached.",
-    upgradeTo: parsePlanParam(data.upgradeTo),
+    reason: parsed.message,
+    upgradeTo: parsePlanParam(parsed.upgradeTo),
   };
 }
 
@@ -761,14 +764,12 @@ export default function NewPostComposer({
   ): Promise<{ reason: string; upgradeTo: PlanId | null } | null> {
     if (res.status !== 403) return null;
     const data = await res.json().catch(() => null);
-    if (data && data.code === "UPGRADE_REQUIRED") {
-      return {
-        reason:
-          typeof data.reason === "string" ? data.reason : "Plan limit reached.",
-        upgradeTo: parsePlanParam(data.upgradeTo),
-      };
-    }
-    return null;
+    const parsed = parseApiError(data);
+    if (parsed.code !== "ENTITLEMENT_DENIED") return null;
+    return {
+      reason: parsed.message,
+      upgradeTo: parsePlanParam(parsed.upgradeTo),
+    };
   }
 
   async function handleSaveDraft() {
