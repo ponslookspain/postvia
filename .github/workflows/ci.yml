@@ -126,6 +126,12 @@ jobs:
     env:
       DATABASE_URL_POSTGRES_PRISMA_URL: postgresql://postgres:postgres@localhost:5432/postvia_e2e?sslmode=disable
       BETTER_AUTH_SECRET: ci-e2e-not-a-secret
+      # Browser UI auth (authClient) validates the request origin against
+      # Better Auth trustedOrigins/allowedHosts, which hardcode
+      # localhost:3000. The E2E base is http://127.0.0.1:3100, so without
+      # this the UI login/delete flows die with "Invalid origin" while
+      # API-authenticated specs pass. Throwaway CI origin only.
+      BETTER_AUTH_TRUSTED_ORIGINS: http://127.0.0.1:3100
       ABUSE_HASH_PEPPER: ci-test-pepper-not-a-secret
       OTP_E2E_DEBUG: "1"
       OTP_DEBUG_TOKEN: ${{ secrets.OTP_DEBUG_TOKEN }}
