@@ -71,14 +71,13 @@ function formatCount(value: number | null, singular: string, plural: string): st
 function PlanCta({ planId, highlighted }: { planId: string; highlighted?: boolean }) {
   return (
     <Button
-      nativeButton={false}
-      render={
-        <Link href={planId === "free" ? "/signup" : `/signup?plan=${planId}`} />
-      }
+      asChild
       variant={highlighted ? "default" : "outline"}
       className="mt-5 w-full"
     >
-      {planId === "free" ? "Get started free" : `Choose ${PLANS.find((p) => p.id === planId)?.name}`}
+      <Link href={planId === "free" ? "/signup" : `/signup?plan=${planId}`}>
+        {planId === "free" ? "Get started free" : `Choose ${PLANS.find((p) => p.id === planId)?.name}`}
+      </Link>
     </Button>
   );
 }

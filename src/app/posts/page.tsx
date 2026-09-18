@@ -79,20 +79,17 @@ export default async function PostsPage({
           description="Manage your content, scheduled posts and publishing activity"
           actions={
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                nativeButton={false}
-                render={<Link href="/posts/bulk" />}
-              >
-                <ClapperboardIcon data-icon="inline-start" />
-                Bulk video
+              <Button variant="outline" asChild>
+                <Link href="/posts/bulk">
+                  <ClapperboardIcon data-icon="inline-start" />
+                  Bulk video
+                </Link>
               </Button>
-              <Button
-                nativeButton={false}
-                render={<Link href="/posts/new" />}
-              >
-                <PlusIcon data-icon="inline-start" />
-                Create post
+              <Button asChild>
+                <Link href="/posts/new">
+                  <PlusIcon data-icon="inline-start" />
+                  Create post
+                </Link>
               </Button>
             </div>
           }

@@ -1154,29 +1154,24 @@ export default function NewPostComposer({
               {publishResult.ok &&
                 publishResult.externalPostId &&
                 publishResult.username && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    nativeButton={false}
-                    render={
-                      <a
-                        href={
-                          isThreads
-                            ? threadsPostUrl(
-                                publishResult.username,
-                                publishResult.externalPostId
-                              )
-                            : `https://x.com/i/status/${publishResult.externalPostId}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      />
-                    }
-                  >
-                    <span className="flex items-center gap-1.5">
-                      View on {isThreads ? "Threads" : "X"}
-                      <ExternalLinkIcon data-icon="inline-end" />
-                    </span>
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href={
+                        isThreads
+                          ? threadsPostUrl(
+                              publishResult.username,
+                              publishResult.externalPostId
+                            )
+                          : `https://x.com/i/status/${publishResult.externalPostId}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        View on {isThreads ? "Threads" : "X"}
+                        <ExternalLinkIcon data-icon="inline-end" />
+                      </span>
+                    </a>
                   </Button>
                 )}
               {!publishResult.ok && (

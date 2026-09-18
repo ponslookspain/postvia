@@ -88,9 +88,11 @@ export default async function DashboardPage({
                 {openingLine}
               </p>
             </div>
-            <Button nativeButton={false} render={<Link href="/posts/new" />}>
-              <PlusIcon data-icon="inline-start" />
-              Create post
+            <Button asChild>
+              <Link href="/posts/new">
+                <PlusIcon data-icon="inline-start" />
+                Create post
+              </Link>
             </Button>
           </div>
         </header>
@@ -102,19 +104,14 @@ export default async function DashboardPage({
             description="Connect a social profile first, then create your first post."
             actions={
               <>
-                <Button
-                  nativeButton={false}
-                  render={<Link href="/accounts" />}
-                >
-                  Connect account
+                <Button asChild>
+                  <Link href="/accounts">Connect account</Link>
                 </Button>
-                <Button
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/posts/new" />}
-                >
-                  <PlusIcon data-icon="inline-start" />
-                  Create post
+                <Button variant="outline" asChild>
+                  <Link href="/posts/new">
+                    <PlusIcon data-icon="inline-start" />
+                    Create post
+                  </Link>
                 </Button>
               </>
             }
@@ -191,12 +188,8 @@ export default async function DashboardPage({
                           : `No ${formatStatusLabel(statusFilter).toLowerCase()} posts yet.`
                       }
                       actions={
-                        <Button
-                          variant="outline"
-                          nativeButton={false}
-                          render={<Link href="/dashboard" />}
-                        >
-                          Clear filters
+                        <Button variant="outline" asChild>
+                          <Link href="/dashboard">Clear filters</Link>
                         </Button>
                       }
                     />
@@ -206,12 +199,11 @@ export default async function DashboardPage({
                       title="No posts yet"
                       description="Create your first post to get started."
                       actions={
-                        <Button
-                          nativeButton={false}
-                          render={<Link href="/posts/new" />}
-                        >
-                          <PlusIcon data-icon="inline-start" />
-                          Create post
+                        <Button asChild>
+                          <Link href="/posts/new">
+                            <PlusIcon data-icon="inline-start" />
+                            Create post
+                          </Link>
                         </Button>
                       }
                     />

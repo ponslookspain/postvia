@@ -65,12 +65,9 @@ type PostVIAButtonSize = "default" | "sm" | "lg" | "icon-sm"
 export type ButtonProps = Omit<React.ComponentProps<"button">, "color"> & {
 	variant?: PostVIAButtonVariant
 	size?: PostVIAButtonSize
+	// Composition for non-button children (e.g. a Next.js Link rendered
+	// with button styling). The child receives the classes via Slot.
 	asChild?: boolean
-	// Legacy BaseUI composition API (Link-as-button across the app).
-	// The render element becomes the Slot child; props merge the same way.
-	render?: React.ReactElement
-	// Legacy BaseUI prop, accepted and ignored (never rendered to the DOM).
-	nativeButton?: boolean
 }
 
 function Button({
@@ -79,7 +76,6 @@ function Button({
 	variant = "default",
 	size = "default",
 	asChild = false,
-	render,
 	...props
 }: ButtonProps) {
 	const classes = cn(
@@ -98,31 +94,16 @@ function Button({
 		className
 	)
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const { nativeButton, ...validProps } = props
-
-	if (render && React.isValidElement(render)) {
-		const rendered = React.cloneElement(
-			render as React.ReactElement<{ children?: React.ReactNode }>,
-			{ children }
-		)
-		return (
-			<Slot data-slot="button" {...validProps} className={classes}>
-				{rendered}
-			</Slot>
-		)
-	}
-
 	if (asChild) {
 		return (
-			<Slot data-slot="button" className={classes} {...validProps}>
+			<Slot data-slot="button" className={classes} {...props}>
 				{children}
 			</Slot>
 		)
 	}
 
 	return (
-		<button data-slot="button" className={classes} {...validProps}>
+		<button data-slot="button" className={classes} {...props}>
 			{children}
 		</button>
 	)

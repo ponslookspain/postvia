@@ -258,20 +258,19 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
         </nav>
         <div className="hidden items-center gap-2 md:flex">
           {isLoggedIn ? (
-            <Button nativeButton={false} render={<Link href="/dashboard" />}>
-              Dashboard
+            <Button asChild>
+              <Link href="/dashboard">Dashboard</Link>
             </Button>
           ) : (
             <>
               <Button
                 variant="ghost"
-                nativeButton={false}
-                render={<Link href="/login" />}
+                asChild
               >
-                Sign in
+                <Link href="/login">Sign in</Link>
               </Button>
-              <Button nativeButton={false} render={<Link href="/signup" />}>
-                Get started
+              <Button asChild>
+                <Link href="/signup">Get started</Link>
               </Button>
             </>
           )}
@@ -398,20 +397,16 @@ export function Navbar({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
           </nav>
           <div className="flex flex-col gap-2 border-t border-border px-6 pt-4 pb-6">
             {isLoggedIn ? (
-              <Button nativeButton={false} render={<Link href="/dashboard" />}>
-                Dashboard
+              <Button asChild>
+                <Link href="/dashboard">Dashboard</Link>
               </Button>
             ) : (
               <>
-                <Button nativeButton={false} render={<Link href="/signup" />}>
-                  Get started
+                <Button asChild>
+                  <Link href="/signup">Get started</Link>
                 </Button>
-                <Button
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/login" />}
-                >
-                  Sign in
+                <Button variant="outline" asChild>
+                  <Link href="/login">Sign in</Link>
                 </Button>
               </>
             )}

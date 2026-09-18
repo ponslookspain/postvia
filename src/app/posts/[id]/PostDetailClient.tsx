@@ -748,23 +748,18 @@ export default function PostDetailPage({
                 )}
 
                 {post.status === "PUBLISHED" && externalPostId && (
-                  <Button
-                    variant="outline"
-                    nativeButton={false}
-                    render={
-                      <a
-                        href={
-                          platform === "THREADS"
-                            ? threadsPostUrl(post.username ?? "", externalPostId)
-                            : `https://x.com/i/status/${externalPostId}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      />
-                    }
-                    className="w-full"
-                  >
-                    View on {platform === "THREADS" ? "Threads" : "X"}
+                  <Button variant="outline" asChild className="w-full">
+                    <a
+                      href={
+                        platform === "THREADS"
+                          ? threadsPostUrl(post.username ?? "", externalPostId)
+                          : `https://x.com/i/status/${externalPostId}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View on {platform === "THREADS" ? "Threads" : "X"}
+                    </a>
                   </Button>
                 )}
 

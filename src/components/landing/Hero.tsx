@@ -38,18 +38,17 @@ export function Hero() {
           style={{ animationDelay: "260ms" }}
           className="mt-8 flex animate-[post-in_.55s_ease_both] flex-col items-center justify-center gap-3 motion-reduce:animate-none sm:flex-row"
         >
-          <Button size="lg" nativeButton={false} render={<Link href="/signup" />}>
-            Get started free
-            <ArrowRightIcon data-icon="inline-end" />
+          <Button size="lg" asChild>
+            <Link href="/signup">
+              Get started free
+              <ArrowRightIcon data-icon="inline-end" />
+            </Link>
           </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            nativeButton={false}
-            render={<Link href="#how" />}
-          >
-            See how it works
-            <ArrowDownIcon data-icon="inline-end" />
+          <Button size="lg" variant="outline" asChild>
+            <Link href="#how">
+              See how it works
+              <ArrowDownIcon data-icon="inline-end" />
+            </Link>
           </Button>
         </div>
         <p

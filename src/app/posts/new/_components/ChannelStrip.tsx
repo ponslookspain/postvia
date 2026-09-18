@@ -68,14 +68,12 @@ export function ChannelStrip({
             </Badge>
           )}
           <Button
-            type="button"
             variant="link"
             size="sm"
-            nativeButton={false}
-            render={<Link href="/accounts" />}
+            asChild
             className="h-auto p-0 text-label"
           >
-            Manage
+            <Link href="/accounts">Manage</Link>
           </Button>
         </div>
       </div>
@@ -85,13 +83,11 @@ export function ChannelStrip({
           title="No connected accounts"
           description="Connect a social account before creating a post."
           actions={
-            <Button
-              size="sm"
-              nativeButton={false}
-              render={<Link href="/accounts" />}
-            >
-              <UsersIcon data-icon="inline-start" />
-              Connect account
+            <Button size="sm" asChild>
+              <Link href="/accounts">
+                <UsersIcon data-icon="inline-start" />
+                Connect account
+              </Link>
             </Button>
           }
         />

@@ -289,48 +289,39 @@ export function CalendarView({
         title="Calendar"
         description={`Publishing schedule for ${userName}`}
         actions={
-          <Button
-            nativeButton={false}
-            render={<Link href="/posts/new" />}
-          >
-            <PlusIcon data-icon="inline-start" />
-            Create post
+          <Button asChild>
+            <Link href="/posts/new">
+              <PlusIcon data-icon="inline-start" />
+              Create post
+            </Link>
           </Button>
         }
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            nativeButton={false}
-            render={
-              <Link href={`/calendar?month=${monthKey(prev.year, prev.monthIndex)}`} aria-label="Previous month" />
-            }
-          >
-            <ChevronLeftIcon />
+          <Button variant="ghost" size="icon-sm" asChild>
+            <Link
+              href={`/calendar?month=${monthKey(prev.year, prev.monthIndex)}`}
+              aria-label="Previous month"
+            >
+              <ChevronLeftIcon />
+            </Link>
           </Button>
           <h2 className="font-heading min-w-0 truncate px-1 text-lg leading-7 font-semibold tracking-tight tabular-nums">
             {title}
           </h2>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            nativeButton={false}
-            render={
-              <Link href={`/calendar?month=${monthKey(next.year, next.monthIndex)}`} aria-label="Next month" />
-            }
-          >
-            <ChevronRightIcon />
+          <Button variant="ghost" size="icon-sm" asChild>
+            <Link
+              href={`/calendar?month=${monthKey(next.year, next.monthIndex)}`}
+              aria-label="Next month"
+            >
+              <ChevronRightIcon />
+            </Link>
           </Button>
         </div>
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<Link href="/calendar" />}
-        >
-          Today
+        <Button variant="outline" asChild>
+          <Link href="/calendar">Today</Link>
         </Button>
       </div>
 
@@ -432,12 +423,11 @@ export function CalendarView({
               title="Nothing scheduled this month"
               description="Create a post or schedule a draft to see it here."
               actions={
-                <Button
-                  nativeButton={false}
-                  render={<Link href="/posts/new" />}
-                >
-                  <PlusIcon data-icon="inline-start" />
-                  Create post
+                <Button asChild>
+                  <Link href="/posts/new">
+                    <PlusIcon data-icon="inline-start" />
+                    Create post
+                  </Link>
                 </Button>
               }
             />

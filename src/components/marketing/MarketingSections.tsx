@@ -95,13 +95,15 @@ export function PageHero({
             {description}
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button size="lg" nativeButton={false} render={<Link href="/signup" />}>
-              Get started free
-              <ArrowRightIcon data-icon="inline-end" />
+            <Button size="lg" asChild>
+              <Link href="/signup">
+                Get started free
+                <ArrowRightIcon data-icon="inline-end" />
+              </Link>
             </Button>
             {secondaryHref && secondaryLabel && (
-              <Button size="lg" variant="outline" nativeButton={false} render={<Link href={secondaryHref} />}>
-                {secondaryLabel}
+              <Button size="lg" variant="outline" asChild>
+                <Link href={secondaryHref}>{secondaryLabel}</Link>
               </Button>
             )}
           </div>

@@ -228,7 +228,7 @@ records each component's current public API.
 
 | Target component | File | API notes |
 | --- | --- | --- |
-| Button | `ui/button.tsx` | Direct PostVIA contract: `variant` `default / secondary / outline / ghost / destructive / link` (`destructive` maps to `--error`), `size` `default / sm / lg / icon-sm`. History: a `POSTVIA_VARIANT_MAP / POSTVIA_SIZE_MAP / POSTVIA_SIZE_FIXES` layer used to translate these onto an internal Radian-style axis, with extra `xs / icon / icon-xs / icon-lg` sizes and `glossy / smooth` variants — all unreachable (zero call sites) and removed; the remaining class sets are unchanged. `render` (BaseUI composition) and `nativeButton` (accepted, never rendered). Geometry: always `rounded-full`. |
+| Button | `ui/button.tsx` | Direct PostVIA contract: `variant` `default / secondary / outline / ghost / destructive / link` (`destructive` maps to `--error`), `size` `default / sm / lg / icon-sm`. Composition is `asChild` only (a `Link` child receives the classes via Slot) — the legacy `render` / `nativeButton` props were removed once every call site migrated. History: a `POSTVIA_VARIANT_MAP / POSTVIA_SIZE_MAP / POSTVIA_SIZE_FIXES` layer used to translate these onto an internal Radian-style axis, with extra `xs / icon / icon-xs / icon-lg` sizes and `glossy / smooth` variants — all unreachable (zero call sites) and removed; the remaining class sets are unchanged. There is no `loading` prop — async actions compose `Spinner + data-icon + disabled`. Geometry: always `rounded-full`. |
 | Input | `ui/input.tsx` | numeric sizes; `InputGroup` chrome |
 | Textarea | `ui/text-area.tsx` | previous defaults preserved (`min-h-16`, `resize-none`) |
 | Select | `ui/select.tsx` | trigger kept `w-fit` pill |

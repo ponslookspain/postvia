@@ -652,11 +652,10 @@ export function BulkScheduler({
             </div>
             <Button
               size="lg"
-              nativeButton={false}
-              render={<Link href="/accounts" />}
+              asChild
               className="min-h-11 w-full sm:w-auto"
             >
-              Connect account
+              <Link href="/accounts">Connect account</Link>
             </Button>
           </CardContent>
         </Card>
@@ -695,11 +694,12 @@ export function BulkScheduler({
             </div>
             <Button
               size="lg"
-              nativeButton={false}
-              render={<Link href="/billing" />}
+              asChild
               className="min-h-11 w-full sm:w-auto"
             >
-              {upgradeName ? `Upgrade to ${upgradeName}` : "Manage plan"}
+              <Link href="/billing">
+                {upgradeName ? `Upgrade to ${upgradeName}` : "Manage plan"}
+              </Link>
             </Button>
           </CardContent>
         </Card>

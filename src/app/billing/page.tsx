@@ -40,8 +40,8 @@ export default async function BillingPage({
           <p className="mt-2 mb-8 text-sm text-muted-foreground">
             Sign in to view your plan and usage.
           </p>
-          <Button nativeButton={false} render={<Link href="/login" />} className="w-full">
-            Sign in
+          <Button asChild className="w-full">
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
       </div>

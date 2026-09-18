@@ -348,12 +348,11 @@ export function PostsList({
             title="No posts yet"
             description="Create your first post to get started."
             actions={
-              <Button
-                nativeButton={false}
-                render={<Link href="/posts/new" />}
-              >
-                <PlusIcon data-icon="inline-start" />
-                Create post
+              <Button asChild>
+                <Link href="/posts/new">
+                  <PlusIcon data-icon="inline-start" />
+                  Create post
+                </Link>
               </Button>
             }
           />

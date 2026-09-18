@@ -64,12 +64,10 @@ export default async function VerifyEmailPage({
                 </AlertDescription>
               </AlertContent>
             </Alert>
-            <Button
-              nativeButton={false}
-              render={<Link href={user ? "/dashboard" : "/login"} />}
-              className="w-full"
-            >
-              {user ? "Go to dashboard" : "Sign in"}
+            <Button asChild className="w-full">
+              <Link href={user ? "/dashboard" : "/login"}>
+                {user ? "Go to dashboard" : "Sign in"}
+              </Link>
             </Button>
           </>
         )}
