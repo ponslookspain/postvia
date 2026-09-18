@@ -72,14 +72,22 @@
 	--elevation-overlay: var(--popover);
 
 	/* —— Border ———————————————————————————————————————————————————————————
-	   `border` is the hairline used for structural splits (header from list,
-	   filter from results). An outline on a block is an ACCENT, never a
-	   default. `input` is the functional field edge; `ring` is the focus
-	   ring. The default border colour is applied in `@layer base`
-	   (`globals.css`) — never as an unlayered `*` rule, which would outrank
-	   and silently disable every `border-*` utility. */
-	--border: #e3e2de;
-	--input: #dedcd5;
+	   Four neutral edge roles on the `paper` ramp, weakest first.
+	   `border-subtle` is the quietest structural split (splits on raised
+	   surfaces); `border` is the default hairline (header from list, filter
+	   from results). An outline on a block is an ACCENT, never a default.
+	   `border-strong` is the emphasised container edge; `input` is the
+	   functional field edge and the strongest neutral edge. `ring` is the
+	   focus ring (brand hue, Group C). Decorative hairlines are exempt
+	   from 3:1; functional edges (`input`, `ring`, invalid states) are
+	   not. `border-subtle` / `border-strong` have no component consumers
+	   yet — Phase 3 wiring targets. The default border colour is applied
+	   in `@layer base` (`globals.css`) — never as an unlayered `*` rule,
+	   which would outrank and silently disable every `border-*` utility. */
+	--border-subtle: var(--paper-5);
+	--border: var(--paper-6);
+	--border-strong: var(--paper-7);
+	--input: var(--paper-8);
 	--ring: #2971c6;
 
 	/* —— Primary ——————————————————————————————————————————————————————————
@@ -194,8 +202,6 @@
 	--popover: var(--paper-4);
 	--popover-foreground: #f5f4ee;
 
-	--border: #34332f;
-	--input: #3a3935;
 	--ring: #5fa1f3;
 
 	--primary: #5fa1f3;
@@ -253,7 +259,9 @@
 	--color-popover-foreground: var(--popover-foreground);
 
 	/* Border */
+	--color-border-subtle: var(--border-subtle);
 	--color-border: var(--border);
+	--color-border-strong: var(--border-strong);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
 

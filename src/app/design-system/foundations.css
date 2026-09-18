@@ -140,10 +140,11 @@
        for them and no component can reach them directly. The ONLY future
        consumer is `semantic.css` (Phase 2 mapping).
      - Only steps with a confirmed Phase-2 consumer are materialized (paper:
-       1/2/3/4/6/7/8/11/12; signal/moss/harvest/clay/sky: 3/7/9/11). The
+       1/2/3/4/5/6/7/8/11/12; signal/moss/harvest/clay/sky: 3/7/9/11). The
        scale reserves the full 1–12 numbering so later steps can be added
        without renumbering or breaking the API. `paper-4` is the overlay
-       rung of the surface ladder (Phase 2, Group A).
+       rung of the surface ladder (Phase 2, Group A); `paper-5` is the
+       subtle-border rung (Phase 2, Group B).
      - Values are PostVIA-owned OKLCH picks anchored near today's semantic
        hues (so Phase 2 can calibrate against them); they are not copied
        from any external palette. Phase 2 maps `semantic.css` tokens onto
@@ -158,6 +159,7 @@
 	--paper-2: oklch(0.967 0.006 95);
 	--paper-3: oklch(0.976 0.005 95);
 	--paper-4: oklch(0.986 0.004 95);
+	--paper-5: oklch(0.93 0.009 95);
 	--paper-6: oklch(0.905 0.01 95);
 	--paper-7: oklch(0.875 0.012 95);
 	--paper-8: oklch(0.83 0.014 95);
@@ -204,6 +206,7 @@
 	--paper-2: oklch(0.315 0.009 95);
 	--paper-3: oklch(0.335 0.009 95);
 	--paper-4: oklch(0.36 0.01 95);
+	--paper-5: oklch(0.37 0.011 95);
 	--paper-6: oklch(0.4 0.012 95);
 	--paper-7: oklch(0.44 0.012 95);
 	--paper-8: oklch(0.5 0.014 95);
