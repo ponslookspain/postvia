@@ -1,7 +1,7 @@
 import { Skeleton } from "postvia";
 
 /**
- * Skeleton previews. Skeleton is `bg-accent animate-pulse rounded-xl` and
+ * Skeleton previews. Skeleton is `bg-muted animate-pulse rounded-xl` and
  * carries no size of its own — the caller gives it the shape of the thing
  * it stands in for. These cells port the real route-level loading files
  * (`src/app/dashboard/loading.tsx`, `src/app/calendar/loading.tsx`):

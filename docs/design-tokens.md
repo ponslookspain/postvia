@@ -129,7 +129,7 @@ Six PostVIA-owned tonal scales in `foundations.css`, consumed ONLY by
 | `moss` | success green | 3, 7, 9, 11 | success-accent(soft) / -border / solid / -text |
 | `harvest` | warning amber | 3, 7, 9, 11 | warning-accent(soft) / -border / solid / -text |
 | `clay` | error red | 3, 7, 9, 11 | error-accent(soft) / -border / solid / -text |
-| `sky` | info blue | 3, 7, 9, 11 | info-accent(soft) / -border (solid and text share the brand `signal` steps; `sky-9` stays reserved) |
+| `sky` | info blue | 3, 7, 11 | info-accent(soft) / -border (solid and text share the brand `signal` steps; `sky-9` removed in Phase 5, zero consumers) |
 
 Rules: steps are plain `:root` / `.dark` properties (not `@theme`
 `--color-*` entries), so Tailwind emits no utilities for them and components
@@ -199,18 +199,24 @@ Meaning, in one line each:
 
 ### Legacy aliases (canonical layer, deprecated names)
 
-Aliases, never values. Each resolves to a canonical token, so there is one
-place to change.
-
-| Legacy | Resolves to | Use instead | Why it is still here |
-| --- | --- | --- | --- |
-| `--accent` | `--muted` | `--muted` | Held a value identical to `--muted` in both themes; the neutral fill step |
+None remain — every legacy name below was removed once repo-wide usage
+analysis showed zero consumers. Each removal was a pure deletion with no
+call-site change.
 
 Removed (zero consumers, verified repo-wide): `--destructive` (the token;
 `variant="destructive"` remains live as Button API and maps directly to
 `--error`), `--signal` / `--signal-foreground` (the SCHEDULED state they
-once named now uses `--info`), `--secondary` / `--secondary-foreground`, and
-`--accent-foreground`.
+once named now uses `--info`), `--secondary` / `--secondary-foreground`,
+`--accent-foreground`, and `--accent` (value-identical to `--muted` in both
+themes; Phase 3 moved every consumer to `--muted`, Phase 5 removed the
+alias and its `--color-accent` exposure).
+
+Also removed in Phase 5 (zero consumers, verified repo-wide):
+`success-` / `warning-` / `info-focus` and `success-` / `warning-` /
+`info-hover` (definitions and `@theme` exposures). Kept: `error-focus`
+(invalid-field rings in `Input` / `TextArea`) and `error-hover`
+(destructive `Button`). Kept as documented vocabulary despite no current
+component consumer: `border-subtle`, `border-strong`.
 
 ## 3. Historical: the Radian name mapping (removed)
 
@@ -239,13 +245,13 @@ reference a Radian name can be read against today's system.
 | `sidebar-fg` / `sidebar-accent-fg` | `sidebar-foreground` / `sidebar-accent-foreground` |
 | `font-body` | `font-sans` |
 
-Two genuine gaps outlive the compat file, now recorded directly against
-`semantic.css` — closing either is a design decision with a visual
-consequence, not a rename: `--muted`/`--accent` still stand in for
-Radian's four-step `fill1`–`fill4` ramp (PostVIA uses two steps, not
-four), and `--elevation-raised` still covers both of Radian's `level1`
-and `level2` (`card` and `popover` are the same colour in both themes
-today).
+One genuine gap outlives the compat file, recorded directly against
+`semantic.css` — closing it is a design decision with a visual
+consequence, not a rename: `--muted` stands in for Radian's four-step
+`fill1`–`fill4` ramp (PostVIA uses two steps, not four). The second gap is
+closed: `--elevation-raised` and `--elevation-overlay` are distinct tones
+(`card` ≠ `popover`) since Color System 2.0 Phase 2, and the `--accent`
+alias that shared the first gap is removed (Phase 5).
 
 ## 4. Components
 

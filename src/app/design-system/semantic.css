@@ -125,10 +125,13 @@
 	/* —— Status sub-steps —————————————————————————————————————————————————
 	   Hand-tuned tonal steps, one per theme — no `color-mix` derivation, so
 	   dark values are optically tuned rather than mirrored. `-accent` is
-	   the soft surface (step 3) and `-border` the status edge (step 7);
-	   `-focus` / `-hover` stay `color-mix`-derived until Phase 5 cleanup.
-	   The `*-text` inks (step 11) are the ONLY status colours allowed for
-	   running text: the base solids are fills and dots (exempt from text
+	   the soft surface (step 3) and `-border` the status edge (step 7).
+	   `-focus` survives only as `error-focus` (invalid-field rings in
+	   `Input` / `TextArea`) and `-hover` only as `error-hover` (the
+	   destructive `Button`); the success/warning/info `-focus`/`-hover`
+	   steps were removed in Phase 5 with zero consumers. The `*-text`
+	   inks (step 11) are the ONLY status colours allowed for running
+	   text: the base solids are fills and dots (exempt from text
 	   contrast). Computed WCAG gates (light, on canvas): success-text
 	   4.98, warning-text 4.91, error-text 5.20, info-text 5.83; white on
 	   success-solid 4.37, warning ink on solid 4.60, white on error-solid
@@ -138,21 +141,15 @@
 	--error-text: var(--clay-11);
 	--info-text: var(--signal-11);
 	--success-accent: var(--moss-3);
-	--success-focus: color-mix(in srgb, var(--success) 18%, var(--card));
 	--success-border: var(--moss-7);
-	--success-hover: color-mix(in srgb, var(--success) 88%, black);
 	--warning-accent: var(--harvest-3);
-	--warning-focus: color-mix(in srgb, var(--warning) 20%, var(--card));
 	--warning-border: var(--harvest-7);
-	--warning-hover: color-mix(in srgb, var(--warning) 88%, black);
 	--error-accent: var(--clay-3);
 	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
 	--error-border: var(--clay-7);
 	--error-hover: color-mix(in srgb, var(--error) 88%, black);
 	--info-accent: var(--sky-3);
-	--info-focus: color-mix(in srgb, var(--info) 18%, var(--card));
 	--info-border: var(--sky-7);
-	--info-hover: color-mix(in srgb, var(--info) 88%, black);
 
 	/* —— Overlay ——————————————————————————————————————————————————————————
 	   Translucent ink washes for hover/press states and hairlines drawn as a
@@ -185,20 +182,18 @@
 	--sidebar-ring: var(--signal-9);
 
 	/* —— Legacy aliases ———————————————————————————————————————————————————
-	   Kept because call sites still use them. They are ALIASES, never
-	   values: each resolves to a canonical token above, so there is exactly
-	   one place to change. Do not add new names here.
+	   None remain. Every legacy name below was removed once repo-wide
+	   usage analysis showed zero consumers of the utilities; the removal
+	   commit in each case is a pure deletion with no call-site change.
 	   History: `--destructive` (legacy name for the failure hue, prefer
 	   `--error`), `--signal` (legacy name for the brand hue, prefer
-	   `--primary`) and `--secondary` (quiet neutral button fill) were
-	   removed once repo-wide usage analysis showed zero consumers of the
-	   utilities. `variant="destructive"` remains live as Button API and
-	   maps directly to `--error`; it never depended on the token.
-
-	   --accent       the neutral fill step. It carried a value identical to
-	                  `--muted` in both themes, so it is stated as an alias
-	                  rather than a second copy of the same colour. */
-	--accent: var(--muted);
+	   `--primary`), `--secondary` / `--secondary-foreground` (quiet
+	   neutral button fill), `--accent-foreground`, and `--accent` (the
+	   neutral fill step, value-identical to `--muted` in both themes;
+	   removed in Color System 2.0 Phase 5 after Phase 3 moved every
+	   consumer to `--muted`). `variant="destructive"` remains live as
+	   Button API and maps directly to `--error`; it never depended on
+	   the token. Do not add new names here. */
 }
 
 .dark {
@@ -290,14 +285,10 @@
 
 	/* Status sub-steps */
 	--color-success-accent: var(--success-accent);
-	--color-success-focus: var(--success-focus);
 	--color-success-border: var(--success-border);
-	--color-success-hover: var(--success-hover);
 	--color-success-text: var(--success-text);
 	--color-warning-accent: var(--warning-accent);
-	--color-warning-focus: var(--warning-focus);
 	--color-warning-border: var(--warning-border);
-	--color-warning-hover: var(--warning-hover);
 	--color-warning-text: var(--warning-text);
 	--color-error-accent: var(--error-accent);
 	--color-error-focus: var(--error-focus);
@@ -306,9 +297,7 @@
 	--color-error-text: var(--error-text);
 	--color-info-text: var(--info-text);
 	--color-info-accent: var(--info-accent);
-	--color-info-focus: var(--info-focus);
 	--color-info-border: var(--info-border);
-	--color-info-hover: var(--info-hover);
 
 	/* Overlay */
 	--color-overlay-4: var(--overlay-4);
@@ -327,7 +316,4 @@
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
-
-	/* Legacy alias — see the `:root` block. */
-	--color-accent: var(--accent);
 }
