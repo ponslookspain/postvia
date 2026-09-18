@@ -40,8 +40,13 @@
 	--muted-foreground: #65645d;
 
 	/* —— Muted ————————————————————————————————————————————————————————————
-	   The neutral fill: hovers, inset wells, disabled chrome. */
-	--muted: #e7e5de;
+	   The neutral fill: hovers, inset wells, disabled chrome — the one
+	   SUNKEN rung of the surface ladder (`paper-0`), below the canvas.
+	   Was a hand-written literal (`#e7e5de`) until this fix; unchanged in
+	   practice in light (ΔL* from card: -5.43 before, -5.51 after) but the
+	   dark literal it replaces had drifted onto the Phase 2 card value —
+	   see `foundations.css`'s `paper-0` comment. */
+	--muted: var(--paper-0);
 
 	/* —— Panel ————————————————————————————————————————————————————————————
 	   A block on the page (`paper-2`): one rung above the canvas and carrying
@@ -204,7 +209,7 @@
 	   measured 3.73 effective on cards in 2026-09. */
 	--muted-foreground: #b3b2ac;
 
-	--muted: #38362f;
+	--muted: var(--paper-0);
 
 	--panel: var(--paper-2);
 
