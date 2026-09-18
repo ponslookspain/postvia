@@ -114,6 +114,33 @@ both themes because they stay legible on either canvas.
 Surfaces, Borders and Elevation are tone decisions rather than raw scales,
 so they live in the semantic layer.
 
+### Tonal scales (Color System 2.0, Phase 1 — additive, no consumers)
+
+Six PostVIA-owned tonal scales in `foundations.css`, reserved for the future
+Phase 2 semantic mapping. Each scale follows the 1 → 12 progression
+(1 whisper · 2 very subtle · 3 soft surface · 4 hover · 5 active ·
+6 subtle border · 7 border · 8 strong border/input · 9 solid ·
+10 solid hover · 11 accessible text · 12 strongest text).
+
+| Scale | Hue family | Materialized steps | Intended Phase 2 consumers |
+| --- | --- | --- | --- |
+| `paper` | neutral / warm | 1, 2, 3, 6, 7, 8, 11, 12 | surfaces, borders, neutral text |
+| `signal` | brand blue | 3, 7, 9, 11 | primary soft / border / solid / text + focus |
+| `moss` | success green | 3, 7, 9, 11 | success soft / border / solid / text |
+| `harvest` | warning amber | 3, 7, 9, 11 | warning soft / border / solid / text |
+| `clay` | error red | 3, 7, 9, 11 | error soft / border / solid / text |
+| `sky` | info blue | 3, 7, 9, 11 | info soft / border / solid / text (tuned independently of `signal`) |
+
+Rules: steps are plain `:root` / `.dark` properties (not `@theme`
+`--color-*` entries), so Tailwind emits no utilities for them and components
+cannot consume them directly — the only future consumer is `semantic.css`.
+Unmaterialized steps (4, 5, 10, and the rest) stay reserved; they can be
+added later without renumbering. Values are PostVIA-owned OKLCH picks
+anchored near today's semantic hues, not copied from any external palette.
+
+**Semantic mapping is unchanged.** No `semantic.css` token points at these
+steps yet; rendered output is identical. The remapping is Phase 2 work.
+
 ## 2. Semantic tokens — canonical
 
 Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).

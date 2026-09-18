@@ -112,7 +112,125 @@
    hover / text / fg`; every hue and step without a consumer was removed once
    the Badge/Avatar color axes stopped spanning them (see
    `docs/design-tokens.md`, "Radian removal").
+
+   PostVIA tonal scales (Color System 2.0, Phase 1 — ADDITIVE, no consumers).
+   ----------------------------------------------------------------------------
+   Six PostVIA-owned tonal scales. Each scale follows the 1 → 12 progression:
+
+       1  whisper surface      7  border
+       2  very subtle surface  8  strong border / input edge
+       3  soft surface         9  solid accent (fills, dots)
+       4  hover surface        10 solid hover
+       5  active surface       11 accessible text ink
+       6  subtle border        12 strongest text ink
+
+   Scales:
+       --paper-*    neutral / warm       (surfaces, borders, neutral text)
+       --signal-*   brand blue           (primary actions, focus)
+       --moss-*     success green
+       --harvest-*  warning amber
+       --clay-*     error red
+       --sky-*      info blue            (routine SCHEDULED states; same hue
+                                        family as signal by intent, tuned
+                                        independently)
+
+   Rules for this block:
+     - Steps are plain `:root` / `.dark` custom properties on purpose: they
+       are NOT `--color-*` `@theme` entries, so Tailwind emits no utilities
+       for them and no component can reach them directly. The ONLY future
+       consumer is `semantic.css` (Phase 2 mapping).
+     - Only steps with a confirmed Phase-2 consumer are materialized (paper:
+       1/2/3/6/7/8/11/12; signal/moss/harvest/clay/sky: 3/7/9/11). The scale
+       reserves the full 1–12 numbering so later steps can be added without
+       renumbering or breaking the API.
+     - Values are PostVIA-owned OKLCH picks anchored near today's semantic
+       hues (so Phase 2 can calibrate against them); they are not copied
+       from any external palette. Nothing below changes rendered output:
+       no `semantic.css` token points at these steps yet.
 -------------------------------------------------------------------------- */
+:root {
+	/* paper — neutral / warm */
+	--paper-1: oklch(0.985 0.004 95);
+	--paper-2: oklch(0.965 0.006 95);
+	--paper-3: oklch(0.945 0.008 95);
+	--paper-6: oklch(0.905 0.01 95);
+	--paper-7: oklch(0.875 0.012 95);
+	--paper-8: oklch(0.83 0.014 95);
+	--paper-11: oklch(0.45 0.02 95);
+	--paper-12: oklch(0.28 0.02 95);
+
+	/* signal — brand blue */
+	--signal-3: oklch(0.94 0.03 255);
+	--signal-7: oklch(0.7 0.1 255);
+	--signal-9: oklch(0.55 0.15 255);
+	--signal-11: oklch(0.48 0.15 255);
+
+	/* moss — success green */
+	--moss-3: oklch(0.945 0.03 155);
+	--moss-7: oklch(0.7 0.1 155);
+	--moss-9: oklch(0.56 0.13 155);
+	--moss-11: oklch(0.5 0.12 155);
+
+	/* harvest — warning amber */
+	--harvest-3: oklch(0.955 0.035 80);
+	--harvest-7: oklch(0.75 0.1 80);
+	--harvest-9: oklch(0.66 0.13 80);
+	--harvest-11: oklch(0.52 0.1 80);
+
+	/* clay — error red */
+	--clay-3: oklch(0.94 0.03 25);
+	--clay-7: oklch(0.7 0.1 25);
+	--clay-9: oklch(0.57 0.15 25);
+	--clay-11: oklch(0.52 0.14 25);
+
+	/* sky — info blue */
+	--sky-3: oklch(0.945 0.028 250);
+	--sky-7: oklch(0.71 0.095 250);
+	--sky-9: oklch(0.56 0.145 250);
+	--sky-11: oklch(0.51 0.145 250);
+}
+
+.dark {
+	/* paper — neutral / warm */
+	--paper-1: oklch(0.3 0.008 95);
+	--paper-2: oklch(0.33 0.008 95);
+	--paper-3: oklch(0.36 0.01 95);
+	--paper-6: oklch(0.4 0.012 95);
+	--paper-7: oklch(0.44 0.012 95);
+	--paper-8: oklch(0.5 0.014 95);
+	--paper-11: oklch(0.76 0.02 95);
+	--paper-12: oklch(0.95 0.008 95);
+
+	/* signal — brand blue */
+	--signal-3: oklch(0.35 0.07 255);
+	--signal-7: oklch(0.55 0.12 255);
+	--signal-9: oklch(0.7 0.13 255);
+	--signal-11: oklch(0.75 0.12 255);
+
+	/* moss — success green */
+	--moss-3: oklch(0.35 0.06 155);
+	--moss-7: oklch(0.55 0.1 155);
+	--moss-9: oklch(0.7 0.13 155);
+	--moss-11: oklch(0.72 0.13 155);
+
+	/* harvest — warning amber */
+	--harvest-3: oklch(0.36 0.06 80);
+	--harvest-7: oklch(0.58 0.1 80);
+	--harvest-9: oklch(0.72 0.13 80);
+	--harvest-11: oklch(0.74 0.13 80);
+
+	/* clay — error red */
+	--clay-3: oklch(0.36 0.07 25);
+	--clay-7: oklch(0.57 0.12 25);
+	--clay-9: oklch(0.66 0.14 25);
+	--clay-11: oklch(0.71 0.13 25);
+
+	/* sky — info blue */
+	--sky-3: oklch(0.35 0.065 250);
+	--sky-7: oklch(0.56 0.115 250);
+	--sky-9: oklch(0.7 0.13 250);
+	--sky-11: oklch(0.74 0.12 250);
+}
 @theme {
 	/* red */
 	--color-red-accent: oklch(0.956 0.02 17.516);
