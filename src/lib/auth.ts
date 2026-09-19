@@ -283,6 +283,16 @@ export const auth = betterAuth({
     accountLinking: {
       trustedProviders: isGoogleOAuthConfigured() ? ["google"] : [],
     },
+    // Encrypts Account.accessToken/refreshToken at rest (AES via
+    // `BETTER_AUTH_SECRET`, the library's own oauth2/utils.ts
+    // setTokenUtil/decryptOAuthToken). Built-in and reversible: existing
+    // plaintext rows still decrypt (isLikelyEncrypted() passes them
+    // through unchanged) and every write path (initial Google callback,
+    // account linking, /refresh-token) re-encrypts going forward, so no
+    // backfill or schema change is needed. idToken is not covered by this
+    // flag; it is a short-lived OIDC identity token, not a bearer
+    // credential, and nothing in this app reads it back.
+    encryptOAuthTokens: true,
   },
   session: {
     /**

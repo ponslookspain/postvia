@@ -29,9 +29,12 @@
  *    indefinitely. Writes encrypt only when a key is configured, so
  *    deploying this code with no key set is a literal no-op.
  *
- * Better Auth's own `Account` table is deliberately NOT touched: its token
- * columns are written by the library's adapter, so encrypting them needs a
- * library-supported hook rather than a Prisma-level change.
+ * Better Auth's own `Account` table (Google OAuth login, `accessToken` /
+ * `refreshToken`) is encrypted separately, through the library's own
+ * built-in `account.encryptOAuthTokens` option in `src/lib/auth.ts` —
+ * not this module. That flag reuses `BETTER_AUTH_SECRET` and every
+ * adapter write path (initial callback, account linking, refresh-token),
+ * so it needed no Prisma-level change here either.
  */
 
 import {

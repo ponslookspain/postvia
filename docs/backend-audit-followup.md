@@ -464,7 +464,18 @@ Once the plan is confirmed as Pro, the whole change is:
 ```
 and the tests above will hold it.
 
-### P1.5(b) — Social token encryption: **needs a migration plan first**
+### P1.5(b) — Social token encryption: **RESOLVED, without the migration this section assumed**
+
+`SocialAccount.accessToken` / `refreshToken` are now encrypted — see "Social
+token encryption (priority 3)" under Round 2, above. Better Auth's `Account`
+token columns (Google login) are also now encrypted, via the library's own
+`account.encryptOAuthTokens: true` option in `src/lib/auth.ts` — no
+library patch or hook was needed, just turning on a flag that already existed
+in the installed 1.7.4. Neither fix needed the column migration, key-id
+column, or backfill this section proposed; both are additive and reversible
+the same way (self-describing ciphertext / library-side envelope, opaque to
+any comparand, plaintext rows still read). The original reasoning is kept
+below for the record.
 
 `SocialAccount.accessToken` / `refreshToken` and Better Auth's `Account` token
 columns are plaintext. This was the audit's top security finding and it is
@@ -481,6 +492,9 @@ guessed at.
 Better Auth's `Account` table is harder still: its token columns are owned and
 rewritten by the library's own adapter, so encrypting them needs a
 library-supported hook, not a Prisma-level change.
+
+(Historical: that hook turned out to already exist — see the RESOLVED note
+above.)
 
 Proposed design, for review before implementation:
 1. Add `tokenKeyId INT NULL` to `SocialAccount` (additive, nullable — same
@@ -580,7 +594,7 @@ Step 1 is safe today and should not wait for step 2.
 |---|---|---|
 | Scheduled posts publish up to ~24h late | **Critical** | Blocked on the plan check (P0.1). Bounding and tests are in place; only the schedule line remains. |
 | Video publishing may be killed mid-poll on Hobby | **High** | Same check resolves it. |
-| OAuth tokens plaintext at rest | **High** | Surface narrowed; encryption designed, not shipped. |
+| OAuth tokens plaintext at rest | ~~High~~ | **RESOLVED** — `SocialAccount` via `social-token-crypto.ts`, Better Auth `Account` via `encryptOAuthTokens: true`. Better Auth's own `idToken` column stays unencrypted (short-lived OIDC identity token, not a bearer credential; nothing reads it back). |
 | Production DB pooling unverified | **High** | `docs/DATABASE_POOLING.md`. Demand reduced by P1.7. |
 | No storage quota / no media retention | **High** | Model designed; limits need a product decision. |
 | No automated production migration gate | **High** | CI drift-check recommended above. |
