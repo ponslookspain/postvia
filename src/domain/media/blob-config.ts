@@ -17,14 +17,19 @@ export type BlobAuthStatus =
 /**
  * Pure credential preflight mirroring @vercel/blob's `resolveBlobAuth`
  * (token option is never used by this codebase — every call relies on
- * ambient env, exactly like production where Vercel injects the store
- * binding). Returns presence flags only, never secret values.
+ * ambient env). Returns presence flags only, never secret values.
  *
- * Why this exists: local development has no injected store binding, so a
- * missing `BLOB_READ_WRITE_TOKEN` (and no OIDC `BLOB_STORE_ID`) fails
- * every Blob call with "No blob credentials found" — surfacing in the
- * browser as the opaque SDK error "Failed to retrieve the presigned URL".
- * Callers use this to fail fast with an actionable message instead.
+ * The OIDC branch (`VERCEL_OIDC_TOKEN` + `BLOB_STORE_ID`) exists because
+ * that is theoretically how a platform-connected store can authenticate
+ * without a token, but it has NOT proven reliable for this project's store
+ * connection (confirmed 2026-09-19: `autoExposeSystemEnvs` +
+ * `oidcTokenConfig` enabled and redeployed, `VERCEL_OIDC_TOKEN` still never
+ * showed up at runtime). `BLOB_READ_WRITE_TOKEN` must be set explicitly in
+ * every environment, including Production/Preview — see
+ * `docs/environment.md`. Without it every Blob call fails with "No blob
+ * credentials found" server-side, surfacing in the browser as the opaque
+ * SDK error "Failed to retrieve the presigned URL". Callers use this
+ * function to fail fast with an actionable message instead.
  */
 export function describeBlobAuth(
   env: Record<string, string | undefined>

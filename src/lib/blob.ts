@@ -193,9 +193,16 @@ export async function headPrivateBlob(
  * Issues a `put` signed token for the official client upload flow
  * (`uploadPresigned()` + `handleUploadPresigned()`).
  *
- * Uses `issueSignedToken`, which authenticates through the Vercel OIDC
- * credentials injected by the platform (no BLOB_READ_WRITE_TOKEN needed),
- * and keeps the store PRIVATE.
+ * Uses `issueSignedToken`, and keeps the store PRIVATE.
+ *
+ * In principle this can authenticate via Vercel OIDC (`VERCEL_OIDC_TOKEN`)
+ * instead of `BLOB_READ_WRITE_TOKEN`, but that path has proven unreliable in
+ * practice: enabling `autoExposeSystemEnvs` and `oidcTokenConfig` on the
+ * project, then redeploying, did NOT make `VERCEL_OIDC_TOKEN` available at
+ * runtime for this store's connection (root-caused an outage on
+ * postvia.online, 2026-09-19). `BLOB_READ_WRITE_TOKEN` is the credential
+ * this codebase actually relies on in every environment now — see
+ * `docs/environment.md`.
  */
 export async function createPutSignedToken(input: {
   pathname: string;
