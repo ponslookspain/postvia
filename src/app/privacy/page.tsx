@@ -178,9 +178,22 @@ export default function PrivacyPage() {
           Before storage and publishing, uploads are validated against the
           published limits (images JPEG, PNG, WebP, or GIF up to 10&nbsp;MB;
           videos MP4, WebM, or MOV up to 100&nbsp;MB; at most 4 files per
-          post). Processing happens on our own infrastructure for the sole
+          post &mdash; the platform-wide maximums; your plan may apply a
+          lower limit, see{" "}
+          <a href="/pricing" className="underline underline-offset-2">
+            Pricing
+          </a>
+          ). Processing happens on our own infrastructure for the sole
           purpose of delivering the features you use; uploads are never used
           for advertising or shared with data brokers.
+        </p>
+        <p>
+          Once a post is fully published, its original media is kept for a
+          limited time (3 months on Free, 12 months on Growth and Scale)
+          and then automatically deleted to control storage cost. This
+          never deletes the post, its caption, or its publishing history,
+          and never affects a draft, scheduled, or partially-published
+          post&apos;s media.
         </p>
       </LegalSection>
 

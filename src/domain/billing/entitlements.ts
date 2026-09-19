@@ -300,6 +300,9 @@ function unlimitedEntitlements(): PlanEntitlements {
     calendar: true,
     bulk: true,
     retryReschedule: true,
+    maxVideoBytes: Number.MAX_SAFE_INTEGER,
+    maxMediaPerPost: Number.MAX_SAFE_INTEGER,
+    mediaRetentionMs: null,
   };
 }
 
@@ -359,6 +362,47 @@ export function canConnectAccount(
   return upgradeDenial(
     eff.plan,
     `Account limit reached (${currentTotalAccounts}/${limit} connected accounts).`
+  );
+}
+
+function formatMB(bytes: number): string {
+  return String(Math.round(bytes / (1024 * 1024)));
+}
+
+/**
+ * Plan-level video size gate. A tighter subset of the absolute platform
+ * ceiling (`MEDIA_LIMITS.VIDEO.maxBytes`, enforced unconditionally in
+ * `@/domain/media/policy` regardless of plan) — this only narrows it
+ * further for cheaper tiers, it never widens it.
+ */
+export function canUploadVideoSize(
+  eff: EffectiveSubscription,
+  sizeBytes: number
+): Check {
+  if (eff.bypass) return { ok: true };
+  const limit = eff.entitlements.maxVideoBytes;
+  if (sizeBytes <= limit) return { ok: true };
+  return upgradeDenial(
+    eff.plan,
+    `Videos over ${formatMB(limit)} MB need a paid plan (this plan's limit is ${formatMB(limit)} MB).`
+  );
+}
+
+/**
+ * Plan-level per-post media count gate. Same relationship to
+ * `MAX_MEDIA_PER_POST` (the absolute ceiling) as `canUploadVideoSize` has
+ * to `MEDIA_LIMITS.VIDEO.maxBytes` above.
+ */
+export function canAddMediaToPost(
+  eff: EffectiveSubscription,
+  currentCount: number
+): Check {
+  if (eff.bypass) return { ok: true };
+  const limit = eff.entitlements.maxMediaPerPost;
+  if (currentCount < limit) return { ok: true };
+  return upgradeDenial(
+    eff.plan,
+    `This plan allows at most ${limit} media file${limit === 1 ? "" : "s"} per post.`
   );
 }
 

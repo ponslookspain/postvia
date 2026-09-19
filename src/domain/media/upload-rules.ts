@@ -13,7 +13,6 @@
  */
 import {
   isAscii,
-  MAX_MEDIA_PER_POST,
   sanitizeFilename,
   validateMediaInput,
   type MediaKind,
@@ -254,10 +253,14 @@ export function validateCompletedUpload(input: {
  * "retry me" — the blob is always removed before this is raised.
  */
 export class MediaRegistrationRejected extends Error {
-  readonly reason: "media-cap" | "signature-mismatch" | "video-invalid";
+  readonly reason:
+    | "media-cap"
+    | "signature-mismatch"
+    | "video-invalid"
+    | "plan-limit";
 
   constructor(
-    reason: "media-cap" | "signature-mismatch" | "video-invalid",
+    reason: "media-cap" | "signature-mismatch" | "video-invalid" | "plan-limit",
     message: string
   ) {
     super(message);
@@ -326,14 +329,22 @@ export async function claimMediaSlot(
     mimeType: string;
     size: number;
     type: MediaKind;
-  }
+  },
+  /**
+   * The cap to enforce for THIS caller — plan-aware (see
+   * `canAddMediaToPost`, `@/domain/billing/entitlements`), never higher
+   * than `MAX_MEDIA_PER_POST` (the absolute ceiling). Required rather than
+   * defaulted so a caller can never silently fall back to the loosest
+   * value by omission.
+   */
+  maxMediaPerPost: number
 ): Promise<MediaSlotClaim> {
   return store.withPostLock(data.postId, async (tx) => {
     const duplicate = await tx.findByPathname(data.pathname);
     if (duplicate) return "duplicate";
 
     const count = await tx.countForPost(data.postId, data.userId);
-    if (count >= MAX_MEDIA_PER_POST) return "over-cap";
+    if (count >= maxMediaPerPost) return "over-cap";
 
     await tx.create(data);
     return "created";

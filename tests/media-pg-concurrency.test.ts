@@ -87,7 +87,11 @@ describe("pg: per-post media cap under real concurrency", { skip: !ENABLED }, ()
     try {
       const results = await Promise.all(
         Array.from({ length: 20 }, (_, i) =>
-          claimMediaSlot(liveMediaRegistrationStore, payload(userId, postId, i))
+          claimMediaSlot(
+            liveMediaRegistrationStore,
+            payload(userId, postId, i),
+            MAX_MEDIA_PER_POST
+          )
         )
       );
 
@@ -115,7 +119,8 @@ describe("pg: per-post media cap under real concurrency", { skip: !ENABLED }, ()
       for (let i = 0; i < MAX_MEDIA_PER_POST; i++) {
         const result = await claimMediaSlot(
           liveMediaRegistrationStore,
-          payload(userId, postId, i)
+          payload(userId, postId, i),
+          MAX_MEDIA_PER_POST
         );
         assert.equal(result, "created");
       }
@@ -124,7 +129,8 @@ describe("pg: per-post media cap under real concurrency", { skip: !ENABLED }, ()
         Array.from({ length: 20 }, (_, i) =>
           claimMediaSlot(
             liveMediaRegistrationStore,
-            payload(userId, postId, 100 + i)
+            payload(userId, postId, 100 + i),
+            MAX_MEDIA_PER_POST
           )
         )
       );
@@ -140,14 +146,19 @@ describe("pg: per-post media cap under real concurrency", { skip: !ENABLED }, ()
     const { userId, email, postId } = await createUserWithPost("lastslot");
     try {
       for (let i = 0; i < MAX_MEDIA_PER_POST - 1; i++) {
-        await claimMediaSlot(liveMediaRegistrationStore, payload(userId, postId, i));
+        await claimMediaSlot(
+          liveMediaRegistrationStore,
+          payload(userId, postId, i),
+          MAX_MEDIA_PER_POST
+        );
       }
 
       const results = await Promise.all(
         Array.from({ length: 12 }, (_, i) =>
           claimMediaSlot(
             liveMediaRegistrationStore,
-            payload(userId, postId, 200 + i)
+            payload(userId, postId, 200 + i),
+            MAX_MEDIA_PER_POST
           )
         )
       );
@@ -166,7 +177,7 @@ describe("pg: per-post media cap under real concurrency", { skip: !ENABLED }, ()
 
       const results = await Promise.all(
         Array.from({ length: 8 }, () =>
-          claimMediaSlot(liveMediaRegistrationStore, data)
+          claimMediaSlot(liveMediaRegistrationStore, data, MAX_MEDIA_PER_POST)
         )
       );
 
@@ -184,10 +195,18 @@ describe("pg: per-post media cap under real concurrency", { skip: !ENABLED }, ()
     try {
       const results = await Promise.all([
         ...Array.from({ length: 4 }, (_, i) =>
-          claimMediaSlot(liveMediaRegistrationStore, payload(a.userId, a.postId, i))
+          claimMediaSlot(
+            liveMediaRegistrationStore,
+            payload(a.userId, a.postId, i),
+            MAX_MEDIA_PER_POST
+          )
         ),
         ...Array.from({ length: 4 }, (_, i) =>
-          claimMediaSlot(liveMediaRegistrationStore, payload(b.userId, b.postId, i))
+          claimMediaSlot(
+            liveMediaRegistrationStore,
+            payload(b.userId, b.postId, i),
+            MAX_MEDIA_PER_POST
+          )
         ),
       ]);
 
@@ -207,7 +226,11 @@ describe("pg: per-post media cap under real concurrency", { skip: !ENABLED }, ()
     try {
       await Promise.all(
         Array.from({ length: 20 }, (_, i) =>
-          claimMediaSlot(liveMediaRegistrationStore, payload(userId, postId, i))
+          claimMediaSlot(
+            liveMediaRegistrationStore,
+            payload(userId, postId, i),
+            MAX_MEDIA_PER_POST
+          )
         )
       );
 

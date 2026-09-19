@@ -125,6 +125,60 @@ describe("planMediaAdd", () => {
     assert.equal(plan.accepted[0]?.file, MOV);
     assert.equal(plan.accepted[0]?.kind, "VIDEO");
   });
+
+  test("maxVideoBytes rejects an over-plan-limit video, instantly and client-side", () => {
+    const bigVideo = { name: "big.mp4", type: "video/mp4", size: 60 * 1024 * 1024 };
+    const plan = planMediaAdd({
+      files: [bigVideo],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["threads-1"],
+      accounts: ACCOUNTS,
+      maxVideoBytes: 50 * 1024 * 1024,
+    });
+    assert.equal(plan.accepted.length, 0);
+    assert.equal(plan.rejected.length, 1);
+    assert.match(plan.rejected[0]!.error, /50 MB/);
+  });
+
+  test("maxVideoBytes accepts a video at exactly the limit", () => {
+    const atLimit = { name: "ok.mp4", type: "video/mp4", size: 50 * 1024 * 1024 };
+    const plan = planMediaAdd({
+      files: [atLimit],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["threads-1"],
+      accounts: ACCOUNTS,
+      maxVideoBytes: 50 * 1024 * 1024,
+    });
+    assert.equal(plan.accepted.length, 1);
+    assert.equal(plan.rejected.length, 0);
+  });
+
+  test("maxVideoBytes never rejects an image, however large the plan cap", () => {
+    const plan = planMediaAdd({
+      files: [PNG],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["threads-1"],
+      accounts: ACCOUNTS,
+      maxVideoBytes: 1,
+    });
+    assert.equal(plan.accepted.length, 1);
+    assert.equal(plan.rejected.length, 0);
+  });
+
+  test("omitting maxVideoBytes keeps legacy behavior (no plan check here)", () => {
+    const bigVideo = { name: "big.mp4", type: "video/mp4", size: 60 * 1024 * 1024 };
+    const plan = planMediaAdd({
+      files: [bigVideo],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["threads-1"],
+      accounts: ACCOUNTS,
+    });
+    assert.equal(plan.accepted.length, 1, "under the absolute ceiling, no plan cap given");
+  });
 });
 
 describe("getFailedPublishActions", () => {

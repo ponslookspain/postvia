@@ -118,6 +118,11 @@ type PrepareResponse = {
   pathname: string;
 };
 
+/** A file rejected by the server, distinguishing a plan limit from any other failure. */
+type UploadFileResult =
+  | { ok: true }
+  | { ok: false; message: string; planDenial?: { reason: string; upgradeTo: PlanId | null } };
+
 /**
  * Production-safe bound for the direct browser→Blob PUT phase only
  * (`await uploadPresigned(...)`). A stalled transport resolves to a
@@ -131,7 +136,7 @@ function uploadFileToPost(
   postId: string,
   file: File,
   onProgress: (percent: number) => void
-): Promise<string | null> {
+): Promise<UploadFileResult> {
   return new Promise((resolve) => {
     (async () => {
       const uploadStart = Date.now();
@@ -139,7 +144,8 @@ function uploadFileToPost(
         onProgress(0);
 
         // Step 1: the server reserves an authorized, ASCII-only,
-        // user/post-scoped pathname (session + ownership + limits checked).
+        // user/post-scoped pathname (session + ownership + limits checked,
+        // including the plan's video-size/media-count caps).
         const prepRes = await fetch("/api/media/prepare", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -152,11 +158,25 @@ function uploadFileToPost(
         });
         if (!prepRes.ok) {
           const data = await prepRes.json().catch(() => null);
-          resolve(
-            typeof data?.error === "string"
-              ? data.error
-              : "Failed to prepare upload"
-          );
+          const parsed = parseApiError(data);
+          if (parsed.code === "ENTITLEMENT_DENIED") {
+            resolve({
+              ok: false,
+              message: parsed.message,
+              planDenial: {
+                reason: parsed.message,
+                upgradeTo: parsePlanParam(parsed.upgradeTo),
+              },
+            });
+            return;
+          }
+          resolve({
+            ok: false,
+            message:
+              typeof data?.error === "string"
+                ? data.error
+                : "Failed to prepare upload",
+          });
           return;
         }
         const { pathname } = (await prepRes.json()) as PrepareResponse;
@@ -209,12 +229,12 @@ function uploadFileToPost(
             );
             // Do NOT proceed to registration polling: without a
             // completed PUT there is nothing to register.
-            resolve("Media upload timed out. Please try again.");
+            resolve({ ok: false, message: "Media upload timed out. Please try again." });
             return;
           }
           const message =
             error instanceof Error ? error.message : "Unknown upload error";
-          resolve(`Upload failed: ${message}`);
+          resolve({ ok: false, message: `Upload failed: ${message}` });
           return;
         } finally {
           clearTimeout(putTimer);
@@ -223,12 +243,18 @@ function uploadFileToPost(
 
         // Step 3: the server registers the Media row from the verified
         // blob.upload-completed webhook; wait for it before publishing.
-        resolve(await waitForMediaRegistration({ postId, pathname }));
+        // Rejections at this stage (incl. the plan cap, re-checked here
+        // against the real byte count) are not surfaced richly — see
+        // registerCompletedUpload in media-upload.ts.
+        const registrationError = await waitForMediaRegistration({ postId, pathname });
+        resolve(
+          registrationError ? { ok: false, message: registrationError } : { ok: true }
+        );
       } catch (error) {
         reportError("composer-client", "upload file failed", error, {
           postId,
         });
-        resolve("Unable to upload this file. Please try again.");
+        resolve({ ok: false, message: "Unable to upload this file. Please try again." });
       }
     })();
   });
@@ -253,10 +279,13 @@ export default function NewPostComposer({
   userName,
   accounts,
   quota,
+  mediaLimits,
 }: {
   userName: string;
   accounts: ConnectedAccount[];
   quota: { postsLeft: number | null; upgradeTo: PlanId | null };
+  /** The caller's plan limits (Free's tighter caps) — see PlanEntitlements. */
+  mediaLimits: { maxMediaPerPost: number; maxVideoBytes: number };
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
@@ -335,7 +364,14 @@ export default function NewPostComposer({
   const effectiveMedia = getEffectiveMediaConstraints(
     selectedAccounts.map((account) => account.platform)
   );
-  const effectiveMaxMedia = effectiveMedia?.maxItems ?? MAX_MEDIA;
+  // The tighter of the platform's own constraint (if any) and the plan's
+  // cap (Free's 2 vs paid's 4) — a plan can only narrow this further, so
+  // whichever is smaller wins. `MAX_MEDIA` (the absolute ceiling) is the
+  // fallback of last resort when neither applies.
+  const effectiveMaxMedia = Math.min(
+    effectiveMedia?.maxItems ?? MAX_MEDIA,
+    mediaLimits.maxMediaPerPost
+  );
   const mediaAccept = buildMediaAccept(effectiveMedia?.mimeTypes ?? null);
   const platform: Platform = selectedAccounts[0]?.platform ?? "THREADS";
   const charCount = countCharacters(text);
@@ -639,6 +675,7 @@ export default function NewPostComposer({
         type: item.kind,
         mimeType: item.file.type,
       })),
+      maxVideoBytes: mediaLimits.maxVideoBytes,
     });
     for (const item of plan.rejected) {
       toast.add({
@@ -721,7 +758,7 @@ export default function NewPostComposer({
       items,
       MEDIA_UPLOAD_CONCURRENCY,
       async (item) => {
-        const error = await uploadFileToPost(
+        const result = await uploadFileToPost(
           postId,
           item.file,
           (percent) =>
@@ -731,13 +768,20 @@ export default function NewPostComposer({
               )
             )
         );
-        if (error) {
+        if (!result.ok) {
           setMedia((prev) =>
             prev.map((m) =>
-              m.key === item.key ? { ...m, status: "error", error } : m
+              m.key === item.key
+                ? { ...m, status: "error", error: result.message }
+                : m
             )
           );
-          return `${item.name}: ${error}`;
+          // A plan limit (Free's tighter video-size/media-count cap) is
+          // not just "this file failed" — it's the same upgrade prompt
+          // used for the post/schedule quotas, so it renders through the
+          // shared UpgradeCta rather than a plain error string.
+          if (result.planDenial) setQuotaError(result.planDenial);
+          return `${item.name}: ${result.message}`;
         }
         setMedia((prev) =>
           prev.map((m) =>
@@ -1338,6 +1382,7 @@ export default function NewPostComposer({
               )}
             media={media}
             maxMedia={effectiveMaxMedia}
+            maxVideoBytes={mediaLimits.maxVideoBytes}
             accept={mediaAccept}
             disabled={saving || publishing || scheduling}
             mediaUploadNote={mediaUploadNote}

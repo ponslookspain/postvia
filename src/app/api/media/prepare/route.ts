@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
         error: result.error,
         status: result.status,
         code: result.code,
+        upgradeTo: result.upgradeTo,
       });
       return NextResponse.json(mapped.body, { status: mapped.status });
     }

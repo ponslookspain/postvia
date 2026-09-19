@@ -98,10 +98,32 @@ describe("claimMediaSlot — sequential behaviour", () => {
   test("an empty post accepts a first media", async () => {
     const { store, rows } = fakeStore();
 
-    const result = await claimMediaSlot(store, payload("p1", "u1", 0));
+    const result = await claimMediaSlot(store, payload("p1", "u1", 0), MAX_MEDIA_PER_POST);
 
     assert.equal(result, "created");
     assert.equal(rows.length, 1);
+  });
+
+  test("the cap is caller-supplied, not hardcoded: a tighter plan cap rejects sooner", async () => {
+    const seed = [
+      { postId: "p1", userId: "u1", pathname: "existing-0" },
+      { postId: "p1", userId: "u1", pathname: "existing-1" },
+    ];
+    const { store, rows } = fakeStore(seed);
+    const FREE_CAP = 2;
+
+    const result = await claimMediaSlot(store, payload("p1", "u1", 99), FREE_CAP);
+
+    assert.equal(result, "over-cap", "2 already held, Free's cap is 2");
+    assert.equal(rows.length, 2, "no row is written");
+
+    // The same post, same count, under the paid cap: still room.
+    const underPaidCap = await claimMediaSlot(
+      store,
+      payload("p1", "u1", 100),
+      MAX_MEDIA_PER_POST
+    );
+    assert.equal(underPaidCap, "created");
   });
 
   test("the cap is enforced once the post is full", async () => {
@@ -112,7 +134,7 @@ describe("claimMediaSlot — sequential behaviour", () => {
     }));
     const { store, rows } = fakeStore(seed);
 
-    const result = await claimMediaSlot(store, payload("p1", "u1", 99));
+    const result = await claimMediaSlot(store, payload("p1", "u1", 99), MAX_MEDIA_PER_POST);
 
     assert.equal(result, "over-cap");
     assert.equal(rows.length, MAX_MEDIA_PER_POST, "no row is written");
@@ -122,9 +144,9 @@ describe("claimMediaSlot — sequential behaviour", () => {
     const { store, rows } = fakeStore();
     const data = payload("p1", "u1", 0);
 
-    assert.equal(await claimMediaSlot(store, data), "created");
-    assert.equal(await claimMediaSlot(store, data), "duplicate");
-    assert.equal(await claimMediaSlot(store, data), "duplicate");
+    assert.equal(await claimMediaSlot(store, data, MAX_MEDIA_PER_POST), "created");
+    assert.equal(await claimMediaSlot(store, data, MAX_MEDIA_PER_POST), "duplicate");
+    assert.equal(await claimMediaSlot(store, data, MAX_MEDIA_PER_POST), "duplicate");
 
     assert.equal(rows.length, 1, "retries never consume extra capacity");
   });
@@ -137,8 +159,8 @@ describe("claimMediaSlot — sequential behaviour", () => {
     }));
     const { store } = fakeStore(seed);
 
-    assert.equal(await claimMediaSlot(store, payload("p1", "u1", 9)), "over-cap");
-    assert.equal(await claimMediaSlot(store, payload("p2", "u1", 9)), "created");
+    assert.equal(await claimMediaSlot(store, payload("p1", "u1", 9), MAX_MEDIA_PER_POST), "over-cap");
+    assert.equal(await claimMediaSlot(store, payload("p2", "u1", 9), MAX_MEDIA_PER_POST), "created");
   });
 });
 
@@ -148,7 +170,7 @@ describe("claimMediaSlot — the race this fix exists for", () => {
 
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, i) =>
-        claimMediaSlot(store, payload("p1", "u1", i))
+        claimMediaSlot(store, payload("p1", "u1", i), MAX_MEDIA_PER_POST)
       )
     );
 
@@ -171,7 +193,7 @@ describe("claimMediaSlot — the race this fix exists for", () => {
 
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, i) =>
-        claimMediaSlot(store, payload("p1", "u1", i))
+        claimMediaSlot(store, payload("p1", "u1", i), MAX_MEDIA_PER_POST)
       )
     );
 
@@ -192,7 +214,7 @@ describe("claimMediaSlot — the race this fix exists for", () => {
 
     const results = await Promise.all(
       Array.from({ length: 12 }, (_, i) =>
-        claimMediaSlot(store, payload("p1", "u1", i))
+        claimMediaSlot(store, payload("p1", "u1", i), MAX_MEDIA_PER_POST)
       )
     );
 
@@ -209,7 +231,7 @@ describe("claimMediaSlot — the race this fix exists for", () => {
     const data = payload("p1", "u1", 0);
 
     const results = await Promise.all(
-      Array.from({ length: 8 }, () => claimMediaSlot(store, data))
+      Array.from({ length: 8 }, () => claimMediaSlot(store, data, MAX_MEDIA_PER_POST))
     );
 
     assert.equal(results.filter((r) => r === "created").length, 1);
@@ -221,9 +243,9 @@ describe("claimMediaSlot — the race this fix exists for", () => {
     const { store, rows } = fakeStore();
 
     const results = await Promise.all([
-      claimMediaSlot(store, payload("p1", "u1", 0)),
-      claimMediaSlot(store, payload("p2", "u1", 0)),
-      claimMediaSlot(store, payload("p3", "u1", 0)),
+      claimMediaSlot(store, payload("p1", "u1", 0), MAX_MEDIA_PER_POST),
+      claimMediaSlot(store, payload("p2", "u1", 0), MAX_MEDIA_PER_POST),
+      claimMediaSlot(store, payload("p3", "u1", 0), MAX_MEDIA_PER_POST),
     ]);
 
     assert.ok(results.every((r) => r === "created"));

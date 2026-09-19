@@ -34,12 +34,14 @@ import { logDiagnostic, logErrorDiagnostic } from "@/lib/diagnostics";
  * order (blob first) risks a Media row pointing at bytes that no longer
  * exist, which is unrecoverable and user-visible.
  *
- * Default horizon is deliberately conservative (12 months): the goal of
- * this first pass is to stop unbounded growth from posts nobody will ever
- * revisit, not to aggressively reclaim space. Tighten `MEDIA_RETENTION_MS`
- * once real storage-usage data (see `storage-usage.ts`) shows it's needed.
+ * The horizon is plan-dependent (`PlanEntitlements.mediaRetentionMs`,
+ * `@/domain/billing/plans`) — Free is deliberately tighter than paid, since
+ * Free accounts are the ones accruing storage cost with no matching
+ * revenue. The cron caller runs this sweep once per retention bucket
+ * (currently: Free's 3 months, and Growth/Scale's shared 12 months),
+ * passing each bucket's own cutoff and a `findEligible` scoped to that
+ * bucket's users — this module stays retention-value-agnostic.
  */
-export const MEDIA_RETENTION_MS = 365 * 86_400_000;
 
 /** Media rows reaped per DB statement. Mirrors RATE_BUCKET_SWEEP_BATCH. */
 export const MEDIA_RETENTION_BATCH = 100;

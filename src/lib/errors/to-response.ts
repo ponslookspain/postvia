@@ -72,6 +72,7 @@ function fromLegacyResult(value: {
   status?: unknown;
   code?: unknown;
   retryAfterSeconds?: unknown;
+  upgradeTo?: unknown;
 }): ApiErrorResponse | null {
   if (typeof value.error !== "string" || value.error.length === 0) return null;
   const status =
@@ -98,9 +99,17 @@ function fromLegacyResult(value: {
                     : "VALIDATION_FAILED";
   const body: ApiErrorBody = { error: value.error, code };
   if (code === "RATE_LIMITED") body.retryable = true;
+  const details: Record<string, unknown> = {};
   if (typeof value.retryAfterSeconds === "number" && Number.isFinite(value.retryAfterSeconds)) {
-    body.details = { retryAfterSeconds: Math.min(Math.max(Math.ceil(value.retryAfterSeconds), 1), 3600) };
+    details.retryAfterSeconds = Math.min(Math.max(Math.ceil(value.retryAfterSeconds), 1), 3600);
   }
+  // Carries the plan a denied caller should upgrade to (see
+  // `@/domain/billing/entitlements`'s `Denial.upgradeTo`) through to the
+  // client's `parseApiError`, which reads it from `details.upgradeTo`.
+  if (code === "ENTITLEMENT_DENIED" && typeof value.upgradeTo === "string") {
+    details.upgradeTo = value.upgradeTo;
+  }
+  if (Object.keys(details).length > 0) body.details = details;
   return { status, body };
 }
 

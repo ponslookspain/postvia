@@ -43,22 +43,27 @@ const FAQS = [
   {
     question: "What does the Free plan include?",
     answer:
-      "15 posts per month, 1 connected account, scheduling for Instagram, Threads and TikTok, immediate publishing to X, per-platform previews and the content calendar. No credit card required.",
+      "15 posts per month, 1 connected account, scheduling for Instagram, Threads and TikTok, immediate publishing to X, per-platform previews and the content calendar. Videos up to 50 MB, 2 media files per post. No credit card required.",
   },
   {
     question: "When do I need Growth?",
     answer:
-      "When one account is not enough: up to 5 connected accounts, 300 posts per month, and bulk video scheduling up to 10 videos per batch.",
+      "When one account is not enough: up to 5 connected accounts, 300 posts per month, bulk video scheduling up to 10 videos per batch, videos up to 100 MB and 4 media files per post.",
   },
   {
     question: "What does Scale add?",
     answer:
-      "Unlimited connected accounts and unlimited monthly posts, with the same bulk scheduling, calendar and retry controls. For teams and heavy schedules.",
+      "Unlimited connected accounts and unlimited monthly posts, with the same bulk scheduling, calendar, retry controls and media limits as Growth. For teams and heavy schedules.",
   },
   {
     question: "Do unused posts or deleted posts refill my quota?",
     answer:
       "No. Monthly quota counts created posts via a server-side ledger, and deleting a post never refills it. Downgrades never delete your data — only new actions are gated.",
+  },
+  {
+    question: "How long do you keep my uploaded photos and videos?",
+    answer:
+      "Once a post is fully published, its original media is kept for 3 months on Free and 12 months on Growth and Scale, then automatically removed to control storage cost — the post itself, its caption and its publishing history are never deleted. Draft and scheduled posts are never affected.",
   },
 ];
 
@@ -110,6 +115,27 @@ const ROWS: { label: string; value: (planId: string) => string }[] = [
   { label: "Content calendar", value: () => "Included" },
   { label: "Per-platform previews", value: () => "Included" },
   { label: "Retry and reschedule", value: () => "Included" },
+  {
+    label: "Max video size",
+    value: (id) =>
+      `${Math.round(PLANS.find((p) => p.id === id)!.entitlements.maxVideoBytes / (1024 * 1024))} MB`,
+  },
+  {
+    label: "Media files per post",
+    value: (id) => {
+      const v = PLANS.find((p) => p.id === id)!.entitlements.maxMediaPerPost;
+      return `${v} ${v === 1 ? "file" : "files"}`;
+    },
+  },
+  {
+    label: "Media kept after publishing",
+    value: (id) => {
+      const ms = PLANS.find((p) => p.id === id)!.entitlements.mediaRetentionMs;
+      if (ms === null) return "Forever";
+      const months = Math.round(ms / (30 * 86_400_000));
+      return `${months} ${months === 1 ? "month" : "months"}`;
+    },
+  },
 ];
 
 export default function PricingPage() {

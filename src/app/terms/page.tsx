@@ -335,9 +335,15 @@ export default function TermsPage() {
         <p>
           Postvia accepts images (JPEG, PNG, WebP, GIF up to 10&nbsp;MB) and
           videos (MP4, WebM, MOV up to 100&nbsp;MB), with a maximum of 4
-          media files per post. To prepare uploads for publishing, Postvia
-          validates file type and size and converts still images to a
-          canonical JPEG form where appropriate (animated GIFs are kept
+          media files per post &mdash; the platform-wide maximums. Your
+          plan may apply a lower limit: the Free plan accepts videos up to
+          50&nbsp;MB and 2 media files per post; see{" "}
+          <a href="/pricing" className="underline underline-offset-2">
+            Pricing
+          </a>{" "}
+          for the current limits by plan. To prepare uploads for publishing,
+          Postvia validates file type and size and converts still images to
+          a canonical JPEG form where appropriate (animated GIFs are kept
           as-is).
         </p>
         <p>
@@ -346,6 +352,15 @@ export default function TermsPage() {
           publishing through short-lived, single-file links &mdash; never
           through public URLs. Uploaded files that are never attached to a
           post are removed automatically.
+        </p>
+        <p>
+          Once a post is fully published, its original media is kept for a
+          limited time and then automatically removed to control storage
+          cost &mdash; 3 months on the Free plan, 12 months on Growth and
+          Scale. The post itself, its caption, and its publishing history
+          are never deleted by this. Media attached to a draft or scheduled
+          post, or to a post that only partially published, is never
+          affected.
         </p>
       </LegalSection>
 

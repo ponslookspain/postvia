@@ -13,6 +13,7 @@ import type { DraftMedia } from "./types";
 export function MediaGrid({
   media,
   maxMedia,
+  maxVideoBytes,
   disabled,
   mediaUploadNote,
   canRetry,
@@ -23,6 +24,8 @@ export function MediaGrid({
 }: {
   media: DraftMedia[];
   maxMedia: number;
+  /** The caller's plan video-size cap, in bytes (see PlanEntitlements.maxVideoBytes). */
+  maxVideoBytes: number;
   disabled: boolean;
   mediaUploadNote: string | null;
   canRetry: boolean;
@@ -49,7 +52,7 @@ export function MediaGrid({
           </h2>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">
             JPG, PNG, WebP or GIF images up to 10 MB; MP4, WebM or MOV
-            videos up to 100 MB.
+            videos up to {Math.round(maxVideoBytes / (1024 * 1024))} MB.
           </p>
         </div>
         <Badge variant="soft" className="shrink-0 tabular-nums">

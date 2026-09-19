@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { executePublish, resumeJobTarget } from "@/lib/publish";
 import { deleteBlobs, listMediaBlobs } from "@/lib/blob";
 import { sweepOrphanBlobs } from "@/lib/media-cleanup";
-import { MEDIA_RETENTION_MS, sweepPublishedMedia } from "@/lib/media-retention";
+import { sweepPublishedMedia } from "@/lib/media-retention";
 import { reportHeavyStorageUsers } from "@/lib/storage-usage";
 import { reportError } from "@/lib/diagnostics";
+import { getPlan } from "@/lib/plans";
 import {
   liveAbuseStores,
   TOMBSTONE_SOCIAL_TTL_MS,
@@ -101,28 +102,52 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
     reportError("cron", "rate bucket sweep failed", error);
   }
   // Media retention (storage-cost guard): fully-published posts untouched
-  // for a year lose their original media, freeing the blob. Best-effort,
-  // capped, same contract as the sweeps above — never fails the tick.
+  // long enough lose their original media, freeing the blob. Plan-aware —
+  // Free's horizon is tighter than paid's, since Free accounts accrue this
+  // cost with no matching revenue (see PlanEntitlements.mediaRetentionMs).
+  // Run once per distinct retention bucket; Growth and Scale currently
+  // share one value, so this is two passes, not three — collapse fewer or
+  // split further here if a future plan's retention diverges.
+  const freeRetentionMs = getPlan("free").entitlements.mediaRetentionMs;
+  const paidRetentionMs = getPlan("growth").entitlements.mediaRetentionMs;
+  async function sweepMediaForPlanBucket(
+    olderThanMs: number | null,
+    userFilter: Record<string, unknown>
+  ): Promise<{ removed: number; blobFailures: number }> {
+    if (olderThanMs === null) return { removed: 0, blobFailures: 0 };
+    return sweepPublishedMedia(retentionCutoff(nowMs, olderThanMs), {
+      findEligible: (olderThan, limit) =>
+        prisma.media.findMany({
+          where: {
+            post: { status: "PUBLISHED", updatedAt: { lt: olderThan } },
+            user: userFilter,
+          },
+          select: { id: true, pathname: true },
+          take: limit,
+        }),
+      deleteMediaRows: async (ids) => {
+        const result = await prisma.media.deleteMany({
+          where: { id: { in: ids } },
+        });
+        return result.count;
+      },
+      deleteBlobs: (pathnames) => deleteBlobs(pathnames),
+    });
+  }
   let mediaRetention = { removed: 0, blobFailures: 0 };
   try {
-    mediaRetention = await sweepPublishedMedia(
-      retentionCutoff(nowMs, MEDIA_RETENTION_MS),
-      {
-        findEligible: (olderThan, limit) =>
-          prisma.media.findMany({
-            where: { post: { status: "PUBLISHED", updatedAt: { lt: olderThan } } },
-            select: { id: true, pathname: true },
-            take: limit,
-          }),
-        deleteMediaRows: async (ids) => {
-          const result = await prisma.media.deleteMany({
-            where: { id: { in: ids } },
-          });
-          return result.count;
-        },
-        deleteBlobs: (pathnames) => deleteBlobs(pathnames),
-      }
-    );
+    // "Free" also covers a user with no Subscription row at all — the same
+    // default `getEffectivePlan` applies when billing was never touched.
+    const free = await sweepMediaForPlanBucket(freeRetentionMs, {
+      OR: [{ subscription: null }, { subscription: { plan: "FREE" } }],
+    });
+    const paid = await sweepMediaForPlanBucket(paidRetentionMs, {
+      subscription: { plan: { in: ["GROWTH", "SCALE"] } },
+    });
+    mediaRetention = {
+      removed: free.removed + paid.removed,
+      blobFailures: free.blobFailures + paid.blobFailures,
+    };
   } catch (error) {
     reportError("cron", "media retention sweep failed", error);
   }

@@ -23,6 +23,28 @@ export type PlanEntitlements = {
   calendar: boolean;
   bulk: boolean;
   retryReschedule: boolean;
+  /**
+   * Max video size per upload, in bytes, for THIS plan. A tighter subset
+   * of the absolute platform ceiling (`MEDIA_LIMITS.VIDEO.maxBytes`,
+   * `src/domain/media/policy.ts`) — that ceiling never changes per plan,
+   * this narrows it further for cheaper tiers. Image size is not
+   * plan-gated; only video, because video is what drives storage cost.
+   */
+  maxVideoBytes: number;
+  /**
+   * Max media files per post for THIS plan. A tighter subset of the
+   * absolute ceiling (`MAX_MEDIA_PER_POST`, `src/domain/media/policy.ts`),
+   * same relationship as `maxVideoBytes` above.
+   */
+  maxMediaPerPost: number;
+  /**
+   * How long a fully-published post keeps its media before the retention
+   * sweep (`src/lib/media-retention.ts`) reclaims it, in milliseconds.
+   * Never null in practice today — every plan has a horizon — kept
+   * nullable so "no automatic expiry" has a real, self-documenting value
+   * if a future plan ever needs one, instead of a magic huge number.
+   */
+  mediaRetentionMs: number | null;
 };
 
 /**
@@ -63,6 +85,8 @@ export const PLANS: Plan[] = [
       "Schedule posts ahead",
       "Per-platform previews",
       "1 connected account",
+      "Videos up to 50 MB, 2 files per post",
+      "Media kept for 3 months after publishing",
     ],
     entitlements: {
       maxTotalAccounts: 1,
@@ -71,6 +95,9 @@ export const PLANS: Plan[] = [
       calendar: true,
       bulk: false,
       retryReschedule: true,
+      maxVideoBytes: 50 * 1024 * 1024,
+      maxMediaPerPost: 2,
+      mediaRetentionMs: 90 * 86_400_000,
     },
   },
   {
@@ -85,6 +112,8 @@ export const PLANS: Plan[] = [
       "Bulk video scheduling up to 10 videos",
       "Up to 5 connected accounts",
       "Retry and reschedule controls",
+      "Videos up to 100 MB, 4 files per post",
+      "Media kept for 12 months after publishing",
     ],
     highlighted: true,
     entitlements: {
@@ -94,6 +123,9 @@ export const PLANS: Plan[] = [
       calendar: true,
       bulk: true,
       retryReschedule: true,
+      maxVideoBytes: 100 * 1024 * 1024,
+      maxMediaPerPost: 4,
+      mediaRetentionMs: 365 * 86_400_000,
     },
   },
   {
@@ -107,6 +139,8 @@ export const PLANS: Plan[] = [
       "Unlimited scheduled posts",
       "Priority publishing queue",
       "All current and future platforms",
+      "Videos up to 100 MB, 4 files per post",
+      "Media kept for 12 months after publishing",
     ],
     entitlements: {
       maxTotalAccounts: null,
@@ -115,6 +149,9 @@ export const PLANS: Plan[] = [
       calendar: true,
       bulk: true,
       retryReschedule: true,
+      maxVideoBytes: 100 * 1024 * 1024,
+      maxMediaPerPost: 4,
+      mediaRetentionMs: 365 * 86_400_000,
     },
   },
 ];

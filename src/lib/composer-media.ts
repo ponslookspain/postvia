@@ -67,6 +67,13 @@ export function planMediaAdd(args: {
   effective?: EffectiveMediaConstraints;
   /** Existing media for mixing/multiple-video checks (size-free). */
   existingMedia?: readonly ValidatableMediaItem[];
+  /**
+   * The caller's plan video-size cap (Free's tighter limit vs paid's —
+   * see PlanEntitlements.maxVideoBytes). Absent = no plan-level check here
+   * (the server's `/api/media/prepare` still enforces it; this is purely
+   * the instant, no-network-round-trip version of the same rule).
+   */
+  maxVideoBytes?: number;
 }): MediaAddPlan {
   const accepted: { file: MediaFileLike; kind: MediaKind }[] = [];
   // Size-free mirror of the accepted set for structural platform checks
@@ -99,6 +106,18 @@ export function planMediaAdd(args: {
       rejected.push({
         name: file.name,
         error: withTiktokSizeHint(validation.error, file, tiktokSelected),
+      });
+      continue;
+    }
+    if (
+      validation.kind === "VIDEO" &&
+      args.maxVideoBytes !== undefined &&
+      file.size > args.maxVideoBytes
+    ) {
+      const limitMB = Math.round(args.maxVideoBytes / (1024 * 1024));
+      rejected.push({
+        name: file.name,
+        error: `Videos over ${limitMB} MB need a paid plan (this plan's limit is ${limitMB} MB).`,
       });
       continue;
     }

@@ -374,20 +374,43 @@ WebM is not parsed (variable-length EBML) and is documented as such.
 
 ### Storage quota (priority 4): architecture proposed, limits are yours
 
-**Update — two pieces of this shipped without waiting on the pricing
-decision below:** `src/lib/media-retention.ts` (`sweepPublishedMedia`, wired
-into the cron tick) now removes `Media` rows and their blobs once their post
-is fully `PUBLISHED` and untouched for 12 months — the unbounded-growth case
-this section describes, closed with no schema change (it reuses
-`@@index([status, updatedAt])`, reasoning why in the module's own header).
-`src/lib/storage-usage.ts` (`reportHeavyStorageUsers`) logs, never blocks,
-any account over a 10 GiB tripwire, so the byte-limit decision below can be
-made from real usage data. What is described below — an *enforced* quota
-that rejects an upload — is still not built; it still needs the numbers.
+**Update — three pieces of this shipped without waiting on a per-user byte
+quota:**
 
-No byte quota exists. Scale is unlimited monthly posts x 4 media x 100 MB,
-forever; Free is up to ~6 GB of permanent storage per identity per month at $0.
-`Media` has no TTL.
+1. `src/lib/media-retention.ts` (`sweepPublishedMedia`, wired into the cron
+   tick) removes `Media` rows and their blobs once their post is fully
+   `PUBLISHED` and untouched for the plan's retention window — the
+   unbounded-growth case this section describes, closed with no schema
+   change (it reuses `@@index([status, updatedAt])`, reasoning why in the
+   module's own header).
+2. `src/lib/storage-usage.ts` (`reportHeavyStorageUsers`) logs, never
+   blocks, any account over a 10 GiB tripwire, so a future per-user byte
+   quota can be sized from real usage data.
+3. **Plan-differentiated per-upload limits** (`PlanEntitlements` in
+   `src/domain/billing/plans.ts`, enforced in `reserveUploadPathname` /
+   `registerCompletedUpload`, `src/lib/media-upload.ts`): Free gets a
+   tighter video-size cap, a tighter per-post media count, and a shorter
+   retention window than Growth/Scale — see the table below. Each is a
+   *narrower* subset of the absolute platform ceiling
+   (`MEDIA_LIMITS`/`MAX_MEDIA_PER_POST`, `@/domain/media/policy`), which
+   never changes by plan. A denied upload returns the same
+   `{code:"UPGRADE_REQUIRED", reason, upgradeTo}` shape as every other
+   entitlement denial, so the composer's existing `UpgradeCta` renders it
+   with no new client plumbing.
+
+| | Free | Growth / Scale |
+|---|---|---|
+| Max video size | 50 MB | 100 MB (the absolute ceiling) |
+| Media files per post | 2 | 4 (the absolute ceiling) |
+| Media retention after publish | 3 months | 12 months |
+
+What is still not built is a per-user *total* byte quota that rejects an
+upload once an account's cumulative storage crosses a number — that still
+needs the number, informed by the tripwire above.
+
+Scale is unlimited monthly posts x 4 media x 100 MB, forever, subject to the
+per-plan caps above; there is still no cumulative per-user byte ceiling.
+`Media` has no TTL beyond the retention sweep.
 
 Per the instruction not to invent business limits, here is the design, not an
 implementation:
@@ -559,6 +582,12 @@ needs almost no client change.
 
 ### P2 — Storage quota: **model designed, limits are a product decision**
 
+**Update:** `PlanEntitlements` now covers `maxVideoBytes`, `maxMediaPerPost`
+and `mediaRetentionMs` too (see "Storage quota (priority 4)" above) — the
+per-upload and retention pieces of this are shipped. What is described below
+(a `maxStorageBytes` *cumulative* quota) remains a pricing decision, not
+invented. Original text kept for the record:
+
 There is no byte quota anywhere. `PlanEntitlements` covers accounts, monthly
 posts, bulk videos and three booleans. Scale is unlimited monthly posts × 4
 media × 100 MB, forever; Free is up to ~6 GB of permanent storage per identity
@@ -607,7 +636,7 @@ Step 1 is safe today and should not wait for step 2.
 | Video publishing may be killed mid-poll on Hobby | **High** | Same check resolves it. |
 | OAuth tokens plaintext at rest | ~~High~~ | **RESOLVED** — `SocialAccount` via `social-token-crypto.ts`, Better Auth `Account` via `encryptOAuthTokens: true`. Better Auth's own `idToken` column stays unencrypted (short-lived OIDC identity token, not a bearer credential; nothing reads it back). |
 | Production DB pooling unverified | **High** | `docs/DATABASE_POOLING.md`. Demand reduced by P1.7. |
-| No storage quota / no media retention | **Medium** | **PARTLY RESOLVED** — `media-retention.ts` now sweeps media on fully-`PUBLISHED` posts untouched for 12 months (cron tick, `sweepPublishedMedia`), and `storage-usage.ts` logs (never blocks) any account over a 10 GiB tripwire so a real per-plan byte quota can be sized from data instead of a guess. A hard enforced quota is still not implemented — that part is still a pricing decision. |
+| No storage quota / no media retention | **Medium** | **PARTLY RESOLVED** — `media-retention.ts` sweeps media on fully-`PUBLISHED` posts untouched past the plan's retention window (Free 3 months, Growth/Scale 12 months; cron tick, `sweepPublishedMedia`); Free additionally gets a tighter per-upload video-size cap (50 MB vs 100 MB) and per-post media count (2 vs 4), enforced in `reserveUploadPathname`/`registerCompletedUpload`; `storage-usage.ts` logs (never blocks) any account over a 10 GiB tripwire so a real per-user byte quota can be sized from data instead of a guess. A hard *cumulative* byte quota is still not implemented — that part is still a pricing decision. |
 | No automated production migration gate | **High** | CI drift-check recommended above. |
 | Video accepted with no duration/codec/resolution check | **Medium** | Container check shipped; the rest needs a worker. |
 | X video buffers up to 100 MB | **Medium** | Feasible fix designed, deferred to its own change. |

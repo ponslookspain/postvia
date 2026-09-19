@@ -27,6 +27,7 @@ export function ComposerCard({
   overLimitLabels,
   media,
   maxMedia,
+  maxVideoBytes,
   disabled,
   mediaUploadNote,
   canRetry,
@@ -42,6 +43,7 @@ export function ComposerCard({
   overLimitLabels: string[];
   media: DraftMedia[];
   maxMedia: number;
+  maxVideoBytes: number;
   disabled: boolean;
   mediaUploadNote: string | null;
   canRetry: boolean;
@@ -104,6 +106,7 @@ export function ComposerCard({
         <MediaGrid
           media={media}
           maxMedia={maxMedia}
+          maxVideoBytes={maxVideoBytes}
           disabled={disabled}
           mediaUploadNote={mediaUploadNote}
           canRetry={canRetry}

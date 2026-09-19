@@ -32,6 +32,12 @@ import {
 } from "@/lib/diagnostics";
 import { mediaTrace } from "@/lib/diagnostics-server";
 import type { ErrorCode } from "@/lib/errors/codes";
+import { getEffectivePlan } from "@/lib/entitlements";
+import {
+  canAddMediaToPost,
+  canUploadVideoSize,
+} from "@/domain/billing/entitlements";
+import type { PlanId } from "@/lib/plans";
 
 /**
  * Pure upload rules (validation, codecs, security decisions) live in
@@ -58,7 +64,14 @@ import {
  */
 export type ReserveUploadResult =
   | { ok: true; pathname: string }
-  | { ok: false; status: number; error: string; code: ErrorCode };
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      code: ErrorCode | "UPGRADE_REQUIRED";
+      /** Present only alongside `code: "UPGRADE_REQUIRED"` (see to-response.ts). */
+      upgradeTo?: Exclude<PlanId, "scale"> | null;
+    };
 function reserveFailure(status: number, error: string): ReserveUploadResult {
   const code: ErrorCode =
     status === 401
@@ -67,6 +80,21 @@ function reserveFailure(status: number, error: string): ReserveUploadResult {
         ? "NOT_FOUND"
         : "VALIDATION_FAILED";
   return { ok: false, status, error, code };
+}
+
+/**
+ * A plan-level media limit (Free's tighter video-size/per-post-count caps —
+ * see `PlanEntitlements` in `@/domain/billing/plans`), NOT the absolute
+ * platform ceiling (`MEDIA_LIMITS`/`MAX_MEDIA_PER_POST`), which is checked
+ * separately above this and never varies by plan. Shaped for
+ * `toApiResponse`'s legacy bridge so the client's existing
+ * upgrade-prompt UI (`UpgradeCta`) renders it with no new plumbing.
+ */
+function planLimitFailure(
+  reason: string,
+  upgradeTo: Exclude<PlanId, "scale"> | null
+): ReserveUploadResult {
+  return { ok: false, status: 403, error: reason, code: "UPGRADE_REQUIRED", upgradeTo };
 }
 export async function reserveUploadPathname(input: {
   user: { id: string } | null;
@@ -114,6 +142,23 @@ export async function reserveUploadPathname(input: {
       400,
       `A post can have at most ${MAX_MEDIA_PER_POST} media files`
     );
+  }
+
+  // Plan-level limits (Free's tighter caps) — checked only after the
+  // absolute platform ceiling above, so a request that would fail for
+  // EVERY plan gets that error, not a confusing "upgrade" prompt it
+  // couldn't fix by upgrading. Client-declared size, checked again with
+  // the real byte count at registration time (see registerCompletedUpload).
+  const effectivePlan = await getEffectivePlan({ userId: authorized.userId });
+  const mediaCountGate = canAddMediaToPost(effectivePlan, existing);
+  if (!mediaCountGate.ok) {
+    return planLimitFailure(mediaCountGate.reason, mediaCountGate.upgradeTo);
+  }
+  if (validation.kind === "VIDEO") {
+    const videoSizeGate = canUploadVideoSize(effectivePlan, input.size);
+    if (!videoSizeGate.ok) {
+      return planLimitFailure(videoSizeGate.reason, videoSizeGate.upgradeTo);
+    }
   }
 
   const pathname = makeBlobPathname(
@@ -340,6 +385,13 @@ export async function registerCompletedUpload(
     throw new Error(outcome.error);
   }
 
+  // Authoritative plan lookup: `reserveUploadPathname` already checked this
+  // with the client-declared size at prepare time, purely for fast
+  // feedback. This is the safety net against a lied-about size or a
+  // concurrent-prepare race, using the real stored byte count (`meta.size`)
+  // and (below) the same lock `claimMediaSlot` already takes for the count.
+  const effectivePlan = await getEffectivePlan({ userId: outcome.userId });
+
   // `@@unique([pathname])`: the true unique lookup (Batch 2 pattern).
   const existing = await store.findByPathname(meta.pathname);
   if (existing) {
@@ -411,17 +463,30 @@ export async function registerCompletedUpload(
       }),
       durationSeconds: video.durationSeconds,
     });
+
+    // Plan-level video-size ceiling (Free's tighter cap), checked against
+    // the real stored size — never the client-declared one. Not the
+    // absolute platform ceiling (`MEDIA_LIMITS.VIDEO.maxBytes`), which
+    // `validateCompletedUpload` already enforced above via `outcome`.
+    const sizeGate = canUploadVideoSize(effectivePlan, meta.size);
+    if (!sizeGate.ok) {
+      await discardRejectedBlob(meta.pathname, "plan-limit");
+      throw new MediaRegistrationRejected("plan-limit", sizeGate.reason);
+    }
   }
 
   // Cheap advisory pre-check BEFORE the (billed) canonical transformation, so
   // an over-cap flood cannot amplify into image transformations. The
-  // authoritative check is the locked one below.
+  // authoritative check is the locked one below. Plan-aware: Free's tighter
+  // per-post cap, never looser than `MAX_MEDIA_PER_POST` (the absolute
+  // ceiling every plan's `maxMediaPerPost` sits at or under).
+  const maxMediaPerPost = effectivePlan.entitlements.maxMediaPerPost;
   const preCount = await store.countForPost(outcome.postId, outcome.userId);
-  if (preCount >= MAX_MEDIA_PER_POST) {
+  if (preCount >= maxMediaPerPost) {
     await discardRejectedBlob(meta.pathname, "media-cap");
     throw new MediaRegistrationRejected(
       "media-cap",
-      `A post can have at most ${MAX_MEDIA_PER_POST} media files`
+      `This plan allows at most ${maxMediaPerPost} media files per post`
     );
   }
 
@@ -436,12 +501,16 @@ export async function registerCompletedUpload(
   // lock, N concurrent completions all read the same count and all insert.
   let result: MediaSlotClaim;
   try {
-    result = await claimMediaSlot(store, {
-      ...outcome.createInput,
-      url: canonical.url,
-      mimeType: canonical.contentType,
-      size: canonical.size,
-    });
+    result = await claimMediaSlot(
+      store,
+      {
+        ...outcome.createInput,
+        url: canonical.url,
+        mimeType: canonical.contentType,
+        size: canonical.size,
+      },
+      maxMediaPerPost
+    );
   } catch (error) {
     if (isDuplicatePathnameError(error)) {
       // A concurrent webhook delivery already registered this pathname
@@ -476,7 +545,7 @@ export async function registerCompletedUpload(
     logErrorDiagnostic(
       "media",
       "upload rejected: post is at the media cap",
-      new Error(`Post already holds ${MAX_MEDIA_PER_POST} media files`),
+      new Error(`Post already holds ${maxMediaPerPost} media files`),
       mediaTrace({
         stage: "media-cap",
         userId: outcome.userId,
@@ -486,7 +555,7 @@ export async function registerCompletedUpload(
     );
     throw new MediaRegistrationRejected(
       "media-cap",
-      `A post can have at most ${MAX_MEDIA_PER_POST} media files`
+      `This plan allows at most ${maxMediaPerPost} media files per post`
     );
   }
 

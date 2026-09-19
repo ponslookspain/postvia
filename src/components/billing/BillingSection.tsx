@@ -92,6 +92,14 @@ function planFeatureRows(plan: Plan): string[] {
     const row = featureRow(e, key);
     if (row) rows.push(row);
   }
+  rows.push(`Videos up to ${Math.round(e.maxVideoBytes / (1024 * 1024))} MB`);
+  rows.push(
+    `${e.maxMediaPerPost} media file${e.maxMediaPerPost === 1 ? "" : "s"} per post`
+  );
+  if (e.mediaRetentionMs !== null) {
+    const months = Math.round(e.mediaRetentionMs / (30 * 86_400_000));
+    rows.push(`Media kept ${months} ${months === 1 ? "month" : "months"} after publishing`);
+  }
   return rows;
 }
 

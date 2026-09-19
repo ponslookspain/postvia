@@ -45,6 +45,10 @@ export default async function NewPostPage() {
           postsLeft: quota.postsLeft,
           upgradeTo: getUpgradeTarget(effective.plan),
         }}
+        mediaLimits={{
+          maxMediaPerPost: effective.entitlements.maxMediaPerPost,
+          maxVideoBytes: effective.entitlements.maxVideoBytes,
+        }}
       />
     </AppShell>
   );

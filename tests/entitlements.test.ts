@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {
   applyPeriodRules,
   buildBillingView,
+  canAddMediaToPost,
   canBulkSchedule,
   canConnectAccount,
   canCreatePost,
   canRetry,
+  canUploadVideoSize,
   canUseCalendar,
   canUseFeature,
   getDisplayPostsUsed,
@@ -211,6 +213,48 @@ describe("bulk, calendar, retry", () => {
       assert.deepEqual(canUseCalendar(eff(plan)), { ok: true });
       assert.deepEqual(canRetry(eff(plan)), { ok: true });
     }
+  });
+});
+
+describe("plan-level media limits (Free's tighter video/count caps)", () => {
+  const MB = 1024 * 1024;
+
+  test("free video: 50MB fits, 50MB+1 needs an upgrade", () => {
+    assert.deepEqual(canUploadVideoSize(eff("free"), 50 * MB), { ok: true });
+    const denied = canUploadVideoSize(eff("free"), 50 * MB + 1);
+    assert.equal(denied.ok, false);
+    if (!denied.ok) {
+      assert.equal(denied.upgradeTo, "growth");
+      assert.match(denied.reason, /50 MB/);
+    }
+  });
+
+  test("growth and scale video: 100MB fits, 100MB+1 does not", () => {
+    assert.deepEqual(canUploadVideoSize(eff("growth"), 100 * MB), { ok: true });
+    assert.equal(canUploadVideoSize(eff("growth"), 100 * MB + 1).ok, false);
+    assert.deepEqual(canUploadVideoSize(eff("scale"), 100 * MB), { ok: true });
+    assert.equal(canUploadVideoSize(eff("scale"), 100 * MB + 1).ok, false);
+  });
+
+  test("free media count: first two files fit, a third needs an upgrade", () => {
+    assert.deepEqual(canAddMediaToPost(eff("free"), 0), { ok: true });
+    assert.deepEqual(canAddMediaToPost(eff("free"), 1), { ok: true });
+    const denied = canAddMediaToPost(eff("free"), 2);
+    assert.equal(denied.ok, false);
+    if (!denied.ok) assert.equal(denied.upgradeTo, "growth");
+  });
+
+  test("growth and scale media count: four files fit, a fifth does not", () => {
+    assert.deepEqual(canAddMediaToPost(eff("growth"), 3), { ok: true });
+    assert.equal(canAddMediaToPost(eff("growth"), 4).ok, false);
+    assert.deepEqual(canAddMediaToPost(eff("scale"), 3), { ok: true });
+    assert.equal(canAddMediaToPost(eff("scale"), 4).ok, false);
+  });
+
+  test("bypass grants both regardless of plan", () => {
+    const bypassed = eff("free", { bypass: true });
+    assert.deepEqual(canUploadVideoSize(bypassed, 500 * MB), { ok: true });
+    assert.deepEqual(canAddMediaToPost(bypassed, 99), { ok: true });
   });
 });
 

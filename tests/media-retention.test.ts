@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import {
   MEDIA_RETENTION_BATCH,
   MEDIA_RETENTION_MAX_BATCHES,
-  MEDIA_RETENTION_MS,
   sweepPublishedMedia,
   type EligibleMedia,
 } from "../src/lib/media-retention";
 import { retentionCutoff } from "../src/lib/retention";
+
+/** Stand-in for a plan's `mediaRetentionMs` — the sweep itself is value-agnostic. */
+const TEST_RETENTION_MS = 365 * 86_400_000;
 
 /**
  * Media retention (storage-cost guard). The sweep is exercised through an
@@ -55,7 +57,7 @@ function fakeStore(rows: (EligibleMedia & { eligible: boolean })[]) {
 }
 
 const NOW = new Date("2026-09-19T00:00:00Z");
-const cutoff = retentionCutoff(NOW.getTime(), MEDIA_RETENTION_MS);
+const cutoff = retentionCutoff(NOW.getTime(), TEST_RETENTION_MS);
 
 describe("sweepPublishedMedia", () => {
   test("removes eligible media and their blobs", async () => {
@@ -158,8 +160,7 @@ describe("sweepPublishedMedia", () => {
     assert.deepEqual(store.deleteCalls, []);
   });
 
-  test("the horizon and batch constants are sane", () => {
-    assert.equal(MEDIA_RETENTION_MS, 365 * 86_400_000);
+  test("the batch constants are sane", () => {
     assert.ok(MEDIA_RETENTION_BATCH > 0);
     assert.ok(MEDIA_RETENTION_MAX_BATCHES > 0);
   });
