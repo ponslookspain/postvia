@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:local": "next dev --port 3000",
+    "dev": "next dev --webpack",
+    "dev:local": "next dev --webpack --port 3000",
     "dev:tunnel": "ngrok http 3000",
     "build": "prisma generate && next build",
     "start": "next start",
