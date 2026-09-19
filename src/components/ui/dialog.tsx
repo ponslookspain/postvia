@@ -40,8 +40,7 @@ const dialogOverlayVariants = cva(
 	{
 		variants: {
 			backdrop: {
-				blackOverlay: "bg-black/50",
-				whiteOverlay: "bg-white/50",
+				blackOverlay: "bg-overlay-scrim",
 				blur: "backdrop-blur-sm",
 				transparent: "bg-transparent",
 			},

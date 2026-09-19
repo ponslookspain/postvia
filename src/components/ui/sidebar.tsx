@@ -63,7 +63,7 @@ export type SidebarProviderProps = React.ComponentProps<"div"> & {
 }
 
 export type SidebarProps = React.ComponentProps<"div"> & {
-	theme?: "gray" | "default" | "gray-body" | "inverse"
+	theme?: "gray" | "default" | "gray-body"
 	side?: "left" | "right"
 	variant?: "sidebar" | "floating" | "inset"
 	collapsible?: "offcanvas" | "icon" | "none"
@@ -393,7 +393,7 @@ function SidebarProvider({
 						} as React.CSSProperties
 					}
 					className={cn(
-						"group/sidebar-wrapper bg-background has-data-[theme=default]:bg-background has-data-[theme=gray]:has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full has-data-[theme=inverse]:has-data-[variant=inset]:bg-black",
+						"group/sidebar-wrapper bg-background has-data-[theme=default]:bg-background has-data-[theme=gray]:has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
 						className
 					)}
 					{...props}>
@@ -414,7 +414,6 @@ const sidebarThemeVars: Record<
 		"--color-sidebar-accent": "var(--sidebar-accent)",
 	} as React.CSSProperties,
 	"gray-body": { "--color-sidebar": "var(--background)" } as React.CSSProperties,
-	inverse: { "--color-sidebar": "black" } as React.CSSProperties,
 }
 
 /**
@@ -501,7 +500,6 @@ function Sidebar({
 				style={sidebarThemeVars[theme]}
 				className={cn(
 					"bg-sidebar text-sidebar-foreground sticky top-0 flex h-svh w-(--sidebar-width) flex-col",
-					theme === "inverse" && "dark",
 					className
 				)}
 				{...props}>
@@ -524,7 +522,6 @@ function Sidebar({
 					data-mobile="true"
 					className={cn(
 						"bg-sidebar text-sidebar-foreground group w-(--sidebar-width) p-0",
-						theme === "inverse" && "dark",
 						className
 					)}
 					style={
@@ -544,8 +541,7 @@ function Sidebar({
 		<div
 			style={sidebarThemeVars[theme]}
 			className={cn(
-				"text-sidebar-foreground group peer hidden md:block",
-				theme === "inverse" && "dark"
+				"text-sidebar-foreground group peer hidden md:block"
 			)}
 			data-state={state}
 			data-collapsible={state === "collapsed" ? collapsible : ""}
