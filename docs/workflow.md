@@ -1,9 +1,10 @@
 # Development & release workflow
 
-How Postvia gets from a local edit to `postvia.online`, and what OpenCode
-may / may not do on the way. This file is the process contract. Technical
-details live in the sibling docs (auth, deployment, environment, database,
-security).
+How Postvia gets from a local edit to `postvia.online`, and what the
+coding agent (**OpenCode** via `opencode`, or **Claude Code** via
+`claude` — same rules for both, use whichever is open) may / may not do
+on the way. This file is the process contract. Technical details live in
+the sibling docs (auth, deployment, environment, database, security).
 
 ## Model: local-first
 
@@ -36,11 +37,12 @@ LOCAL EDIT
 ## Levels
 
 - **Local project** — the working copy on your machine. This is the only
-  place OpenCode works: reads/edits local files, runs
+  place the agent works: reads/edits local files, runs
   `npm run typecheck/lint/test/build` here.
-- **Local dev server** — `npm run dev` (`http://localhost:3000`). The main
-  dev server. Never run it as a long-lived foreground process inside an
-  automated OpenCode task; use short-lived checks.
+- **Local dev server** — `npm run dev` (`http://localhost:3000`, webpack —
+  see `docs/local-development.md`). The main dev server. Never run it as
+  a long-lived foreground process inside an automated agent task; use
+  short-lived checks.
 - **ngrok tunnel** — `npm run dev:tunnel` (`ngrok http 3000`). Used ONLY
   when an external public HTTPS origin is needed (OAuth callbacks, social
   integration testing — see `docs/local-social-dev.md`). The permanent
@@ -58,29 +60,37 @@ LOCAL EDIT
 
 ## Standard daily workflow
 
-1. Open the project, run `opencode`.
-2. Give OpenCode the task.
-3. OpenCode studies the code, implements, and runs the relevant checks
+1. Open the project, run `opencode` or `claude`.
+2. Give the agent the task, in plain language.
+3. The agent studies the code, implements, and runs the relevant checks
    locally (`prisma validate/generate`, `typecheck`, `lint`, `test`,
    `build`), fixing failures.
 4. Verify locally in a browser: `http://localhost:3000`, plus the tunnel
    origin when the task needs external HTTPS/OAuth.
-5. OpenCode commits and pushes the feature/fix/chore/staging branch.
+5. The agent commits and pushes `dev` (or a `feature/fix/chore/staging`
+   branch, only when a change genuinely needs isolating):
+   ```bash
+   git status
+   git add -A
+   git commit -m "short description of what changed"
+   git push
+   ```
    The push builds NOTHING on Vercel (no Preview by policy).
-6. **OpenCode stops after the push and hands you a report.**
-7. You open the GitHub Pull Request, it gets reviewed, then merged to
-   `main`.
+6. **The agent stops after the push and hands you a report.**
+7. You open the GitHub Pull Request (`dev` → `main` — the push output
+   prints a ready-made link), it gets reviewed, then merged to `main`
+   (you click Merge; the agent does not, without your explicit go-ahead).
 8. The merge to `main` automatically deploys Production
    (`postvia.online`) — no manual release step.
-9. Bug found → back to OpenCode → fix → checks → commit → push → new PR
+9. Bug found → back to the agent → fix → checks → commit → push → new PR
    review cycle.
 
-## Critical OpenCode rule
+## Critical agent rule
 
-**By default OpenCode always stops after pushing the feature/staging
+**By default the agent always stops after pushing the feature/staging
 branch with green local checks.**
 
-Without your explicit approval OpenCode must NOT:
+Without your explicit approval the agent must NOT:
 
 - merge to `main`, push to `main`;
 - open or merge Pull Requests by itself;
@@ -105,14 +115,15 @@ Production deployment ever fails, the fix goes through the same loop
 ## The "ship it" command
 
 When you say "готово, выпускай в production" / "отправляй в прод" /
-"можно в production", OpenCode must first:
+"можно в production" (or "merge to main" / "ship it"), the agent must
+first:
 
 - report current branch, HEAD, clean working tree;
 - confirm local checks are green and the PR is reviewed;
 - confirm the merge to `main` is what will release (automatic).
 
 Merging to `main` needs your explicit confirmation **after** that
-summary, because the merge itself is the release. OpenCode never merges
+summary, because the merge itself is the release. The agent never merges
 silently.
 
 ## Environments (presence only — never values)
