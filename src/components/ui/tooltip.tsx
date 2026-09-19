@@ -13,11 +13,11 @@ type TooltipContentProps = React.ComponentProps<
 	VariantProps<typeof tooltipContentVariants> & { withArrow?: boolean }
 
 const tooltipContentVariants = cva(
-	"animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 rounded-md max-w-70 px-2 py-1.5 text-label/4 shadow-md shadow-black/5",
+	"animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 rounded-md max-w-70 px-2 py-1.5 text-label/4 shadow-md shadow-foreground/5",
 	{
 		variants: {
 			theme: {
-				light: "bg-elevation-raised text-muted-foreground border border-border",
+				light: "bg-popover text-muted-foreground border border-border",
 				default: "bg-foreground text-background",
 			},
 		},
@@ -69,7 +69,7 @@ function TooltipContent({
 					data-theme={theme}
 					width={12}
 					height={7}
-					className="data-[theme=light]:fill-elevation-raised data-[theme=default]:fill-foreground -mt-0.5 rounded-md data-[theme=light]:drop-shadow-[0_1px_0_var(--color-border)]"
+					className="data-[theme=light]:fill-popover data-[theme=default]:fill-foreground -mt-0.5 rounded-md data-[theme=light]:drop-shadow-[0_1px_0_var(--color-border)]"
 				/>
 			)}
 		</TooltipPrimitive.Content>

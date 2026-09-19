@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ErrorBlock } from "@/components/StateBlock";
 import { formatFileSize } from "@/lib/media";
+import { GLOBAL_MEDIA_ACCEPT } from "@/lib/composer-media";
 import type { DraftMedia } from "./types";
 
 export function MediaGrid({
@@ -18,6 +19,7 @@ export function MediaGrid({
   onAddFiles,
   onRemove,
   onRetry,
+  accept = GLOBAL_MEDIA_ACCEPT,
 }: {
   media: DraftMedia[];
   maxMedia: number;
@@ -27,6 +29,12 @@ export function MediaGrid({
   onAddFiles: (files: File[]) => void;
   onRemove: (key: string) => void;
   onRetry: (key: string) => void;
+  /**
+   * File picker hint, derived from the selected platforms' effective
+   * MIME intersection (UX only — never a validation boundary).
+   * Defaults to the global media set.
+   */
+  accept?: string;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
@@ -120,7 +128,7 @@ export function MediaGrid({
                 <p className="w-24 text-xs text-muted-foreground">Uploaded</p>
               )}
               {item.status === "error" && item.error && (
-                <p className="w-24 text-xs text-error">{item.error}</p>
+                <p className="w-24 text-xs text-error-text">{item.error}</p>
               )}
               {item.status === "error" && (
                 <Button
@@ -162,7 +170,7 @@ export function MediaGrid({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.gif,.mp4,.m4v,.webm,.mov"
+            accept={accept}
             multiple
             className="hidden"
             onChange={(e) => {

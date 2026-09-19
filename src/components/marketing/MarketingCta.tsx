@@ -25,12 +25,14 @@ export function MarketingCta({
           {text}
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button size="lg" nativeButton={false} render={<Link href="/signup" />}>
-            Get started free
-            <ArrowRightIcon data-icon="inline-end" />
+          <Button size="lg" asChild>
+            <Link href="/signup">
+              Get started free
+              <ArrowRightIcon data-icon="inline-end" />
+            </Link>
           </Button>
-          <Button size="lg" variant="outline" nativeButton={false} render={<Link href="/pricing" />}>
-            See pricing
+          <Button size="lg" variant="outline" asChild>
+            <Link href="/pricing">See pricing</Link>
           </Button>
         </div>
         {note && <p className="mt-4 text-sm text-muted-foreground">{note}</p>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { pollPostSettled } from "@/lib/publish-poll";
 import type { MediaKind } from "@/lib/media";
@@ -51,6 +51,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";import { TextArea } from "@/components/ui/text-area";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { reportError } from "@/lib/diagnostics";
 
@@ -286,6 +287,20 @@ export default function PostDetailPage({
   const [rescheduleInvalid, setRescheduleInvalid] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+
+  // The reschedule dialog is controlled without a DialogTrigger, so Radix
+  // has no trigger to restore focus to on close. Return focus to the
+  // opener (Schedule/Reschedule button) instead of dropping it to <body>.
+  useEffect(() => {
+    if (!rescheduleOpen) return;
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    return () => {
+      opener?.focus();
+    };
+  }, [rescheduleOpen]);
 
   const target = post.targets[0];
   const platform = target?.platform ?? "X";
@@ -628,7 +643,7 @@ export default function PostDetailPage({
                             : ""}
                         </p>
                         {targetItem.errorMessage && (
-                          <p className="truncate text-xs text-error">
+                          <p className="truncate text-xs text-error-text">
                             Couldn&apos;t publish to{" "}
                             {formatPlatformName(targetItem.platform)}.
                           </p>
@@ -733,23 +748,18 @@ export default function PostDetailPage({
                 )}
 
                 {post.status === "PUBLISHED" && externalPostId && (
-                  <Button
-                    variant="outline"
-                    nativeButton={false}
-                    render={
-                      <a
-                        href={
-                          platform === "THREADS"
-                            ? threadsPostUrl(post.username ?? "", externalPostId)
-                            : `https://x.com/i/status/${externalPostId}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      />
-                    }
-                    className="w-full"
-                  >
-                    View on {platform === "THREADS" ? "Threads" : "X"}
+                  <Button variant="outline" asChild className="w-full">
+                    <a
+                      href={
+                        platform === "THREADS"
+                          ? threadsPostUrl(post.username ?? "", externalPostId)
+                          : `https://x.com/i/status/${externalPostId}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View on {platform === "THREADS" ? "Threads" : "X"}
+                    </a>
                   </Button>
                 )}
 
@@ -813,23 +823,21 @@ export default function PostDetailPage({
             <div className="grid grid-cols-2 gap-4">
               <Field>
                 <FieldLabel htmlFor="reschedule-date">Date</FieldLabel>
-                <input
+                <Input
                   id="reschedule-date"
                   type="date"
                   value={rescheduleDate}
                   min={localDateInputValue(new Date())}
                   onChange={(e) => setRescheduleDate(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </Field>
               <Field>
                 <FieldLabel htmlFor="reschedule-time">Time</FieldLabel>
-                <input
+                <Input
                   id="reschedule-time"
                   type="time"
                   value={rescheduleTime}
                   onChange={(e) => setRescheduleTime(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                 />
               </Field>
             </div>

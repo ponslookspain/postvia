@@ -2,14 +2,9 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatPlatformName } from "@/lib/utils";
+import type { ChannelRow } from "@/lib/dashboard-types";
 
-export type ChannelRow = {
-  platform: string;
-  usernames: string[];
-  expired: boolean;
-  published: number;
-  lastPublishedLabel: string | null;
-};
+export type { ChannelRow };
 
 /**
  * Where posts go, said plainly. Success-rate bars used to live here;
@@ -25,11 +20,14 @@ export function Channels({ rows }: { rows: ChannelRow[] }) {
     );
   }
   return (
-    <ul className="flex flex-col gap-1 border-t border-border pt-1">
+    <ul className="flex flex-col gap-1 border-t border-subtle pt-1">
       {rows.map((row) => (
         <li key={row.platform} className="flex items-center gap-3 py-2">
           <Avatar className="size-9 shrink-0">
-            <AvatarFallback aria-label={formatPlatformName(row.platform)}>
+            <AvatarFallback
+              role="img"
+              aria-label={formatPlatformName(row.platform)}
+            >
               <PlatformIcon platform={row.platform} className="size-4" />
             </AvatarFallback>
           </Avatar>

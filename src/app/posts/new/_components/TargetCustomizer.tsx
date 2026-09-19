@@ -11,7 +11,6 @@ import {
 import { TextArea } from "@/components/ui/text-area";
 import {
   countCharacters,
-  remainingCharacters,
   type ComposerPreviewModel,
 } from "@/lib/composer-previews";
 import { TiktokTargetSettings } from "./TiktokTargetSettings";
@@ -56,12 +55,6 @@ export function TargetCustomizer({
   onUseGlobal: () => void;
   onDone: () => void;
 }) {
-  const remainingLabel =
-    remainingCharacters(model.text, model.maxLength) +
-    " characters remaining of " +
-    model.maxLength +
-    " for " +
-    model.label;
   return (
     <div id={anchorId} className="scroll-mt-24 rounded-lg bg-muted p-3">
       <FieldGroup className="gap-3">
@@ -89,9 +82,13 @@ export function TargetCustomizer({
                       : "Leave empty to use your post text as the caption"
                   }
                 aria-invalid={model.overLimit || undefined}
+                aria-describedby={`custom-${model.accountId}-count`}
                 onChange={(event) => onCustomTextChange(event.target.value)}
               />
-              <FieldDescription aria-label={remainingLabel}>
+              <FieldDescription
+                id={`custom-${model.accountId}-count`}
+                role="status"
+              >
                 {countCharacters(customText ?? model.text)} / {model.maxLength}
               </FieldDescription>
               {model.overLimit && (
@@ -120,12 +117,14 @@ export function TargetCustomizer({
                     countCharacters(customDescription ?? model.description) >
                       model.descriptionMaxLength || undefined
                   }
+                  aria-describedby={`custom-desc-${model.accountId}-count`}
                   onChange={(event) =>
                     onCustomDescriptionChange?.(event.target.value)
                   }
                 />
                 <FieldDescription
-                  aria-label={`${remainingCharacters(customDescription ?? model.description, model.descriptionMaxLength)} characters remaining of ${model.descriptionMaxLength} for the TikTok description`}
+                  id={`custom-desc-${model.accountId}-count`}
+                  role="status"
                 >
                   {countCharacters(customDescription ?? model.description)} /{" "}
                   {model.descriptionMaxLength}
@@ -151,9 +150,13 @@ export function TargetCustomizer({
               rows={4}
               placeholder={`Text for ${model.label}`}
               aria-invalid={model.overLimit || undefined}
+              aria-describedby={`custom-${model.accountId}-count`}
               onChange={(event) => onCustomTextChange(event.target.value)}
             />
-            <FieldDescription aria-label={remainingLabel}>
+            <FieldDescription
+              id={`custom-${model.accountId}-count`}
+              role="status"
+            >
               {countCharacters(model.text)} / {model.maxLength}
             </FieldDescription>
             {model.overLimit && (

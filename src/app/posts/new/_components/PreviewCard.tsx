@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { FieldDescription } from "@/components/ui/field";
 import {
   countCharacters,
-  remainingCharacters,
   type ComposerPreviewModel,
 } from "@/lib/composer-previews";
 import { PlatformPost } from "./preview/PlatformPost";
@@ -64,12 +63,6 @@ export function PreviewCard({
   onDone?: () => void;
   onCustomize: () => void;
 }) {
-  const remainingLabel =
-    remainingCharacters(model.text, model.maxLength) +
-    " characters remaining of " +
-    model.maxLength +
-    " for " +
-    model.label;
   return (
     <div key={model.accountId} className="flex min-w-0 flex-col gap-3">
       {(model.customized || model.hasSettingsOverride || model.inheritsGlobal) && (
@@ -107,7 +100,7 @@ export function PreviewCard({
           <PlatformPost model={model} userName={userName} media={media} />
           <PreviewValidation validation={model.validation} />
           <div className="flex items-center justify-between gap-2">
-            <FieldDescription aria-label={remainingLabel}>
+            <FieldDescription>
               {countCharacters(model.text)} / {model.maxLength}
             </FieldDescription>
             {model.customized && (

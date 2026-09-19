@@ -106,7 +106,7 @@ export function ComposerVisual() {
             184 characters
           </p>
           <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-background px-3 py-2.5">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.06]">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-overlay-8">
               <ImageIcon className="size-4 text-muted-foreground" />
             </span>
             <span className="min-w-0 flex-1">

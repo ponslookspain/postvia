@@ -55,6 +55,39 @@ Headed / debug:
 E2E_BASE=http://127.0.0.1:3100 npx playwright test tests/e2e/browser-smoke.spec.ts --headed
 ```
 
+## Accessibility
+
+`tests/e2e/a11y.spec.ts` runs right after the smoke gate (before the
+journey suite) on its own throwaway user (`withFakeAccount`):
+
+- **Axe scan** (`@axe-core/playwright`) over `/login` (public) plus the 7
+  authenticated routes, in both `dark` and `light` themes. The shared user
+  seeds one scheduled post first, so scans cover populated states (post
+  rows, status tabs, calendar chips, dashboard feed) — empty states alone
+  once hid a critical violation. Only `critical`/`serious` axe violations
+  fail; `color-contrast` findings are recorded as `a11y-color-contrast`
+  annotations instead — contrast fixes are token-level decisions in
+  `src/app/design-system/semantic.css` and must be measured deliberately,
+  not auto-failed by the checker. Animations/transitions are frozen via an
+  injected stylesheet before each scan (deterministic, no sleeps; mirrors
+  the product's own `prefers-reduced-motion` handling) so mid-flight
+  opacity never skews color measurement.
+- **Keyboard smoke** (what axe cannot prove): Tab order on `/login`,
+  row-menu open/Escape on `/posts`, delete-dialog focus trap + Escape
+  (read-only — the post is never deleted), schedule-dialog open/Tab-trap/
+  Escape with focus restored to the trigger, date-picker open/arrows/month
+  navigation/Escape, reschedule-dialog on `/posts/[id]` (native date/time
+  inputs — the keyboard alternative to calendar drag-and-drop), onboarding
+  plan radios (one Tab stop, arrows move — native fieldset/radio, no JS
+  keys), and mobile navigation open/Escape at 375px. No form submits, no
+  Stripe/OAuth/Blob/OTP.
+- **Runtime policy**: same as smoke — `pageerror` fails,
+  `console.error` is annotation-only.
+
+```bash
+E2E_BASE=http://127.0.0.1:3100 npx playwright test tests/e2e/a11y.spec.ts
+```
+
 ## Prerequisites
 
 - Local Postgres (the suite refuses production-like origins; see
@@ -66,9 +99,27 @@ E2E_BASE=http://127.0.0.1:3100 npx playwright test tests/e2e/browser-smoke.spec.
 
 ## Run locally
 
+Ordinary browser E2E (including Browser Smoke and the full suite) runs
+with Resend **disabled** — no verification emails are sent and no Resend
+API calls are made. `playwright.config.ts` forces `RESEND_API_KEY` to
+empty for the server it boots (an explicitly provided ambient key still
+passes through for OTP runs, see below). Resend is not needed for these
+tests: password signup dev-skips the verification mail when the key is
+absent.
+
 ```bash
-# Terminal 1: dev server with OTP debug enabled
-OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> npm run dev
+# Self-booted server (mirrors CI): Resend is off by default.
+E2E_BASE=http://127.0.0.1:3100 OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> npm run e2e
+```
+
+Reused-server variant: `webServer.env` cannot change the environment of
+an already running process, so a dev server started separately (e.g.
+`npm run dev` on `:3000`) keeps whatever `RESEND_API_KEY` it loaded from
+`.env.local`. For ordinary E2E, start it without the key:
+
+```bash
+# Terminal 1: dev server with OTP debug enabled, Resend disabled
+OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> RESEND_API_KEY= npm run dev
 
 # Terminal 2 (same env + E2E_BASE pointing at terminal 1):
 E2E_BASE=http://localhost:3000 OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> npm run e2e
@@ -77,7 +128,7 @@ E2E_BASE=http://localhost:3000 OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> npm run 
 Port 3100 variant (mirrors CI):
 
 ```bash
-OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> npx next dev --port 3100
+OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> RESEND_API_KEY= npx next dev --port 3100
 E2E_BASE=http://127.0.0.1:3100 OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> npm run e2e
 ```
 
@@ -103,6 +154,17 @@ to paper over: do not stub the mailer to force it green.
 CI behavior: the `e2e` job passes `OTP_DEBUG_TOKEN` and `RESEND_API_KEY`
 from GitHub Secrets when present; without them the OTP spec skips and the
 rest of the suite still validates.
+
+Explicit OTP run (local only, needs a dev Resend key capable of real
+sends — no such verification is possible without one):
+
+```bash
+OTP_E2E_DEBUG=1 OTP_DEBUG_TOKEN=<secret> RESEND_API_KEY=re_<dev-key> npx playwright test tests/e2e/auth.otp.spec.ts
+```
+
+The ambient key passes through `webServer.env` to the booted server; for
+a reused server, start it with the same key in its own environment.
+Production email behavior is unchanged.
 
 ## Media note
 

@@ -1,7 +1,7 @@
 import type { PublishOutcome } from "@/lib/publish";
 import { selectPublishableTargetIds } from "@/lib/publish";
-import { NextRequest, NextResponse } from "next/server";
 import { reportError } from "@/lib/diagnostics";
+import { emitLateSchedule } from "@/lib/publish-observability";
 import { recoverStalePublishing } from "./scheduling/recover-stale";
 
 /**
@@ -17,7 +17,12 @@ export {
   STALE_RECOVERY_BATCH,
 } from "./scheduling/recover-stale";
 
-const AUTH_PREFIX = "Bearer ";
+/**
+ * Cron authorization boundary lives in `./cron-auth` (Bearer gate +
+ * generic 500 envelope). Re-exported here so the public API of
+ * `@/lib/scheduling` is unchanged.
+ */
+export { withCron, isCronAuthorized } from "./cron-auth";
 
 /**
  * The platform's hard wall-clock ceiling for one function invocation.
@@ -84,6 +89,15 @@ export const CRON_TICK_BUDGET_MS = Math.floor(
 export const SCHEDULE_TICK_BATCH = 200;
 
 /**
+ * A scheduled post that starts later than this after its `scheduledAt`
+ * emits a `late_schedule` observability event (per target, once per claim).
+ * 1h keeps the daily-cron reality (`0 3 * * *`) useful: intraday posts are
+ * routinely hours late by design, and flagging every minute of queue delay
+ * would be noise. Observability-only — never gates publishing.
+ */
+export const LATE_THRESHOLD_MS = 60 * 60_000;
+
+/**
  * How many posts one tick publishes at a time.
  *
  * The tick used to publish strictly serially, so one slow target held the
@@ -110,53 +124,6 @@ export function scheduleTickConcurrency(
   const raw = Number(env.SCHEDULE_TICK_CONCURRENCY);
   if (Number.isInteger(raw) && raw > 0) return raw;
   return SCHEDULE_TICK_CONCURRENCY;
-}
-
-/**
- * Timing-safe comparison of the `Authorization: Bearer <CRON_SECRET>`
- * header. Missing/empty secret always rejects, so there is no
- * unauthenticated execution path.
- */
-export function isCronAuthorized(authHeader: string | null): boolean {
-  const expected = process.env.CRON_SECRET;
-  if (!expected || expected.length === 0) return false;
-  if (!authHeader || !authHeader.startsWith(AUTH_PREFIX)) return false;
-
-  const provided = authHeader.slice(AUTH_PREFIX.length);
-  if (provided.length !== expected.length) return false;
-
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) {
-    diff |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-/**
- * Shared cron route wrapper (E5): Bearer auth gate + generic 500 envelope
- * with diagnostics. Route handlers pass only their work function; GET and
- * POST share it (Vercel Cron uses GET, manual triggers use POST). A
- * handler failure can never leak internals — the raw cause stays in
- * diagnostics.
- */
-export function withCron(
-  handler: (request: NextRequest) => Promise<NextResponse>
-): {
-  GET: (request: NextRequest) => Promise<NextResponse>;
-  POST: (request: NextRequest) => Promise<NextResponse>;
-} {
-  const wrapped = async (request: NextRequest): Promise<NextResponse> => {
-    if (!isCronAuthorized(request.headers.get("authorization"))) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    try {
-      return await handler(request);
-    } catch (error) {
-      reportError("cron", "cron handler failed", error);
-      return NextResponse.json({ error: "Cron run failed" }, { status: 500 });
-    }
-  };
-  return { GET: wrapped, POST: wrapped };
 }
 
 export type StoredPostTarget = {
@@ -329,7 +296,7 @@ export async function runScheduledPublishTick(deps: {
     // the siblings that are already in flight. This mirrors how
     // `publishTargetsInParallel` already isolates targets within a post.
     const settled = await Promise.allSettled(
-      chunk.map((post) => claimAndPublishPost(db, deps.publish, post))
+      chunk.map((post) => claimAndPublishPost(db, deps.publish, post, now))
     );
 
     for (const [index, result] of settled.entries()) {
@@ -364,7 +331,8 @@ async function claimAndPublishPost(
     account?: SocialAccountRow,
     target?: { id: string; platform: string }
   ) => Promise<PublishOutcome>,
-  post: StoredPost
+  post: StoredPost,
+  now: Date
 ): Promise<"published" | "failed" | "skipped"> {
   const claim = await db.post.updateMany({
     where: { id: post.id, status: "SCHEDULED" },
@@ -376,6 +344,22 @@ async function claimAndPublishPost(
   const target = post.targets.find((candidate) =>
     publishableIds.includes(candidate.id)
   );
+
+  // Late-schedule detection (observability-only): per first publishable
+  // target, once per claim. No target yet → no event (never magic ids).
+  if (target && post.scheduledAt) {
+    const latenessMs = now.getTime() - post.scheduledAt.getTime();
+    if (latenessMs > LATE_THRESHOLD_MS) {
+      emitLateSchedule({
+        provider: target.platform,
+        postId: post.id,
+        targetId: target.id,
+        // Best-effort: re-published overdue targets are repeats.
+        attempt: target.status === "FAILED" ? 2 : 1,
+        duration: latenessMs,
+      });
+    }
+  }
 
   try {
     const outcome = await publish(

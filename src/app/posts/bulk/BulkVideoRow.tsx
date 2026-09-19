@@ -97,12 +97,12 @@ export function BulkVideoRow({
           />
         )}
         {error && (
-          <span className="mt-0.5 block text-xs text-error">
+            <span className="mt-0.5 block text-xs text-error-text">
             {error}
           </span>
         )}
         {problems.length > 0 && (
-          <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5">
+            <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-warning-border bg-warning-accent px-2 py-1.5">
             <TriangleAlertIcon
               aria-hidden="true"
               className="mt-0.5 size-3.5 shrink-0 text-warning"

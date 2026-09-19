@@ -27,8 +27,15 @@ import {
   type WeekBucket,
 } from "@/lib/dashboard-analytics";
 import type { Prisma } from "@prisma/client";
-import type { ChannelRow } from "@/app/dashboard/Channels";
-import type { OutcomeSegment } from "@/app/dashboard/OutcomeDonut";
+import type { ChannelRow, OutcomeSegment } from "@/lib/dashboard-types";
+import { logDiagnostic } from "@/lib/diagnostics";
+import { traceUserId } from "@/lib/diagnostics-server";
+import {
+  isDashboardTimingEnabled,
+  roundMs,
+  timeQuery,
+  type DashboardQueryTimings,
+} from "@/lib/dashboard-timing";
 
 export const FILTERABLE_STATUSES = [
   "DRAFT",
@@ -313,13 +320,28 @@ export function buildDashboardViewModel(
  * Dashboard-level orchestration. Single flat `Promise.all` for all
  * independent reads — never sequentialize these without a correctness
  * reason. Query shapes mirror the historical page verbatim.
+ *
+ * Instrumentation: every read is wrapped in `timeQuery` (result- and
+ * error-transparent; ~ns overhead from two clock reads). Timings are
+ * delivered via `opts.onTimings` and — only when
+ * `DASHBOARD_QUERY_TIMING=1` — emitted as a structured diagnostic event
+ * with rounded durations plus a hashed user id. No post content,
+ * usernames, tokens, or raw user ids ever leave this module.
  */
-export async function getDashboard(input: {
-  userId: string;
-  userEmail?: string | null;
-  filter: DashboardFilter;
-  now?: Date;
-}): Promise<DashboardViewModel> {
+export async function getDashboard(
+  input: {
+    userId: string;
+    userEmail?: string | null;
+    filter: DashboardFilter;
+    now?: Date;
+  },
+  opts?: { onTimings?: (timings: DashboardQueryTimings) => void },
+): Promise<DashboardViewModel> {
+  const totalStart =
+    typeof performance !== "undefined" &&
+    typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
   const now = input.now ?? new Date();
   // Activity window for the charts: bounded reads only, volumes capped
   // by plan maxima, so server-side bucketing stays cheap.
@@ -331,73 +353,112 @@ export async function getDashboard(input: {
   // One groupBy replaces the per-status count queries; total is the sum of
   // the same groups. All independent reads run in parallel.
   const [
-    statusGroups,
-    recentPosts,
-    attentionPosts,
-    upcomingPosts,
-    accounts,
-    effective,
-    usage,
-    targetStats,
-    recentActivity,
-    accountPulse,
+    statusGroupsTimed,
+    recentPostsTimed,
+    attentionPostsTimed,
+    upcomingPostsTimed,
+    accountsTimed,
+    effectiveTimed,
+    usageTimed,
+    targetStatsTimed,
+    recentActivityTimed,
+    accountPulseTimed,
   ] = await Promise.all([
-    prisma.post.groupBy({
-      by: ["status"],
-      where: { userId: input.userId },
-      _count: { _all: true },
-    }),
-    prisma.post.findMany({
-      where: {
-        userId: input.userId,
-        ...(status !== "all" ? { status: status as never } : {}),
-        ...(q ? { text: { contains: q, mode: "insensitive" } } : {}),
-      },
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: postFeedInclude,
-    }),
-    prisma.post.findMany({
-      where: {
-        userId: input.userId,
-        status: { in: ["FAILED", "PARTIALLY_PUBLISHED", "PUBLISHING"] },
-      },
-      take: 5,
-      orderBy: { updatedAt: "desc" },
-      include: postFeedInclude,
-    }),
-    prisma.post.findMany({
-      where: { userId: input.userId, status: "SCHEDULED" },
-      take: 3,
-      orderBy: { scheduledAt: "asc" },
-      include: postFeedInclude,
-    }),
-    prisma.socialAccount.findMany({
-      where: { userId: input.userId },
-      select: { id: true, platform: true, username: true, expiresAt: true },
-      orderBy: [{ platform: "asc" }, { username: "asc" }],
-    }),
-    getEffectivePlan({ userId: input.userId, userEmail: input.userEmail }),
-    getUsage(input.userId),
-    prisma.postTarget.groupBy({
-      by: ["platform", "status"],
-      where: { post: { userId: input.userId } },
-      _count: { _all: true },
-    }),
-    prisma.post.findMany({
-      where: { userId: input.userId, createdAt: { gte: twelveWeeksAgo } },
-      select: { createdAt: true, status: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.postTarget.groupBy({
-      by: ["socialAccountId"],
-      where: { post: { userId: input.userId }, socialAccountId: { not: null } },
-      _count: { _all: true },
-      _max: { publishedAt: true },
-    }),
+    timeQuery(() =>
+      prisma.post.groupBy({
+        by: ["status"],
+        where: { userId: input.userId },
+        _count: { _all: true },
+      }),
+    ),
+    timeQuery(() =>
+      prisma.post.findMany({
+        where: {
+          userId: input.userId,
+          ...(status !== "all" ? { status: status as never } : {}),
+          ...(q ? { text: { contains: q, mode: "insensitive" } } : {}),
+        },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: postFeedInclude,
+      }),
+    ),
+    timeQuery(() =>
+      prisma.post.findMany({
+        where: {
+          userId: input.userId,
+          status: { in: ["FAILED", "PARTIALLY_PUBLISHED", "PUBLISHING"] },
+        },
+        take: 5,
+        orderBy: { updatedAt: "desc" },
+        include: postFeedInclude,
+      }),
+    ),
+    timeQuery(() =>
+      prisma.post.findMany({
+        where: { userId: input.userId, status: "SCHEDULED" },
+        take: 3,
+        orderBy: { scheduledAt: "asc" },
+        include: postFeedInclude,
+      }),
+    ),
+    timeQuery(() =>
+      prisma.socialAccount.findMany({
+        where: { userId: input.userId },
+        select: { id: true, platform: true, username: true, expiresAt: true },
+        orderBy: [{ platform: "asc" }, { username: "asc" }],
+      }),
+    ),
+    timeQuery(() =>
+      getEffectivePlan({ userId: input.userId, userEmail: input.userEmail }),
+    ),
+    timeQuery(() => getUsage(input.userId)),
+    timeQuery(() =>
+      prisma.postTarget.groupBy({
+        by: ["platform", "status"],
+        where: { post: { userId: input.userId } },
+        _count: { _all: true },
+      }),
+    ),
+    timeQuery(() =>
+      prisma.post.findMany({
+        where: { userId: input.userId, createdAt: { gte: twelveWeeksAgo } },
+        select: { createdAt: true, status: true },
+        orderBy: { createdAt: "asc" },
+      }),
+    ),
+    timeQuery(() =>
+      prisma.postTarget.groupBy({
+        by: ["socialAccountId"],
+        where: {
+          post: { userId: input.userId },
+          socialAccountId: { not: null },
+        },
+        _count: { _all: true },
+        _max: { publishedAt: true },
+      }),
+    ),
   ]);
+  const {
+    value: statusGroups,
+    ms: q1Ms,
+  } = statusGroupsTimed;
+  const { value: recentPosts, ms: q2Ms } = recentPostsTimed;
+  const { value: attentionPosts, ms: q3Ms } = attentionPostsTimed;
+  const { value: upcomingPosts, ms: q4Ms } = upcomingPostsTimed;
+  const { value: accounts, ms: q5Ms } = accountsTimed;
+  const { value: effective, ms: q6Ms } = effectiveTimed;
+  const { value: usage, ms: q7Ms } = usageTimed;
+  const { value: targetStats, ms: q8Ms } = targetStatsTimed;
+  const { value: recentActivity, ms: q9Ms } = recentActivityTimed;
+  const { value: accountPulse, ms: q10Ms } = accountPulseTimed;
 
-  return buildDashboardViewModel(
+  const viewModelStart =
+    typeof performance !== "undefined" &&
+    typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+  const viewModel = buildDashboardViewModel(
     {
       statusGroups,
       recentPosts,
@@ -411,6 +472,38 @@ export async function getDashboard(input: {
       accountPulse,
     },
     input.filter,
-    now
+    now,
   );
+  const clockNow =
+    typeof performance !== "undefined" &&
+    typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+  const timings: DashboardQueryTimings = {
+    "dashboard.q1.statusGroups": q1Ms,
+    "dashboard.q2.recentPosts": q2Ms,
+    "dashboard.q3.attentionPosts": q3Ms,
+    "dashboard.q4.upcomingPosts": q4Ms,
+    "dashboard.q5.accounts": q5Ms,
+    "dashboard.q6.effective": q6Ms,
+    "dashboard.q7.usage": q7Ms,
+    "dashboard.q8.targetStats": q8Ms,
+    "dashboard.q9.recentActivity": q9Ms,
+    "dashboard.q10.accountPulse": q10Ms,
+    "dashboard.viewModel": Math.max(0, clockNow - viewModelStart),
+    "dashboard.total": Math.max(0, clockNow - totalStart),
+  };
+  opts?.onTimings?.(timings);
+  if (isDashboardTimingEnabled()) {
+    const rounded: Record<string, number> = {};
+    for (const [key, ms] of Object.entries(timings)) {
+      if (typeof ms === "number") rounded[key] = roundMs(ms);
+    }
+    logDiagnostic("dashboard", "queries", {
+      ...rounded,
+      userHash: traceUserId(input.userId),
+    });
+  }
+
+  return viewModel;
 }

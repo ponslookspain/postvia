@@ -8,6 +8,7 @@ import { publishPostTargets } from "@/lib/publish";
 import { canRetry, getEffectivePlan } from "@/lib/entitlements";
 import { STALE_PUBLISHING_MS } from "@/lib/scheduling";
 import { reportError } from "@/lib/diagnostics";
+import { emitPublishRetry } from "@/lib/publish-observability";
 
 // Same 60s Hobby ceiling as the publish route (see there). Claims and resume
 // semantics stay in publishPostTargets, so a retry killed by the ceiling is
@@ -65,7 +66,7 @@ export async function POST(
         userId: true,
         status: true,
         updatedAt: true,
-        targets: { select: { id: true, status: true, externalJobId: true } },
+        targets: { select: { id: true, status: true, externalJobId: true, platform: true } },
       },
     });
 
@@ -97,9 +98,22 @@ export async function POST(
       });
       const refreshed = await prisma.post.findFirst({
         where: { id },
-        select: { targets: { select: { id: true, status: true, externalJobId: true } } },
+        select: { targets: { select: { id: true, status: true, externalJobId: true, platform: true } } },
       });
       target = refreshed?.targets.find((t) => t.status === "PENDING") ?? undefined;
+      // Observability-only: stale re-queue is a retry re-entry. Only the
+      // jobless PUBLISHING targets captured above were actually reset.
+      if (target) {
+        for (const reset of post.targets) {
+          if (reset.status !== "PUBLISHING" || reset.externalJobId !== null) continue;
+          emitPublishRetry({
+            provider: reset.platform,
+            postId: id,
+            targetId: reset.id,
+            attempt: 2,
+          });
+        }
+      }
     }
 
     if (!target) {

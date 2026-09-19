@@ -30,7 +30,7 @@ const tabsListStyles = cva(
 				full: "data-[orientation=horizontal]:w-full data-[orientation=horizontal]:items-stretch data-[orientation=horizontal]:*:flex-1",
 			}, // default medium
 			variant: {
-				default: "bg-accent",
+				default: "bg-muted",
 				open: "data-[orientation=horizontal]:border-b data-[orientation=vertical]:border-r border-border",
 				ghost: "",
 			},
@@ -59,10 +59,10 @@ const tabsTriggerStyles = cva(
 		variants: {
 			variant: {
 				default:
-					"data-[state=active]:bg-elevation-raised border border-transparent data-[state=active]:border data-[state=active]:border-overlay-8 data-[state=active]:drop-shadow-xs",
+					"data-[state=active]:bg-card border border-transparent data-[state=active]:border data-[state=active]:border-overlay-8 data-[state=active]:drop-shadow-xs",
 				open: "data-[orientation=horizontal]:border-b-2 data-[orientation=vertical]:border-r-2 border-transparent data-[state=active][orientation=horizontal]:border-b-2 data-[state=active][orientation=vertical]:border-r-2 data-[state=active]:border-primary",
 				ghost:
-					"data-[state=active]:bg-accent data-[state=active]:text-primary",
+					"data-[state=active]:bg-muted data-[state=active]:text-primary",
 			},
 		},
 		compoundVariants: [
@@ -131,11 +131,18 @@ function TabsList({
 }
 TabsList.displayName = TabsPrimitive.List.displayName
 
-function TabsTrigger({ className, ...props }: TabsTriggerProps) {
+function TabsTrigger({ className, asChild, ...props }: TabsTriggerProps) {
 	const { variant } = useTabsList()
 	return (
 		<TabsPrimitive.Trigger
 			data-slot="tabs-trigger"
+			asChild={asChild}
+			// asChild children (e.g. a Link tab) must not inherit the
+			// button-only `type` attribute — `<a type="button">` is invalid
+			// HTML and fails axe. A real <button> child keeps its own
+			// `type` (child props win over Slot props); an explicit caller
+			// `type` still wins via the props spread below.
+			{...(asChild ? { type: undefined } : null)}
 			className={cn(tabsTriggerStyles({ variant }), className)}
 			{...props}
 		/>

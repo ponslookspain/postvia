@@ -12,10 +12,20 @@ UI (src/app/*, src/components/*)
   ↓ fetch / server components
 API routes (src/app/api/*)
   ↓
-Domain libs (src/lib/*)
+Domain (src/domain/* — pure business logic, no Prisma/Stripe/Blob/Next I/O)
+  ↓ (domain may use pure shared helpers from src/lib only)
+Application / infrastructure libs (src/lib/*)
   ↓ PrismaClient (src/lib/prisma.ts, singleton)
 Neon PostgreSQL
 ```
+
+Migration is incremental by design: new or actively changing business
+logic goes to `src/domain/<domain>`; existing `src/lib` modules stay
+where they are until a real change justifies a split. `src/lib`
+modules that already moved keep compatibility re-export shims
+(e.g. `@/lib/platforms/capabilities` → `@/domain/social/capabilities`)
+so old imports keep working. `src/lib` never depends on `src/app`
+(shared view-model types live in `src/lib/*-types.ts`, not in pages).
 
 External services: Better Auth (auth), Stripe (billing), Resend (email),
 Vercel Blob (media), provider APIs (X / Threads / TikTok / Instagram),
@@ -28,16 +38,23 @@ Sentry (error reporting), Vercel Cron (scheduler trigger).
 | `auth.ts` | Better Auth instance, session helpers, auth lifecycle hooks (abuse bookkeeping) |
 | `abuse.ts` | Identity resolution/merge, risk, tombstones, rate limits, OAuth gates, ledgers |
 | `free-post-kernel.ts` | Atomic Free post creation (identity + per-user claim + insert in one `$transaction`) |
-| `entitlements.ts` | Effective plan, usage, per-user quota ledger (`PostUsage`) |
+| `entitlements.ts` | Live billing reads + quota ledger stores + admin gate + billing view (`getSubscription/getTestOverride/getEffectivePlan/getUsage/liveQuotaStore/assertCanConnectAccount/isAdminEmail/BillingView`); pure rules re-exported from `domain/billing/entitlements.ts` |
+| `domain/billing/entitlements.ts` | Canonical pure entitlement rules: plan/status mapping, period/expiry rules, effective-subscription resolution, feature/bulk/account gates, quota selectors, date helpers, quota-claim algorithm over the injected `QuotaClaimStore` port (`claimMonthlyQuota`, `createWithMonthlyQuota`). Depends only on `domain/billing/plans`; live reads, quota stores and admin env stay in `lib` |
 | `dashboard.ts` | Server-side dashboard fetch + view model (`parseDashboardParams` / `getDashboard` / `buildDashboardViewModel`); reuses `dashboard-analytics.ts` pure utilities and `entitlements.ts` billing rules, never replaces them |
+| `dashboard-types.ts` | Shared dashboard view-model types (`ChannelRow`, `OutcomeSegment`) — single source so `lib` never imports from `app` |
 | `dashboard-analytics.ts` | Pure dashboard analytics/formatting utilities (no Prisma, no I/O) |
-| `plans.ts` | Plan ids, prices, entitlements (single source of truth) |
+| `plans.ts` | Compatibility re-export of `domain/billing/plans.ts` (single source of truth) |
+| `domain/billing/plans.ts` | Canonical plan definitions + entitlement constants (`PlanId`, `PlanEntitlements`, `FeatureKey`, `PLANS`, `parsePlanParam`, `getPlan`). Dependency-free, client-safe |
 | `social-accounts.ts` | Race-safe `SocialAccount` create/disconnect lookup |
-| `social/` | Per-provider OAuth, token refresh, publish primitives (`x`, `threads`, `tiktok`, `instagram`, `provider`, `pkce`) |
+| `social/` | Per-provider OAuth, token refresh, publish primitives (`x`, `threads`, `tiktok`, `instagram`) — infrastructure clients, stay in `lib`. Pure policies re-exported from `domain/social/policies/*` |
+| `domain/social/policies/` | Pure per-platform policies: X error classification + media router + attempt/retry decisions (`x`), Threads auth classification + media router (`threads`), TikTok media router + error classification + post-info builders + chunk planning + status rules (`tiktok`), Instagram error classification + caption gate (`instagram`). Zero deps (only `domain/media` types). `src/lib/social/{x,threads,tiktok,instagram}.ts` and `src/lib/media.ts` (Threads policy) are re-export shims; OAuth/refresh/Prisma/fetch/upload stay in `lib` |
+| `domain/social/` | Pure social domain: platform capability registry (`capabilities`), target overrides/content validation (`overrides`), TikTok photo-flow limits (`tiktok-photo-limits`: title 90 / description 4000 / 20 MB per photo — flow-specific, not capability-level; single source for the publish pipeline, composer preview, upload guidance and bulk), provider interfaces (`provider`), PKCE helpers (`pkce`). `src/lib/platforms/*` and `src/lib/social/{provider,pkce}.ts` are re-export shims; per-platform policy constants (`policies/tiktok`, `policies/x`) re-export the shared flow limits instead of duplicating them. Runtime clients (`ensureFresh*Token`, fetch/poll/upload, Prisma CAS) stay in `src/lib/social/*`. Consumes `domain/media` (`MediaKind`, `isMediaKind`), never `lib/media` |
+| `domain/media/` | Pure media core: global kind/limit/MIME policy + validation (`policy`), byte-signature verification (`signature`), video probe + duration check with caller-supplied cap (`video`), canonical-image decision (`optimize`), upload validation/codecs/security decisions (`upload-rules`: TTL, authorize, client-payload codec, reserved-pathname rules, token-payload codec, completed-upload validation, rejection error) + registration contract (`MediaRegistrationTx/Store` ports with the withPostLock serialization contract, `claimMediaSlot` duplicate→cap→create claim, `MediaSlotClaim`) + HTTP Range parsing (`http-range`) + Blob credential/config preflight with caller-supplied env (`blob-config`) + orphan-sweep policy/ports (`cleanup-policy`: 24h age, caps, `SweepDeps`). Zero deps (no Prisma/Blob/Next/env/diagnostics). `src/lib/media{,-signature,-video,-optimize,-upload,-cleanup}.ts`, `src/lib/blob.ts` and `src/lib/http-range.ts` are re-export shims; `lib/media.ts` additionally keeps `makeBlobPathname` (storage layout + random) and re-exports the Threads policy from `domain/social/policies/threads`; `lib/media-video.ts` keeps `maxVideoDurationSeconds` (env reader, lib passes the limit into the domain check); `lib/blob.ts` keeps ambient-`process.env` wrappers delegating to the domain preflight; `lib/media-upload.ts` keeps orchestration (reserve/register, `txFromClient`, `liveMediaRegistrationStore` with `pg_advisory_xact_lock`, Blob verify wrappers, orphan cleanup, P2002 mapping); `lib/media-cleanup.ts` keeps the `sweepOrphanBlobs` runner (listing, lookup, deletion, logging) |
 | `publish.ts` / `scheduling.ts` / `schedule.ts` | Publish engine, due-post claiming, schedule validation |
 | `bulk-schedule.ts` | Client/server bulk helpers (fan-out through `POST /api/posts`) |
 | `media*.ts`, `blob.ts` | Upload reservation, presigned flow, optimization, orphan sweep |
-| `stripe.ts`, `stripe-redirect.ts` | Stripe config/prices, webhook snapshot processing, redirect safety |
+| `stripe.ts`, `stripe-redirect.ts` | Live Stripe layer: SDK client, env-gated config wrappers, guarded webhook writer, dispatcher, reconcile/cancel; pure rules re-exported from `domain/billing/stripe-rules.ts`; redirect safety stays dependency-free |
+| `domain/billing/stripe-rules.ts` | Canonical pure Stripe rules: price mapping, key-mode/config resolution (caller-supplied env), status mapping, live-stake guards, snapshot parsers, ordering guards (`isStaleDelivery`), store ports, webhook outcome algebra. Depends only on `domain/billing/{plans,entitlements}` types; SDK/Prisma/env stay in `lib` |
 | `email.ts` | Resend verification mail only |
 | `diagnostics.ts` | Console pipeline + scrubbed Sentry bridge (`reportError`) |
 | `base-url.ts` | `BETTER_AUTH_URL` / Vercel URL resolution |

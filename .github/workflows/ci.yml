@@ -152,6 +152,11 @@ jobs:
       # (see tests/e2e/browser-smoke.spec.ts). If smoke is red the job
       # stops here and the full journey suite does not run.
       - run: npx playwright test tests/e2e/browser-smoke.spec.ts
+      # Accessibility second: axe scan (critical/serious only, both themes)
+      # + keyboard smoke for dialogs, menus and mobile navigation
+      # (see tests/e2e/a11y.spec.ts). Runs before the journey suite so an
+      # a11y regression fails fast without waiting for the full run.
+      - run: npx playwright test tests/e2e/a11y.spec.ts
       - run: npx playwright test
       - uses: actions/upload-artifact@v4
         if: failure()

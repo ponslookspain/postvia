@@ -3,6 +3,24 @@ import {
   logErrorDiagnostic,
   safePathname,
 } from "@/lib/diagnostics";
+import {
+  ORPHAN_BLOB_MAX_AGE_MS,
+  ORPHAN_SWEEP_MAX_REMOVALS,
+  ORPHAN_SWEEP_MAX_SCANNED,
+  type SweepBlobListing,
+  type SweepDeps,
+  type SweepOutcome,
+} from "@/domain/media/cleanup-policy";
+
+/**
+ * Orphan-sweep policy (constants + ports) lives in
+ * `@/domain/media/cleanup-policy` and is re-exported here so existing
+ * `@/lib/media-cleanup` imports keep working. The runner below stays in
+ * `lib`: listing, lookup, deletion and logging are infrastructure.
+ * No behavior change.
+ */
+export * from "@/domain/media/cleanup-policy";
+export type * from "@/domain/media/cleanup-policy";
 
 /**
  * Orphan-blob sweep.
@@ -22,37 +40,6 @@ import {
  * - removals per run are capped (`maxRemovals`) so the sweep always fits
  *   inside the cron tick budget; leftovers wait for the next invocation.
  */
-
-export const ORPHAN_BLOB_MAX_AGE_MS = 24 * 60 * 60_000;
-export const ORPHAN_SWEEP_MAX_REMOVALS = 100;
-/** Hard ceiling on scanned blobs per run: the sweep must always fit the tick. */
-export const ORPHAN_SWEEP_MAX_SCANNED = 2000;
-/** DB round-trips are batched in chunks of this size. */
-export const ORPHAN_SWEEP_LOOKUP_CHUNK = 200;
-
-export type SweepBlobListing = {
-  pathname: string;
-  uploadedAt: Date;
-};
-
-export type SweepListPage = {
-  blobs: SweepBlobListing[];
-  cursor?: string;
-  hasMore: boolean;
-};
-
-export type SweepDeps = {
-  listBlobs: (cursor?: string) => Promise<SweepListPage>;
-  findRegistered: (pathnames: string[]) => Promise<Set<string>>;
-  removeBlobs: (pathnames: string[]) => Promise<void>;
-  now?: () => number;
-};
-
-export type SweepOutcome = {
-  scanned: number;
-  removed: number;
-  hasMore: boolean;
-};
 
 export async function sweepOrphanBlobs(
   deps: SweepDeps,

@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 import { Label } from "@/components/ui/label"
-import { Divider as Separator } from "@/components/ui/divider"
+import { Divider } from "@/components/ui/divider"
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -52,7 +52,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 const fieldVariants = cva(
-  "group/field flex w-full gap-3 data-[invalid=true]:text-error",
+  "group/field flex w-full gap-3 data-[invalid=true]:text-error-text",
   {
     variants: {
       orientation: {
@@ -106,7 +106,7 @@ function FieldLabel({
     <Label
       data-slot="field-label"
       className={cn(
-        "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-data-checked:border-primary/30 has-data-checked:bg-primary/5 has-[>[data-slot=field]]:rounded-xl has-[>[data-slot=field]]:border has-[>[data-slot=field]]:not-has-[:disabled,[data-disabled]]:hover:bg-input/40 has-[>[data-slot=field]]:has-[:focus-visible]:border-ring has-[>[data-slot=field]]:has-[:focus-visible]:ring-[3px] has-[>[data-slot=field]]:has-[:focus-visible]:ring-ring/50 *:data-[slot=field]:p-4 dark:has-data-checked:border-primary/20 dark:has-data-checked:bg-primary/10",
+        "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-data-checked:border-primary-border has-data-checked:bg-primary-soft has-[>[data-slot=field]]:rounded-xl has-[>[data-slot=field]]:border has-[>[data-slot=field]]:not-has-[:disabled,[data-disabled]]:hover:bg-input/40 has-[>[data-slot=field]]:has-[:focus-visible]:border-ring has-[>[data-slot=field]]:has-[:focus-visible]:ring-[3px] has-[>[data-slot=field]]:has-[:focus-visible]:ring-ring/50 *:data-[slot=field]:p-4",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col",
         className
       )}
@@ -116,9 +116,9 @@ function FieldLabel({
 }
 
 function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="field-label"
+	return (
+		<div
+			data-slot="field-title"
       className={cn(
         "flex w-fit items-center gap-2 text-sm font-medium group-data-[disabled=true]/field:opacity-50",
         className
@@ -160,7 +160,7 @@ function FieldSeparator({
       )}
       {...props}
     >
-      <Separator decorative={false} className="absolute inset-0 top-1/2" />
+      <Divider decorative={false} className="absolute inset-0 top-1/2" />
       {children && (
         <span
           className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"
@@ -218,7 +218,7 @@ function FieldError({
       data-slot="field-error"
       // Form error pattern:
       // text-xs, normal weight, error-text token.
-      className={cn("text-xs font-normal text-error", className)}
+      className={cn("text-xs font-normal text-error-text", className)}
       {...props}
     >
       {content}

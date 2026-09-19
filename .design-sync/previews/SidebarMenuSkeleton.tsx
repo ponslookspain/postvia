@@ -23,12 +23,12 @@ import {
  * `true` prepends a 16px square for the nav icon. The product's nav
  * rows all carry icons, so the loading rail uses `showIcon`.
  *
- * Surface matters here. `Skeleton` is `bg-accent`, and in the LIGHT theme
- * these previews render in, `--accent` is aliased to `--muted`, so
- * `--color-accent` and `--color-muted` are the same colour — a skeleton
- * laid on a `fill1` panel is invisible. The standalone cells therefore
+ * Surface matters here. `Skeleton` is `bg-muted`, so a skeleton laid on
+ * a `muted` panel is invisible (the old `--accent` alias this note once
+ * described was value-identical and has since been removed). The
+ * standalone cells therefore
  * sit on `--color-background`; `LoadingRail` sits on the real rail, which is
- * `--color-sidebar` (a shade lighter than `fill1`) and still reads.
+ * `--color-sidebar` (a shade lighter than `muted`) and still reads.
  *
  * Widths genuinely differ per row — that is the component's own
  * randomiser, not preview noise, and it is what makes the stack read as

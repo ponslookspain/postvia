@@ -4,6 +4,11 @@ import type {
   StoredPostTarget,
   TickStats,
 } from "../scheduling";
+import {
+  emitPublishFailure,
+  emitPublishRetry,
+  emitPublishTimeout,
+} from "@/lib/publish-observability";
 
 /**
  * A post still in PUBLISHING cannot have a running publish function behind
@@ -142,7 +147,28 @@ export async function recoverStalePublishing(
         where: { id: post.id, status: "PUBLISHING" },
         data: { status: "FAILED", errorMessage: TIMEOUT_MESSAGE },
       });
-      if (claimed.count > 0) stats.expired++;
+      if (claimed.count > 0) {
+        stats.expired++;
+        // Observability-only: stuck past the validity window is a real
+        // timeout, then a terminal failure — per target, allowlisted.
+        for (const target of current.targets) {
+          if (target.status !== "PUBLISHING") continue;
+          emitPublishTimeout({
+            provider: target.platform,
+            postId: post.id,
+            targetId: target.id,
+            attempt: 2,
+            duration: 0,
+          });
+          emitPublishFailure({
+            provider: target.platform,
+            postId: post.id,
+            targetId: target.id,
+            attempt: 2,
+            duration: 0,
+          });
+        }
+      }
       continue;
     }
 
@@ -157,7 +183,20 @@ export async function recoverStalePublishing(
       where: { id: post.id, status: "PUBLISHING" },
       data: { status: resetStatus, errorMessage: null },
     });
-    if (claimed.count > 0) stats.recovered++;
+    if (claimed.count > 0) {
+      stats.recovered++;
+      // Observability-only: crashed-attempt re-queue is a real retry
+      // re-entry (the next tick/claim emits the following attempt).
+      for (const target of current.targets) {
+        if (target.status !== "PUBLISHING") continue;
+        emitPublishRetry({
+          provider: target.platform,
+          postId: post.id,
+          targetId: target.id,
+          attempt: 2,
+        });
+      }
+    }
   }
 
   return stats;

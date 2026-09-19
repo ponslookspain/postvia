@@ -101,6 +101,48 @@ Tick order (must stay equivalent): recovery → due fetch (`SCHEDULED`,
 `scheduledAt <= now`, oldest-due-first) → batch → conditional claim →
 bounded concurrency → publish → aggregate repair → stats.
 
+## Publishing observability
+
+Structured per-target events (`src/lib/publish-observability.ts`,
+`[postvia] publish: <event>` via the existing `logDiagnostic` pipeline).
+Observability-only: no behavior, policy, schema, or contract changes.
+
+Event taxonomy: `publish_attempt` (after a successful per-target claim;
+concurrent claim loss emits nothing) → `publish_success` (terminal
+`PUBLISHED`) | `publish_failure` (terminal `FAILED`; X
+transport-throw / aged markers use `failed_ambiguous`) | `timeout`
+(poll-budget exhaustion while the job stays `PUBLISHING`, stale expiry;
+never a failure by itself — a terminal `FAILED` after a timeout emits
+both, in order) | `retry` (real re-entry only: `FAILED` re-claim,
+manual retry route stale reset, stale-recovery re-queue; never polling)
+| `provider_rate_limit` (provably detected 429/rate-limit codes only;
+X has no 429 branch and Threads none — see limitations) |
+`token_refresh` (`refreshed`/`refresh_failed`, only when this worker
+performed a refresh call — fast-path and concurrent reuse stay silent)
+| `late_schedule` (per first publishable target after claim, only when
+`now - scheduledAt > LATE_THRESHOLD_MS = 1h`).
+
+Payload contract (exactly six fields, allowlisted at compile time and
+runtime): `provider`, `postId`, `targetId`, `duration` (ms: per-target
+attempt claim→terminal write; lateness for `late_schedule`; `0` for
+instant markers), `attempt` (best-effort saturating: `1` first-known,
+`2` any repeat — no persistent counter by design, no migration),
+`status` (strict union: `attempted|published|failed|failed_ambiguous|
+retry_queued|timeout|rate_limited|refreshed|refresh_failed|late`).
+
+Security: helpers accept only the six fields (no `Record`, no
+`...rest`); runtime `pick` drops smuggled keys; raw errors, messages,
+stacks, tokens, headers, bodies, user/account ids, PII, post text and
+media URLs can never cross the boundary. Events are console logs, never
+Sentry events (crashes stay covered by the existing `reportError`
+boundaries). Covered by `tests/publish-observability.test.ts`.
+
+Known limitations: `attempt` is approximate (saturates at 2); rate-limit
+coverage is best-effort per provider (TikTok normalized codes + 429,
+Instagram 368/rate-limit strings, generic 429 duck-typing; X/Threads
+mappers unchanged); no server-side fetch timeouts exist to instrument
+— `timeout` covers poll-budget and stale-expiry conditions only.
+
 ## Media
 
 `POST /api/media/prepare` (authorized pathname reservation) → presigned

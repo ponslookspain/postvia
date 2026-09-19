@@ -1,4 +1,4 @@
-import { Button } from "postvia";
+import { Button, Spinner } from "postvia";
 import { ArrowRightIcon, PlusIcon, RotateCcwIcon, Trash2Icon } from "lucide-react";
 
 /**
@@ -73,8 +73,12 @@ export function IconOnly() {
 export function States() {
   return (
     <div className={row}>
-      <Button loading>Publishing</Button>
-      <Button variant="outline" loading>
+      <Button disabled>
+        <Spinner data-icon="inline-start" aria-hidden="true" />
+        Publishing
+      </Button>
+      <Button variant="outline" disabled>
+        <Spinner data-icon="inline-start" aria-hidden="true" />
         Checking channels
       </Button>
       <Button disabled>Publish now</Button>

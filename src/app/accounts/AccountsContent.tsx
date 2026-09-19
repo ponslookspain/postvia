@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { reportError } from "@/lib/diagnostics";
+import { parseApiError } from "@/lib/client-error-message";
 import { getImplementedPlatforms } from "@/lib/platforms/capabilities";
 
 interface PlatformAccount {
@@ -184,9 +185,16 @@ export default function AccountsContent({
         window.location.assign(url);
         return;
       }
-      await res.json().catch(() => null);
+      // OAuth `?error=` protocol unchanged. For API errors, only the
+      // typed code is trusted (connect may echo raw provider text):
+      // expired sessions get a specific message, everything else stays
+      // generic.
+      const parsed = parseApiError(data);
       setMessage({
-        text: "Unable to start the connection. Please try again.",
+        text:
+          parsed.code === "UNAUTHENTICATED"
+            ? "Your sign-in expired. Please sign in and try again."
+            : "Unable to start the connection. Please try again.",
         error: true,
       });
       setConnecting(null);

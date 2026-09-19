@@ -289,48 +289,39 @@ export function CalendarView({
         title="Calendar"
         description={`Publishing schedule for ${userName}`}
         actions={
-          <Button
-            nativeButton={false}
-            render={<Link href="/posts/new" />}
-          >
-            <PlusIcon data-icon="inline-start" />
-            Create post
+          <Button asChild>
+            <Link href="/posts/new">
+              <PlusIcon data-icon="inline-start" />
+              Create post
+            </Link>
           </Button>
         }
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-xl bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            nativeButton={false}
-            render={
-              <Link href={`/calendar?month=${monthKey(prev.year, prev.monthIndex)}`} aria-label="Previous month" />
-            }
-          >
-            <ChevronLeftIcon />
+          <Button variant="ghost" size="icon-sm" asChild>
+            <Link
+              href={`/calendar?month=${monthKey(prev.year, prev.monthIndex)}`}
+              aria-label="Previous month"
+            >
+              <ChevronLeftIcon />
+            </Link>
           </Button>
           <h2 className="font-heading min-w-0 truncate px-1 text-lg leading-7 font-semibold tracking-tight tabular-nums">
             {title}
           </h2>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            nativeButton={false}
-            render={
-              <Link href={`/calendar?month=${monthKey(next.year, next.monthIndex)}`} aria-label="Next month" />
-            }
-          >
-            <ChevronRightIcon />
+          <Button variant="ghost" size="icon-sm" asChild>
+            <Link
+              href={`/calendar?month=${monthKey(next.year, next.monthIndex)}`}
+              aria-label="Next month"
+            >
+              <ChevronRightIcon />
+            </Link>
           </Button>
         </div>
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<Link href="/calendar" />}
-        >
-          Today
+        <Button variant="outline" asChild>
+          <Link href="/calendar">Today</Link>
         </Button>
       </div>
 
@@ -353,7 +344,7 @@ export function CalendarView({
               const isOver = dropKey === key;
               const visible = dayPosts.slice(0, MAX_VISIBLE_CHIPS);
               const overflow = dayPosts.slice(MAX_VISIBLE_CHIPS);
-              const dayLabel = `${Number(key.slice(8))} ${title}`;
+              const dayLabel = `${Number(key.slice(8))} ${title}${isToday ? ", today" : ""}`;
               return (
                 <div
                   key={key}
@@ -373,6 +364,7 @@ export function CalendarView({
                   )}
                 >
                   <span
+                    aria-current={isToday ? "date" : undefined}
                     className={cn(
                       "flex size-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums",
                       isToday && "bg-primary font-medium text-primary-foreground"
@@ -431,12 +423,11 @@ export function CalendarView({
               title="Nothing scheduled this month"
               description="Create a post or schedule a draft to see it here."
               actions={
-                <Button
-                  nativeButton={false}
-                  render={<Link href="/posts/new" />}
-                >
-                  <PlusIcon data-icon="inline-start" />
-                  Create post
+                <Button asChild>
+                  <Link href="/posts/new">
+                    <PlusIcon data-icon="inline-start" />
+                    Create post
+                  </Link>
                 </Button>
               }
             />
@@ -462,7 +453,8 @@ export function CalendarView({
             {drafts.length === 0 ? (
               <p className="text-sm leading-5 text-muted-foreground">
                 No unscheduled drafts. Drag a scheduled post between days
-                to move it, or create a new one.
+                to move it, or open a post to change its date from the
+                keyboard.
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5">
@@ -499,7 +491,8 @@ export function CalendarView({
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
             Only scheduled posts and unscheduled drafts can be moved.
-            Times shown in your local timezone.
+            Drag with a mouse, or open a post to reschedule it from the
+            keyboard. Times shown in your local timezone.
           </p>
         </aside>
       </div>

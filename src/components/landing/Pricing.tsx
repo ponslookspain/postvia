@@ -84,22 +84,21 @@ export function Pricing() {
                   ))}
                 </ul>
                 <Button
-                  nativeButton={false}
-                  render={
-                    <Link
-                      href={
-                        plan.id === "free"
-                          ? "/signup"
-                          : `/signup?plan=${plan.id}`
-                      }
-                    />
-                  }
+                  asChild
                   variant={plan.highlighted ? "default" : "outline"}
                   className="mt-6 w-full"
                 >
-                  {plan.id === "free"
-                    ? "Get started free"
-                    : `Choose ${plan.name}`}
+                  <Link
+                    href={
+                      plan.id === "free"
+                        ? "/signup"
+                        : `/signup?plan=${plan.id}`
+                    }
+                  >
+                    {plan.id === "free"
+                      ? "Get started free"
+                      : `Choose ${plan.name}`}
+                  </Link>
                 </Button>
               </div>
             </Reveal>

@@ -27,8 +27,6 @@ import {
   type PlatformDispatch,
 } from "@/lib/platforms/providers";
 import {
-  isTiktokAuthErrorCode,
-  TiktokApiError,
   ensureFreshTiktokToken,
   fetchTiktokPublishStatus,
   publishTiktokDirectPhoto,
@@ -61,6 +59,18 @@ import {
 } from "@/lib/platforms/overrides";
 import { resolveThreadsMediaPolicy, type MediaKind } from "@/lib/media";
 import { createSignedGetUrl, fetchPrivateBlob } from "@/lib/blob";
+import { normalizeProviderError } from "@/lib/errors/normalize";
+import {
+  emitProviderRateLimit,
+  emitPublishAttempt,
+  emitPublishFailure,
+  emitPublishRetry,
+  emitPublishSuccess,
+  emitPublishTimeout,
+  emitTokenRefresh,
+  inferAttemptNumber,
+  isRateLimitSignal,
+} from "@/lib/publish-observability";
 
 export interface PublishOutcome {
   ok: boolean;
@@ -275,12 +285,12 @@ async function resolveTargetAccount(
 
 async function updateTargetFailure(
   postId: string,
-  targetId: string,
+  target: { id: string; platform: string },
   error: string,
-  options: { clearJobId?: boolean } = {}
+  options: { clearJobId?: boolean; ambiguous?: boolean } = {}
 ): Promise<void> {
   await prisma.postTarget.update({
-    where: { id: targetId },
+    where: { id: target.id },
     data: {
       status: "FAILED",
       errorMessage: error,
@@ -289,37 +299,144 @@ async function updateTargetFailure(
       ...(options.clearJobId ? { externalJobId: null } : {}),
     },
   });
+  // Observability-only: terminal failure for this target attempt. The DB
+  // write above is unchanged; this emit never throws and never blocks.
+  const ctx = obsContextFor(target);
+  emitPublishFailure({
+    provider: target.platform,
+    postId,
+    targetId: target.id,
+    attempt: ctx.attempt,
+    duration: Date.now() - ctx.startedAt,
+    ...(options.ambiguous ? { ambiguous: true as const } : {}),
+  });
 }
 
+/**
+ * Per-attempt observability context, keyed by the in-memory target object
+ * (WeakMap — no leaks, no cross-request bleed, no signature changes to the
+ * platform dispatch table). Set once in `executeTargetPublish` / resume
+ * entry points; read at every terminal emit for the same attempt.
+ * `attempt` is best-effort saturating (1 = first-known, 2 = any repeat):
+ * the DB has no persistent attempt counter by design.
+ */
+type ObsAttemptContext = { attempt: 1 | 2; startedAt: number };
+
+const obsAttemptContexts = new WeakMap<object, ObsAttemptContext>();
+
+function obsContextFor(target: object): ObsAttemptContext {
+  return (
+    obsAttemptContexts.get(target) ?? { attempt: 1, startedAt: Date.now() }
+  );
+}
+
+function obsRefreshNotify(
+  provider: string,
+  postId: string,
+  target: PublishTarget
+): (outcome: "refreshed" | "refresh_failed") => void {
+  return (outcome) => {
+    const ctx = obsContextFor(target);
+    emitTokenRefresh({
+      provider,
+      postId,
+      targetId: target.id,
+      attempt: ctx.attempt,
+      status: outcome,
+    });
+  };
+}
+
+function obsRateLimitIfSignal(
+  raw: unknown,
+  provider: string,
+  postId: string,
+  target: PublishTarget
+): void {
+  if (!isRateLimitSignal(raw)) return;
+  const ctx = obsContextFor(target);
+  emitProviderRateLimit({
+    provider,
+    postId,
+    targetId: target.id,
+    attempt: ctx.attempt,
+  });
+}
+
+/**
+ * TikTok failure boundary (unified error model pilot).
+ *
+ * Normalizes the raw provider error (`ProviderError` vs
+ * `ExternalProviderError`, `retryable`) but persists the SAME user-safe
+ * string as before (`tiktokErrorMessage`) into `postTarget.errorMessage`
+ * (still a plain string — no schema change). `clearJobId` semantics are
+ * intentionally unchanged: terminal TikTok states need a fresh init,
+ * while token-refresh failures keep the job id for resume and
+ * `processing` paths never fail at all.
+ */
+async function failTiktokTarget(
+  postId: string,
+  target: PublishTarget,
+  rawError: unknown,
+  options: { clearJobId?: boolean } = {}
+): Promise<PublishOutcome> {
+  const normalized = normalizeProviderError("tiktok", rawError, tiktokErrorMessage(rawError));
+  obsRateLimitIfSignal(rawError, "TIKTOK", postId, target);
+  await updateTargetFailure(postId, target, normalized.safeMessage, options);
+  return failedOutcome(target, normalized.safeMessage);
+}
 
 async function executeTargetPublish(
   post: PublishPost,
   target: PublishTarget
 ): Promise<PublishOutcome> {
+  // Best-effort attempt number from the pre-claim snapshot (PENDING = first,
+  // FAILED = repeat). No persistent counter exists by design.
+  const attempt = inferAttemptNumber(target.status);
+  obsAttemptContexts.set(target, { attempt, startedAt: Date.now() });
+  if (target.status === "FAILED") {
+    // Real re-entry into the publish flow (manual retry, stale recovery).
+    // Polling loops and concurrent claims never reach here.
+    emitPublishRetry({
+      provider: target.platform,
+      postId: post.id,
+      targetId: target.id,
+      attempt,
+    });
+  }
   const claim = await prisma.postTarget.updateMany({
     where: { id: target.id, status: { in: ["PENDING", "FAILED"] } },
     data: { status: "PUBLISHING", errorMessage: null },
   });
   if (claim.count === 0) {
+    // Concurrent winner lost: not a new attempt, not a failure — no event.
+    obsAttemptContexts.delete(target);
     return failedOutcome(target, "Target is already being published or published");
   }
+  // Attempt formed and claimed: the single `publish_attempt` hook.
+  emitPublishAttempt({
+    provider: target.platform,
+    postId: post.id,
+    targetId: target.id,
+    attempt,
+  });
 
   const caps = getPlatformCapabilities(target.platform as never);
   const account = await resolveTargetAccount(post.userId, target);
   if (!account) {
     const error = `${target.platform} account not found or does not belong to this user`;
-    await updateTargetFailure(post.id, target.id, error);
+    await updateTargetFailure(post.id, target, error);
     return failedOutcome(target, error);
   }
   if (!caps.implemented) {
     const error = `${caps.label} publishing is not implemented yet`;
-    await updateTargetFailure(post.id, target.id, error);
+    await updateTargetFailure(post.id, target, error);
     return failedOutcome(target, error);
   }
 
   const overrideValidation = validateTargetOverrides(target.platform as never, target.overrides);
   if (!overrideValidation.ok) {
-    await updateTargetFailure(post.id, target.id, overrideValidation.error);
+    await updateTargetFailure(post.id, target, overrideValidation.error);
     return failedOutcome(target, overrideValidation.error);
   }
   const effective = resolveEffectiveTargetContent(post.text, overrideValidation.overrides);
@@ -358,26 +475,31 @@ async function executeXTarget(
   const caps = getPlatformCapabilities("X");
   const mediaValidation = validateTargetMedia(caps, post.media);
   if (!mediaValidation.ok) {
-    await updateTargetFailure(post.id, target.id, mediaValidation.error);
+    await updateTargetFailure(post.id, target, mediaValidation.error);
     return failedOutcome(target, mediaValidation.error);
   }
   const policy = resolveXMediaPolicy(post.media);
   if (policy.kind === "error") {
-    await updateTargetFailure(post.id, target.id, policy.message, { clearJobId: true });
+    await updateTargetFailure(post.id, target, policy.message, { clearJobId: true });
     return failedOutcome(target, policy.message);
   }
 
   let accessToken: string;
   try {
-    accessToken = await ensureFreshXToken({
-      id: account.id,
-      accessToken: account.accessToken,
-      refreshToken: account.refreshToken,
-      expiresAt: account.expiresAt,
-    });
+    accessToken = await ensureFreshXToken(
+      {
+        id: account.id,
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        expiresAt: account.expiresAt,
+      },
+      undefined,
+      obsRefreshNotify("X", post.id, target)
+    );
   } catch (error) {
     const message = xErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message);
+    obsRateLimitIfSignal(error, "X", post.id, target);
+    await updateTargetFailure(post.id, target, message);
     return failedOutcome(target, message);
   }
 
@@ -393,7 +515,7 @@ async function executeXTarget(
         const item = byId.get(id);
         if (!item) {
           const error = "X media could not be resolved.";
-          await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+          await updateTargetFailure(post.id, target, error, { clearJobId: true });
           return failedOutcome(target, error);
         }
         // Ranged reads instead of buffering the whole file: X's INIT only
@@ -425,7 +547,17 @@ async function executeXTarget(
         if (uploaded.state === "failed") {
           // Upload-only failure: no tweet POST was reached, so no tweet
           // can exist — a plain retryable failure, no ambiguity.
-          await updateTargetFailure(post.id, target.id, uploaded.error, { clearJobId: true });
+          // The upload budget message ("still processing") is timeout-like:
+          // emit `timeout`, then the terminal `failure` via the funnel.
+          const ctx = obsContextFor(target);
+          emitPublishTimeout({
+            provider: "X",
+            postId: post.id,
+            targetId: target.id,
+            attempt: ctx.attempt,
+            duration: Date.now() - ctx.startedAt,
+          });
+          await updateTargetFailure(post.id, target, uploaded.error, { clearJobId: true });
           return failedOutcome(target, uploaded.error);
         }
         mediaIds.push(uploaded.mediaId);
@@ -433,7 +565,8 @@ async function executeXTarget(
     } catch (error) {
       // Upload-phase failure happens before any tweet POST: unambiguous.
       const message = xErrorMessage(error);
-      await updateTargetFailure(post.id, target.id, message, { clearJobId: true });
+      obsRateLimitIfSignal(error, "X", post.id, target);
+      await updateTargetFailure(post.id, target, message, { clearJobId: true });
       return failedOutcome(target, message);
     }
   }
@@ -449,7 +582,7 @@ async function executeXTarget(
     });
   } catch (error) {
     const message = xErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message);
+    await updateTargetFailure(post.id, target, message);
     return failedOutcome(target, message);
   }
 
@@ -460,16 +593,17 @@ async function executeXTarget(
   } catch {
     // Transport-level failure: the request may already have been applied
     // remotely. FAILED (cron never auto-retries FAILED) with check-first
-    // guidance — never a blind "try again".
+    // guidance — never a blind "try again". Outcome unknowable → ambiguous.
     const message = xAmbiguousRetryMessage();
-    await updateTargetFailure(post.id, target.id, message, { clearJobId: true });
+    await updateTargetFailure(post.id, target, message, { clearJobId: true, ambiguous: true });
     return failedOutcome(target, message);
   }
   if (!result.success) {
     // An HTTP error response from X is unambiguous: the tweet was
     // rejected, so a later retry cannot duplicate it.
     const error = xErrorMessage(new Error(result.error || "Publication failed"));
-    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    obsRateLimitIfSignal(result.error ?? null, "X", post.id, target);
+    await updateTargetFailure(post.id, target, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
 
@@ -483,6 +617,16 @@ async function executeXTarget(
       errorMessage: null,
     },
   });
+  {
+    const ctx = obsContextFor(target);
+    emitPublishSuccess({
+      provider: "X",
+      postId: post.id,
+      targetId: target.id,
+      attempt: ctx.attempt,
+      duration: Date.now() - ctx.startedAt,
+    });
+  }
   return {
     ok: true,
     externalPostId: result.externalPostId,
@@ -503,7 +647,7 @@ async function executeThreadsTarget(
     // A stale container id from an earlier attempt must not survive a
     // validation failure: the next retry would otherwise poll a dead
     // container instead of creating a fresh one.
-    await updateTargetFailure(post.id, target.id, mediaValidation.error, {
+    await updateTargetFailure(post.id, target, mediaValidation.error, {
       clearJobId: true,
     });
     return failedOutcome(target, mediaValidation.error);
@@ -515,7 +659,7 @@ async function executeThreadsTarget(
       createSignedGetUrl({ pathname, ttlMs })
     );
     if (resolvedMedia.error) {
-      await updateTargetFailure(post.id, target.id, resolvedMedia.error, {
+      await updateTargetFailure(post.id, target, resolvedMedia.error, {
         clearJobId: true,
       });
       return failedOutcome(target, resolvedMedia.error);
@@ -526,7 +670,7 @@ async function executeThreadsTarget(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to generate media URL for Threads";
-    await updateTargetFailure(post.id, target.id, message, { clearJobId: true });
+    await updateTargetFailure(post.id, target, message, { clearJobId: true });
     return failedOutcome(target, message);
   }
 
@@ -534,14 +678,19 @@ async function executeThreadsTarget(
   // plain retryable failure (no container to drop, mirroring X).
   let accessToken: string;
   try {
-    accessToken = await ensureFreshThreadsToken({
-      id: account.id,
-      accessToken: account.accessToken,
-      expiresAt: account.expiresAt,
-    });
+    accessToken = await ensureFreshThreadsToken(
+      {
+        id: account.id,
+        accessToken: account.accessToken,
+        expiresAt: account.expiresAt,
+      },
+      undefined,
+      obsRefreshNotify("THREADS", post.id, target)
+    );
   } catch (error) {
     const message = threadsErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message);
+    obsRateLimitIfSignal(error, "THREADS", post.id, target);
+    await updateTargetFailure(post.id, target, message);
     return failedOutcome(target, message);
   }
 
@@ -574,6 +723,16 @@ async function executeThreadsTarget(
           errorMessage: null,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishSuccess({
+          provider: "THREADS",
+          postId: post.id,
+          targetId: target.id,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return {
         ok: true,
         externalPostId: outcome.externalPostId ?? undefined,
@@ -585,12 +744,23 @@ async function executeThreadsTarget(
       // ERROR/EXPIRED/transport failures are terminal on Meta's side for
       // this container: clear the id so the next manual retry starts a
       // fresh container.
-      await updateTargetFailure(post.id, target.id, outcome.error, {
+      obsRateLimitIfSignal(outcome.error, "THREADS", post.id, target);
+      await updateTargetFailure(post.id, target, outcome.error, {
         clearJobId: true,
       });
       return failedOutcome(target, outcome.error);
     }
     case "processing": {
+      // Poll budget exhausted but the container lives on Meta-side:
+      // resumable, NOT a failure.
+      const ctx = obsContextFor(target);
+      emitPublishTimeout({
+        provider: "THREADS",
+        postId: post.id,
+        targetId: target.id,
+        attempt: ctx.attempt,
+        duration: Date.now() - ctx.startedAt,
+      });
       return {
         ok: false,
         error: "Threads is still processing this media. Publishing continues automatically — do not retry yet.",
@@ -630,7 +800,7 @@ async function executeTiktokTarget(
   const caps = getPlatformCapabilities("TIKTOK");
   const mediaValidation = validateTargetMedia(caps, post.media);
   if (!mediaValidation.ok) {
-    await updateTargetFailure(post.id, target.id, mediaValidation.error);
+    await updateTargetFailure(post.id, target, mediaValidation.error);
     return failedOutcome(target, mediaValidation.error);
   }
   // One common Content field: the global post text is the default
@@ -644,7 +814,7 @@ async function executeTiktokTarget(
   const settings = tiktokSettingsFromRaw(effective.settings);
   const policy = resolveTiktokMediaPolicy(post.media, settings.photoCoverIndex);
   if (policy.kind === "error") {
-    await updateTargetFailure(post.id, target.id, policy.message, { clearJobId: true });
+    await updateTargetFailure(post.id, target, policy.message, { clearJobId: true });
     return failedOutcome(target, policy.message);
   }
   const tiktokContent = normalizeTiktokContent(effective.content);
@@ -654,17 +824,17 @@ async function executeTiktokTarget(
   if (policy.kind === "photo") {
     if (!title && !description) {
       const error = "TikTok photo post has no text. Add post text, a custom title, or a description.";
-      await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+      await updateTargetFailure(post.id, target, error, { clearJobId: true });
       return failedOutcome(target, error);
     }
     if (Array.from(title).length > TIKTOK_PHOTO_TITLE_MAX_LENGTH) {
       const error = `TikTok photo title exceeds the ${TIKTOK_PHOTO_TITLE_MAX_LENGTH} character limit.`;
-      await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+      await updateTargetFailure(post.id, target, error, { clearJobId: true });
       return failedOutcome(target, error);
     }
     if (Array.from(description).length > TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH) {
       const error = `TikTok photo description exceeds the ${TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH} character limit.`;
-      await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+      await updateTargetFailure(post.id, target, error, { clearJobId: true });
       return failedOutcome(target, error);
     }
     return executeTiktokPhotoTarget(post, target, account, {
@@ -678,39 +848,41 @@ async function executeTiktokTarget(
 
   if (!title) {
     const error = "TikTok video has no caption text. Add post text or a custom TikTok title.";
-    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    await updateTargetFailure(post.id, target, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
   if (Array.from(title).length > TIKTOK_CAPTION_MAX_LENGTH) {
     const error = `TikTok title exceeds the ${TIKTOK_CAPTION_MAX_LENGTH} character limit.`;
-    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    await updateTargetFailure(post.id, target, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
 
   const video = post.media.find((item) => item.id === policy.mediaId);
   if (!video) {
     const error = "TikTok media could not be resolved.";
-    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    await updateTargetFailure(post.id, target, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
 
   let accessToken: string;
   let mediaReadUrl: string;
   try {
-    accessToken = await ensureFreshTiktokToken({
-      id: account.id,
-      accessToken: account.accessToken,
-      refreshToken: account.refreshToken,
-      expiresAt: account.expiresAt,
-    });
+    accessToken = await ensureFreshTiktokToken(
+      {
+        id: account.id,
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        expiresAt: account.expiresAt,
+      },
+      undefined,
+      obsRefreshNotify("TIKTOK", post.id, target)
+    );
     mediaReadUrl = await createSignedGetUrl({
       pathname: video.pathname,
       ttlMs: TIKTOK_MEDIA_READ_TTL_MS,
     });
   } catch (error) {
-    const message = tiktokErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message);
-    return failedOutcome(target, message);
+    return failTiktokTarget(post.id, target, error);
   }
 
   const outcome = await publishTiktokDirectVideo(
@@ -752,6 +924,16 @@ async function executeTiktokTarget(
           errorMessage: null,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishSuccess({
+          provider: "TIKTOK",
+          postId: post.id,
+          targetId: target.id,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return {
         ok: true,
         externalPostId: outcome.externalPostId,
@@ -763,7 +945,8 @@ async function executeTiktokTarget(
     case "failed": {
       // TikTok reports these states only when the job is terminal
       // (FAILED status / rejected init): safe to clear for a fresh retry.
-      await updateTargetFailure(post.id, target.id, outcome.error, {
+      obsRateLimitIfSignal(outcome.error, "TIKTOK", post.id, target);
+      await updateTargetFailure(post.id, target, outcome.error, {
         clearJobId: true,
       });
       return failedOutcome(target, outcome.error);
@@ -771,6 +954,15 @@ async function executeTiktokTarget(
     case "processing": {
       // externalJobId is persisted; the next cron tick/resume or a manual
       // retry continues with status/fetch — never a second init.
+      // Poll budget exhausted while the job lives on TikTok-side: timeout.
+      const ctx = obsContextFor(target);
+      emitPublishTimeout({
+        provider: "TIKTOK",
+        postId: post.id,
+        targetId: target.id,
+        attempt: ctx.attempt,
+        duration: Date.now() - ctx.startedAt,
+      });
       return {
         ok: false,
         error: "TikTok is still processing this video. Publishing continues automatically — do not reinitialize.",
@@ -816,19 +1008,23 @@ async function executeTiktokPhotoTarget(
   const ordered = input.mediaIds.map((id) => byId.get(id));
   if (ordered.some((item) => !item)) {
     const error = "TikTok media could not be resolved.";
-    await updateTargetFailure(post.id, target.id, error, { clearJobId: true });
+    await updateTargetFailure(post.id, target, error, { clearJobId: true });
     return failedOutcome(target, error);
   }
 
   let accessToken: string;
   let photoUrls: string[] = [];
   try {
-    accessToken = await ensureFreshTiktokToken({
-      id: account.id,
-      accessToken: account.accessToken,
-      refreshToken: account.refreshToken,
-      expiresAt: account.expiresAt,
-    });
+    accessToken = await ensureFreshTiktokToken(
+      {
+        id: account.id,
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        expiresAt: account.expiresAt,
+      },
+      undefined,
+      obsRefreshNotify("TIKTOK", post.id, target)
+    );
     // Resume path: TikTok already has the bytes; polling needs no URLs.
     // Skipping URL generation also avoids extra Blob token calls against
     // TikTok's rate limits.
@@ -840,9 +1036,7 @@ async function executeTiktokPhotoTarget(
       }
     }
   } catch (error) {
-    const message = tiktokErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message);
-    return failedOutcome(target, message);
+    return failTiktokTarget(post.id, target, error);
   }
 
   const outcome = await publishTiktokDirectPhoto(
@@ -876,6 +1070,16 @@ async function executeTiktokPhotoTarget(
           errorMessage: null,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishSuccess({
+          provider: "TIKTOK",
+          postId: post.id,
+          targetId: target.id,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return {
         ok: true,
         externalPostId: outcome.externalPostId,
@@ -885,12 +1089,21 @@ async function executeTiktokPhotoTarget(
     }
     case "invalid":
     case "failed": {
-      await updateTargetFailure(post.id, target.id, outcome.error, {
+      obsRateLimitIfSignal(outcome.error, "TIKTOK", post.id, target);
+      await updateTargetFailure(post.id, target, outcome.error, {
         clearJobId: true,
       });
       return failedOutcome(target, outcome.error);
     }
     case "processing": {
+      const ctx = obsContextFor(target);
+      emitPublishTimeout({
+        provider: "TIKTOK",
+        postId: post.id,
+        targetId: target.id,
+        attempt: ctx.attempt,
+        duration: Date.now() - ctx.startedAt,
+      });
       return {
         ok: false,
         error: "TikTok is still processing these photos. Publishing continues automatically — do not reinitialize.",
@@ -916,7 +1129,7 @@ async function executeInstagramTarget(
     // A stale container id from an earlier attempt must not survive a
     // validation failure: the next retry would otherwise poll a dead
     // container instead of creating a fresh one.
-    await updateTargetFailure(post.id, target.id, mediaValidation.error, {
+    await updateTargetFailure(post.id, target, mediaValidation.error, {
       clearJobId: true,
     });
     return failedOutcome(target, mediaValidation.error);
@@ -930,18 +1143,23 @@ async function executeInstagramTarget(
   let accessToken: string;
   let mediaUrl: string;
   try {
-    accessToken = await ensureFreshInstagramToken({
-      id: account.id,
-      accessToken: account.accessToken,
-      expiresAt: account.expiresAt,
-    });
+    accessToken = await ensureFreshInstagramToken(
+      {
+        id: account.id,
+        accessToken: account.accessToken,
+        expiresAt: account.expiresAt,
+      },
+      undefined,
+      obsRefreshNotify("INSTAGRAM", post.id, target)
+    );
     mediaUrl = await createSignedGetUrl({
       pathname: media.pathname,
       ttlMs: INSTAGRAM_MEDIA_READ_TTL_MS,
     });
   } catch (error) {
     const message = instagramErrorMessage(error);
-    await updateTargetFailure(post.id, target.id, message, {
+    obsRateLimitIfSignal(error, "INSTAGRAM", post.id, target);
+    await updateTargetFailure(post.id, target, message, {
       clearJobId: true,
     });
     return failedOutcome(target, message);
@@ -977,6 +1195,16 @@ async function executeInstagramTarget(
           errorMessage: null,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishSuccess({
+          provider: "INSTAGRAM",
+          postId: post.id,
+          targetId: target.id,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return {
         ok: true,
         externalPostId: outcome.externalPostId ?? undefined,
@@ -988,12 +1216,23 @@ async function executeInstagramTarget(
     case "failed": {
       // ERROR/EXPIRED/media errors are terminal on Instagram's side: clear the
       // container id so the next manual retry starts a fresh container.
-      await updateTargetFailure(post.id, target.id, outcome.error, {
+      obsRateLimitIfSignal(outcome.error, "INSTAGRAM", post.id, target);
+      await updateTargetFailure(post.id, target, outcome.error, {
         clearJobId: true,
       });
       return failedOutcome(target, outcome.error);
     }
     case "processing": {
+      // Poll budget exhausted while the container lives on Meta-side:
+      // resumable, NOT a failure.
+      const ctx = obsContextFor(target);
+      emitPublishTimeout({
+        provider: "INSTAGRAM",
+        postId: post.id,
+        targetId: target.id,
+        attempt: ctx.attempt,
+        duration: Date.now() - ctx.startedAt,
+      });
       return {
         ok: false,
         error: "Instagram is still processing this media. Publishing continues automatically — do not retry yet.",
@@ -1025,8 +1264,14 @@ export async function resumeTiktokTarget(
     return "skip";
   }
   const account = target.socialAccount;
+  // Resume continuation of the stuck attempt (best-effort attempt 1).
+  obsAttemptContexts.set(target, { attempt: 1, startedAt: Date.now() });
   try {
-    const accessToken = await ensureFreshTiktokToken(account);
+    const accessToken = await ensureFreshTiktokToken(
+      account,
+      undefined,
+      obsRefreshNotify("TIKTOK", target.postId, target)
+    );
     const status = await fetchTiktokPublishStatus(accessToken, target.externalJobId);
     if (status.status === TIKTOK_STATUS_COMPLETE) {
       await prisma.postTarget.update({
@@ -1038,9 +1283,20 @@ export async function resumeTiktokTarget(
           errorMessage: null,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishSuccess({
+          provider: "TIKTOK",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "complete";
     }
     if (status.status === TIKTOK_STATUS_FAILED) {
+      obsRateLimitIfSignal(status.failReason ?? null, "TIKTOK", target.postId, target);
       await prisma.postTarget.update({
         where: { id: targetId },
         data: {
@@ -1051,22 +1307,47 @@ export async function resumeTiktokTarget(
           errorMessage: tiktokFailReasonMessage(status.failReason),
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishFailure({
+          provider: "TIKTOK",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "failed";
     }
     return "pending";
   } catch (error) {
-    const code = error instanceof TiktokApiError ? error.code : "";
-    if (isTiktokAuthErrorCode(code)) {
+    // Auth-terminal (incl. rotated-refresh failures) fails the target so a
+    // manual retry starts fresh; transient provider failures stay pending
+    // for the next tick. Same outcomes as the previous
+    // `isTiktokAuthErrorCode` check, now via the normalized category.
+    const normalized = normalizeProviderError("tiktok", error, tiktokErrorMessage(error));
+    if (normalized.code === "EXTERNAL_AUTH_EXPIRED") {
       await prisma.postTarget.update({
         where: { id: targetId },
         data: {
           status: "FAILED",
           externalJobId: null,
-          errorMessage: tiktokErrorMessage(error),
+          errorMessage: normalized.safeMessage,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishFailure({
+          provider: "TIKTOK",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "failed";
     }
+    obsRateLimitIfSignal(error, "TIKTOK", target.postId, target);
     return "pending";
   }
 }
@@ -1089,8 +1370,13 @@ export async function resumeInstagramTarget(
     return "skip";
   }
   const account = target.socialAccount;
+  obsAttemptContexts.set(target, { attempt: 1, startedAt: Date.now() });
   try {
-    const accessToken = await ensureFreshInstagramToken(account);
+    const accessToken = await ensureFreshInstagramToken(
+      account,
+      undefined,
+      obsRefreshNotify("INSTAGRAM", target.postId, target)
+    );
     const outcome = await monitorInstagramContainer(
       accessToken,
       { igUserId: account.externalId, containerId: target.externalJobId }
@@ -1105,9 +1391,20 @@ export async function resumeInstagramTarget(
           errorMessage: null,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishSuccess({
+          provider: "INSTAGRAM",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "complete";
     }
     if (outcome.state === "failed") {
+      obsRateLimitIfSignal(outcome.error, "INSTAGRAM", target.postId, target);
       await prisma.postTarget.update({
         where: { id: targetId },
         data: {
@@ -1116,6 +1413,16 @@ export async function resumeInstagramTarget(
           errorMessage: outcome.error,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishFailure({
+          provider: "INSTAGRAM",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "failed";
     }
     return "pending";
@@ -1135,8 +1442,19 @@ export async function resumeInstagramTarget(
           errorMessage: instagramErrorMessage(error),
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishFailure({
+          provider: "INSTAGRAM",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "failed";
     }
+    obsRateLimitIfSignal(error, "INSTAGRAM", target.postId, target);
     return "pending";
   }
 }
@@ -1166,6 +1484,7 @@ export async function resumeThreadsTarget(
     return "skip";
   }
   const account = target.socialAccount;
+  obsAttemptContexts.set(target, { attempt: 1, startedAt: Date.now() });
   // Video containers transcode server-side for minutes: resume with the
   // video budget when the post carries video so polling is not cut short
   // (a short budget only reports "processing" and retries next tick —
@@ -1173,7 +1492,11 @@ export async function resumeThreadsTarget(
   const video = target.post.media.some((item) => item.type === "VIDEO");
   let accessToken: string;
   try {
-    accessToken = await ensureFreshThreadsToken(account);
+    accessToken = await ensureFreshThreadsToken(
+      account,
+      undefined,
+      obsRefreshNotify("THREADS", target.postId, target)
+    );
   } catch (error) {
     // Terminal refresh failure (expired/revoked): fail with reconnect
     // guidance. Anything else stays pending below.
@@ -1186,8 +1509,19 @@ export async function resumeThreadsTarget(
           errorMessage: threadsErrorMessage(error),
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishFailure({
+          provider: "THREADS",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "failed";
     }
+    obsRateLimitIfSignal(error, "THREADS", target.postId, target);
     return "pending";
   }
   try {
@@ -1209,9 +1543,20 @@ export async function resumeThreadsTarget(
           errorMessage: null,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishSuccess({
+          provider: "THREADS",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "complete";
     }
     if (outcome.state === "failed") {
+      obsRateLimitIfSignal(outcome.error, "THREADS", target.postId, target);
       await prisma.postTarget.update({
         where: { id: targetId },
         data: {
@@ -1220,6 +1565,16 @@ export async function resumeThreadsTarget(
           errorMessage: outcome.error,
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishFailure({
+          provider: "THREADS",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "failed";
     }
     return "pending";
@@ -1237,8 +1592,19 @@ export async function resumeThreadsTarget(
           errorMessage: threadsErrorMessage(error),
         },
       });
+      {
+        const ctx = obsContextFor(target);
+        emitPublishFailure({
+          provider: "THREADS",
+          postId: target.postId,
+          targetId,
+          attempt: ctx.attempt,
+          duration: Date.now() - ctx.startedAt,
+        });
+      }
       return "failed";
     }
+    obsRateLimitIfSignal(error, "THREADS", target.postId, target);
     return "pending";
   }
 }
@@ -1278,7 +1644,27 @@ export async function resumeXTarget(
       errorMessage: xAmbiguousRetryMessage(),
     },
   });
-  return claimed.count > 0 ? "failed" : "skip";
+  if (claimed.count > 0) {
+    // Stale for over the ambiguity window with no resolvable outcome:
+    // timeout detection, then the terminal ambiguous failure.
+    emitPublishTimeout({
+      provider: target.platform,
+      postId: target.postId,
+      targetId,
+      attempt: 2,
+      duration: 0,
+    });
+    emitPublishFailure({
+      provider: target.platform,
+      postId: target.postId,
+      targetId,
+      attempt: 2,
+      duration: 0,
+      ambiguous: true,
+    });
+    return "failed";
+  }
+  return "skip";
 }
 
 /**
@@ -1382,7 +1768,15 @@ export async function publishPostTargets(
       if (result.status !== "rejected") return Promise.resolve();
       const error =
         result.reason instanceof Error ? result.reason.message : "Publication failed";
-      return updateTargetFailure(postId, targets[index].id, error);
+      const target = targets[index];
+      // Best-effort context for the funnel: the throw escaped dispatch
+      // (e.g. UnknownPlatformError), so the attempt number comes from the
+      // pre-claim snapshot and the duration clock starts here.
+      obsAttemptContexts.set(target, {
+        attempt: inferAttemptNumber(target.status),
+        startedAt: Date.now(),
+      });
+      return updateTargetFailure(postId, target, error);
     })
   );
   return finalizePostStatus(postId, post.status as AggregatePostStatus);

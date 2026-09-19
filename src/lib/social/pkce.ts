@@ -1,13 +1,9 @@
-import crypto from "crypto";
-
-export function generateCodeVerifier(): string {
-  return crypto.randomBytes(32).toString("base64url");
-}
-
-export function generateCodeChallenge(verifier: string): string {
-  return crypto.createHash("sha256").update(verifier).digest("base64url");
-}
-
-export function generateState(): string {
-  return crypto.randomBytes(16).toString("hex");
-}
+/**
+ * Compatibility re-export.
+ *
+ * Canonical location: `@/domain/social/pkce`.
+ * This shim keeps existing `@/lib/social/pkce` imports working
+ * while new code should import from the domain module directly.
+ * No behavior change — pure re-export.
+ */
+export * from "@/domain/social/pkce";

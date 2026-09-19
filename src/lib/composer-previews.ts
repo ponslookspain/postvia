@@ -6,6 +6,10 @@ import {
 import { validateTargetMedia } from "@/lib/platforms/overrides";
 import type { MediaKind } from "@/lib/media";
 import { validateMediaInput } from "@/lib/media";
+import {
+  TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH,
+  TIKTOK_PHOTO_TITLE_MAX_LENGTH,
+} from "@/domain/social/tiktok-photo-limits";
 
 export type PreviewAccount = {
   id: string;
@@ -21,14 +25,14 @@ export type PreviewOverride = {
 };
 
 /**
- * TikTok photo-flow limits. Mirror of TIKTOK_PHOTO_TITLE_MAX_LENGTH /
- * TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH in `@/lib/social/tiktok` — kept
- * local (not imported) so this client-consumed module never pulls the
- * server-side provider (prisma) into the browser bundle. A unit test
- * asserts the mirrors stay in sync.
+ * Back-compat aliases: historically local mirrors of the TikTok photo-flow
+ * limits, now bound to the canonical `tiktok-photo-limits` values (single
+ * source; no behavior change). Prefer importing the canonical names in
+ * new code.
  */
-export const TIKTOK_PHOTO_TITLE_LIMIT = 90;
-export const TIKTOK_PHOTO_DESCRIPTION_LIMIT = 4000;
+export const TIKTOK_PHOTO_TITLE_LIMIT = TIKTOK_PHOTO_TITLE_MAX_LENGTH;
+export const TIKTOK_PHOTO_DESCRIPTION_LIMIT =
+  TIKTOK_PHOTO_DESCRIPTION_MAX_LENGTH;
 
 export type ComposerPreview = {
   accountId: string;

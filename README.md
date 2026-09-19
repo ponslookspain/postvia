@@ -9,58 +9,108 @@ posting, billing, [abuse protection](docs/abuse-protection.md), environment,
 deployment, [workflow](docs/workflow.md), security, development). The code
 is the source of truth; docs mirror it.
 
-## Local development
+## Your workflow (local-first, agent-driven)
+
+You don't write code by hand. You sit in the project directory and drive
+an AI coding agent — **OpenCode** (`opencode`) or **Claude Code**
+(`claude`), either one, same rules for both — through the loop below.
+Full process contract, including exactly what the agent may and may not
+do on its own: [`docs/workflow.md`](docs/workflow.md).
+
+```
+you describe the task
+  → agent edits code
+  → agent runs checks locally (typecheck/lint/test/build) and fixes red ones
+  → you look at it in the browser
+  → agent commits + pushes `dev`  (builds NOTHING on Vercel — no Preview)
+  → agent STOPS and reports
+  → you open the GitHub PR (dev → main), review, click Merge
+  → merging main auto-deploys postvia.online — no other step
+```
 
 ### One-time setup
 
 ```bash
 npm install
-# configure .env.local (DATABASE_URL_POSTGRES_PRISMA_URL, BETTER_AUTH_SECRET,
-# provider keys, RESEND_API_KEY, ABUSE_HASH_PEPPER, ADMIN_EMAILS) —
-# template: .env.example, details: docs/environment.md. Never commit secrets.
-npx prisma db push   # empty/dev databases only — never production
+npx prisma generate
+cp .env.example .env.local   # fill in values — template + notes in
+                              # docs/environment.md. Never commit .env.local.
+npx prisma db push           # empty/dev databases only — never production
 ```
 
-### Daily run
+### Every day: running it locally
 
-First terminal:
 ```bash
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000) — the app always runs
+here. That's it for anything that isn't OAuth/social.
 
-Second terminal (only when social/OAuth testing is needed):
+**Only when you need to test a real login/social connection** (X,
+Threads, TikTok, Instagram — providers that redirect back to a public
+HTTPS URL, which `localhost` isn't), open a second terminal:
 ```bash
-npm run dev:tunnel   # ngrok http 3000 — the ngrok agent must be running
+npm run dev:tunnel   # ngrok http 3000 — the ngrok CLI must be installed
+                      # and the agent running
+```
+This proxies a permanent HTTPS address, `https://<NGROK_HOST>` (the exact
+hostname is in `.env.local` as `BETTER_AUTH_URL` — see
+[`docs/local-development.md`](docs/local-development.md)), through to
+your `localhost:3000`. Providers call back to that public URL, ngrok
+forwards it to your machine. It is **never** Production — just a
+tunnel into your own laptop. Full social-testing guide:
+[`docs/local-social-dev.md`](docs/local-social-dev.md).
+
+### Branches
+
+- Everyday work happens **on `dev`** — the same branch every session, not
+  a fresh one per task. The agent only cuts a separate `feature/*` /
+  `fix/*` / `staging/*` branch when a change genuinely needs isolating.
+- **`main` is Production.** Nobody commits to it directly; it only ever
+  receives a merge from a reviewed Pull Request, and that merge is itself
+  the release.
+
+### Commit → push → PR → merge
+
+The agent does the first two for you; you do the last two:
+
+```bash
+git status              # see what changed, sanity-check it
+git add -A
+git commit -m "short description of what changed"
+git push                # pushes dev — builds nothing on Vercel (no Preview)
 ```
 
-- Local app: [http://localhost:3000](http://localhost:3000) — the app
-  always runs here.
-- Social/OAuth test URL: `https://<NGROK_HOST>` — the operator's
-  permanent development hostname (current value in `.env.local` as
-  `BETTER_AUTH_URL`; see [`docs/local-development.md`](docs/local-development.md)),
-  proxied by ngrok to your localhost. This is NOT Production.
-- Log in locally with email OTP / password, connect real X / Threads /
-  TikTok / Instagram accounts on `/accounts`, publish a test video.
-  Google OAuth is not part of this flow. Full guide:
-  [`docs/local-social-dev.md`](docs/local-social-dev.md).
+- **The agent stops right after the push** and hands you a report — it
+  never opens or merges a Pull Request, and never touches `main`, without
+  you explicitly telling it to.
+- Open the Pull Request it points you to (`dev → main`, link printed by
+  `git push` / shown in the report), read the diff, click **Merge** when
+  happy.
+- That merge is the release: `postvia.online` redeploys automatically,
+  no extra step, no CLI command.
+- Bug after merge? Same loop again: task → agent fixes → checks → commit
+  → push → new PR → review → merge.
 
-### Ship it
+### Checks before every commit
 
+The agent already runs these and fixes failures before it hands things
+back to you; run them yourself if you ever commit by hand:
+
+```bash
+npx prisma validate
+npx prisma generate
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
-dev (active development) → local testing → commit → push (no Preview)
-→ GitHub Pull Request (dev → main) → review → merge main
-→ automatic Vercel Production (postvia.online)
-```
-
-Vercel Preview is not part of daily development. Checks before commit:
-`npx prisma validate` → `npx prisma generate` → `npm run typecheck` →
-`npm run lint` → `npm test` → `npm run build`.
 
 ## Stack
 
 - **Framework:** Next.js 16 (App Router, RSC), React 19, TypeScript
-- **Styling:** Tailwind CSS v4, Radian UI on Radix UI primitives,
-  Lucide icons, Inter body + DM Sans headings
+- **Styling:** Tailwind CSS v4, PostVIA primitives on Radix UI
+  (behavior/accessibility layer), Lucide icons, Inter body + DM Sans headings
   (`--font-sans` / `--font-heading`; Geist variables retained, not primary),
   dark theme by default with a light opt-in
 - **Database:** PostgreSQL via Prisma 6
@@ -213,16 +263,17 @@ invariants and the fail-open/fail-closed matrix:
 - **Dark by default, light opt-in.** The theme class is set on `<html>`
   before first paint (`src/hooks/use-theme.ts`), persists in
   `localStorage` and is switched from Appearance in the account menu.
-- **Red brand hue** for primary actions, kept a step off the error red;
-  the scheduled state uses info blue so routine work never looks like an
-  alert.
+- **PostVIA Blue brand hue** for primary actions, kept distinct from the
+  error red; the scheduled state uses info blue so routine work never
+  looks like an alert.
 - **Blocks carry no outline:** a tile is `--panel`, one shade off the
-  page; a block nested inside a tile goes inset (`bg-bg`). List rows are
+  page; a block nested inside a tile goes inset (`bg-background`). List rows are
   rounded surfaces separated by spacing, not hairline bands.
 - Shared components (`src/components`): `PageHeader`, `StatusBadge`,
   `AuthShell`, `MobileTopBar`, `PageContainer` (page-width tokens
-  `--page-narrow/default/wide`), plus Radian UI primitives in
-  `src/components/ui` (Radix UI) and PostVIA custom components
+  `--page-narrow/default/wide`), plus PostVIA primitives in
+  `src/components/ui` (Radix UI as the behavior/accessibility layer) and
+  PostVIA custom components
   (`Field` forms, `Toast` notifications).
 - Conventions: `FieldGroup` + `Field` forms with `data-invalid` /
   `aria-invalid`, `Card` sections with full header composition, `Alert` for
@@ -234,30 +285,11 @@ invariants and the fail-open/fail-closed matrix:
   (`MobileTopBar`, `MobileComposerBar` with safe-area padding).
 - Full contract: [`docs/design-system.md`](docs/design-system.md).
 
-## Getting started
-
-```bash
-npm install
-# configure .env (DATABASE_URL_POSTGRES_PRISMA_URL, BETTER_AUTH_SECRET,
-# GOOGLE_CLIENT_ID/SECRET, provider keys, RESEND_API_KEY, Blob keys,
-# ABUSE_HASH_PEPPER, ADMIN_EMAILS) — see docs/environment.md
-npx prisma db push   # empty/dev databases only — never production
-npm run dev
-```
-```bash
-cd C:\Users\Ponslookspain\postvia
-npm run dev:tunnel
-```
-Open [http://localhost:3000](http://localhost:3000), or `https://<NGROK_HOST>`
-for OAuth/social flows (see above).
-
-Canonical local guide (env, ngrok, DB, Blob, OAuth, smoke tests):
-[`docs/local-development.md`](docs/local-development.md).
-
 ## Scripts
 
 ```bash
-npm run dev        # start dev server (http://localhost:3000)
+npm run dev        # start dev server (http://localhost:3000), webpack —
+                   # see docs/local-development.md for why not Turbopack
 npm run dev:local  # same, explicit local-only dev server
 npm run dev:tunnel # ngrok http 3000 (permanent dev HTTPS for OAuth
                    # callbacks; needs the `ngrok` CLI)
@@ -270,32 +302,22 @@ npm run test:pg    # real-PostgreSQL concurrency suite —
                    # needs PG_INTEGRATION=1 + isolated test DB, never prod
 ```
 
-## Development & release (local-first)
+Canonical local guide (env, ngrok, DB, Blob, OAuth, smoke tests):
+[`docs/local-development.md`](docs/local-development.md).
 
-Development is local-first: edit and verify on your own machine, then ship
-through GitHub. Vercel is the release platform, not a mandatory preview
-environment.
+## Vercel: release platform, not a preview environment
 
-- Local dev server: `npm run dev` → [http://localhost:3000](http://localhost:3000).
-- Public HTTPS for OAuth callbacks / integration testing only:
-  `npm run dev:tunnel` (`ngrok http 3000`) → permanent development URL
-  `https://<NGROK_HOST>` (operator hostname, see
-  [`docs/local-development.md`](docs/local-development.md)), which proxies to
-  `localhost:3000`. It never replaces Production. Real social testing
-  guide: [`docs/local-social-dev.md`](docs/local-social-dev.md).
-- Flow: `dev` (active development) → local testing → commit →
-  push (**no Vercel Preview is built**) → GitHub Pull Request (`dev` → `main`) → review →
-  merge to `main` → **automatic Vercel Production deployment** of `main`
-  (`postvia.online`). Vercel Preview is not part of daily development.
-- Vercel Preview is NOT a required step of daily development and must NOT
-  be built for feature-branch pushes. Vercel Git deployment triggers live
-  in the Vercel Project settings (dashboard, outside this repository) —
-  the repo and docs cannot switch them off by themselves. Required
-  dashboard policy: Production Branch = `main` (auto-deploys on merge),
-  non-production branches skipped (no Preview builds).
+Vercel only ever builds two things for this repo: nothing (on a `dev`
+push — no Preview, by policy) and Production (on a merge to `main`).
+That policy lives in the Vercel Project's dashboard settings, outside
+this repository — the code and docs describe it but cannot change it:
+Production Branch = `main` (auto-deploys on merge), non-production
+branches skipped (no Preview builds). See
+[`docs/deployment.md`](docs/deployment.md).
 
-Full process contract: [`docs/workflow.md`](docs/workflow.md). Release
-details: [`docs/deployment.md`](docs/deployment.md). Scheduled publishing
-runs on the cron defined in `vercel.json` (daily at 03:00 UTC — the
-maximum frequency on the current Hobby plan, so scheduled posts can go
-out up to ~24h late; a paid plan unlocks sub-daily schedules).
+Full process contract (what the agent may/may not do, the "ship it"
+confirmation rule, environment variables): [`docs/workflow.md`](docs/workflow.md).
+Scheduled publishing runs on the cron defined in `vercel.json` (daily at
+03:00 UTC — the maximum frequency on the current Hobby plan, so scheduled
+posts can go out up to ~24h late; a paid plan unlocks sub-daily
+schedules).

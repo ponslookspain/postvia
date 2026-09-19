@@ -301,21 +301,15 @@ wrapping it in an inline-sized span does not help (the svg keeps its own
 The general shape — a component exposing `className` but not `style` — will
 recur; check the signature before assuming inline styles are available.
 
-### `muted` and `accent` are the same colour in the light theme
+### `muted`-on-`muted` fills are invisible (no error)
 
-`--accent` is a plain alias of `--muted` (`semantic.css`: `--accent: var(--muted)`).
-So anything `bg-accent` on a `bg-muted` surface is **invisible**, with no
-error. `Skeleton` is `bg-accent` — a skeleton stack on a `muted` panel
-photographs as an empty grey box.
-
-**This is pre-existing, not something the token refactor (or the later
-Radian-naming removal) introduced**: `--muted` and `--accent` have always
-held the same `oklch(0.97 0 0)` in light theme; only the name on top of them
-changed (`fill1`/`fill2` → `muted`/`accent`, when `compat-radian.css` was
-removed). It is the documented `muted`/`accent` collapse (`docs/design-tokens.md`,
-"Radian removal" §3) meeting a real component. Authors: put `Skeleton` on
-`--color-background`, or inside a real `Sidebar` where `--color-sidebar` (`0.985`) is a
-shade lighter and it just reads.
+Fill-on-same-fill renders nothing: `Skeleton` is `bg-muted`, so a skeleton
+stack on a `muted` panel photographs as an empty grey box. (History: this
+note once described the same trap through the `--accent` alias, which was
+value-identical to `--muted` and has since been removed in Color System
+2.0 Phase 5 — the trap itself survives under the canonical name.)
+Authors: put `Skeleton` on `--color-background`, or inside a real `Sidebar`
+where `--color-sidebar` is a shade lighter and it just reads.
 
 ### `Sidebar` geometry in a capture
 

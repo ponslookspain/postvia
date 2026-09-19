@@ -11,7 +11,6 @@ export type BannerTitleProps = React.HTMLAttributes<HTMLHeadingElement>
 export type BannerDescriptionProps = React.HTMLAttributes<HTMLParagraphElement>
 export type BannerContentProps = React.HTMLAttributes<HTMLDivElement>
 export type BannerIconProps = React.HTMLAttributes<HTMLDivElement>
-export type BannerToolbarProps = React.HTMLAttributes<HTMLDivElement>
 
 const bannerVariants = cva(
 	"flex items-center justify-center w-full gap-2 p-2 overflow-hidden",
@@ -29,16 +28,16 @@ const bannerVariants = cva(
 				strong: "[&_[data-slot=banner-close]]:text-current",
 				soft: "[&_[data-slot=banner-close]]:text-current [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-foreground",
 				outline:
-					"border border-accent border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-muted-foreground [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-muted-foreground",
+					"border border-border border-l-0 border-t-0 border-r-0 [&_[data-slot=banner-close]]:text-muted-foreground [&_[data-slot=banner-title]]:text-foreground [&_[data-slot=banner-description]]:text-muted-foreground",
 			},
 		},
 		compoundVariants: [
 			// Soft
-			{ color: "neutral", variant: "soft", className: "bg-accent" },
+			{ color: "neutral", variant: "soft", className: "bg-muted" },
 			{
 				color: "primary",
 				variant: "soft",
-				className: "bg-accent text-primary",
+				className: "bg-muted text-primary",
 			},
 			{
 				color: "info",
@@ -48,18 +47,18 @@ const bannerVariants = cva(
 			{
 				color: "success",
 				variant: "soft",
-				className: "bg-success-accent text-success",
+				className: "bg-success-accent text-success-text",
 			},
 			{
 				color: "error",
 				variant: "soft",
-				className: "bg-error-accent text-error",
+				className: "bg-error-accent text-error-text",
 			},
 			{
 				color: "warning",
 				variant: "soft",
 				className:
-					"bg-warning-accent text-warning [&_[data-slot=banner-icon]]:text-warning-border",
+					"bg-warning-accent text-warning-text [&_[data-slot=banner-icon]]:text-warning-border",
 			},
 
 			// Strong
@@ -105,17 +104,17 @@ const bannerVariants = cva(
 			{
 				color: "success",
 				variant: "outline",
-				className: "bg-transparent text-success",
+				className: "bg-transparent text-success-text",
 			},
 			{
 				color: "error",
 				variant: "outline",
-				className: "bg-transparent text-error",
+				className: "bg-transparent text-error-text",
 			},
 			{
 				color: "warning",
 				variant: "outline",
-				className: "bg-transparent text-warning",
+				className: "bg-transparent text-warning-text",
 			},
 		],
 		defaultVariants: {

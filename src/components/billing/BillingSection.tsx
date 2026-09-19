@@ -284,7 +284,9 @@ export function BillingSection({
                       : `${initial.totalAccounts} of ${initial.accountsLimit}`}
                   </dd>
                 </div>
-                <Divider />
+              </dl>
+              <Divider />
+              <dl className="flex flex-col">
                 <div className="flex items-center justify-between gap-4 py-2.5 text-sm">
                   <dt className="text-muted-foreground">Billing period</dt>
                   <dd className="font-medium">
@@ -420,14 +422,14 @@ export function BillingSection({
                 key={plan.id}
                 className={cn(
                   "h-full",
-                  recommended && "border-primary/30 bg-primary/10"
+                  recommended && "border-primary-border bg-primary-soft"
                 )}
               >
                 <CardHeader>
                   <div className="flex flex-wrap items-center gap-2">
                     <CardTitle>{plan.name}</CardTitle>
                     {recommended && (
-                      <Badge variant="strong" color="primary" className="border-primary/30 bg-primary/10 text-primary">
+                      <Badge variant="soft" className="border-primary-border bg-primary-soft">
                         Recommended
                       </Badge>
                     )}

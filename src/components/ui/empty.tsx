@@ -16,7 +16,7 @@ const emptyMediaVariants = cva(
 		variants: {
 			variant: {
 				default: "bg-transparent",
-				icon: "bg-accent text-primary border p-3 border-accent flex shrink-0 items-center justify-center rounded-lg [&_svg:not([class*='size-'])]:size-6",
+				icon: "bg-muted text-primary border p-3 border-border flex shrink-0 items-center justify-center rounded-lg [&_svg:not([class*='size-'])]:size-6",
 			},
 		},
 		defaultVariants: {
@@ -58,7 +58,7 @@ function EmptyMedia({
 }: EmptyMediaProps) {
 	return (
 		<div
-			data-slot="empty-icon"
+			data-slot="empty-media"
 			data-variant={variant}
 			className={cn(emptyMediaVariants({ variant, className }))}
 			{...props}

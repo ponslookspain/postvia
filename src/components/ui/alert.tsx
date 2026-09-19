@@ -38,16 +38,16 @@ const alertVariants = cva(
 				"soft-outline":
 					"ring-1 ring-inset [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
 				outline:
-					"border border-accent [&_[data-slot=alert-close]]:text-muted-foreground [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
+					"border border-border [&_[data-slot=alert-close]]:text-muted-foreground [&_[data-slot=alert-title]]:text-foreground [&_[data-slot=alert-description]]:text-foreground",
 			},
 		},
 		compoundVariants: [
 			// Soft variants
-			{ color: "neutral", variant: "soft", className: "bg-accent" },
+			{ color: "neutral", variant: "soft", className: "bg-muted" },
 			{
 				color: "primary",
 				variant: "soft",
-				className: "bg-accent text-primary",
+				className: "bg-muted text-primary",
 			},
 			{
 				color: "info",
@@ -57,17 +57,17 @@ const alertVariants = cva(
 			{
 				color: "success",
 				variant: "soft",
-				className: "bg-success-accent text-success",
+				className: "bg-success-accent text-success-text",
 			},
 			{
 				color: "error",
 				variant: "soft",
-				className: "bg-error-accent text-error",
+				className: "bg-error-accent text-error-text",
 			},
 			{
 				color: "warning",
 				variant: "soft",
-				className: "bg-warning-accent text-warning",
+				className: "bg-warning-accent text-warning-text",
 			},
 
 			// Strong variants
@@ -98,12 +98,12 @@ const alertVariants = cva(
 			{
 				color: "neutral",
 				variant: "soft-outline",
-				className: "border-border bg-accent",
+				className: "border-border bg-muted",
 			},
 			{
 				color: "primary",
 				variant: "soft-outline",
-				className: "bg-accent text-primary border-primary",
+				className: "bg-muted text-primary border-primary",
 			},
 			{
 				color: "info",
@@ -113,17 +113,17 @@ const alertVariants = cva(
 			{
 				color: "success",
 				variant: "soft-outline",
-				className: "bg-success-accent text-success border-success-border",
+				className: "bg-success-accent text-success-text border-success-border",
 			},
 			{
 				color: "error",
 				variant: "soft-outline",
-				className: "bg-error-accent text-error border-error-border",
+				className: "bg-error-accent text-error-text border-error-border",
 			},
 			{
 				color: "warning",
 				variant: "soft-outline",
-				className: "bg-warning-accent text-warning border-warning-border",
+				className: "bg-warning-accent text-warning-text border-warning-border",
 			},
 
 			// Outline variants
@@ -145,17 +145,17 @@ const alertVariants = cva(
 			{
 				color: "success",
 				variant: "outline",
-				className: "bg-transparent text-success",
+				className: "bg-transparent text-success-text",
 			},
 			{
 				color: "error",
 				variant: "outline",
-				className: "bg-transparent text-error",
+				className: "bg-transparent text-error-text",
 			},
 			{
 				color: "warning",
 				variant: "outline",
-				className: "bg-transparent text-warning",
+				className: "bg-transparent text-warning-text",
 			},
 		],
 		defaultVariants: {
@@ -174,12 +174,15 @@ function Alert({
 	children,
 	...props
 }: AlertProps) {
+	// Assertive `alert` is reserved for errors; neutral/info/success/warning
+	// are status updates. An explicit `role` prop still wins via the spread.
+	const { role: roleOverride, ...rest } = props
 	return (
 		<div
 			data-slot="alert"
-			role="alert"
+			role={roleOverride ?? (color === "error" ? "alert" : "status")}
 			className={cn(alertVariants({ color, variant }), className)}
-			{...props}>
+			{...rest}>
 			{children}
 			{close && (
 				<button

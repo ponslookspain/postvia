@@ -20,7 +20,7 @@ export function PostAvatar({
 }) {
   return (
     <Avatar>
-      <AvatarFallback aria-label={label}>
+      <AvatarFallback role="img" aria-label={label}>
         <span className="flex size-4 items-center justify-center [&_svg]:size-4">
           <PlatformIcon platform={platform} />
         </span>

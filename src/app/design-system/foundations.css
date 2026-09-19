@@ -112,7 +112,163 @@
    hover / text / fg`; every hue and step without a consumer was removed once
    the Badge/Avatar color axes stopped spanning them (see
    `docs/design-tokens.md`, "Radian removal").
+
+   PostVIA tonal scales (Color System 2.0, Phase 1 — ADDITIVE, no consumers).
+   ----------------------------------------------------------------------------
+   Six PostVIA-owned tonal scales. Each scale follows the 1 → 12 progression:
+
+       1  whisper surface      7  border
+       2  very subtle surface  8  strong border / input edge
+       3  soft surface         9  solid accent (fills, dots)
+       4  hover surface        10 solid hover
+       5  active surface       11 accessible text ink
+       6  subtle border        12 strongest text ink
+
+   Scales:
+       --paper-*    neutral / warm       (surfaces, borders, neutral text)
+       --signal-*   brand blue           (primary actions, focus)
+       --moss-*     success green
+       --harvest-*  warning amber
+       --clay-*     error red
+       --sky-*      info blue            (routine SCHEDULED states; same hue
+                                        family as signal by intent, tuned
+                                        independently)
+
+   Rules for this block:
+     - Steps are plain `:root` / `.dark` custom properties on purpose: they
+       are NOT `--color-*` `@theme` entries, so Tailwind emits no utilities
+       for them and no component can reach them directly. The ONLY future
+       consumer is `semantic.css` (Phase 2 mapping).
+     - Only steps with a confirmed consumer are materialized (paper:
+       0/1/2/3/4/5/6/7/8/11/12; signal/moss/harvest/clay: 3/7/9/11; sky:
+       3/7/11). The scale reserves the full 1–12 numbering so later steps
+       can be added without renumbering or breaking the API. `paper-4` is
+       the overlay rung of the surface ladder; `paper-5` the subtle-border
+       rung. `sky-9` was removed in Phase 5 (zero consumers — info solid
+       shares the brand `signal-9`).
+     - `paper-0` sits BELOW the surface ladder (1–4), on the opposite side
+       from the borders (5–8): it is the one sunken rung, backing
+       `--muted` (the sunken elevation tier). It was added after Phase 2 shipped
+       1–4/11/12 without a place for the recessed role, which left `--muted`
+       a hand-written literal while every surface around it moved onto the
+       scale — in dark that literal (`#38362f`, L* 33.25) ended up
+       indistinguishable from the Phase 2 `paper-3` card (L* 33.61, ΔL* 0.35,
+       contrast 1.014:1). `paper-0` restores one direction in both themes:
+       `muted` reads BELOW canvas everywhere (light already did; dark did
+       the opposite before this fix).
+     - Values are PostVIA-owned OKLCH picks anchored near today's semantic
+       hues (so Phase 2 can calibrate against them); they are not copied
+       from any external palette. Phase 2 maps `semantic.css` tokens onto
+       these steps group by group; each mapping is validated before merge.
 -------------------------------------------------------------------------- */
+:root {
+	/* paper — neutral / warm.
+	   Surface ladder (Group A): 1 canvas ≈ #F5F4EE · 2 surface ≈ #F7F6F0 ·
+	   3 raised ≈ #FAF9F5 · 4 overlay ≈ #FCFBF7. Tiers lighten monotonically
+	   from the canvas; canvas and raised hold their pre-Phase-2 values.
+	   `paper-0` is the one sunken rung, BELOW canvas — backs `--muted` (see
+	   the block comment above). Sits ~3.5 L* below `paper-1`, unchanged in
+	   practice from the pre-existing `--muted` literal it replaces. */
+	--paper-0: oklch(0.92 0.009 95);
+	--paper-1: oklch(0.956 0.007 95);
+	--paper-2: oklch(0.967 0.006 95);
+	--paper-3: oklch(0.976 0.005 95);
+	--paper-4: oklch(0.986 0.004 95);
+	--paper-5: oklch(0.93 0.009 95);
+	--paper-6: oklch(0.905 0.01 95);
+	--paper-7: oklch(0.875 0.012 95);
+	--paper-8: oklch(0.83 0.014 95);
+	--paper-11: oklch(0.45 0.02 95);
+	--paper-12: oklch(0.28 0.02 95);
+
+	/* signal — brand blue.
+	   `signal-9` is gated on computed WCAG contrast (Group C): 4.89 as
+	   link text on the canvas and 5.55 for white on solid, both above the
+	   previous #286FC2 (4.46 / 5.07). */
+	--signal-3: oklch(0.94 0.03 255);
+	--signal-7: oklch(0.7 0.1 255);
+	--signal-9: oklch(0.52 0.14 255);
+	--signal-11: oklch(0.48 0.15 255);
+
+	/* moss — success green */
+	--moss-3: oklch(0.945 0.03 155);
+	--moss-7: oklch(0.7 0.1 155);
+	--moss-9: oklch(0.56 0.13 155);
+	--moss-11: oklch(0.5 0.12 155);
+
+	/* harvest — warning amber.
+	   `harvest-9` is gated on computed WCAG contrast (Group D): 4.60 for
+	   the dark warning ink on solid, above the previous #C58A24 (4.50). */
+	--harvest-3: oklch(0.955 0.035 80);
+	--harvest-7: oklch(0.75 0.1 80);
+	--harvest-9: oklch(0.68 0.12 80);
+	--harvest-11: oklch(0.52 0.1 80);
+
+	/* clay — error red */
+	--clay-3: oklch(0.94 0.03 25);
+	--clay-7: oklch(0.7 0.1 25);
+	--clay-9: oklch(0.57 0.15 25);
+	--clay-11: oklch(0.52 0.14 25);
+
+	/* sky — info blue (`sky-9` was never consumed — info solid shares the
+	   brand `signal-9` — and was removed in Phase 5). */
+	--sky-3: oklch(0.945 0.028 250);
+	--sky-7: oklch(0.71 0.095 250);
+	--sky-11: oklch(0.51 0.145 250);
+}
+
+.dark {
+	/* paper — neutral / warm.
+	   Surface ladder (Group A): 1 canvas ≈ #262624 · 2 surface ≈ #2A2927 ·
+	   3 raised ≈ #2D2C2B · 4 overlay ≈ #302F2C. Same ascending logic as
+	   light, optically tuned — not mirrored numbers.
+	   `paper-0` is the sunken rung backing `--muted`. Chosen ~3.3 L* below
+	   `paper-1` (matching light's direction and magnitude) instead of
+	   mirroring the old `--muted` literal (`#38362f`), which had drifted
+	   ABOVE canvas and onto `paper-3` (card) once Phase 2 retuned the
+	   surface ladder — see the block comment above for the measured
+	   collapse (ΔL* 0.35, 1.014:1). */
+	--paper-0: oklch(0.255 0.008 95);
+	--paper-1: oklch(0.29 0.008 95);
+	--paper-2: oklch(0.315 0.009 95);
+	--paper-3: oklch(0.335 0.009 95);
+	--paper-4: oklch(0.36 0.01 95);
+	--paper-5: oklch(0.37 0.011 95);
+	--paper-6: oklch(0.4 0.012 95);
+	--paper-7: oklch(0.44 0.012 95);
+	--paper-8: oklch(0.5 0.014 95);
+	--paper-11: oklch(0.76 0.02 95);
+	--paper-12: oklch(0.95 0.008 95);
+
+	/* signal — brand blue */
+	--signal-3: oklch(0.35 0.07 255);
+	--signal-7: oklch(0.55 0.12 255);
+	--signal-9: oklch(0.7 0.13 255);
+	--signal-11: oklch(0.75 0.12 255);
+
+	/* moss — success green */
+	--moss-3: oklch(0.35 0.06 155);
+	--moss-7: oklch(0.55 0.1 155);
+	--moss-9: oklch(0.7 0.13 155);
+	--moss-11: oklch(0.72 0.13 155);
+
+	/* harvest — warning amber */
+	--harvest-3: oklch(0.36 0.06 80);
+	--harvest-7: oklch(0.58 0.1 80);
+	--harvest-9: oklch(0.72 0.13 80);
+	--harvest-11: oklch(0.74 0.13 80);
+
+	/* clay — error red */
+	--clay-3: oklch(0.36 0.07 25);
+	--clay-7: oklch(0.57 0.12 25);
+	--clay-9: oklch(0.66 0.14 25);
+	--clay-11: oklch(0.71 0.13 25);
+
+	/* sky — info blue (no `sky-9`; see above). */
+	--sky-3: oklch(0.35 0.065 250);
+	--sky-7: oklch(0.56 0.115 250);
+	--sky-11: oklch(0.74 0.12 250);
+}
 @theme {
 	/* red */
 	--color-red-accent: oklch(0.956 0.02 17.516);

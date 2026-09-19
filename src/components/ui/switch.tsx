@@ -23,7 +23,7 @@ const SwitchContext = React.createContext<SwitchContextType>({
 const switchVariants = cva(
 	`
   relative peer inline-flex shrink-0 cursor-pointer items-center rounded-full transition-colors 
-  focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg 
+  focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background 
   disabled:cursor-not-allowed disabled:opacity-50 bg-overlay-8
   aria-invalid:border aria-invalid:border-error aria-invalid:ring-error
   [[data-invalid=true]_&]:border [[data-invalid=true]_&]:border-error [[data-invalid=true]_&]:ring-error
@@ -40,7 +40,7 @@ const switchVariants = cva(
 				"32": "w-14 h-8",
 			},
 			permanent: {
-				true: "bg-accent",
+				true: "bg-muted",
 				false: "data-[state=checked]:bg-primary",
 			},
 		},
@@ -55,7 +55,7 @@ const switchVariants = cva(
 // Thumb Variants
 const switchThumbVariants = cva(
 	`
-  pointer-events-none bg-white shadow-lg ring-0 transition-transform 
+  pointer-events-none bg-switch-thumb shadow-lg ring-0 transition-transform 
   data-[state=unchecked]:translate-x-[3px]
   rtl:data-[state=unchecked]:-translate-x-[3px]
   rtl:data-[state=checked]:-translate-x-[calc(100%-3px)]

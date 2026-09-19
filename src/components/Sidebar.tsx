@@ -243,7 +243,7 @@ export function Sidebar({
             <DropdownMenuDivider />
             <DropdownMenuItem
               onSelect={() => void handleSignOut()}
-              className="text-error [&_svg]:text-error"
+              className="text-error-text [&_svg]:text-error-text"
             >
               <LogOutIcon aria-hidden="true" />
               Sign out

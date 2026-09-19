@@ -12,6 +12,7 @@
 import { getPlatformCapabilities } from "@/lib/platforms/capabilities";
 import { validateTargetMedia } from "@/lib/platforms/overrides";
 import { validateMediaInput } from "@/lib/media";
+import { TIKTOK_PHOTO_TITLE_MAX_LENGTH } from "@/domain/social/tiktok-photo-limits";
 import type { Platform } from "@prisma/client";
 
 export const BULK_MAX_VIDEOS = 10;
@@ -273,10 +274,11 @@ export function bulkTextLimit(
   platform: Platform,
   media: { hasVideo: boolean; hasImage: boolean }
 ): number {
-  // Photo flow narrows TikTok's 2200 title gate to 90 downstream
-  // (resolveTiktokPhotoPostInfo); there is no description override in
-  // bulk, so the shared text itself must fit the title cap.
-  if (platform === "TIKTOK" && !media.hasVideo && media.hasImage) return 90;
+  // Photo flow narrows TikTok's 2200 title gate to the canonical photo
+  // title cap (resolveTiktokPhotoPostInfo); there is no description
+  // override in bulk, so the shared text itself must fit the title cap.
+  if (platform === "TIKTOK" && !media.hasVideo && media.hasImage)
+    return TIKTOK_PHOTO_TITLE_MAX_LENGTH;
   const caps = getPlatformCapabilities(platform);
   return caps.fields.find((field) => field.type === "text")?.maxLength ?? 500;
 }

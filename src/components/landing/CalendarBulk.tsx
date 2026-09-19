@@ -133,14 +133,11 @@ export function CalendarBulk() {
               <p className="mt-4 text-sm text-muted-foreground">
                 Free keeps the same calendar workflow for individual posts.
               </p>
-              <Button
-                variant="outline"
-                nativeButton={false}
-                render={<Link href="#pricing" />}
-                className="mt-4"
-              >
-                Compare plans
-                <ArrowRightIcon data-icon="inline-end" />
+              <Button variant="outline" asChild className="mt-4">
+                <Link href="#pricing">
+                  Compare plans
+                  <ArrowRightIcon data-icon="inline-end" />
+                </Link>
               </Button>
             </div>
           </Reveal>

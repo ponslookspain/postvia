@@ -7,6 +7,7 @@ export type LabelProps = React.ComponentProps<typeof LabelPrimitive.Root>
 function Label({ className, ...props }: LabelProps) {
 	return (
 		<LabelPrimitive.Root
+			data-slot="label"
 			className={cn(
 				"peer-disabled:text-muted-foreground peer-has-disabled:text-muted-foreground text-sm font-medium peer-disabled:cursor-not-allowed",
 				className

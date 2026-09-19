@@ -116,6 +116,19 @@ the ngrok origin, production uses `postvia.online` — never
 | TikTok | ✅ (global text default, optional override) | ✅ JPEG/WebP ≤20 MB | ❌ | ✅ MP4/WebM/MOV | 4 (API allows 35) | No mixing; title/description are API-optional — global post text is the default caption, a custom title/description wins per target; photo title ≤90, description ≤4000; composer blocks Publish on over-limit values |
 | Instagram | ❌ (caption+media) | ✅ JPEG only | ❌ | ✅ MP4 Reel | 1 | No carousel/stories/alt_text in Postvia (API supports them) |
 
+Composer add-gate (UX only): `/posts/new` derives effective media
+constraints from the selected targets (`getEffectiveMediaConstraints` in
+`src/domain/social/overrides.ts` — min `maxItems`, MIME intersection,
+AND of the mixing/multiple-video flags, all read from the canonical
+`capabilities.ts`). The counter, Add control and picker hint follow the
+effective limit; incompatible new files are refused with the same
+messages the server validation produces. Existing media is never
+auto-removed when the selection changes — the conflict keeps surfacing
+through the existing per-target preview validation with submit
+disabled. `POST /api/posts` and publish-time `validateTargetMedia` stay
+authoritative; file size is still enforced on the preview/upload layer,
+never at add time.
+
 ## Retry / duplicate protection (`externalJobId` semantics per platform)
 
 - TikTok: `publish_id` persisted immediately after init; resume polls

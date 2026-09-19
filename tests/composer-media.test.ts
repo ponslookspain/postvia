@@ -13,6 +13,7 @@ import {
   planMediaAdd,
   selectMediaForUpload,
 } from "../src/lib/composer-media";
+import { getEffectiveMediaConstraints } from "../src/lib/platforms/overrides";
 
 const ACCOUNTS = [
   { id: "threads-1", platform: "THREADS" },
@@ -455,5 +456,174 @@ describe("TikTok photo byte mirror", () => {
       "../src/lib/social/tiktok"
     );
     assert.equal(20 * 1024 * 1024, TIKTOK_PHOTO_MAX_BYTES);
+  });
+});
+
+describe("planMediaAdd with effective platform constraints", () => {
+  const TIKTOK = { id: "tt-1", platform: "TIKTOK" };
+  const INSTAGRAM = { id: "ig-1", platform: "INSTAGRAM" };
+  const JPEG = { name: "photo.jpg", type: "image/jpeg", size: 1024 };
+  const GIF = { name: "anim.gif", type: "image/gif", size: 1024 };
+
+  function effectiveFor(ids: string[], all: { id: string; platform: string }[]) {
+    return (
+      getEffectiveMediaConstraints(
+        all
+          .filter((account) => ids.includes(account.id))
+          .map((account) => account.platform as never)
+      ) ?? undefined
+    );
+  }
+
+  function addWithEffective(
+    files: { name: string; type: string; size: number }[],
+    ids: string[],
+    all: { id: string; platform: string }[],
+    existingMedia: { type: "IMAGE" | "VIDEO"; mimeType: string }[] = []
+  ) {
+    return planMediaAdd({
+      files,
+      existingCount: existingMedia.length,
+      maxMedia: 4,
+      selectedAccountIds: ids,
+      accounts: all,
+      effective: effectiveFor(ids, all),
+      existingMedia,
+    });
+  }
+
+  test("legacy call without effective keeps the old behavior", () => {
+    // Four PNGs for a Threads-only selection: rejected under the
+    // effective gate (maxItems 1), accepted on the legacy path.
+    const plan = planMediaAdd({
+      files: [PNG, PNG, PNG, PNG],
+      existingCount: 0,
+      maxMedia: 4,
+      selectedAccountIds: ["threads-1"],
+      accounts: ACCOUNTS,
+    });
+    assert.equal(plan.limitExceeded, false);
+    assert.equal(plan.accepted.length, 4);
+    assert.equal(plan.rejected.length, 0);
+  });
+
+  test("X + 4 JPEG is allowed", () => {
+    const plan = addWithEffective(
+      [JPEG, JPEG, JPEG, JPEG],
+      ["x-1"],
+      ACCOUNTS
+    );
+    assert.equal(plan.rejected.length, 0);
+    assert.equal(plan.accepted.length, 4);
+  });
+
+  test("X + TikTok + 4 JPEG is allowed, PNG is blocked", () => {
+    const all = [...ACCOUNTS, TIKTOK];
+    const ok = addWithEffective(
+      [JPEG, JPEG, JPEG, JPEG],
+      ["x-1", "tt-1"],
+      all
+    );
+    assert.equal(ok.rejected.length, 0);
+    assert.equal(ok.accepted.length, 4);
+    const png = addWithEffective([PNG], ["x-1", "tt-1"], all);
+    assert.equal(png.accepted.length, 0);
+    assert.equal(png.rejected.length, 1);
+    assert.match(png.rejected[0]?.error ?? "", /does not support/);
+  });
+
+  test("X + Instagram + 2 images: second is blocked by count", () => {
+    const all = [...ACCOUNTS, INSTAGRAM];
+    const plan = addWithEffective([JPEG, JPEG], ["x-1", "ig-1"], all);
+    assert.equal(plan.accepted.length, 1);
+    assert.equal(plan.rejected.length, 1);
+    assert.match(
+      plan.rejected[0]?.error ?? "",
+      /supports at most 1 media item/
+    );
+  });
+
+  test("Instagram + Threads + 2 images: second is blocked by count", () => {
+    const all = [...ACCOUNTS, INSTAGRAM];
+    const plan = addWithEffective(
+      [JPEG, JPEG],
+      ["ig-1", "threads-1"],
+      all
+    );
+    assert.equal(plan.accepted.length, 1);
+    assert.equal(plan.rejected.length, 1);
+    assert.match(
+      plan.rejected[0]?.error ?? "",
+      /supports at most 1 media item/
+    );
+  });
+
+  test("Instagram + GIF is blocked by MIME", () => {
+    const all = [...ACCOUNTS, INSTAGRAM];
+    const plan = addWithEffective([GIF], ["ig-1"], all);
+    assert.equal(plan.accepted.length, 0);
+    assert.match(plan.rejected[0]?.error ?? "", /does not support/);
+  });
+
+  test("X + video + photo is blocked as mixed media", () => {
+    const plan = addWithEffective([PNG, MP4], ["x-1"], ACCOUNTS);
+    assert.equal(plan.accepted.length, 1);
+    assert.equal(plan.rejected.length, 1);
+    assert.match(plan.rejected[0]?.error ?? "", /mixing photos and videos/);
+  });
+
+  test("X + 2 videos is blocked as multiple videos", () => {
+    const plan = addWithEffective([MP4, MP4], ["x-1"], ACCOUNTS);
+    assert.equal(plan.accepted.length, 1);
+    assert.equal(plan.rejected.length, 1);
+    assert.match(plan.rejected[0]?.error ?? "", /only one video per post/);
+  });
+
+  test("existing video blocks a new photo on X (no auto-removal, add refused)", () => {
+    const plan = addWithEffective([PNG], ["x-1"], ACCOUNTS, [
+      { type: "VIDEO", mimeType: "video/mp4" },
+    ]);
+    assert.equal(plan.accepted.length, 0);
+    assert.match(plan.rejected[0]?.error ?? "", /mixing photos and videos/);
+  });
+
+  test("Threads + WebM is blocked by MIME", () => {
+    const plan = addWithEffective(
+      [{ name: "clip.webm", type: "video/webm", size: 1024 }],
+      ["threads-1"],
+      ACCOUNTS
+    );
+    assert.equal(plan.accepted.length, 0);
+    assert.match(plan.rejected[0]?.error ?? "", /does not support/);
+  });
+
+  test("TikTok + MOV is allowed", () => {
+    const plan = addWithEffective([MOV], ["tt-1"], [TIKTOK]);
+    assert.equal(plan.accepted.length, 1);
+    assert.equal(plan.rejected.length, 0);
+  });
+
+  test("size is NOT blocked at add time (preview layer owns it)", () => {
+    const bigJpeg = { name: "photo.jpg", type: "image/jpeg", size: 6 * 1024 * 1024 };
+    const plan = addWithEffective([bigJpeg], ["x-1"], ACCOUNTS);
+    assert.equal(plan.rejected.length, 0);
+    assert.equal(plan.accepted.length, 1);
+  });
+
+  test("effective count gate stays atomic when the legacy count overflows", () => {
+    // existingCount without item detail (legacy caller shape): the single
+    // candidate is structurally fine for Instagram, but 1 existing + 1 new
+    // exceeds the effective max of 1 → limitExceeded, nothing added.
+    const all = [...ACCOUNTS, INSTAGRAM];
+    const plan = planMediaAdd({
+      files: [JPEG],
+      existingCount: 1,
+      maxMedia: 4,
+      selectedAccountIds: ["ig-1"],
+      accounts: all,
+      effective: effectiveFor(["ig-1"], all),
+    });
+    assert.equal(plan.limitExceeded, true);
+    assert.equal(plan.rejected.length, 0);
   });
 });

@@ -175,7 +175,7 @@ export function HowItWorks() {
                 className={cn(
                   "group relative min-w-0 rounded-xl border p-2.5 text-left outline-none transition-colors duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:p-4",
                   isActive
-                    ? "border-foreground/20 bg-card"
+                    ? "border-strong bg-card"
                     : "border-transparent hover:bg-muted/60"
                 )}
               >

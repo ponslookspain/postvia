@@ -36,7 +36,7 @@ const badgeVariants = cva(
 			color: {
 				primary: "",
 				error: "",
-				neutral: "bg-elevation-raised border-overlay-12",
+				neutral: "bg-card border-overlay-12",
 			},
 		},
 		defaultVariants: {
@@ -72,7 +72,7 @@ const badgeVariants = cva(
 			{
 				variant: "outline",
 				color: "error",
-				className: "text-error border border-error-border bg-transparent",
+				className: "text-error-text border border-error-border bg-transparent",
 			},
 			{
 				variant: "outline",
@@ -83,17 +83,17 @@ const badgeVariants = cva(
 			{
 				variant: "soft",
 				color: "primary",
-				className: "bg-accent text-primary border-overlay-8",
+				className: "bg-muted text-primary border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "error",
-				className: "bg-error-accent text-error border-overlay-8",
+				className: "bg-error-accent text-error-text border-overlay-8",
 			},
 			{
 				variant: "soft",
 				color: "neutral",
-				className: "bg-accent text-foreground border-overlay-8",
+				className: "bg-muted text-foreground border-overlay-8",
 			},
 		],
 	}
@@ -115,6 +115,7 @@ function Badge({
 	if (asChild) {
 		return (
 			<Slot
+				data-slot="badge"
 				className={cn(badgeVariants({ variant, size, color }), className)}
 				{...props}>
 				{children}
@@ -124,6 +125,7 @@ function Badge({
 
 	return (
 		<span
+			data-slot="badge"
 			className={cn(badgeVariants({ variant, size, color }), className)}
 			{...props}>
 			{wrappedChildren}

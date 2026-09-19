@@ -114,65 +114,109 @@ both themes because they stay legible on either canvas.
 Surfaces, Borders and Elevation are tone decisions rather than raw scales,
 so they live in the semantic layer.
 
+### Tonal scales (Color System 2.0 — Phase 2 mapped)
+
+Six PostVIA-owned tonal scales in `foundations.css`, consumed ONLY by
+`semantic.css` (§2). Each scale follows the 1 → 12 progression
+(1 whisper · 2 very subtle · 3 soft surface · 4 hover · 5 active ·
+6 subtle border · 7 border · 8 strong border/input · 9 solid ·
+10 solid hover · 11 accessible text · 12 strongest text).
+
+| Scale | Hue family | Materialized steps | Semantic consumers |
+| --- | --- | --- | --- |
+| `paper` | neutral / warm | 1, 2, 3, 4, 5, 6, 7, 8, 11, 12 | background(1) · panel(2) · card(3) · popover(4) · border-subtle(5) · border(6) · border-strong(7) · input(8) |
+| `signal` | brand blue | 3, 7, 9, 11 | primary-soft / -border / solid / -text + ring + info solid |
+| `moss` | success green | 3, 7, 9, 11 | success-accent(soft) / -border / solid / -text |
+| `harvest` | warning amber | 3, 7, 9, 11 | warning-accent(soft) / -border / solid / -text |
+| `clay` | error red | 3, 7, 9, 11 | error-accent(soft) / -border / solid / -text |
+| `sky` | info blue | 3, 7, 11 | info-accent(soft) / -border (solid and text share the brand `signal` steps; `sky-9` removed in Phase 5, zero consumers) |
+
+Rules: steps are plain `:root` / `.dark` properties (not `@theme`
+`--color-*` entries), so Tailwind emits no utilities for them and components
+cannot consume them directly. Unmaterialized steps (10, 12 on hue scales,
+and the rest) stay reserved; they can be added later without renumbering.
+Values are PostVIA-owned OKLCH picks, not copied from any external palette.
+`signal-9` and `harvest-9` carry computed WCAG gates (see `semantic.css`):
+link-text 4.89 and warning-ink-on-solid 4.60, both above their predecessors.
+
 ## 2. Semantic tokens — canonical
 
 Each row is a Tailwind utility family (`bg-*`, `text-*`, `border-*`, …).
 
 | Group | Token | Light | Dark |
 | --- | --- | --- | --- |
-| Background | `--background` | `#F5F4EE` | `#262624` |
+| Background | `--background` | → `paper-1` (≈ `#F5F4EE`) | → `paper-1` (≈ `#262624`) |
 | Foreground | `--foreground` | `#20201E` | `#F5F4EE` |
 | Muted | `--muted` | `#E7E5DE` | `#38362F` |
-| Muted | `--muted-foreground` | `#77766F` | `#A4A39D` |
-| Panel | `--panel` | `#F0EFEB` | `#222120` |
+| Muted | `--muted-foreground` | `#65645D` | `#B3B2AC` |
+| Panel | `--panel` | → `paper-2` (≈ `#F7F6F0`) | → `paper-2` (≈ `#2A2927`) |
 | Panel | `--panel-foreground` | → `--foreground` | → `--foreground` |
-| Surface | `--card` / `--card-foreground` | `#FAF9F5` / `#20201E` | `#2C2C2B` / `#F5F4EE` |
-| Surface | `--popover` / `--popover-foreground` | `#FAF9F5` / `#20201E` | `#2C2C2B` / `#F5F4EE` |
-| Elevation | `--elevation-sunken / -surface / -raised / -overlay` | → `muted / panel / card / popover` | same aliases |
-| Border | `--border` | `#E3E2DE` | `#34332F` |
-| Border | `--input` | `#DEDCD5` | `#3A3935` |
-| Border | `--ring` | `#2971C6` | `#5FA1F3` |
-| Primary | `--primary` / `--primary-foreground` | `#2971C6` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
-| Success | `--success` / `--success-foreground` | `#2F8F5B` / `#FFFFFF` | `#69B887` / `#102217` |
-| Warning | `--warning` / `--warning-foreground` | `#C58A24` / `#3D2C0E` | `#D6A64A` / `#261D0D` |
-| Error | `--error` / `--error-foreground` | `#C84B4B` / `#FFFFFF` | `#E06A6A` / `#260F0F` |
-| Info | `--info` / `--info-foreground` | `#2971C6` / `#FFFFFF` | `#5FA1F3` / `#0F0F0E` |
+| Surface | `--card` / `--card-foreground` | → `paper-3` (≈ `#FAF9F5`) / `#20201E` | → `paper-3` (≈ `#2D2C2B`) / `#F5F4EE` |
+| Surface | `--popover` / `--popover-foreground` | → `paper-4` (≈ `#FCFBF7`) / `#20201E` | → `paper-4` (≈ `#302F2C`) / `#F5F4EE` |
+| Elevation | `--elevation-sunken / -surface / -raised / -overlay` | → `muted / panel / card / popover` | same aliases (raised ≠ overlay since Phase 2) |
+| Border | `--border-subtle` / `--border` / `--border-strong` | → `paper-5 / -6 / -7` | → `paper-5 / -6 / -7` |
+| Border | `--input` | → `paper-8` | → `paper-8` |
+| Border | `--ring` | → `signal-9` | → `signal-9` |
+| Switch | `--switch-thumb` | `#FFFFFF` (both themes — the knob stays light for track contrast) | `#FFFFFF` |
+| Primary | `--primary` / `--primary-foreground` | → `signal-9` / `#FFFFFF` | → `signal-9` / `#0F0F0E` |
+| Primary | `--primary-soft` / `--primary-border` / `--primary-text` | → `signal-3 / -7 / -11` | → `signal-3 / -7 / -11` |
+| Success | `--success` / `--success-foreground` | → `moss-9` / `#FFFFFF` | → `moss-9` / `#102217` |
+| Warning | `--warning` / `--warning-foreground` | → `harvest-9` / `#3D2C0E` | → `harvest-9` / `#261D0D` |
+| Error | `--error` / `--error-foreground` | → `clay-9` / `#FFFFFF` | → `clay-9` / `#260F0F` |
+| Info | `--info` / `--info-foreground` | → `signal-9` / `#FFFFFF` | → `signal-9` / `#0F0F0E` |
+| Status steps | `<status>-accent / -border / -text` | → step `3 / 7 / 11` of its scale | → step `3 / 7 / 11` of its scale |
 | Navigation | `--sidebar`, `--sidebar-foreground`, `--sidebar-primary(-foreground)`, `--sidebar-accent(-foreground)`, `--sidebar-border`, `--sidebar-ring` | rail one shade off the page | rail one shade off the page |
 
 Meaning, in one line each:
 
-- **Background** — the page canvas.
+- **Background** — the page canvas (`paper-1`).
 - **Foreground / Muted** — ink, and its quiet counterpart for metadata.
-- **Panel** — a block on the page: one shade off the canvas, **no outline**.
-  A block nested inside a panel goes the other way (`bg-background`) so it
-  reads as inset.
-- **Surface** — `card` is a block that may lift; `popover` is genuinely
-  floating UI and is the only tier where a shadow is allowed.
+- **Panel** — a block on the page (`paper-2`): one rung above the canvas,
+  **no outline**. A block nested inside a panel goes the other way
+  (`bg-background`) so it reads as inset.
+- **Surface** — `card` (`paper-3`) is a block that may lift; `popover`
+  (`paper-4`) is genuinely floating UI and is the only tier where a shadow
+  is allowed. Tiers lighten monotonically from the canvas in both themes.
 - **Elevation** — PostVIA elevates by **tone**, not shadow. The four-step
   ladder above is the whole elevation system.
-- **Border** — hairlines for structural splits only. An outline on a block
-  is an accent, never a default.
-- **Primary** — one brand hue (PostVIA Blue #2971C6 / #5FA1F3),
-  reserved for primary actions, active navigation, selected tabs, links,
-  focus and main CTAs. Red is reserved for error/destructive only.
+- **Border** — `border-subtle` / `border` are hairlines for structural
+  splits only; `border-strong` / `input` are functional edges. An outline
+  on a block is an accent, never a default.
+- **Primary** — one brand hue (`signal-9` solid, `signal-11` text,
+  `signal-3` soft, `signal-7` border), reserved for primary actions,
+  active navigation, selected tabs, links, focus and main CTAs. Red is
+  reserved for error/destructive only. The old near-duplicate `#2971C6`
+  (`ring`, `info`, `sidebar-*`) is unified onto `signal-9`.
 - **Success / Warning / Error / Info** — status hues live in dots and badges
-  only. `info` is the SCHEDULED state: a routine future-dated post must not
-  look like an alert.
+  only. `info` is the brand solid: the SCHEDULED state is a routine
+  future-dated post and must not look like an alert. Soft/border/text steps
+  come from `moss` / `harvest` / `clay` / `sky`, hand-tuned per theme.
+- **Status text inks** — the ONLY status colours allowed for running text:
+  step 11 of each scale. The base solids are fills and dots (exempt from
+  text contrast). Status chips (`StatusBadge`) use canonical
+  `bg-*-accent` + `border-*-border` shells (no `/10` · `/30` opacity
+  recipe) and keep the label in neutral `text-foreground`.
 
 ### Legacy aliases (canonical layer, deprecated names)
 
-Aliases, never values. Each resolves to a canonical token, so there is one
-place to change.
-
-| Legacy | Resolves to | Use instead | Why it is still here |
-| --- | --- | --- | --- |
-| `--accent` | `--muted` | `--muted` | Held a value identical to `--muted` in both themes; the neutral fill step |
+None remain — every legacy name below was removed once repo-wide usage
+analysis showed zero consumers. Each removal was a pure deletion with no
+call-site change.
 
 Removed (zero consumers, verified repo-wide): `--destructive` (the token;
 `variant="destructive"` remains live as Button API and maps directly to
 `--error`), `--signal` / `--signal-foreground` (the SCHEDULED state they
-once named now uses `--info`), `--secondary` / `--secondary-foreground`, and
-`--accent-foreground`.
+once named now uses `--info`), `--secondary` / `--secondary-foreground`,
+`--accent-foreground`, and `--accent` (value-identical to `--muted` in both
+themes; Phase 3 moved every consumer to `--muted`, Phase 5 removed the
+alias and its `--color-accent` exposure).
+
+Also removed in Phase 5 (zero consumers, verified repo-wide):
+`success-` / `warning-` / `info-focus` and `success-` / `warning-` /
+`info-hover` (definitions and `@theme` exposures). Kept: `error-focus`
+(invalid-field rings in `Input` / `TextArea`) and `error-hover`
+(destructive `Button`). Kept as documented vocabulary despite no current
+component consumer: `border-subtle`, `border-strong`.
 
 ## 3. Historical: the Radian name mapping (removed)
 
@@ -201,13 +245,13 @@ reference a Radian name can be read against today's system.
 | `sidebar-fg` / `sidebar-accent-fg` | `sidebar-foreground` / `sidebar-accent-foreground` |
 | `font-body` | `font-sans` |
 
-Two genuine gaps outlive the compat file, now recorded directly against
-`semantic.css` — closing either is a design decision with a visual
-consequence, not a rename: `--muted`/`--accent` still stand in for
-Radian's four-step `fill1`–`fill4` ramp (PostVIA uses two steps, not
-four), and `--elevation-raised` still covers both of Radian's `level1`
-and `level2` (`card` and `popover` are the same colour in both themes
-today).
+One genuine gap outlives the compat file, recorded directly against
+`semantic.css` — closing it is a design decision with a visual
+consequence, not a rename: `--muted` stands in for Radian's four-step
+`fill1`–`fill4` ramp (PostVIA uses two steps, not four). The second gap is
+closed: `--elevation-raised` and `--elevation-overlay` are distinct tones
+(`card` ≠ `popover`) since Color System 2.0 Phase 2, and the `--accent`
+alias that shared the first gap is removed (Phase 5).
 
 ## 4. Components
 
@@ -220,16 +264,16 @@ records each component's current public API.
 
 | Target component | File | API notes |
 | --- | --- | --- |
-| Button | `ui/button.tsx` | Direct PostVIA contract: `variant` `default / secondary / outline / ghost / destructive / link` (`destructive` maps to `--error`), `size` `default / sm / lg / icon-sm`. History: a `POSTVIA_VARIANT_MAP / POSTVIA_SIZE_MAP / POSTVIA_SIZE_FIXES` layer used to translate these onto an internal Radian-style axis, with extra `xs / icon / icon-xs / icon-lg` sizes and `glossy / smooth` variants — all unreachable (zero call sites) and removed; the remaining class sets are unchanged. `render` (BaseUI composition) and `nativeButton` (accepted, never rendered). Geometry: always `rounded-full`. |
+| Button | `ui/button.tsx` | Direct PostVIA contract: `variant` `default / secondary / outline / ghost / destructive / link` (`destructive` maps to `--error`), `size` `default / sm / lg / icon-sm`. Composition is `asChild` only (a `Link` child receives the classes via Slot) — the legacy `render` / `nativeButton` props were removed once every call site migrated. History: a `POSTVIA_VARIANT_MAP / POSTVIA_SIZE_MAP / POSTVIA_SIZE_FIXES` layer used to translate these onto an internal Radian-style axis, with extra `xs / icon / icon-xs / icon-lg` sizes and `glossy / smooth` variants — all unreachable (zero call sites) and removed; the remaining class sets are unchanged. There is no `loading` prop — async actions compose `Spinner + data-icon + disabled`. Geometry: always `rounded-full`. |
 | Input | `ui/input.tsx` | numeric sizes; `InputGroup` chrome |
 | Textarea | `ui/text-area.tsx` | previous defaults preserved (`min-h-16`, `resize-none`) |
 | Select | `ui/select.tsx` | trigger kept `w-fit` pill |
 | Checkbox | `ui/checkbox.tsx` | — |
-| Radio | `ui/radio-group.tsx` | — |
+| Radio | `ui/radio-group.tsx` | Library surface, currently unused in app — onboarding plan choice uses validated native `fieldset`/`radio` inputs (keyboard: one Tab stop, arrows move, no JS key handling; covered by `tests/e2e/a11y.spec.ts`) |
 | Switch | `ui/switch.tsx` | — |
-| Badge | `ui/badge.tsx` | `variant` `strong / outline / soft`, `size` `20 / 24`, semantic `color` `primary / error / neutral` (default); `BadgeDot`. Post statuses go through the `StatusBadge` domain gateway, never through a Badge color. History: the color axis spanned the full 17-hue palette plus `info / success / warning`, and a `28` size existed — zero call sites, removed. |
+| Badge | `ui/badge.tsx` | `variant` `strong / outline / soft`, `size` `20 / 24`, semantic `color` `primary / error / neutral` (default); `BadgeDot`. Post statuses go through the `StatusBadge` domain gateway, never through a Badge color — and `StatusBadge` labels are neutral `text-foreground` (hue lives in the dot + tinted shell, which passes 4.5:1 where colored running text did not). History: the color axis spanned the full 17-hue palette plus `info / success / warning`, and a `28` size existed — zero call sites, removed. |
 | Avatar | `ui/avatar.tsx` | default 32px (`size-8`); `data-size` drives `AvatarBadge`; PostVIA extension layer preserved verbatim. `AvatarFallback` tint axis narrowed to the four product hues (`red / emerald / amber / light-blue`); the default is muted monochrome. |
-| Tabs | `ui/tabs.tsx` | URL-driven links for status filters |
+| Tabs | `ui/tabs.tsx` | URL-driven links for status filters. `TabsTrigger asChild` strips the button-only `type` attribute (an `<a type="button">` is invalid HTML); URL-driven tab lists set `aria-controls={undefined}` because there is no tabpanel element (the filtered page is the panel) — arrow-key travel between triggers keeps working |
 | Tooltip | `ui/tooltip.tsx` | — |
 | Dropdown | `ui/dropdown-menu.tsx` | — |
 | Dialog | `ui/dialog.tsx`, `ui/drawer.tsx`, `ui/popover.tsx` | — |
