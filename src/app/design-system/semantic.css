@@ -90,8 +90,11 @@
 	   functional field edge and the strongest neutral edge. `ring` is the
 	   focus ring (brand hue, Group C). Decorative hairlines are exempt
 	   from 3:1; functional edges (`input`, `ring`, invalid states) are
-	   not. `border-subtle` / `border-strong` have no component consumers
-	   yet — Phase 3 wiring targets. The default border colour is applied
+	   not. `border-subtle` wires structural splits nested inside a raised
+	   surface (`Channels`, `PostsList`'s header/footer rows); `border-strong`
+	   wires a neutral hover/active emphasis that used to be an ad-hoc
+	   `border-foreground/NN` ink alpha (`BulkScheduler`'s interval pills,
+	   `HowItWorks`'s active step). The default border colour is applied
 	   in `@layer base` (`globals.css`) — never as an unlayered `*` rule,
 	   which would outrank and silently disable every `border-*` utility. */
 	--border-subtle: var(--paper-5);
@@ -249,7 +252,12 @@
 	--sidebar: #1f1e1d;
 	--sidebar-foreground: #e6e5df;
 	--sidebar-primary-foreground: #0f0f0e;
-	--sidebar-accent: #0f0f0e;
+	/* Was #0f0f0e -- darker than the page canvas (#2c2b27), so the
+	   active nav pill read as a hole cut into the rail rather than a
+	   lift off it (inverse of light, where the pill lightens off the
+	   rail). oklch(0.33 0.009 95) is a quiet lift, +9.35 L* above the
+	   #1f1e1d rail, with sidebar-accent-foreground still at 11.12:1. */
+	--sidebar-accent: oklch(0.33 0.009 95);
 	--sidebar-accent-foreground: #f5f4ee;
 	--sidebar-border: var(--border);
 }
@@ -334,4 +342,25 @@
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ----------------------------------------------------------------------------
+   `border-subtle` / `border-strong` — explicit utility fallback
+   ----------------------------------------------------------------------------
+   Tailwind v4 derives a color utility's class name by taking the FULL
+   remainder of the theme variable's name after `--color-` and prefixing it
+   with the property: `--color-error-border` -> `border-error-border`. For
+   `--color-border-subtle` / `--color-border-strong` that remainder is
+   itself "border-subtle" / "border-strong", so the automatic utility is
+   `.border-border-subtle` / `.border-border-strong` -- never the
+   `border-subtle` / `border-strong` class every call site actually writes.
+   The automatic utility silently compiles to nothing for the class name in
+   use, the same failure mode as the removed `--elevation-*` aliases.
+   `@utility` declares the exact class by hand instead of relying on the
+   naming convention; the token itself is unchanged. */
+@utility border-subtle {
+	border-color: var(--color-border-subtle);
+}
+@utility border-strong {
+	border-color: var(--color-border-strong);
 }

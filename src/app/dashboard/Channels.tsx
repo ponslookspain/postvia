@@ -20,7 +20,7 @@ export function Channels({ rows }: { rows: ChannelRow[] }) {
     );
   }
   return (
-    <ul className="flex flex-col gap-1 border-t border-border pt-1">
+    <ul className="flex flex-col gap-1 border-t border-subtle pt-1">
       {rows.map((row) => (
         <li key={row.platform} className="flex items-center gap-3 py-2">
           <Avatar className="size-9 shrink-0">
