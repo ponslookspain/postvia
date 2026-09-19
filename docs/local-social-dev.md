@@ -93,13 +93,16 @@ THREADS_APP_ID= / THREADS_APP_SECRET=
 TIKTOK_CLIENT_KEY= / TIKTOK_CLIENT_SECRET=
 INSTAGRAM_APP_ID= / INSTAGRAM_APP_SECRET=
 
-# Media storage (Vercel Blob). Production gets its store binding from the
-# platform; locally you MUST provide a read-write token, otherwise every
-# upload fails with "Failed to retrieve the presigned URL" (server log:
-# "No blob credentials found"). A short-lived VERCEL_OIDC_TOKEN alone is
-# NOT sufficient (it expires and carries no store binding).
+# Media storage (Vercel Blob). Required everywhere, including Production
+# and Preview on Vercel — do NOT assume the platform's OIDC binding covers
+# this: on postvia, connecting the store to the project exposed only
+# BLOB_STORE_ID/BLOB_WEBHOOK_PUBLIC_KEY, and VERCEL_OIDC_TOKEN never showed
+# up at runtime even with autoExposeSystemEnvs + oidcTokenConfig enabled
+# and the project redeployed (root-caused a production media-upload outage,
+# 2026-09-19). Without this token every upload fails with "Failed to
+# retrieve the presigned URL" (server log: "No blob credentials found").
 # Obtain: Vercel Dashboard → Storage → Blob store → create a Read-Write
-# token (prefer a separate dev store; never commit the value):
+# token (prefer a separate dev store locally; never commit the value):
 BLOB_READ_WRITE_TOKEN=
 
 # Webhook verification key for the SAME dev store (the SDK requires it
