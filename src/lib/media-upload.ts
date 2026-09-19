@@ -28,9 +28,9 @@ import {
 import {
   logDiagnostic,
   logErrorDiagnostic,
-  mediaTrace,
   safePathname,
 } from "@/lib/diagnostics";
+import { mediaTrace } from "@/lib/diagnostics-server";
 import type { ErrorCode } from "@/lib/errors/codes";
 
 /**
