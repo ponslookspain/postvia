@@ -40,8 +40,13 @@
 	--muted-foreground: #65645d;
 
 	/* —— Muted ————————————————————————————————————————————————————————————
-	   The neutral fill: hovers, inset wells, disabled chrome. */
-	--muted: #e7e5de;
+	   The neutral fill: hovers, inset wells, disabled chrome — the one
+	   SUNKEN rung of the surface ladder (`paper-0`), below the canvas.
+	   Was a hand-written literal (`#e7e5de`) until this fix; unchanged in
+	   practice in light (ΔL* from card: -5.43 before, -5.51 after) but the
+	   dark literal it replaces had drifted onto the Phase 2 card value —
+	   see `foundations.css`'s `paper-0` comment. */
+	--muted: var(--paper-0);
 
 	/* —— Panel ————————————————————————————————————————————————————————————
 	   A block on the page (`paper-2`): one rung above the canvas and carrying
@@ -55,21 +60,26 @@
 	   Raised and floating surfaces. `card` (`paper-3`) is a block that may
 	   lift off the page; `popover` (`paper-4`) is genuinely floating UI
 	   (popover, dialog, drawer, toast, select menu), one rung above card,
-	   and is the only tier where a shadow is allowed. */
+	   and is the only tier where a shadow is allowed. `-foreground` on both
+	   is an alias to `--foreground` (was a byte-identical literal in both
+	   themes — a value is written down exactly once, per the file's own
+	   rule at the top). */
 	--card: var(--paper-3);
-	--card-foreground: #20201e;
+	--card-foreground: var(--foreground);
 	--popover: var(--paper-4);
-	--popover-foreground: #20201e;
+	--popover-foreground: var(--foreground);
 
 	/* —— Elevation ————————————————————————————————————————————————————————
-	   PostVIA elevates by TONE, not by shadow. The ladder below is the whole
-	   elevation system; `shadow-md` / `shadow-lg` are reserved for the
-	   floating tier and are applied by the primitives themselves. Each rung
-	   is now a distinct tone (raised ≠ overlay). */
-	--elevation-sunken: var(--muted);
-	--elevation-surface: var(--panel);
-	--elevation-raised: var(--card);
-	--elevation-overlay: var(--popover);
+	   PostVIA elevates by TONE, not by shadow: sunken (`muted`) → surface
+	   (`panel`) → raised (`card`) → overlay (`popover`), each a distinct
+	   tone. `shadow-md` / `shadow-lg` are reserved for the floating tier and
+	   are applied by the primitives themselves. There used to be a parallel
+	   `--elevation-*` alias set naming these four rungs, but it was never
+	   exposed under `--color-*` in the `@theme inline` block below, so
+	   `bg-elevation-raised` (and friends) compiled to nothing everywhere it
+	   was used — a second, non-functional vocabulary for the same four
+	   tokens. Removed; call sites now name the tier directly
+	   (`bg-muted` / `bg-panel` / `bg-card` / `bg-popover`). */
 
 	/* —— Border ———————————————————————————————————————————————————————————
 	   Four neutral edge roles on the `paper` ramp, weakest first.
@@ -80,8 +90,11 @@
 	   functional field edge and the strongest neutral edge. `ring` is the
 	   focus ring (brand hue, Group C). Decorative hairlines are exempt
 	   from 3:1; functional edges (`input`, `ring`, invalid states) are
-	   not. `border-subtle` / `border-strong` have no component consumers
-	   yet — Phase 3 wiring targets. The default border colour is applied
+	   not. `border-subtle` wires structural splits nested inside a raised
+	   surface (`Channels`, `PostsList`'s header/footer rows); `border-strong`
+	   wires a neutral hover/active emphasis that used to be an ad-hoc
+	   `border-foreground/NN` ink alpha (`BulkScheduler`'s interval pills,
+	   `HowItWorks`'s active step). The default border colour is applied
 	   in `@layer base` (`globals.css`) — never as an unlayered `*` rule,
 	   which would outrank and silently disable every `border-*` utility. */
 	--border-subtle: var(--paper-5);
@@ -147,7 +160,12 @@
 	--error-accent: var(--clay-3);
 	--error-focus: color-mix(in srgb, var(--error) 18%, var(--card));
 	--error-border: var(--clay-7);
-	--error-hover: color-mix(in srgb, var(--error) 88%, black);
+	/* Mixes toward --foreground, not literal black: darkens in light
+	   (same as before) and LIGHTENS in dark, since --foreground is dark
+	   text there. Mixing toward black in both themes had the destructive
+	   Button's hover state darken an already light-on-dark hue in dark
+	   -- reducing contrast on hover instead of increasing it. */
+	--error-hover: color-mix(in srgb, var(--error) 88%, var(--foreground));
 	--info-accent: var(--sky-3);
 	--info-border: var(--sky-7);
 
@@ -160,6 +178,14 @@
 	--overlay-4: color-mix(in oklch, var(--foreground) 4%, transparent);
 	--overlay-8: color-mix(in oklch, var(--foreground) 8%, transparent);
 	--overlay-12: color-mix(in oklch, var(--foreground) 12%, transparent);
+
+	/* --overlay-scrim is a different job: a modal/drawer backdrop that has
+	   to read consistently over ARBITRARY page content in either theme, not
+	   a tint mixed from --foreground onto a known surface. Stays literal
+	   black at 50% (unchanged from the two bg-black/50 call sites it
+	   replaces) -- named so it is no longer an untokenised colour literal
+	   duplicated across Dialog and Drawer. */
+	--overlay-scrim: color-mix(in oklab, black 50%, transparent);
 
 	/* —— Switch thumb ————————————————————————————————————————————————————
 	   The switch knob rides on neutral and brand tracks in both states, so
@@ -178,7 +204,10 @@
 	--sidebar-primary-foreground: #ffffff;
 	--sidebar-accent: #e9e6dc;
 	--sidebar-accent-foreground: #20201e;
-	--sidebar-border: #e3e2de;
+	/* Was its own literal (#e3e2de), pre-dating Phase 2's --border
+	   remap onto paper-6 -- an accidental fifth border tone on the
+	   rail. Aliased so the rail edge tracks --border again. */
+	--sidebar-border: var(--border);
 	--sidebar-ring: var(--signal-9);
 
 	/* —— Legacy aliases ———————————————————————————————————————————————————
@@ -204,14 +233,14 @@
 	   measured 3.73 effective on cards in 2026-09. */
 	--muted-foreground: #b3b2ac;
 
-	--muted: #38362f;
+	--muted: var(--paper-0);
 
 	--panel: var(--paper-2);
 
 	--card: var(--paper-3);
-	--card-foreground: #f5f4ee;
+	--card-foreground: var(--foreground);
 	--popover: var(--paper-4);
-	--popover-foreground: #f5f4ee;
+	--popover-foreground: var(--foreground);
 
 	--primary-foreground: #0f0f0e;
 
@@ -231,9 +260,14 @@
 	--sidebar: #1f1e1d;
 	--sidebar-foreground: #e6e5df;
 	--sidebar-primary-foreground: #0f0f0e;
-	--sidebar-accent: #0f0f0e;
+	/* Was #0f0f0e -- darker than the page canvas (#2c2b27), so the
+	   active nav pill read as a hole cut into the rail rather than a
+	   lift off it (inverse of light, where the pill lightens off the
+	   rail). oklch(0.33 0.009 95) is a quiet lift, +9.35 L* above the
+	   #1f1e1d rail, with sidebar-accent-foreground still at 11.12:1. */
+	--sidebar-accent: oklch(0.33 0.009 95);
 	--sidebar-accent-foreground: #f5f4ee;
-	--sidebar-border: #34332f;
+	--sidebar-border: var(--border);
 }
 
 /* ----------------------------------------------------------------------------
@@ -303,6 +337,7 @@
 	--color-overlay-4: var(--overlay-4);
 	--color-overlay-8: var(--overlay-8);
 	--color-overlay-12: var(--overlay-12);
+	--color-overlay-scrim: var(--overlay-scrim);
 
 	/* Switch */
 	--color-switch-thumb: var(--switch-thumb);
@@ -316,4 +351,25 @@
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ----------------------------------------------------------------------------
+   `border-subtle` / `border-strong` — explicit utility fallback
+   ----------------------------------------------------------------------------
+   Tailwind v4 derives a color utility's class name by taking the FULL
+   remainder of the theme variable's name after `--color-` and prefixing it
+   with the property: `--color-error-border` -> `border-error-border`. For
+   `--color-border-subtle` / `--color-border-strong` that remainder is
+   itself "border-subtle" / "border-strong", so the automatic utility is
+   `.border-border-subtle` / `.border-border-strong` -- never the
+   `border-subtle` / `border-strong` class every call site actually writes.
+   The automatic utility silently compiles to nothing for the class name in
+   use, the same failure mode as the removed `--elevation-*` aliases.
+   `@utility` declares the exact class by hand instead of relying on the
+   naming convention; the token itself is unchanged. */
+@utility border-subtle {
+	border-color: var(--color-border-subtle);
+}
+@utility border-strong {
+	border-color: var(--color-border-strong);
 }

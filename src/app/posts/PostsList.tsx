@@ -361,7 +361,7 @@ export function PostsList({
         <div className="overflow-hidden rounded-xl bg-card">
           <div
             aria-hidden="true"
-            className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-border bg-muted/40 px-4 py-2.5 text-meta font-medium tracking-wide text-muted-foreground uppercase md:grid"
+            className="hidden grid-cols-[64px_minmax(0,1fr)_150px_140px_120px_44px] items-center gap-4 border-b border-subtle bg-muted/40 px-4 py-2.5 text-meta font-medium tracking-wide text-muted-foreground uppercase md:grid"
           >
             <span>Media</span>
             <span>Content</span>
@@ -463,7 +463,7 @@ export function PostsList({
             ))}
           </ul>
           {cursor || items.length < totalCount ? (
-            <div className="flex flex-col items-center gap-2 border-t border-border bg-muted/30 px-4 py-5">
+            <div className="flex flex-col items-center gap-2 border-t border-subtle bg-muted/30 px-4 py-5">
               <p className="text-xs text-muted-foreground tabular-nums">
                 Showing {items.length} of {totalCount} posts
               </p>

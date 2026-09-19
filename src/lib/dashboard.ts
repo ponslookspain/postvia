@@ -28,7 +28,8 @@ import {
 } from "@/lib/dashboard-analytics";
 import type { Prisma } from "@prisma/client";
 import type { ChannelRow, OutcomeSegment } from "@/lib/dashboard-types";
-import { logDiagnostic, traceUserId } from "@/lib/diagnostics";
+import { logDiagnostic } from "@/lib/diagnostics";
+import { traceUserId } from "@/lib/diagnostics-server";
 import {
   isDashboardTimingEnabled,
   roundMs,

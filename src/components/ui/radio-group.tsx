@@ -20,7 +20,7 @@ type RadioGroupProps = React.ComponentProps<typeof RadioGroupPrimitive.Root> &
 
 const radioItemVariants = cva(
 	cn(
-		"outline-hidden border-input data-[state=checked]:bg-primary disabled:opacity-50 focus-visible:ring-primary focus-visible:ring-offset-bg peer flex aspect-square items-center justify-center rounded-full border transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed data-[state=checked]:border-none",
+		"outline-hidden border-input data-[state=checked]:bg-primary disabled:opacity-50 focus-visible:ring-primary focus-visible:ring-offset-background peer flex aspect-square items-center justify-center rounded-full border transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed data-[state=checked]:border-none",
 		"aria-invalid:border-error aria-invalid:ring-error ",
 		"[[data-invalid=true]_&]:border-error [[data-invalid=true]_&]:ring-error"
 	),

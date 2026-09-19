@@ -59,7 +59,7 @@ const tabsTriggerStyles = cva(
 		variants: {
 			variant: {
 				default:
-					"data-[state=active]:bg-elevation-raised border border-transparent data-[state=active]:border data-[state=active]:border-overlay-8 data-[state=active]:drop-shadow-xs",
+					"data-[state=active]:bg-card border border-transparent data-[state=active]:border data-[state=active]:border-overlay-8 data-[state=active]:drop-shadow-xs",
 				open: "data-[orientation=horizontal]:border-b-2 data-[orientation=vertical]:border-r-2 border-transparent data-[state=active][orientation=horizontal]:border-b-2 data-[state=active][orientation=vertical]:border-r-2 data-[state=active]:border-primary",
 				ghost:
 					"data-[state=active]:bg-muted data-[state=active]:text-primary",

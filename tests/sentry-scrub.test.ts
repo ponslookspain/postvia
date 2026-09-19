@@ -1,15 +1,13 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  mediaTrace,
-  pathDigest,
   reportError,
   scrubRequestPath,
   scrubSentryEvent,
   scrubUrl,
   scrubValue,
-  traceUserId,
 } from "../src/lib/diagnostics";
+import { mediaTrace, pathDigest, traceUserId } from "../src/lib/diagnostics-server";
 
 describe("sentry scrub denylist", () => {
   test("redacts token, password, secret and code keys", () => {

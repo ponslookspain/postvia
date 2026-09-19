@@ -59,6 +59,17 @@ Terminal 1:
 npm run dev      # http://localhost:3000 — the app always runs here
 ```
 
+`dev` / `dev:local` run on **webpack**, not Next 16's Turbopack default
+(`next dev --webpack` under the hood). Turbopack has an outstanding
+upstream Windows bug where it fails to load a project's
+`postcss.config.mjs` (`Cannot find module '@vercel/turbopack/postcss'`,
+every page 500s) — see
+[vercel/next.js#63755](https://github.com/vercel/next.js/issues/63755) and
+[vercel/next.js#96619](https://github.com/vercel/next.js/issues/96619).
+Webpack has no such issue here, so it is the default for everyone until
+that's fixed upstream. macOS/Linux contributors who want Turbopack's
+faster HMR can still run `npx next dev --turbopack` directly.
+
 ## 6. ngrok (only for OAuth/social flows)
 
 Terminal 2:
@@ -137,3 +148,9 @@ process you did not start.
   `Post.clientOperationId` column (schema drift, fixed by migration).
 - Wrong database → compare URL host against the known development
   endpoint before any write; abort on mismatch.
+- `Cannot find module '@vercel/turbopack/postcss'`, every page 500s
+  (`Error evaluating Node.js code` on `globals.css`) → you ran raw
+  `next dev` / `npx next dev` instead of `npm run dev`, so it picked up
+  Next 16's Turbopack default and hit the Windows bug from §5. Use
+  `npm run dev` (or `npx next dev --webpack` if you need the flag
+  by hand).

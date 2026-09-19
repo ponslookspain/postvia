@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils"
 // verified against all call sites (default/h-9, sm/h-8, lg/h-10).
 // Full history in docs/design-tokens.md ("Radian removal").
 const buttonVariants = cva(
-	"inline-flex whitespace-nowrap items-center justify-center box-border focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none hover:cursor-pointer w-fit",
+	"inline-flex whitespace-nowrap items-center justify-center box-border focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none hover:cursor-pointer w-fit",
 	{
 		variants: {
 			variant: {
@@ -25,7 +25,7 @@ const buttonVariants = cva(
 					"bg-muted font-medium text-foreground hover:bg-muted focus-visible:bg-background focus-visible:outline-none focus-visible:ring-border",
 				// Raised surface with a hairline.
 				outline:
-					"bg-elevation-raised font-medium text-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border",
+					"bg-card font-medium text-foreground border border-border hover:bg-overlay-4 focus-visible:ring-border",
 				// Borderless action.
 				ghost:
 					"bg-transparent text-foreground font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-border",
