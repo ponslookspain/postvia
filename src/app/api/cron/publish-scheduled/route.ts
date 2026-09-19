@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { executePublish, resumeJobTarget } from "@/lib/publish";
 import { deleteBlobs, listMediaBlobs } from "@/lib/blob";
 import { sweepOrphanBlobs } from "@/lib/media-cleanup";
+import { MEDIA_RETENTION_MS, sweepPublishedMedia } from "@/lib/media-retention";
+import { reportHeavyStorageUsers } from "@/lib/storage-usage";
 import { reportError } from "@/lib/diagnostics";
 import {
   liveAbuseStores,
@@ -98,6 +100,56 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     reportError("cron", "rate bucket sweep failed", error);
   }
+  // Media retention (storage-cost guard): fully-published posts untouched
+  // for a year lose their original media, freeing the blob. Best-effort,
+  // capped, same contract as the sweeps above — never fails the tick.
+  let mediaRetention = { removed: 0, blobFailures: 0 };
+  try {
+    mediaRetention = await sweepPublishedMedia(
+      retentionCutoff(nowMs, MEDIA_RETENTION_MS),
+      {
+        findEligible: (olderThan, limit) =>
+          prisma.media.findMany({
+            where: { post: { status: "PUBLISHED", updatedAt: { lt: olderThan } } },
+            select: { id: true, pathname: true },
+            take: limit,
+          }),
+        deleteMediaRows: async (ids) => {
+          const result = await prisma.media.deleteMany({
+            where: { id: { in: ids } },
+          });
+          return result.count;
+        },
+        deleteBlobs: (pathnames) => deleteBlobs(pathnames),
+      }
+    );
+  } catch (error) {
+    reportError("cron", "media retention sweep failed", error);
+  }
+  // Storage-usage tripwire: log (never block) accounts heavier than the
+  // diagnostic threshold, so a real per-plan quota can be sized from
+  // actual data instead of a guess. See storage-usage.ts.
+  let heavyStorageUsers = 0;
+  try {
+    const heavy = await reportHeavyStorageUsers({
+      findUsersOverThreshold: async (thresholdBytes, limit) => {
+        const rows = await prisma.media.groupBy({
+          by: ["userId"],
+          _sum: { size: true },
+          having: { size: { _sum: { gte: thresholdBytes } } },
+          orderBy: { _sum: { size: "desc" } },
+          take: limit,
+        });
+        return rows.map((row) => ({
+          userId: row.userId,
+          totalBytes: row._sum.size ?? 0,
+        }));
+      },
+    });
+    heavyStorageUsers = heavy.length;
+  } catch (error) {
+    reportError("cron", "storage usage tripwire failed", error);
+  }
   return NextResponse.json({
     ok: true,
     ...stats,
@@ -106,6 +158,8 @@ async function handleCron(request: NextRequest): Promise<NextResponse> {
     stripeEvents,
     abuseEvents,
     rateBuckets,
+    mediaRetention,
+    heavyStorageUsers,
   });
 }
 

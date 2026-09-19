@@ -374,6 +374,17 @@ WebM is not parsed (variable-length EBML) and is documented as such.
 
 ### Storage quota (priority 4): architecture proposed, limits are yours
 
+**Update — two pieces of this shipped without waiting on the pricing
+decision below:** `src/lib/media-retention.ts` (`sweepPublishedMedia`, wired
+into the cron tick) now removes `Media` rows and their blobs once their post
+is fully `PUBLISHED` and untouched for 12 months — the unbounded-growth case
+this section describes, closed with no schema change (it reuses
+`@@index([status, updatedAt])`, reasoning why in the module's own header).
+`src/lib/storage-usage.ts` (`reportHeavyStorageUsers`) logs, never blocks,
+any account over a 10 GiB tripwire, so the byte-limit decision below can be
+made from real usage data. What is described below — an *enforced* quota
+that rejects an upload — is still not built; it still needs the numbers.
+
 No byte quota exists. Scale is unlimited monthly posts x 4 media x 100 MB,
 forever; Free is up to ~6 GB of permanent storage per identity per month at $0.
 `Media` has no TTL.
@@ -596,7 +607,7 @@ Step 1 is safe today and should not wait for step 2.
 | Video publishing may be killed mid-poll on Hobby | **High** | Same check resolves it. |
 | OAuth tokens plaintext at rest | ~~High~~ | **RESOLVED** — `SocialAccount` via `social-token-crypto.ts`, Better Auth `Account` via `encryptOAuthTokens: true`. Better Auth's own `idToken` column stays unencrypted (short-lived OIDC identity token, not a bearer credential; nothing reads it back). |
 | Production DB pooling unverified | **High** | `docs/DATABASE_POOLING.md`. Demand reduced by P1.7. |
-| No storage quota / no media retention | **High** | Model designed; limits need a product decision. |
+| No storage quota / no media retention | **Medium** | **PARTLY RESOLVED** — `media-retention.ts` now sweeps media on fully-`PUBLISHED` posts untouched for 12 months (cron tick, `sweepPublishedMedia`), and `storage-usage.ts` logs (never blocks) any account over a 10 GiB tripwire so a real per-plan byte quota can be sized from data instead of a guess. A hard enforced quota is still not implemented — that part is still a pricing decision. |
 | No automated production migration gate | **High** | CI drift-check recommended above. |
 | Video accepted with no duration/codec/resolution check | **Medium** | Container check shipped; the rest needs a worker. |
 | X video buffers up to 100 MB | **Medium** | Feasible fix designed, deferred to its own change. |
